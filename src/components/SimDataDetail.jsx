@@ -1,5 +1,5 @@
 import {
-  Typography, Box, Tabs, Tab, TextField, Paper, Accordion, AccordionSummary, AccordionDetails, Switch, Slider, Divider, Radio, RadioGroup, FormControlLabel, FormControl, FormLabel
+  Typography, Box, Tabs, Tab, TextField, Paper, Accordion, AccordionSummary, AccordionDetails, Switch, Slider, Divider, Radio, RadioGroup, FormControlLabel, FormControl, FormLabel, Select, MenuItem, InputLabel
 } from '@mui/material';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import CommentIcon from '@mui/icons-material/Comment';
@@ -43,6 +43,18 @@ const valueToTime = (value) => {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 };
 
+// Hilfsfunktion: Vergleicht zwei Segment-Arrays (Reihenfolge & Werte)
+function segmentsEqual(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b)) return false;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; ++i) {
+    if (a[i].booking_start !== b[i].booking_start || a[i].booking_end !== b[i].booking_end) {
+      return false;
+    }
+  }
+  return true;
+}
+
 // Erstellt eine zusammenfassende Textdarstellung der Buchungszeiten
 function consolidateBookingSummary(times) {
   if (!times || times.length === 0) return 'Keine Zeiten definiert';
@@ -58,15 +70,18 @@ function consolidateBookingSummary(times) {
   let currentGroup = null;
 
   for (const dayTime of relevantTimes) {
-    const timeStr = dayTime.segments.map(s => `${s.booking_start}-${s.booking_end}`).join(', ');
-    if (currentGroup && currentGroup.timeStr === timeStr) {
+    // Vergleiche Segmente als Array, nicht als String!
+    if (
+      currentGroup &&
+      segmentsEqual(currentGroup.segments, dayTime.segments)
+    ) {
       currentGroup.endDay = dayTime.day_name;
     } else {
       if (currentGroup) grouped.push(currentGroup);
       currentGroup = {
         startDay: dayTime.day_name,
         endDay: dayTime.day_name,
-        timeStr: timeStr,
+        segments: dayTime.segments
       };
     }
   }
@@ -74,13 +89,14 @@ function consolidateBookingSummary(times) {
 
   return grouped.map(g => {
     const dayPart = g.startDay === g.endDay ? g.startDay : `${g.startDay}-${g.endDay}`;
-    return `${dayPart} ${g.timeStr}`;
+    const timeStr = g.segments.map(s => `${s.booking_start}-${s.booking_end}`).join(', ');
+    return `${dayPart} ${timeStr}`;
   }).join(', ');
 }
 
 // --- Neue interaktive Komponenten ---
 
-function DayControl({ dayLabel, dayAbbr, dayData, onToggle, onTimeChange, onAddSegment, onRemoveSegment, type }) {
+function DayControl({ dayLabel, dayAbbr, dayData, onToggle, onTimeChange, onAddSegment, onRemoveSegment, onGroupChange, type, allGroups }) {
   const isActive = !!dayData;
   const segments = isActive ? dayData.segments : [];
 
@@ -111,6 +127,21 @@ function DayControl({ dayLabel, dayAbbr, dayData, onToggle, onTimeChange, onAddS
                   ]}
                   sx={{ flex: 1 }}
                 />
+                {/* Gruppenzuordnung nur für Mitarbeiter */}
+                {type === 'capacity' && allGroups && (
+                  <Select
+                    size="small"
+                    value={seg.groupId || ''}
+                    onChange={e => onGroupChange(dayAbbr, idx, e.target.value)}
+                    displayEmpty
+                    sx={{ minWidth: 100 }}
+                  >
+                    <MenuItem value="">Gruppe unverändert</MenuItem>
+                    {Object.entries(allGroups).map(([gid, gname]) => (
+                      <MenuItem key={gid} value={gid}>{gname}</MenuItem>
+                    ))}
+                  </Select>
+                )}
                 {segments.length > 1 && (
                   <button
                     style={{ marginLeft: 4 }}
@@ -120,7 +151,6 @@ function DayControl({ dayLabel, dayAbbr, dayData, onToggle, onTimeChange, onAddS
                 )}
               </Box>
             ))}
-            {/* Button nur für Mitarbeiter (capacity) */}
             {type === 'capacity' && (
               <button onClick={() => onAddSegment(dayAbbr)} style={{ marginTop: 2 }}>+ Zeitbereich</button>
             )}
@@ -131,7 +161,7 @@ function DayControl({ dayLabel, dayAbbr, dayData, onToggle, onTimeChange, onAddS
   );
 }
 
-function BookingAccordion({ booking, index, type }) {
+function BookingAccordion({ booking, index, type, allGroups }) {
   const [bookingState, setBookingState] = useState(booking);
 
   useEffect(() => {
@@ -202,6 +232,23 @@ function BookingAccordion({ booking, index, type }) {
     }));
   };
 
+  const handleGroupChange = (dayAbbr, segIdx, groupId) => {
+    setBookingState(prev => {
+      const newTimes = prev.times.map(t => {
+        if (t.day_name === dayAbbr) {
+          const newSegments = t.segments.map((seg, i) =>
+            i === segIdx
+              ? { ...seg, groupId }
+              : seg
+          );
+          return { ...t, segments: newSegments };
+        }
+        return t;
+      });
+      return { ...prev, times: newTimes };
+    });
+  };
+
   const daysOfWeek = [
     { label: 'Montag', abbr: 'Mo' }, { label: 'Dienstag', abbr: 'Di' },
     { label: 'Mittwoch', abbr: 'Mi' }, { label: 'Donnerstag', abbr: 'Do' },
@@ -258,7 +305,9 @@ function BookingAccordion({ booking, index, type }) {
             onTimeChange={handleTimeChange}
             onAddSegment={handleAddSegment}
             onRemoveSegment={handleRemoveSegment}
+            onGroupChange={handleGroupChange}
             type={type}
+            allGroups={allGroups}
           />
         ))}
       </AccordionDetails>
@@ -266,14 +315,14 @@ function BookingAccordion({ booking, index, type }) {
   );
 }
 
-function BookingCards({ bookings, type }) {
+function BookingCards({ bookings, type, allGroups }) {
   if (!bookings || bookings.length === 0) {
     return <Typography variant="body2" color="text.secondary">Keine Buchungszeiten vorhanden.</Typography>;
   }
   return (
     <Box>
       {bookings.map((booking, idx) => (
-        <BookingAccordion key={idx} booking={booking} index={idx} type={type} />
+        <BookingAccordion key={idx} booking={booking} index={idx} type={type} allGroups={allGroups} />
       ))}
     </Box>
   );
@@ -452,7 +501,7 @@ function SimDataDetail({ item, allGroups }) {
             />
           </Box>
           <Typography variant="h6" sx={{ mt: 1, mb: 1 }}>Buchungszeiten:</Typography>
-          <BookingCards bookings={item.parseddata?.booking} type={item.type} />
+          <BookingCards bookings={item.parseddata?.booking} type={item.type} allGroups={allGroups} />
           <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>Gruppen:</Typography>
           <GroupCards groups={item.parseddata?.group} allGroups={allGroups} />
         </Box>
