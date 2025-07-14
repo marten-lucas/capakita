@@ -80,37 +80,58 @@ function consolidateBookingSummary(times) {
 
 // --- Neue interaktive Komponenten ---
 
-function DayControl({ dayLabel, dayAbbr, dayData, onToggle, onTimeChange }) {
+function DayControl({ dayLabel, dayAbbr, dayData, onToggle, onTimeChange, onAddSegment, onRemoveSegment, type }) {
   const isActive = !!dayData;
-  const sliderValue = isActive ? [timeToValue(dayData.segments[0].booking_start), timeToValue(dayData.segments[0].booking_end)] : [14, 33];
+  const segments = isActive ? dayData.segments : [];
 
   return (
-    <Box display="flex" alignItems="center" gap={2} sx={{ mb: 1 }}>
-      <Typography sx={{ width: 80 }}>{dayLabel}</Typography>
+    <Box display="flex" alignItems="flex-start" gap={2} sx={{ mb: 1 }}>
+      <Typography sx={{ width: 80, mt: 1 }}>{dayLabel}</Typography>
       <Switch checked={isActive} onChange={(e) => onToggle(dayAbbr, e.target.checked)} />
       <Box sx={{ flex: 1, px: 2 }}>
         {isActive && (
-          <Slider
-            value={sliderValue}
-            onChange={(_, newValue) => onTimeChange(dayAbbr, newValue)}
-            min={14} // 07:00
-            max={33} // 16:30
-            step={1}
-            valueLabelFormat={valueToTime}
-            valueLabelDisplay="auto"
-            marks={[
-              { value: 14, label: '07:00' },
-              { value: 24, label: '12:00' },
-              { value: 33, label: '16:30' },
-            ]}
-          />
+          <Box>
+            {segments.map((seg, idx) => (
+              <Box key={idx} display="flex" alignItems="center" gap={1} sx={{ mb: 1 }}>
+                <Slider
+                  value={[
+                    timeToValue(seg.booking_start),
+                    timeToValue(seg.booking_end)
+                  ]}
+                  onChange={(_, newValue) => onTimeChange(dayAbbr, idx, newValue)}
+                  min={0}
+                  max={47}
+                  step={1}
+                  valueLabelFormat={valueToTime}
+                  valueLabelDisplay="auto"
+                  marks={[
+                    { value: 14, label: '07:00' },
+                    { value: 24, label: '12:00' },
+                    { value: 33, label: '16:30' },
+                  ]}
+                  sx={{ flex: 1 }}
+                />
+                {segments.length > 1 && (
+                  <button
+                    style={{ marginLeft: 4 }}
+                    onClick={() => onRemoveSegment(dayAbbr, idx)}
+                    title="Segment entfernen"
+                  >−</button>
+                )}
+              </Box>
+            ))}
+            {/* Button nur für Mitarbeiter (capacity) */}
+            {type === 'capacity' && (
+              <button onClick={() => onAddSegment(dayAbbr)} style={{ marginTop: 2 }}>+ Zeitbereich</button>
+            )}
+          </Box>
         )}
       </Box>
     </Box>
   );
 }
 
-function BookingAccordion({ booking, index }) {
+function BookingAccordion({ booking, index, type }) {
   const [bookingState, setBookingState] = useState(booking);
 
   useEffect(() => {
@@ -123,25 +144,53 @@ function BookingAccordion({ booking, index }) {
       const dayIndex = newTimes.findIndex(t => t.day_name === dayAbbr);
 
       if (isEnabled && dayIndex === -1) {
-        // Tag hinzufügen
         const dayNr = ['Mo', 'Di', 'Mi', 'Do', 'Fr'].indexOf(dayAbbr) + 1;
         newTimes.push({ day: dayNr, day_name: dayAbbr, segments: [{ booking_start: '08:00', booking_end: '16:00' }] });
       } else if (!isEnabled && dayIndex !== -1) {
-        // Tag entfernen
         newTimes.splice(dayIndex, 1);
       }
       return { ...prev, times: newTimes };
     });
   };
 
-  const handleTimeChange = (dayAbbr, newValues) => {
+  // Bugfix: Segmente tief kopieren, damit nur ein Segment hinzugefügt wird
+  const handleAddSegment = (dayAbbr) => {
     setBookingState(prev => {
-      const newTimes = [...prev.times];
-      const day = newTimes.find(t => t.day_name === dayAbbr);
-      if (day) {
-        day.segments[0].booking_start = valueToTime(newValues[0]);
-        day.segments[0].booking_end = valueToTime(newValues[1]);
-      }
+      const newTimes = prev.times.map(t =>
+        t.day_name === dayAbbr
+          ? { ...t, segments: [...t.segments, { booking_start: '13:00', booking_end: '16:00' }] }
+          : t
+      );
+      return { ...prev, times: newTimes };
+    });
+  };
+
+  const handleTimeChange = (dayAbbr, segIdx, newValues) => {
+    setBookingState(prev => {
+      const newTimes = prev.times.map(t => {
+        if (t.day_name === dayAbbr) {
+          const newSegments = t.segments.map((seg, i) =>
+            i === segIdx
+              ? { ...seg, booking_start: valueToTime(newValues[0]), booking_end: valueToTime(newValues[1]) }
+              : seg
+          );
+          return { ...t, segments: newSegments };
+        }
+        return t;
+      });
+      return { ...prev, times: newTimes };
+    });
+  };
+
+  const handleRemoveSegment = (dayAbbr, segIdx) => {
+    setBookingState(prev => {
+      const newTimes = prev.times.map(t => {
+        if (t.day_name === dayAbbr && t.segments.length > 1) {
+          const newSegments = t.segments.filter((_, i) => i !== segIdx);
+          return { ...t, segments: newSegments };
+        }
+        return t;
+      });
       return { ...prev, times: newTimes };
     });
   };
@@ -207,6 +256,9 @@ function BookingAccordion({ booking, index }) {
             dayData={bookingState.times?.find(t => t.day_name === day.abbr)}
             onToggle={handleDayToggle}
             onTimeChange={handleTimeChange}
+            onAddSegment={handleAddSegment}
+            onRemoveSegment={handleRemoveSegment}
+            type={type}
           />
         ))}
       </AccordionDetails>
@@ -214,14 +266,14 @@ function BookingAccordion({ booking, index }) {
   );
 }
 
-function BookingCards({ bookings }) {
+function BookingCards({ bookings, type }) {
   if (!bookings || bookings.length === 0) {
     return <Typography variant="body2" color="text.secondary">Keine Buchungszeiten vorhanden.</Typography>;
   }
   return (
     <Box>
       {bookings.map((booking, idx) => (
-        <BookingAccordion key={idx} booking={booking} index={idx} />
+        <BookingAccordion key={idx} booking={booking} index={idx} type={type} />
       ))}
     </Box>
   );
@@ -400,7 +452,7 @@ function SimDataDetail({ item, allGroups }) {
             />
           </Box>
           <Typography variant="h6" sx={{ mt: 1, mb: 1 }}>Buchungszeiten:</Typography>
-          <BookingCards bookings={item.parseddata?.booking} />
+          <BookingCards bookings={item.parseddata?.booking} type={item.type} />
           <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>Gruppen:</Typography>
           <GroupCards groups={item.parseddata?.group} allGroups={allGroups} />
         </Box>

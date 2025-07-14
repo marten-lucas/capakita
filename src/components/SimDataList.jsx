@@ -31,20 +31,43 @@ function getGroupColor(group) {
 }
 
 function consolidateBookingTimes(booking) {
-  if (!booking || booking.length === 0) return { text: 'Keine Buchungszeiten', hours: 0 };
+  if (!booking || booking.length === 0) return { text: 'Keine Buchungszeiten', hours: 0, segmentsPerDay: {} };
   const dayOrder = ['Mo', 'Di', 'Mi', 'Do', 'Fr'];
   let totalMinutes = 0;
+  const segmentsPerDay = {};
+
   booking.forEach(b => {
     if (b.times && b.times.length > 0) {
       b.times.forEach(dayTime => {
         if (dayOrder.includes(dayTime.day_name)) {
-          const segs = dayTime.segments || [];
+          // --- NEU: Unterstütze auch String-Format wie aus "ZEITEN" ---
+          let segs = [];
+          if (Array.isArray(dayTime.segments)) {
+            segs = dayTime.segments;
+          } else if (typeof dayTime.segments === 'string') {
+            // z.B. "08:30|13:30|16:00|17:00"
+            const parts = dayTime.segments.split('|').filter(Boolean);
+            for (let i = 0; i < parts.length - 1; i += 2) {
+              if (parts[i] && parts[i + 1]) {
+                segs.push({ booking_start: parts[i], booking_end: parts[i + 1] });
+              }
+            }
+          }
+          // Fallback: falls segments leer, prüfe alt: dayTime.start/end
+          if (!segs.length && dayTime.booking_start && dayTime.booking_end) {
+            segs = [{ booking_start: dayTime.booking_start, booking_end: dayTime.booking_end }];
+          }
+          if (!segmentsPerDay[dayTime.day_name]) segmentsPerDay[dayTime.day_name] = [];
           segs.forEach(seg => {
             if (seg.booking_start && seg.booking_end) {
               const [sh, sm] = seg.booking_start.split(':').map(Number);
               const [eh, em] = seg.booking_end.split(':').map(Number);
               const mins = (eh * 60 + em) - (sh * 60 + sm);
               if (mins > 0) totalMinutes += mins;
+              segmentsPerDay[dayTime.day_name].push({
+                start: seg.booking_start,
+                end: seg.booking_end
+              });
             }
           });
         }
@@ -52,7 +75,8 @@ function consolidateBookingTimes(booking) {
     }
   });
   return {
-    hours: (totalMinutes / 60).toFixed(1)
+    hours: (totalMinutes / 60).toFixed(1),
+    segmentsPerDay // z.B. { Mo: [{start, end}, ...], Di: [...] }
   };
 }
 
@@ -79,7 +103,8 @@ function SimDataList({ data, onRowClick, selectedItem }) {
       }}
     >
       {data.map((item) => {
-        const { hours } = consolidateBookingTimes(item.parseddata?.booking);
+        // Passe consolidateBookingTimes-Aufruf an, übergebe type
+        const { hours } = consolidateBookingTimes(item.parseddata?.booking, item.type);
         // Für demand: erste Gruppe bestimmen
         let group = null;
         let groupName = '';
@@ -94,6 +119,8 @@ function SimDataList({ data, onRowClick, selectedItem }) {
         } else {
           secondaryText = `${hours} h`;
         }
+        // Hinweis: segmentsPerDay enthält jetzt für Mitarbeiter mehrere Zeitsegmente pro Tag
+        // Diese Struktur kann an die Slider-Komponente weitergegeben werden!
         return (
           <div key={item.id}>
             
