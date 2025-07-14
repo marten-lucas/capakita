@@ -1,8 +1,8 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { Box, Container } from '@mui/material'
 import TopNav from './components/TopNav'
-import Daten from './pages/Daten'
-import Simulation from './pages/Simulation'
+import SimDataPage from './pages/SimDatenPage'
+import SimulationPage from './pages/SimulationPage'
 import './App.css'
 
 function App() {
@@ -12,9 +12,9 @@ function App() {
       <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
         <Container maxWidth='l'> {/* Der Container ist jetzt nur für den Inhalt */}
           <Routes>
-            <Route path="/" element={<Navigate to="/daten" replace />} />
-            <Route path="/daten" element={<Daten />} />
-            <Route path="/simulation" element={<Simulation />} />
+            <Route path="/" element={<Navigate to="/data" replace />} />
+            <Route path="/data" element={<SimDataPage />} />
+            <Route path="/simulation" element={<SimulationPage />} />
           </Routes>
         </Container>
       </Box>

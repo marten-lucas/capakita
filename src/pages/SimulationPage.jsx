@@ -1,6 +1,6 @@
 import { Container, Typography } from '@mui/material'
 
-function Simulation() {
+function SimulationPage() {
   return (
     <Container>
       <Typography variant="h4" component="h1" gutterBottom>
@@ -13,4 +13,4 @@ function Simulation() {
   )
 }
 
-export default Simulation
+export default SimulationPage

@@ -1,0 +1,2402 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Adebis Export Analyser</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Rezi/sugar-css@main/dist/sugar.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://code.highcharts.com/highcharts.js"></script>
+    <script src="https://code.highcharts.com/modules/exporting.js"></script>
+    <script src="https://code.highcharts.com/modules/export-data.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"> <!-- Font Awesome for icons -->
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f0f2f5; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; padding: 2rem; box-sizing: border-box; }
+        .container { background-color: #fff; padding: 2.5rem; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,.08); width: 100%; max-width: 80vw; text-align: center; }
+        h1 { color: #333; margin-bottom: 1.5rem; font-size: 2.5rem; font-weight: 700; }
+        .form-section { display: block; }
+        .results-section { display: none; text-align: left; margin-top: 2rem; }
+        .form-group { margin-bottom: 1.5rem; }
+        input[type="file"] { display: none; }
+        .custom-file-upload { display: inline-block; padding: 12px 25px; cursor: pointer; background-color: #007bff; color: white; border-radius: 8px; font-weight: 600; transition: background-color .3s ease,transform .2s ease; box-shadow: 0 4px 10px rgba(0,123,255,.2); }
+        .custom-file-upload:hover { background-color: #0056b3; transform: translateY(-2px); }
+        .file-name { margin-top: 1rem; font-size: 1rem; color: #555; min-height: 1.2rem; }
+        .checkbox-group { margin-top: 1.5rem; display: flex; align-items: center; justify-content: center; gap: .5rem; }
+        .checkbox-group .switch { display: flex; align-items: center; gap: .5rem; }
+        .button-group { margin-top: 2rem; }
+        .button { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600; transition: background-color .3s ease,transform .2s ease; }
+        .button-primary { background-color: #28a745; color: white; box-shadow: 0 4px 10px rgba(40,167,69,.2); }
+        .button-primary:hover { background-color: #218838; transform: translateY(-2px); }
+        pre { background-color: #eee; padding: 1rem; border-radius: 8px; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word; margin-bottom: 0; }
+        .message-box { background-color: #fff3cd; color: #664d03; padding: 1rem; border: 1px solid #ffecb5; border-radius: 8px; margin-bottom: 1rem; display: none; text-align: left; }
+        .message-box.error { background-color: #f8d7da; color: #842029; border-color: #f5c2c7; }
+        details { margin-top: 1rem; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #fdfdfd; box-shadow: 0 2px 5px rgba(0,0,0,.05); }
+        details:not(:last-child) { margin-bottom: .5rem; }
+        summary { background-color: #e9ecef; border-radius: 8px; padding: 1rem 1.5rem; cursor: pointer; transition: background-color .3s ease; display: flex; align-items: center; justify-content: space-between; font-size: 1.25rem; font-weight: 600; color: #333; list-style: none; }
+        summary::-webkit-details-marker { display: none; }
+        summary:hover { background-color: #dee2e6; }
+        details[open] > summary { border-bottom-left-radius: 0; border-bottom-right-radius: 0; background-color: #d8e2ef; }
+        details[open] > summary:hover { background-color: #c0d0e0; }
+        details > div { padding: 1rem 1.5rem; border-top: 1px solid #e0e0e0; }
+        #planningChart { height: 400px; margin-top: 20px; }
+        .date-picker-container {
+            margin-top: 1.5rem;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .date-picker-container label {
+            font-weight: 600;
+            color: #333;
+        }
+        .date-picker-container input[type="date"], .date-picker-container select {
+            padding: 8px 12px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        .data-table-section {
+            margin-top: 2rem;
+            text-align: left;
+        }
+        .data-table-section h3 {
+            margin-bottom: 1rem;
+            color: #333;
+            font-size: 1.5rem;
+        }
+        .data-table-container {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+            background-color: #fdfdfd;
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+        .data-table th, .data-table td {
+            padding: 10px 15px;
+            border-bottom: 1px solid #e9ecef;
+            text-align: left;
+        }
+        .data-table th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #555;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+        .data-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+        .data-table tbody tr:hover {
+            background-color: #f0f0f0;
+        }
+        .filter-container {
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .filter-container label {
+            font-weight: 600;
+            color: #555;
+        }
+        .filter-container select {
+            padding: 8px 12px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            flex-grow: 1;
+            background-color: white;
+            cursor: pointer;
+        }
+        /* Custom styles for this update */
+        .section-heading-margin {
+            margin-top: 4rem; /* Increased margin for visibility */
+        }
+        .simulation-section {
+            margin-top: 3rem; /* Add some margin above the new section */
+            text-align: left;
+        }
+        .simulation-section h2 {
+            color: #333;
+            margin-bottom: 1.5rem;
+            font-size: 2rem; /* Consistent with other h2s */
+            font-weight: 700;
+        }
+        .simulation-section .button-group {
+            margin-top: 1rem; /* Adjust button group margin within simulation */
+        }
+        .simulation-cards-container {
+            margin-top: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem; /* Space between cards */
+        }
+        .simulation-card {
+            background-color: #fdfdfd;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 1rem 1.5rem;
+            box-shadow: 0 2px 5px rgba(0,0,0,.05);
+            position: relative; /* For absolute positioning of remove button and edit icon */
+        }
+        .simulation-card h4 {
+            margin-top: 0;
+            margin-bottom: 1rem;
+            color: #333;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+        .simulation-card .remove-button {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 50%; /* Make it round */
+            width: 25px;
+            height: 25px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color .2s ease;
+            z-index: 10; /* Ensure it's above other content */
+        }
+        .simulation-card .remove-button:hover {
+            background-color: #c82333;
+        }
+        .simulation-card .edit-icon-button {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background-color: #6c757d; /* Grey color for edit icon */
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            font-size: 1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color .2s ease;
+            box-shadow: 0 2px 5px rgba(0,0,0,.1);
+            z-index: 10; /* Ensure it's above other content */
+        }
+        .simulation-card .edit-icon-button:hover {
+            background-color: #5a6268;
+        }
+
+        .simulation-card .edit-mode .form-group {
+            margin-bottom: 1rem;
+            text-align: left;
+        }
+        .simulation-card .edit-mode label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: #555;
+        }
+        .simulation-card .edit-mode input[type="text"],
+        .simulation-card .edit-mode select,
+        .simulation-card .edit-mode input[type="date"],
+        .simulation-card .edit-mode input[type="number"] { /* Added number input to styling */
+            width: calc(100% - 20px); /* Adjust for padding */
+            padding: 8px 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 0.9rem;
+        }
+        .simulation-card .edit-mode .type-quantity-group { /* New style for type and quantity inputs container */
+            display: flex;
+            gap: 1rem; /* Space between inputs */
+            margin-bottom: 1rem;
+            align-items: flex-end; /* Align items at the bottom */
+        }
+        .simulation-card .edit-mode .type-quantity-group .form-group {
+            flex: 1; /* Each input takes equal space */
+            margin-bottom: 0; /* Remove extra margin from inner form-groups */
+        }
+        .simulation-card .edit-mode .date-inputs-group { /* New style for date inputs container */
+            display: flex;
+            gap: 1rem; /* Space between date inputs */
+            margin-bottom: 1rem;
+        }
+        .simulation-card .edit-mode .date-inputs-group .form-group {
+            flex: 1; /* Each date input takes equal space */
+            margin-bottom: 0; /* Remove extra margin from inner form-groups */
+        }
+        .simulation-card .edit-mode .button-group {
+            margin-top: 1.5rem;
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+        .simulation-card .edit-mode .button {
+            padding: 8px 15px;
+            font-size: 0.9rem;
+        }
+        .simulation-card .edit-mode .button-save {
+            background-color: #007bff;
+            color: white;
+        }
+        .simulation-card .edit-mode .button-save:hover {
+            background-color: #0056b3;
+        }
+        .simulation-card .edit-mode .button-cancel {
+            background-color: #6c757d;
+            color: white;
+        }
+        .simulation-card .edit-mode .button-cancel:hover {
+            background-color: #5a6268;
+        }
+
+        /* Styles for the new time sliders */
+        .time-sliders-section {
+            margin-top: 1.5rem;
+            border-top: 1px solid #e0e0e0;
+            padding-top: 1rem;
+        }
+        .time-sliders-section h5 {
+            margin-top: 0;
+            margin-bottom: 1rem;
+            color: #333;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+        .day-time-group {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 1rem;
+            padding: 0.5rem;
+            border: 1px solid #f0f0f0;
+            border-radius: 6px;
+            background-color: #fafafa;
+        }
+        .day-time-group label {
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 0.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .day-time-group .time-display {
+            font-weight: normal;
+            font-size: 0.9em;
+            color: #777;
+        }
+        .day-time-group input[type="range"] {
+            width: 100%;
+            margin-top: 0.5rem;
+            -webkit-appearance: none; /* Override default appearance */
+            height: 8px; /* Height of the track */
+            border-radius: 5px;
+            background: #d3d3d3; /* Grey track */
+            outline: none;
+            opacity: 0.7;
+            -webkit-transition: .2s;
+            transition: opacity .2s;
+        }
+        .day-time-group input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #007bff; /* Blue thumb */
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .day-time-group input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #007bff;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        /* New styles for display mode columns */
+        .simulation-card .display-mode .display-columns {
+            display: grid;
+            grid-template-columns: 1fr 1fr; /* Two equal columns */
+            gap: 1rem; /* Space between columns */
+            margin-bottom: 1rem; /* Space below the columns */
+            text-align: left; /* Align text within columns to left */
+        }
+        .simulation-card .display-mode .display-column p {
+            margin-bottom: 0.5rem; /* Space between paragraphs within a column */
+        }
+        .simulation-card .display-mode .display-column p:last-child {
+            margin-bottom: 0; /* No margin after the last paragraph in a column */
+        }
+        .simulation-card .display-mode .display-day-times-section {
+            text-align: left; /* Align text within this section to left */
+        }
+        /* New: Grid for working hours in display mode */
+        .simulation-card .display-mode .working-hours-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr; /* Two columns for days */
+            gap: 0.5rem 1rem; /* Row gap, column gap */
+        }
+        .simulation-card .display-mode .working-hours-grid p {
+            margin: 0; /* Remove default paragraph margin */
+        }
+
+
+        @media (max-width: 768px) {
+            h1 { font-size: 2rem; }
+            .container { padding: 1.5rem; }
+            .custom-file-upload { padding: 10px 20px; font-size: .9rem; }
+            summary { font-size: 1rem; }
+            .date-picker-container, .filter-container {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .date-picker-container input[type="date"], .date-picker-container select {
+                width: 100%;
+            }
+            .simulation-card .edit-mode .date-inputs-group,
+            .simulation-card .edit-mode .type-quantity-group { /* Stack vertically on small screens */
+                flex-direction: column;
+            }
+            .simulation-card .display-mode .display-columns,
+            .simulation-card .display-mode .working-hours-grid { /* Stack columns on small screens */
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Adebis Export Analyser</h1>
+
+        <div id="formS" class="form-section">
+            <div class="form-group">
+                <label for="zipF" class="custom-file-upload">
+                    <input type="file" id="zipF" accept=".zip" />
+                    ZIP-Datei hochladen
+                </label>
+                <div id="fileN" class="file-name">Keine Datei ausgewählt</div>
+            </div>
+
+            <div class="checkbox-group">
+                <div class="switch">
+                    <input type="checkbox" id="anonCB" checked>
+                    <label for="anonCB">Anonymisiert</label>
+                </div>
+            </div>
+
+            <div class="button-group">
+                <button class="button button-primary" id="analyzeB" disabled>Analysieren</button>
+            </div>
+        </div>
+
+        <div id="resultsS" class="results-section">
+            <div id="msgB" class="message-box"></div>
+            <h2>Daten</h2>
+            <div class="accordion">
+                <details name="data-accordions">
+                    <summary><h3>Bedarf</h3></summary>
+                    <div>
+                        <pre id="parsedK"></pre>
+                    </div>
+                </details>
+
+                <details name="data-accordions">
+                    <summary><h3>Kapazität</h3></summary>
+                    <div>
+                        <pre id="parsedA"></pre>
+                    </div>
+                </details>
+
+                <details name="data-accordions" id="knownChangesAccordion">
+                    <summary><h3>Bekannte Änderungen</h3></summary>
+                    <div>
+                        <pre id="parsedChanges"></pre>
+                    </div>
+                </details>
+            </div>
+
+            <h2 class="section-heading-margin">Analysen</h2>
+            <div class="date-picker-container">
+                <label for="stichtagPicker">Stichtag:</label>
+                <input type="date" id="stichtagPicker">
+                <label for="knownChangesDateFilter">Änderungsdatum:</label>
+                <select id="knownChangesDateFilter"></select>
+            </div>
+
+            <div id="planningChart"></div>
+
+            <div class="simulation-section">
+                <h2>Simulation</h2>
+                <div class="button-group">
+                    <button class="button button-primary" id="addSimButton">+</button>
+                </div>
+                <div id="simulationCardsContainer" class="simulation-cards-container">
+                    <!-- Simulationskarten werden hier hinzugefügt -->
+                </div>
+            </div>
+
+            <div class="button-group" style="margin-top: 3rem;">
+                <button class="button" id="resetB">Neue Analyse</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const zF = document.getElementById('zipF');
+        const fN = document.getElementById('fileN');
+        const aB = document.getElementById('analyzeB');
+        const fS = document.getElementById('formS');
+        const rS = document.getElementById('resultsS');
+        const pK = document.getElementById('parsedK');
+        const pA = document.getElementById('parsedA');
+        const rB = document.getElementById('resetB');
+        const mB = document.getElementById('msgB');
+        const aCB = document.getElementById('anonCB');
+        const sP = document.getElementById('stichtagPicker');
+        const parsedChanges = document.getElementById('parsedChanges');
+        const knownChangesDateFilter = document.getElementById('knownChangesDateFilter');
+        const addSimButton = document.getElementById('addSimButton');
+        const simulationCardsContainer = document.getElementById('simulationCardsContainer');
+
+        let rKD = []; // Raw Kinder Data
+        let rAD = []; // Raw Anstellungs Data
+        let gNM = new Map(); // Group Number Map (GRUNR -> BEZ)
+        let gAM = new Map(); // Group Assignment Map (KINDNR -> GRUPPENZUORDNUNGEN[])
+        let bM = new Map(); // Belegung Map (KINDNR -> BELEGUNGEN[])
+        let cFK = []; // Filtered Kinder Data for current Stichtag
+        let cFA = []; // Filtered Anstellung Data for current Stichtag
+
+        let fullChildrenPerSlot = []; // Stores all children active in each time slot (for chart tooltip and potential simulation)
+        let fullStaffPerSlot = []; // Stores all staff active in each time slot (for chart tooltip and potential simulation)
+        let currentStichtag = null; // The currently selected Stichtag
+        let allKnownChanges = []; // Stores consolidated change objects for future dates
+
+        // Set initial date for stichtagPicker to today
+        const today = new Date();
+        const y = today.getFullYear();
+        const m = String(today.getMonth() + 1).padStart(2, '0');
+        const d = String(today.getDate()).padStart(2, '0');
+        const todayString = `${y}-${m}-${d}`;
+        sP.value = todayString;
+        sP.min = todayString;
+
+        /**
+         * Displays a message in the message box.
+         * @param {string} msg - The message to display.
+         * @param {boolean} [isErr=false] - True if it's an error message, false otherwise.
+         */
+        function showMsg(msg, isErr = false) {
+            mB.textContent = msg;
+            mB.className = 'message-box';
+            if (isErr) mB.classList.add('error');
+            mB.style.display = 'block';
+        }
+
+        /**
+         * Hides the message box.
+         */
+        function hideMsg() {
+            mB.style.display = 'none';
+            mB.textContent = '';
+        }
+
+        /**
+         * Converts a time string (HH:MM) to minutes from midnight.
+         * @param {string} timeStr - The time string (e.g., "08:30").
+         * @returns {number|null} The time in minutes, or null if invalid.
+         */
+        function timeToMins(timeStr) {
+            if (!timeStr) return null;
+            const parts = timeStr.split(':');
+            if (parts.length !== 2) return null;
+            const [h, m] = parts.map(Number);
+            if (isNaN(h) || isNaN(m)) return null;
+            return h * 60 + m;
+        }
+
+        /**
+         * Parses a date string (DD.MM.YYYY) into a Date object.
+         * @param {string} dateStr - The date string (e.g., "01.01.2023").
+         * @returns {Date|null} The Date object, or null if invalid.
+         */
+        function parseDate(dateStr) {
+            if (!dateStr) return null;
+            const parts = dateStr.split('.');
+            if (parts.length === 3) return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+            return null;
+        }
+
+        /**
+         * Formats a date string (YYYY-MM-DD) to German format (DD.MM.YYYY).
+         * @param {string} dateString - The date string in Jamboree-MM-DD format.
+         * @returns {string} The formatted date string.
+         */
+        function formatDateToGerman(dateString) {
+            if (!dateString) return '';
+            const [year, month, day] = dateString.split('-');
+            return `${day}.${month}.${year}`;
+        }
+
+        /**
+         * Generates chart categories (e.g., "MO 07:00", "MO 07:30", ..., "FR 16:00").
+         * @returns {string[]} An array of category strings.
+         */
+        function genChartCats() {
+            const days = ['MO', 'DI', 'MI', 'DO', 'FR'];
+            const categories = [];
+            const interval = 30; // 30-minute intervals
+            const startH = 7; // Start hour 7 AM
+            const endH = 16; // End hour 4 PM
+
+            days.forEach(day => {
+                for (let h = startH; h <= endH; h++) {
+                    for (let m = 0; m < 60; m += interval) {
+                        // Prevent adding times beyond the end hour (e.g., FR 16:30 if endH is 16)
+                        if (h === endH && m >= interval) continue;
+                        const hour = String(h).padStart(2, '0');
+                        const minute = String(m).padStart(2, '0');
+                        categories.push(`${day} ${hour}:${minute}`);
+                    }
+                }
+            });
+            return categories;
+        }
+
+        /**
+         * Converts a slider value (0-47) into a formatted time string (HH:MM).
+         * Each value represents a 30-minute interval.
+         * @param {number} value The slider value.
+         * @returns {string} The formatted time string (e.g., "08:30").
+         */
+        function convertSliderValueToTime(value) {
+            const hours = Math.floor(value / 2);
+            const minutes = (value % 2) * 30;
+            const formattedHours = String(hours).padStart(2, '0');
+            const formattedMinutes = String(minutes).padStart(2, '0');
+            return `${formattedHours}:${formattedMinutes}`;
+        }
+
+        /**
+         * Converts a time string (HH:MM) to a slider value (0-47).
+         * @param {string} timeStr The time string (e.g., "08:30").
+         * @returns {number} The slider value.
+         */
+        function convertTimeToSliderValue(timeStr) {
+            if (!timeStr) return 0;
+            const [hours, minutes] = timeStr.split(':').map(Number);
+            return (hours * 2) + (minutes / 30);
+        }
+
+        /**
+         * Calculates the total weekly booking hours for a child based on their BELEGUNGEN.
+         * @param {object} child - The child data object.
+         * @returns {number} The total weekly booking hours.
+         */
+        function calcWeeklyBookingHours(child) {
+            let totalWeeklyMins = 0;
+            const days = ['MO', 'DI', 'MI', 'DO', 'FR'];
+            (child.BELEGUNGEN || []).forEach(beleg => {
+                days.forEach(day => {
+                    const startStr = beleg[`${day}_START`];
+                    const endStr = beleg[`${day}_END`];
+                    const startMins = timeToMins(startStr);
+                    const endMins = timeToMins(endStr);
+                    if (startMins !== null && endMins !== null && endMins > startMins) {
+                        totalWeeklyMins += (endMins - startMins);
+                    }
+                });
+            });
+            return totalWeeklyMins / 60; // Convert minutes to hours
+        }
+
+        /**
+         * Calculates the "Anstellungsschlüssel" (staffing ratio) based on child and staff data for a given stichtag.
+         * This calculation is a simplified example and might need adjustment based on specific regulations.
+         * @param {Array<object>} childData - Filtered child data for the stichtag.
+         * @param {Array<object>} staffData - Filtered staff data for the stichtag.
+         * @param {Date} stichtag - The reference date for the calculation.
+         * @returns {number} The calculated Anstellungsschlüssel.
+         */
+        function calcAnstellungsschluessel(childData, staffData, stichtag) {
+            let sumWeightedBookingHours = 0;
+            // End of kindergarten year for weighting (e.g., end of current calendar year)
+            const stichtagYear = stichtag.getFullYear();
+            const endOfKindergartenYear = new Date(stichtagYear, 11, 31); // Dec 31st of the stichtag year
+
+            childData.forEach(child => {
+                const weeklyBookingHours = calcWeeklyBookingHours(child);
+                let weightingFactor = 1.0;
+
+                const gebDatum = parseDate(child.GEBDATUM);
+                if (gebDatum) {
+                    // Children younger than 3 years at the end of the kindergarten year might be weighted higher
+                    const thirdBirthdayDate = new Date(gebDatum.getFullYear() + 3, gebDatum.getMonth(), gebDatum.getDate());
+                    if (thirdBirthdayDate > endOfKindergartenYear) {
+                        weightingFactor = 2.0; // Example: double weighting for under 3s
+                    }
+                }
+
+                // Example: School children might have a different weighting
+                const isSchoolChild = (child.GRUPPENZUORDNUNGEN || []).some(grp =>
+                    (grp.BEZ || '').toLowerCase().includes('schulkinder')
+                );
+                if (isSchoolChild) {
+                    weightingFactor = Math.max(weightingFactor, 1.2); // Example: at least 1.2 for school children
+                }
+
+                sumWeightedBookingHours += weeklyBookingHours * weightingFactor;
+            });
+
+            let totalStaffHours = 0;
+            staffData.forEach(staff => {
+                if (staff.ARBZEIT) {
+                    totalStaffHours += parseFloat(staff.ARBZEIT.replace(',', '.')) || 0;
+                }
+            });
+
+            if (totalStaffHours === 0) return 0;
+            return sumWeightedBookingHours / totalStaffHours;
+        }
+
+        /**
+         * Finds and consolidates known future changes from raw child and staff data.
+         * Changes include child registration/deregistration, group assignments, bookings, and staff employment changes.
+         * @param {Array<object>} rawKinderData - All raw child data.
+         * @param {Array<object>} rawAnstellData - All raw staff data.
+         * @param {Map<string, Array<object>>} groupAssignmentsMap - Map of childNr to group assignments.
+         * @param {Map<string, Array<object>>} belegungenMap - Map of childNr to bookings.
+         * @param {Map<string, string>} groupNamesMap - Map of groupNr to group names.
+         * @returns {Array<object>} An array of consolidated change objects, sorted by date.
+         */
+        function findKnownChanges(rawKinderData, rawAnstellData, groupAssignmentsMap, belegungenMap, groupNamesMap) {
+            const individualChanges = [];
+            const today = new Date();
+            today.setHours(0, 0, 0, 0); // Normalize to start of day
+
+            const isAnonymized = aCB.checked;
+
+            // Helper to add an individual change if its date is in the future
+            const addIndividualChange = (date, type, description, details = {}) => {
+                if (date && date > today) {
+                    const effectDate = new Date(date);
+                    // For "ends" or "deregistered" events, the effect usually starts the day *after* the stated date.
+                    // This is a common interpretation for "until" dates.
+                    if (type.includes('endet') || type.includes('abgemeldet')) {
+                        effectDate.setDate(effectDate.getDate() + 1);
+                    }
+                    individualChanges.push({
+                        date: date.toISOString().split('T')[0], // Jamboree-MM-DD
+                        effect: effectDate.toISOString().split('T')[0], // Calculated effect date
+                        type,
+                        description,
+                        details
+                    });
+                }
+            };
+
+            // Process child data for changes
+            rawKinderData.forEach(child => {
+                const kindNr = child.KINDNR;
+                const fName = child.FNAME || 'Unbekannt';
+                const childDisplayName = isAnonymized ? `${kindNr}` : `${fName} (KindNr: ${kindNr})`;
+
+                // Collect primary event dates for this child to filter belegung changes
+                // This prevents duplicate change entries if a belegung starts/ends on the same day as a child's registration/deregistration
+                const primaryEventDatesForChild = new Set();
+
+                const aufnDat = parseDate(child.AUFNDAT);
+                if (aufnDat && aufnDat > today) {
+                    addIndividualChange(aufnDat, 'Kind angemeldet', `Kind ${childDisplayName} wird angemeldet.`, { kindNr, fName: isAnonymized ? undefined : fName });
+                    primaryEventDatesForChild.add(aufnDat.toISOString().split('T')[0]);
+                }
+
+                const austrDat = parseDate(child.AUSTRDAT);
+                if (austrDat && austrDat > today) {
+                    addIndividualChange(austrDat, 'Kind abgemeldet', `Kind ${childDisplayName} wird abgemeldet.`, { kindNr, fName: isAnonymized ? undefined : fName });
+                    primaryEventDatesForChild.add(austrDat.toISOString().split('T')[0]);
+                }
+
+                // Process group assignments
+                (groupAssignmentsMap.get(kindNr) || []).forEach(grpAssign => {
+                    const gruNr = grpAssign.GRUNR;
+                    const bez = grpAssign.BEZ || groupNamesMap.get(gruNr) || 'Unbekannt';
+
+                    const gkVon = parseDate(grpAssign.GKVON);
+                    if (gkVon && gkVon > today) {
+                        addIndividualChange(gkVon, 'Gruppenzuordnung beginnt', `Kind ${childDisplayName} beginnt in Gruppe ${bez}.`, { kindNr, fName: isAnonymized ? undefined : fName, gruNr, bez });
+                        primaryEventDatesForChild.add(gkVon.toISOString().split('T')[0]);
+                    }
+
+                    const gkBis = parseDate(grpAssign.GKBIS);
+                    if (gkBis && gkBis > today) {
+                        addIndividualChange(gkBis, 'Gruppenzuordnung endet', `Kind ${childDisplayName} endet in Gruppe ${bez}.`, { kindNr, fName: isAnonymized ? undefined : fName, gruNr, bez });
+                        primaryEventDatesForChild.add(gkBis.toISOString().split('T')[0]);
+                    }
+                });
+
+                // Process bookings (Belegungen)
+                (belegungenMap.get(kindNr) || []).forEach(beleg => {
+                    const belVon = parseDate(beleg.BELVON);
+                    const belBis = parseDate(beleg.BELBIS);
+
+                    const isBelVonPrimary = belVon && primaryEventDatesForChild.has(belVon.toISOString().split('T')[0]);
+                    const isBelBisPrimary = belBis && primaryEventDatesForChild.has(belBis.toISOString().split('T')[0]);
+
+                    if (belVon && belVon > today && !isBelVonPrimary) {
+                        addIndividualChange(belVon, 'Belegung beginnt', `Belegung für Kind ${childDisplayName} beginnt.`, { kindNr, fName: isAnonymized ? undefined : fName });
+                    }
+
+                    if (belBis && belBis > today && !isBelBisPrimary) {
+                        addIndividualChange(belBis, 'Belegung endet', `Belegung für Kind ${childDisplayName} endet.`, { kindNr, fName: isAnonymized ? undefined : fName });
+                    }
+                });
+            });
+
+            // Process staff data for changes
+            rawAnstellData.forEach(staff => {
+                const idNr = staff.IDNR;
+                const qualifik = staff.QUALIFIK || 'Unbekannt';
+                const staffDisplayName = isAnonymized ? `${idNr}` : `${qualifik} (ID: ${idNr})`;
+
+                const beginnDat = parseDate(staff.BEGINNDAT);
+                addIndividualChange(beginnDat, 'Anstellung beginnt', `Anstellung für Personal ${staffDisplayName} beginnt.`, { idNr, qualifik: isAnonymized ? undefined : qualifik });
+
+                const endDat = parseDate(staff.ENDDAT);
+                addIndividualChange(endDat, 'Anstellung endet', `Anstellung für Personal ${staffDisplayName} endet.`, { idNr, qualifik: isAnonymized ? undefined : qualifik });
+            });
+
+            // Group individual changes by their 'date'
+            const groupedChanges = new Map(); // Map: date (string) -> Array of individual change objects
+
+            individualChanges.forEach(change => {
+                if (!groupedChanges.has(change.date)) {
+                    groupedChanges.set(change.date, []);
+                }
+                groupedChanges.get(change.date).push(change);
+            });
+
+            const consolidatedResults = [];
+            // Sort dates to ensure chronological order
+            Array.from(groupedChanges.keys()).sort().forEach(dateKey => {
+                const changesOnThisDate = groupedChanges.get(dateKey);
+
+                const summaryCounts = {
+                    'Kind angemeldet': 0,
+                    'Kind abgemeldet': 0,
+                    'Gruppenzuordnung beginnt': 0,
+                    'Gruppenzuordnung endet': 0,
+                    'Belegung beginnt': 0,
+                    'Belegung endet': 0,
+                    'Anstellung beginnt': 0,
+                    'Anstellung endet': 0
+                };
+
+                let detailStrings = [];
+                let earliestEffectDate = new Date('9999-12-31'); // Initialize with a very late date
+
+                changesOnThisDate.forEach(change => {
+                    summaryCounts[change.type]++;
+                    detailStrings.push(change.description);
+                    const currentEffectDate = new Date(change.effect);
+                    if (currentEffectDate < earliestEffectDate) {
+                        earliestEffectDate = currentEffectDate;
+                    }
+                });
+
+                const summaryParts = [];
+                if (summaryCounts['Kind angemeldet'] > 0) summaryParts.push(`${summaryCounts['Kind angemeldet']} Kind angemeldet`);
+                if (summaryCounts['Kind abgemeldet'] > 0) summaryParts.push(`${summaryCounts['Kind abgemeldet']} Kind abgemeldet`);
+                if (summaryCounts['Gruppenzuordnung beginnt'] > 0) summaryParts.push(`${summaryCounts['Gruppenzuordnung beginnt']} Gruppenwechsel (Beginn)`);
+                if (summaryCounts['Gruppenzuordnung endet'] > 0) summaryParts.push(`${summaryCounts['Gruppenzuordnung endet']} Gruppenwechsel (Ende)`);
+                if (summaryCounts['Belegung beginnt'] > 0) summaryParts.push(`${summaryCounts['Belegung beginnt']} Belegung (Beginn)`);
+                if (summaryCounts['Belegung endet'] > 0) summaryParts.push(`${summaryCounts['Belegung endet']} Belegung (Ende)`);
+                if (summaryCounts['Anstellung beginnt'] > 0) summaryParts.push(`${summaryCounts['Anstellung beginnt']} Anstellung (Beginn)`);
+                if (summaryCounts['Anstellung endet'] > 0) summaryParts.push(`${summaryCounts['Anstellung endet']} Anstellung (Ende)`);
+
+                consolidatedResults.push({
+                    date: dateKey,
+                    effect: earliestEffectDate.toISOString().split('T')[0], // Use the earliest effect date for the consolidated object
+                    summary: summaryParts.join(', '),
+                    detail: detailStrings.join('\n'), // Join details with newlines
+                    changes: changesOnThisDate // Array of original change objects
+                });
+            });
+
+            return consolidatedResults;
+        }
+
+        /**
+         * Processes raw child and staff data to prepare it for chart rendering.
+         * Populates fullChildrenPerSlot and fullStaffPerSlot for detailed tooltip info.
+         * @param {Array<object>} kindData - Filtered child data.
+         * @param {Array<object>} anstellData - Filtered staff data.
+         * @param {Date} stichtag - The current stichtag.
+         * @returns {object} An object containing chart categories and series data.
+         */
+        function processChartData(kindData, anstellData, stichtag) {
+            const chartCats = genChartCats();
+            const allGroups = new Set();
+            const allQuals = new Set();
+
+            const bedarfCnts = new Map(); // Map: category -> Map: groupName -> { count, details[] }
+            const kapazitaetCnts = new Map(); // Map: category -> Map: qualName -> { count, details[] }
+            
+            // Initialize fullChildrenPerSlot and fullStaffPerSlot for each time slot
+            fullChildrenPerSlot = Array.from({ length: chartCats.length }, () => []);
+            fullStaffPerSlot = Array.from({ length: chartCats.length }, () => []);
+
+            // Initialize count maps for each category
+            chartCats.forEach(cat => {
+                bedarfCnts.set(cat, new Map());
+                kapazitaetCnts.set(cat, new Map());
+            });
+
+            const days = ["MO", "DI", "MI", "DO", "FR"];
+            const interval = 30; // 30-minute intervals
+            const startH = 7;
+            const endH = 16;
+
+            // Iterate through each chart category (time slot)
+            chartCats.forEach((key, slotIdx) => {
+                const [day, timeStr] = key.split(' ');
+                const [h, m] = timeStr.split(':').map(Number);
+                const slotStartMins = h * 60 + m;
+                const slotEndMins = slotStartMins + interval;
+
+                // Determine active children in this slot
+                kindData.forEach(child => {
+                    const childBelegs = child.BELEGUNGEN || [];
+                    const isChildActiveInSlot = childBelegs.some(beleg => {
+                        const belegStartStr = beleg[`${day}_START`];
+                        const belegEndStr = beleg[`${day}_END`];
+                        const belegStartMins = timeToMins(belegStartStr);
+                        const belegEndMins = timeToMins(belegEndStr);
+                        // Check for overlap between child's booking time and the current slot
+                        return (belegStartMins !== null && belegEndMins !== null &&
+                                Math.max(belegStartMins, slotStartMins) < Math.min(belegEndMins, slotEndMins));
+                    });
+
+                    if (isChildActiveInSlot) {
+                        fullChildrenPerSlot[slotIdx].push(child); // Add child to the slot's full list
+                        // Count children per group for the bedarf series
+                        (child.GRUPPENZUORDNUNGEN || []).forEach(grpAssign => {
+                            const grpName = grpAssign.BEZ || grpAssign.GRUNR || 'Unbekannt';
+                            allGroups.add(grpName); // Track all unique group names
+                            const groupMap = bedarfCnts.get(key);
+                            let entry = groupMap.get(grpName);
+                            if (!entry) {
+                                entry = { count: 0, details: [] };
+                                groupMap.set(grpName, entry);
+                            }
+                            entry.count++;
+                            entry.details.push({ KINDNR: child.KINDNR, FNAME: child.FNAME || '' });
+                        });
+                        // Handle children without explicit group assignments
+                        if (!(child.GRUPPENZUORDNUNGEN && child.GRUPPENZUORDNUNGEN.length > 0)) {
+                            const grpName = 'Unbekannt';
+                            allGroups.add(grpName);
+                            const groupMap = bedarfCnts.get(key);
+                            let entry = groupMap.get(grpName);
+                            if (!entry) {
+                                entry = { count: 0, details: [] };
+                                groupMap.set(grpName, entry);
+                            }
+                            entry.count++;
+                            entry.details.push({ KINDNR: child.KINDNR, FNAME: child.FNAME || '' });
+                        }
+                    }
+                });
+
+                // Determine active staff in this slot
+                anstellData.forEach(staff => {
+                    const staffStartStr = staff[`${day}_START`];
+                    const staffEndStr = staff[`${day}_END`];
+                    const staffStartMins = timeToMins(staffStartStr);
+                    const staffEndMins = timeToMins(staffEndStr);
+
+                    const isStaffActiveInSlot = (staffStartMins !== null && staffEndMins !== null &&
+                                                Math.max(staffStartMins, slotStartMins) < Math.min(staffEndMins, slotEndMins));
+
+                    if (isStaffActiveInSlot) {
+                        fullStaffPerSlot[slotIdx].push(staff); // Add staff to the slot's full list
+                        // Count staff per qualification for the kapazitaet series
+                        const qual = staff.QUALIFIK || 'Unbekannt';
+                        allQuals.add(qual); // Track all unique qualifications
+                        const qualMap = kapazitaetCnts.get(key);
+                        let entry = qualMap.get(qual);
+                            if (!entry) {
+                                entry = { count: 0, details: [] };
+                                qualMap.set(qual, entry);
+                            }
+                            entry.count++;
+                            entry.details.push({ IDNR: staff.IDNR, QUALIFIK: staff.QUALIFIK || '' });
+                        }
+                    });
+                });
+
+            // Define colors for chart series
+            const bedarfColors = ['#ff7f0e', '#ff9933', '#cc6600', '#a64d00', '#d9534f'];
+            const kapazitaetColors = ['#1f77b4', '#4A90E2', '#0056B3', '#003366', '#5CB85C'];
+
+            // Create series data for Bedarf (demand)
+            const bedarfSeries = Array.from(allGroups).map((grpName, i) => ({
+                name: `Gruppe ${grpName}`,
+                data: chartCats.map(cat => ({ y: bedarfCnts.get(cat)?.get(grpName)?.count || 0, custom: { details: bedarfCnts.get(cat)?.get(grpName)?.details || [] } })),
+                stack: 'bedarf',
+                type: 'area', // Use area for demand
+                color: bedarfColors[i % bedarfColors.length],
+                yAxis: 1 // Assign to the second Y-axis (now Bedarf)
+            }));
+
+            // Create series data for Kapazität (capacity)
+            const kapazitaetSeries = Array.from(allQuals).map((qual, i) => ({
+                name: `Qualifikation ${qual}`,
+                data: chartCats.map(cat => ({ y: kapazitaetCnts.get(cat)?.get(qual)?.count || 0, custom: { details: kapazitaetCnts.get(cat)?.get(qual)?.details || [] } })),
+                stack: 'kapazitaet',
+                yAxis: 2, // Assign to the third Y-axis (now Kapazität)
+                color: kapazitaetColors[i % kapazitaetColors.length]
+            }));
+
+            return { categories: chartCats, bedarfSeries, kapazitaetSeries };
+        }
+
+        /**
+         * Renders the Highcharts planning chart.
+         * @param {object} chartData - The data prepared by processChartData.
+         */
+        function renderChart(chartData) {
+            const { categories, bedarfSeries, kapazitaetSeries } = chartData;
+            const plotBands = [];
+
+            const days = ["MO", "DI", "MI", "DO", "FR"];
+            const interval = 30;
+            const startH = 7;
+            const endH = 16;
+            // Calculate intervals per day (e.g., 7:00, 7:30, ..., 16:00)
+            const totalIntervalsPerDay = (endH - startH) * (60 / interval) + 1;
+
+            // Add plot bands for visual separation of days
+            days.forEach((day, i) => {
+                plotBands.push({
+                    from: (i * totalIntervalsPerDay) - 0.5, // Start of the day's interval
+                    to: ((i + 1) * totalIntervalsPerDay) - 0.5, // End of the day's interval
+                    color: i % 2 === 0 ? 'rgba(68, 170, 213, 0.1)' : 'rgba(100, 100, 100, 0.05)',
+                    label: {
+                        text: day,
+                        align: 'center',
+                        y: 20,
+                        style: { color: '#666', fontWeight: 'bold' }
+                    }
+                });
+            });
+
+            // Calculate initial Anstellungsschlüssel for each slot
+            const initialAnstellungsschluesselPerSlot = categories.map((_, slotIdx) =>
+                calcAnstellungsschluessel(fullChildrenPerSlot[slotIdx], fullStaffPerSlot[slotIdx], currentStichtag)
+            );
+            // Determine max Y-axis value for Anstellungsschlüssel for better scaling
+            const maxAnstellungsschluessel = Math.max(...initialAnstellungsschluesselPerSlot);
+            const kennzahlYAxisMax = maxAnstellungsschluessel > 0 ? maxAnstellungsschluessel * 1.5 : 15; // Ensure a reasonable default max
+
+            const chartOptions = {
+                chart: {
+                    type: 'column', // Base type for demand/capacity
+                    height: 400,
+                    zoomType: 'x', // Enable zooming on the X-axis
+                    events: {
+                        // Custom event to recalculate Anstellungsschlüssel when legend items are clicked
+                        legendItemClick: function(event) {
+                            const chart = this;
+                            const clickedSeries = event.target;
+                            // Highcharts handles visibility, but we need to re-calculate the Anstellungsschlüssel
+                            // based on the *new* visible series after the click. This requires a small delay.
+                            setTimeout(() => {
+                                // Get names of all currently visible series that are part of a stack (bedarf or kapazitaet)
+                                const visibleSeriesNames = chart.series
+                                    .filter(s => s.visible && s.options.stack !== undefined)
+                                    .map(s => s.name);
+
+                                // Recalculate Anstellungsschlüssel for each slot based on visible data
+                                const newAnstellungsschluesselPerSlot = categories.map((_, slotIdx) => {
+                                    const childrenInSlot = fullChildrenPerSlot[slotIdx];
+                                    const staffInSlot = fullStaffPerSlot[slotIdx];
+
+                                    // Filter children based on visible group series
+                                    const filteredChildren = childrenInSlot.filter(child => {
+                                        if (!child.GRUPPENZUORDNUNGEN || child.GRUPPENZUORDNUNGEN.length === 0) {
+                                            return visibleSeriesNames.includes('Gruppe Unbekannt');
+                                        }
+                                        return child.GRUPPENZUORDNUNGEN.some(grp =>
+                                            visibleSeriesNames.includes(`Gruppe ${grp.BEZ || grp.GRUNR}`)
+                                        );
+                                    });
+
+                                    // Filter staff based on visible qualification series
+                                    const filteredStaff = staffInSlot.filter(staff =>
+                                        visibleSeriesNames.includes(`Qualifikation ${staff.QUALIFIK || 'Unbekannt'}`)
+                                    );
+                                    return calcAnstellungsschluessel(filteredChildren, filteredStaff, currentStichtag);
+                                });
+
+                                // Update the Anstellungsschlüssel series data
+                                const anstSchlSeries = chart.series.find(s => s.name === 'Anstellungsschlüssel');
+                                if (anstSchlSeries) {
+                                    anstSchlSeries.setData(newAnstellungsschluesselPerSlot, false); // false for no redraw yet
+                                    chart.redraw(); // Redraw the chart with updated data
+                                }
+                            }, 0); // Small delay to allow Highcharts to update series visibility first
+                        }
+                    }
+                },
+                title: { text: 'Kurzfristige Planung' },
+                xAxis: {
+                    categories: categories,
+                    labels: {
+                        // Only show time, hide day in the main label
+                        formatter: function() {
+                            return this.value.substring(this.value.indexOf(' ') + 1);
+                        },
+                        rotation: -45, align: 'right', style: { fontSize: '10px' }
+                    },
+                    plotBands: plotBands, // Day separators
+                    crosshair: true // Vertical line on hover
+                },
+                yAxis: [{
+                    // Y-axis 0: Anstellungsschlüssel (Staffing Ratio) - Primary Left
+                    title: { text: 'Anstellungsschlüssel', style: { color: '#0000FF' } },
+                    labels: { format: '{value:.2f}', style: { color: '#0000FF' } },
+                    min: 0,
+                    max: kennzahlYAxisMax // Use calculated max for better scaling
+                }, {
+                    // Y-axis 1: Bedarf (Demand) - Secondary Right
+                    min: 0,
+                    title: { text: 'Bedarf (Anzahl Kinder)', style: { color: '#ff7f0e' } }, // Color matching bedarf
+                    labels: { style: { color: '#ff7f0e' } },
+                    opposite: true, // Place on the right side
+                    stackLabels: { enabled: false } // No stack labels on columns
+                }, {
+                    // Y-axis 2: Kapazität (Capacity) - Secondary Right
+                    min: 0,
+                    title: { text: 'Kapazität (Anzahl Personal)', style: { color: '#1f77b4' } }, // Color matching kapazitaet
+                    labels: { style: { color: '#1f77b4' } },
+                    opposite: true, // Place on the right side
+                    stackLabels: { enabled: false }
+                }],
+                tooltip: {
+                    formatter: function() {
+                        const slotIdx = this.points[0].point.index;
+                        const [day, time] = categories[slotIdx].split(' ');
+                        let tip = `<span style="font-size:10px">${day} ${time}</span><br/>`;
+                        
+                        const anstSchlPoint = this.points.find(p => p.series.name === 'Anstellungsschlüssel');
+                        const bedarfPoints = this.points.filter(p => p.series.options.stack === 'bedarf');
+                        const kapazitaetPoints = this.points.filter(p => p.series.options.stack === 'kapazitaet');
+
+                        // Display Anstellungsschlüssel first (primary axis)
+                        if (anstSchlPoint) {
+                             tip += `<b>Anstellungsschlüssel: ${anstSchlPoint.y.toFixed(2)}</b><br/><br/>`;
+                        }
+
+                        // Display Bedarf
+                        if (bedarfPoints.length > 0) {
+                            const totalBedarf = bedarfPoints.reduce((sum, p) => sum + p.y, 0);
+                            tip += `<span style="color:#ff7f0e;font-weight:bold;">Gesamt Bedarf: ${totalBedarf}</span><br/>`;
+                            bedarfPoints.forEach(p => {
+                                tip += `<tr><td style="color:${p.series.color};padding:0;padding-left: 10px;">${p.series.name}: </td>` +
+                                    `<td style="padding:0"><b>${p.y}</b></td></tr>`;
+                                if (!aCB.checked && p.point.custom && p.point.custom.details && p.point.custom.details.length > 0) {
+                                    let names = p.point.custom.details.map(detail =>
+                                        detail.FNAME ? `${detail.FNAME} (KINDNR: ${detail.KINDNR})` : `KINDNR: ${detail.KINDNR}`
+                                    ).join('<br/>');
+                                    tip += `<tr><td colspan="2" style="padding:0;padding-left: 20px; font-size: 0.8em;">${names}</td></tr>`;
+                                }
+                            });
+                            tip += `<br/>`; // Add a break after Bedarf section
+                        }
+
+                        // Display Kapazität
+                        if (kapazitaetPoints.length > 0) {
+                            const totalKapazitaet = kapazitaetPoints.reduce((sum, p) => sum + p.y, 0);
+                            tip += `<span style="color:#1f77b4;font-weight:bold;">Gesamt Kapazität: ${totalKapazitaet}</span><br/>`;
+                            kapazitaetPoints.forEach(p => {
+                                tip += `<tr><td style="color:${p.series.color};padding:0;padding-left: 10px;">${p.series.name}: </td>` +
+                                    `<td style="padding:0"><b>${p.y}</b></td></tr>`;
+                                if (!aCB.checked && p.point.custom && p.point.custom.details && p.point.custom.details.length > 0) {
+                                    let names = p.point.custom.details.map(detail =>
+                                        detail.QUALIFIK ? `${detail.QUALIFIK} (IDNR: ${detail.IDNR})` : `IDNR: ${detail.IDNR}`
+                                    ).join('<br/>');
+                                    tip += `<tr><td colspan="2" style="padding:0;padding-left: 20px; font-size: 0.8em;">${names}</td></tr>`;
+                                }
+                            });
+                        }
+                        return tip;
+                    },
+                    shared: true, // Show all series for the point
+                    useHTML: true // Allow HTML in tooltip for custom formatting
+                },
+                plotOptions: {
+                    column: { stacking: 'normal', pointPadding: 0.2, borderWidth: 0, dataLabels: { enabled: false } },
+                    area: { stacking: 'normal', marker: { enabled: false }, dataLabels: { enabled: false } }
+                },
+                series: [
+                    ...bedarfSeries, // Demand series (now on yAxis 1)
+                    ...kapazitaetSeries, // Capacity series (now on yAxis 2)
+                    {
+                        name: 'Anstellungsschlüssel',
+                        data: initialAnstellungsschluesselPerSlot,
+                        type: 'line', // Line series for the key
+                        color: '#0000FF',
+                        yAxis: 0, // Use the first Y-axis (primary)
+                        marker: { enabled: false },
+                        dashStyle: 'Solid',
+                        tooltip: { valueSuffix: '' }, // No suffix for ratio
+                        zIndex: 5 // Ensure Anstellungsschlüssel is on top
+                    }
+                ],
+                legend: { enabled: true, layout: 'horizontal', align: 'center', verticalAlign: 'bottom', itemStyle: { fontSize: '10px' } },
+                exporting: {
+                    enabled: true,
+                    showTable: false, // Set to false to hide "View Data Table" initially
+                    buttons: {
+                        contextButton: {
+                            menuItems: ['viewFullscreen', 'printChart', 'separator', 'downloadPNG', 'downloadJPEG', 'downloadPDF', 'downloadSVG', 'separator', 'downloadCSV', 'downloadXLS', 'viewData'] // 'viewData' is the option for "View Data Table"
+                        }
+                    }
+                }
+            };
+            Highcharts.chart('planningChart', chartOptions);
+        }
+
+        /**
+         * Populates the "Änderungsdatum" dropdown with known changes.
+         */
+        function populateKnownChangesDateFilter() {
+            knownChangesDateFilter.innerHTML = ''; // Clear existing options
+
+            const allOption = document.createElement('option');
+            allOption.value = 'all';
+            allOption.textContent = 'Alle';
+            knownChangesDateFilter.appendChild(allOption);
+
+            allKnownChanges.forEach(consolidatedChange => {
+                const formattedDate = formatDateToGerman(consolidatedChange.date);
+                const option = document.createElement('option');
+                option.value = consolidatedChange.date; // Use Jamboree-MM-DD for value
+                option.textContent = `${formattedDate} (${consolidatedChange.summary})`;
+                knownChangesDateFilter.appendChild(option);
+            });
+        }
+
+        /**
+         * Filters the raw data based on the current stichtag and renders the chart.
+         */
+        function filterAndRender() {
+            const stichtagStr = sP.value;
+            currentStichtag = stichtagStr ? new Date(stichtagStr) : new Date();
+            currentStichtag.setHours(0, 0, 0, 0); // Normalize to start of day
+
+            // Filter child data based on AUFNDAT and AUSTRDAT
+            cFK = rKD.filter(child => {
+                const aufnDat = parseDate(child.AUFNDAT);
+                const austrDat = parseDate(child.AUSTRDAT);
+                return (aufnDat === null || aufnDat <= currentStichtag) && (austrDat === null || austrDat > currentStichtag);
+            }).map(child => {
+                // Filter group assignments for the child based on GKVON and GKBIS
+                const filteredGrps = (gAM.get(child.KINDNR) || []).filter(ga => {
+                    const gkVon = parseDate(ga.GKVON);
+                    const gkBis = parseDate(ga.GKBIS);
+                    return (gkVon === null || gkVon <= currentStichtag) && (gkBis === null || gkBis > currentStichtag);
+                });
+
+                // Filter bookings for the child based on BELBIS
+                const filteredBelegungen = (bM.get(child.KINDNR) || []).filter(beleg => {
+                    const belBis = parseDate(beleg.BELBIS);
+                    return (belBis === null || belBis > currentStichtag);
+                });
+
+                return { ...child, GRUPPENZUORDNUNGEN: filteredGrps, BELEGUNGEN: filteredBelegungen };
+            });
+
+            // Filter staff data based on BEGINNDAT and ENDDAT
+            cFA = rAD.filter(staff => {
+                const beginnDat = parseDate(staff.BEGINNDAT);
+                const endDat = parseDate(staff.ENDDAT);
+                return (beginnDat === null || beginnDat <= currentStichtag) && (endDat === null || endDat > currentStichtag);
+            });
+
+            // Update raw data display (for debugging/inspection)
+            pK.textContent = JSON.stringify(cFK, null, 2);
+            pA.textContent = JSON.stringify(cFA, null, 2);
+
+            // Process data and render the chart
+            const chartData = processChartData(cFK, cFA, currentStichtag);
+            renderChart(chartData);
+            hideMsg();
+        }
+
+        /**
+         * Gets unique group names from the global group name map.
+         * @returns {Array<string>} An array of unique group names.
+         */
+        function getUniqueGroupNames() {
+            return Array.from(gNM.values());
+        }
+
+        /**
+         * Gets unique staff qualifications from the raw anstellungs data.
+         * @returns {Array<string>} An array of unique qualifications.
+         */
+        function getUniqueQualifications() {
+            const quals = new Set();
+            rAD.forEach(staff => {
+                if (staff.QUALIFIK) {
+                    quals.add(staff.QUALIFIK);
+                }
+            });
+            return Array.from(quals);
+        }
+
+        /**
+         * Adds a new simulation card to the simulation cards container.
+         */
+        function addSimulationCard() {
+            const card = document.createElement('div');
+            card.className = 'simulation-card';
+            const uniqueId = 'sim-card-' + Date.now();
+            card.id = uniqueId;
+            card.dataset.mode = 'edit'; // Start in edit mode
+
+            // Default values for a new card
+            let currentCardName = 'Neue Simulation';
+            let currentCardType = ''; // Empty string for "Bitte auswählen"
+            let currentQuantity = 1; // Default quantity
+            const today = new Date();
+            const defaultStartDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+            let currentStartDate = defaultStartDate;
+            let currentEndDate = ''; // No default end date
+            let currentGroup = '';
+            let currentQualification = '';
+
+            // Default times for each day (08:00 - 17:00 as slider values)
+            const defaultDayTimes = {
+                MO: { start: 16, end: 34 },
+                DI: { start: 16, end: 34 },
+                MI: { start: 16, end: 34 },
+                DO: { start: 16, end: 34 },
+                FR: { start: 16, end: 34 }
+            };
+            let currentDayTimes = JSON.parse(JSON.stringify(defaultDayTimes)); // Deep copy
+
+            // Populate group options
+            const groupOptions = getUniqueGroupNames().map(group => `<option value="${group}">${group}</option>`).join('');
+            // Populate qualification options
+            const qualOptions = getUniqueQualifications().map(qual => `<option value="${qual}">${qual}</option>`).join('');
+
+            // Helper to generate HTML for a single day's time sliders
+            const generateDaySlidersHtml = (dayCode, dayName, cardId, initialStartValue, initialEndValue) => `
+                <div class="day-time-group">
+                    <label for="startTimeSlider-${dayCode}-${cardId}">
+                        ${dayName}: <span id="timeDisplay-${dayCode}-${cardId}" class="time-display"></span>
+                    </label>
+                    <input type="range" id="startTimeSlider-${dayCode}-${cardId}" min="0" max="47" value="${initialStartValue}">
+                    <input type="range" id="endTimeSlider-${dayCode}-${cardId}" min="0" max="47" value="${initialEndValue}">
+                </div>
+            `;
+
+            card.innerHTML = `
+                <button class="remove-button" data-card-id="${uniqueId}">x</button>
+
+                <!-- Display Mode (initially hidden) -->
+                <div class="display-mode" style="display: none;">
+                    <h4 class="card-name-display">${currentCardName}</h4>
+                    <div class="display-columns">
+                        <div class="display-column">
+                            <p class="card-type-quantity-display">Typ: ${currentCardType === 'kapazitaet' ? 'Kapazität' : (currentCardType === 'bedarf' ? 'Bedarf' : 'Nicht ausgewählt')} | Anzahl: ${currentQuantity}</p>
+                            <p class="card-dates-display">Zeitraum: ${formatDateToGerman(currentStartDate)} - ${currentEndDate ? formatDateToGerman(currentEndDate) : 'Offen'}</p>
+                        </div>
+                        <div class="display-column">
+                            <p class="card-group-display">Gruppe: ${currentGroup || 'Nicht ausgewählt'}</p>
+                            <p class="card-qual-display" style="display: ${currentCardType === 'kapazitaet' ? 'block' : 'none'};">Qualifikation: ${currentQualification || 'Nicht ausgewählt'}</p>
+                        </div>
+                    </div>
+                    <div class="display-day-times-section">
+                        <h5>Arbeitszeiten:</h5>
+                        <div class="working-hours-grid">
+                            <p id="display-time-MO-${uniqueId}">Mo: ${convertSliderValueToTime(currentDayTimes.MO.start)} - ${convertSliderValueToTime(currentDayTimes.MO.end)}</p>
+                            <p id="display-time-DI-${uniqueId}">Di: ${convertSliderValueToTime(currentDayTimes.DI.start)} - ${convertSliderValueToTime(currentDayTimes.DI.end)}</p>
+                            <p id="display-time-MI-${uniqueId}">Mi: ${convertSliderValueToTime(currentDayTimes.MI.start)} - ${convertSliderValueToTime(currentDayTimes.MI.end)}</p>
+                            <p id="display-time-DO-${uniqueId}">Do: ${convertSliderValueToTime(currentDayTimes.DO.start)} - ${convertSliderValueToTime(currentDayTimes.DO.end)}</p>
+                            <p id="display-time-FR-${uniqueId}">Fr: ${convertSliderValueToTime(currentDayTimes.FR.start)} - ${convertSliderValueToTime(currentDayTimes.FR.end)}</p>
+                        </div>
+                    </div>
+                    <button class="edit-icon-button"><i class="fas fa-pencil-alt"></i></button>
+                </div>
+
+                <!-- Edit Mode (initially visible) -->
+                <div class="edit-mode" style="display: block;">
+                    <h4>Simulationskarte bearbeiten</h4>
+                    <div class="form-group">
+                        <label for="cardNameInput-${uniqueId}">Name:</label>
+                        <input type="text" id="cardNameInput-${uniqueId}" value="${currentCardName}">
+                    </div>
+                    <div class="type-quantity-group"> <!-- New container for side-by-side type and quantity inputs -->
+                        <div class="form-group">
+                            <label for="cardTypeSelect-${uniqueId}">Typ:</label>
+                            <select id="cardTypeSelect-${uniqueId}">
+                                <option value="">Bitte auswählen</option>
+                                <option value="kapazitaet" ${currentCardType === 'kapazitaet' ? 'selected' : ''}>Kapazität</option>
+                                <option value="bedarf" ${currentCardType === 'bedarf' ? 'selected' : ''}>Bedarf</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="cardQuantityInput-${uniqueId}">Anzahl:</label>
+                            <input type="number" id="cardQuantityInput-${uniqueId}" value="${currentQuantity}" min="1">
+                        </div>
+                    </div>
+                    <div class="date-inputs-group"> <!-- New container for side-by-side date inputs -->
+                        <div class="form-group">
+                            <label for="startDateInput-${uniqueId}">Startdatum:</label>
+                            <input type="date" id="startDateInput-${uniqueId}" value="${currentStartDate}">
+                        </div>
+                        <div class="form-group">
+                            <label for="endDateInput-${uniqueId}">Enddatum:</label>
+                            <input type="date" id="endDateInput-${uniqueId}" value="${currentEndDate}">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="groupSelect-${uniqueId}">Gruppe:</label>
+                        <select id="groupSelect-${uniqueId}">
+                            <option value="">Bitte auswählen</option>
+                            ${groupOptions}
+                        </select>
+                    </div>
+                    <div class="form-group qualification-group" style="display: ${currentCardType === 'kapazitaet' ? 'block' : 'none'};">
+                        <label for="qualSelect-${uniqueId}">Qualifikation:</label>
+                        <select id="qualSelect-${uniqueId}">
+                            <option value="">Bitte auswählen</option>
+                            ${qualOptions}
+                        </select>
+                    </div>
+
+                    <div class="time-sliders-section">
+                        <h5>Arbeitszeiten pro Tag:</h5>
+                        ${generateDaySlidersHtml('MO', 'Montag', uniqueId, currentDayTimes.MO.start, currentDayTimes.MO.end)}
+                        ${generateDaySlidersHtml('DI', 'Dienstag', uniqueId, currentDayTimes.DI.start, currentDayTimes.DI.end)}
+                        ${generateDaySlidersHtml('MI', 'Mittwoch', uniqueId, currentDayTimes.MI.start, currentDayTimes.MI.end)}
+                        ${generateDaySlidersHtml('DO', 'Donnerstag', uniqueId, currentDayTimes.DO.start, currentDayTimes.DO.end)}
+                        ${generateDaySlidersHtml('FR', 'Freitag', uniqueId, currentDayTimes.FR.start, currentDayTimes.FR.end)}
+                    </div>
+
+                    <div class="button-group">
+                        <button class="button button-save">Speichern</button>
+                        <button class="button button-cancel">Abbrechen</button>
+                    </div>
+                </div>
+            `;
+
+            simulationCardsContainer.appendChild(card);
+
+            // Get references to elements within the newly created card
+            const displayModeDiv = card.querySelector('.display-mode');
+            const editModeDiv = card.querySelector('.edit-mode');
+            const cardNameDisplay = card.querySelector('.card-name-display');
+            const cardTypeQuantityDisplay = card.querySelector('.card-type-quantity-display'); // New element
+            const cardDatesDisplay = card.querySelector('.card-dates-display');
+            const cardGroupDisplay = card.querySelector('.card-group-display');
+            const cardQualDisplay = card.querySelector('.card-qual-display');
+            const displayDayTimesSection = card.querySelector('.display-day-times-section');
+
+            const cardNameInput = card.querySelector(`#cardNameInput-${uniqueId}`);
+            const cardTypeSelect = card.querySelector(`#cardTypeSelect-${uniqueId}`);
+            const cardQuantityInput = card.querySelector(`#cardQuantityInput-${uniqueId}`); // New element
+            const startDateInput = card.querySelector(`#startDateInput-${uniqueId}`);
+            const endDateInput = card.querySelector(`#endDateInput-${uniqueId}`);
+            const groupSelect = card.querySelector(`#groupSelect-${uniqueId}`);
+            const qualSelect = card.querySelector(`#qualSelect-${uniqueId}`);
+            const qualificationGroup = card.querySelector('.qualification-group');
+
+            const editIconButton = card.querySelector('.edit-icon-button');
+            const saveButton = card.querySelector('.button-save');
+            const cancelButton = card.querySelector('.button-cancel');
+            const removeButton = card.querySelector('.remove-button');
+
+            const daysOfWeek = ['MO', 'DI', 'MI', 'DO', 'FR'];
+            const dayNames = { 'MO': 'Mo', 'DI': 'Di', 'MI': 'Mi', 'DO': 'Do', 'FR': 'Fr' };
+
+            // Function to update the time range for a specific day
+            function updateDayTimeRange(dayCode) {
+                const startTimeSlider = card.querySelector(`#startTimeSlider-${dayCode}-${uniqueId}`);
+                const endTimeSlider = card.querySelector(`#endTimeSlider-${dayCode}-${uniqueId}`);
+                const timeDisplay = card.querySelector(`#timeDisplay-${dayCode}-${uniqueId}`);
+
+                let startTimeValue = parseInt(startTimeSlider.value);
+                let endTimeValue = parseInt(endTimeSlider.value);
+
+                // Ensure end time is always greater than or equal to start time
+                if (startTimeValue > endTimeValue) {
+                    endTimeSlider.value = startTimeValue;
+                    endTimeValue = startTimeValue;
+                } else if (endTimeValue < startTimeValue) {
+                    startTimeSlider.value = endTimeValue;
+                    startTimeValue = endTimeValue;
+                }
+
+                currentDayTimes[dayCode].start = startTimeValue;
+                currentDayTimes[dayCode].end = endTimeValue;
+
+                const startTime = convertSliderValueToTime(startTimeValue);
+                const endTime = convertSliderValueToTime(endTimeValue);
+                timeDisplay.textContent = `${startTime} - ${endTime}`;
+            }
+
+            // Function to toggle qualification field visibility
+            function toggleQualificationField() {
+                if (cardTypeSelect.value === 'kapazitaet') {
+                    qualificationGroup.style.display = 'block';
+                } else {
+                    qualificationGroup.style.display = 'none';
+                    qualSelect.value = ''; // Clear qualification if type changes from capacity
+                }
+            }
+
+            // Function to switch to edit mode
+            function switchToEditMode() {
+                displayModeDiv.style.display = 'none';
+                editModeDiv.style.display = 'block';
+                card.dataset.mode = 'edit';
+                
+                // Set input values to current displayed values
+                cardNameInput.value = currentCardName;
+                cardTypeSelect.value = currentCardType;
+                cardQuantityInput.value = currentQuantity; // Set quantity input
+                startDateInput.value = currentStartDate;
+                endDateInput.value = currentEndDate;
+                groupSelect.value = currentGroup;
+                qualSelect.value = currentQualification;
+                toggleQualificationField(); // Ensure correct visibility on entering edit mode
+
+                // Set slider values and update time displays for each day
+                daysOfWeek.forEach(dayCode => {
+                    const startTimeSlider = card.querySelector(`#startTimeSlider-${dayCode}-${uniqueId}`);
+                    const endTimeSlider = card.querySelector(`#endTimeSlider-${dayCode}-${uniqueId}`);
+                    startTimeSlider.value = currentDayTimes[dayCode].start;
+                    endTimeSlider.value = currentDayTimes[dayCode].end;
+                    updateDayTimeRange(dayCode); // Update display based on slider values
+                });
+            }
+
+            // Function to switch to display mode
+            function switchToDisplayMode() {
+                editModeDiv.style.display = 'none';
+                displayModeDiv.style.display = 'block';
+                card.dataset.mode = 'display';
+            }
+
+            // Event Listeners for the new card
+            removeButton.addEventListener('click', () => {
+                card.remove();
+                showMsg('Simulationskarte entfernt.', false);
+            });
+
+            editIconButton.addEventListener('click', switchToEditMode);
+
+            cardTypeSelect.addEventListener('change', toggleQualificationField);
+
+            saveButton.addEventListener('click', () => {
+                // --- Validation Start ---
+                if (!cardTypeSelect.value) {
+                    showMsg('Bitte wählen Sie einen Typ für die Simulationskarte aus.', true);
+                    return;
+                }
+                if (!startDateInput.value) {
+                    showMsg('Bitte wählen Sie ein Startdatum für die Simulationskarte aus.', true);
+                    return;
+                }
+                if (!groupSelect.value) {
+                    showMsg('Bitte wählen Sie eine Gruppe für die Simulationskarte aus.', true);
+                    return;
+                }
+                // --- Validation End ---
+
+                currentCardName = cardNameInput.value;
+                currentCardType = cardTypeSelect.value;
+                currentQuantity = parseInt(cardQuantityInput.value) || 1; // Parse as int, default to 1
+                currentStartDate = startDateInput.value;
+                currentEndDate = endDateInput.value;
+                currentGroup = groupSelect.value;
+                currentQualification = qualSelect.value; // Will be empty if not capacity type
+
+                cardNameDisplay.textContent = currentCardName;
+                cardTypeQuantityDisplay.textContent = `Typ: ${currentCardType === 'kapazitaet' ? 'Kapazität' : (currentCardType === 'bedarf' ? 'Bedarf' : 'Nicht ausgewählt')} | Anzahl: ${currentQuantity}`;
+                // Format dates for display
+                cardDatesDisplay.textContent = `Zeitraum: ${formatDateToGerman(currentStartDate)} - ${currentEndDate ? formatDateToGerman(currentEndDate) : 'Offen'}`;
+                cardGroupDisplay.textContent = `Gruppe: ${currentGroup || 'Nicht ausgewählt'}`;
+                
+                if (currentCardType === 'kapazitaet') {
+                    cardQualDisplay.style.display = 'block';
+                    cardQualDisplay.textContent = `Qualifikation: ${currentQualification || 'Nicht ausgewählt'}`;
+                } else {
+                    cardQualDisplay.style.display = 'none';
+                    cardQualDisplay.textContent = ''; // Clear text if hidden
+                }
+
+                // Update display mode for daily times
+                daysOfWeek.forEach(dayCode => {
+                    const displayTimeElement = card.querySelector(`#display-time-${dayCode}-${uniqueId}`);
+                    const startTime = convertSliderValueToTime(currentDayTimes[dayCode].start);
+                    const endTime = convertSliderValueToTime(currentDayTimes[dayCode].end);
+                    displayTimeElement.textContent = `${dayNames[dayCode]}: ${startTime} - ${endTime}`;
+                });
+
+                switchToDisplayMode();
+                showMsg('Simulationskarte gespeichert.', false);
+            });
+
+            cancelButton.addEventListener('click', () => {
+                // Revert to last saved state (which is in currentCardName/Type etc.)
+                // Note: For simplicity, `currentDayTimes` is not reverted here.
+                // A more robust solution would involve storing a 'last saved' state.
+                switchToDisplayMode();
+                showMsg('Bearbeitung abgebrochen.', false);
+            });
+
+            // Initial setup for sliders and time display
+            daysOfWeek.forEach(dayCode => {
+                const startTimeSlider = card.querySelector(`#startTimeSlider-${dayCode}-${uniqueId}`);
+                const endTimeSlider = card.querySelector(`#endTimeSlider-${dayCode}-${uniqueId}`);
+                
+                startTimeSlider.addEventListener('input', () => updateDayTimeRange(dayCode));
+                endTimeSlider.addEventListener('input', () => updateDayTimeRange(dayCode));
+                
+                updateDayTimeRange(dayCode); // Initial update
+            });
+        }
+
+
+        // Event Listener for ZIP file input change
+        zF.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                fN.textContent = `Ausgewählte Datei: ${e.target.files[0].name}`;
+                aB.disabled = false; // Enable analyze button
+                hideMsg();
+            } else {
+                fN.textContent = 'Keine Datei ausgewählt';
+                aB.disabled = true; // Disable analyze button
+            }
+        });
+
+        // Event Listener for Analyze button click
+        aB.addEventListener('click', async () => {
+            if (zF.files.length === 0) { showMsg('Bitte wählen Sie zuerst eine ZIP-Datei aus.', true); return; }
+
+            const file = zF.files[0];
+            showMsg('Analyse wird gestartet...', false);
+
+            fS.style.display = 'none'; // Hide form section
+            rS.style.display = 'block'; // Show results section
+            pK.textContent = 'Lade und analysiere Daten...';
+            pA.textContent = 'Lade und analysiere Daten...';
+            parsedChanges.textContent = 'Lade und analysiere Daten...';
+            document.getElementById('planningChart').innerHTML = ''; // Clear chart area
+
+            try {
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    const ab = e.target.result;
+                    const zip = new JSZip();
+                    const lZ = await zip.loadAsync(ab);
+
+                    let kXC = null, gXC = null, grXC = null, bXC = null, aXC = null; // XML content variables
+
+                    // Find and load specific XML files from the ZIP
+                    for (const fN in lZ.files) {
+                        if (fN.toLowerCase().includes('kind.xml')) kXC = await lZ.files[fN].async("arraybuffer");
+                        else if (fN.toLowerCase().includes('gruki.xml')) gXC = await lZ.files[fN].async("arraybuffer");
+                        else if (fN.toLowerCase().includes('gruppe.xml')) grXC = await lZ.files[fN].async("arraybuffer");
+                        else if (fN.toLowerCase().includes('belegung.xml')) bXC = await lZ.files[fN].async("arraybuffer");
+                        else if (fN.toLowerCase().includes('anstell.xml')) aXC = await lZ.files[fN].async("arraybuffer");
+                    }
+
+                    // Check if kind.xml is present (mandatory)
+                    if (!kXC) { showMsg('Die Datei "kind.xml" wurde im ZIP-Archiv nicht gefunden.', true); pK.textContent = 'Fehler: kind.xml nicht gefunden.'; pA.textContent = ''; parsedChanges.textContent = ''; return; }
+
+                    const dec = new TextDecoder('windows-1252'); // Decoder for Windows-1252 (common for German exports)
+                    const dKXS = dec.decode(kXC);
+                    const parser = new DOMParser();
+                    const kXD = parser.parseFromString(dKXS, "text/xml"); // Parse kind.xml
+
+                    // Check for XML parsing errors
+                    if (kXD.querySelector('parsererror')) { showMsg('Fehler beim Parsen der kind.xml-Datei: ' + kXD.querySelector('parsererror').textContent, true); pK.textContent = 'Fehler beim Parsen der kind.xml-Datei.'; pA.textContent = ''; parsedChanges.textContent = ''; return; }
+
+                    // Parse gruppe.xml (group names)
+                    gNM = new Map();
+                    if (grXC) {
+                        const grXD = parser.parseFromString(dec.decode(grXC), "text/xml");
+                        if (!grXD.querySelector('parsererror')) grXD.querySelectorAll('GRUPPE').forEach(n => { const r = n.querySelector('GRUNR')?.textContent.trim(); const b = n.querySelector('BEZ')?.textContent.trim(); if (r && b) gNM.set(r, b); });
+                        else showMsg('Warnung: Fehler beim Parsen der gruppe.xml-Datei: ' + grXD.querySelector('parsererror').textContent, false);
+                    } else showMsg('Warnung: Die Datei "gruppe.xml" wurde im ZIP-Archiv nicht gefunden. Gruppenbezeichnungen werden nicht angezeigt.', false);
+
+                    // Parse gruki.xml (group assignments for children)
+                    gAM = new Map();
+                    if (gXC) {
+                        const gkXD = parser.parseFromString(dec.decode(gXC), "text/xml");
+                        if (!gkXD.querySelector('parsererror')) gkXD.querySelectorAll('GRUPPENZUORDNUNG').forEach(n => {
+                            const k = n.querySelector('KINDNR')?.textContent.trim();
+                            const r = n.querySelector('GRUNR')?.textContent.trim();
+                            const v = n.querySelector('GKVON')?.textContent.trim();
+                            const b = n.querySelector('GKBIS')?.textContent.trim() || '';
+                            if (k) {
+                                const d = { GRUNR: r, GKVON: v, GKBIS: b };
+                                if (r && gNM.has(r)) d.BEZ = gNM.get(r); // Add group name if available
+                                if (!gAM.has(k)) gAM.set(k, []);
+                                gAM.get(k).push(d);
+                            }
+                        });
+                        else showMsg('Warnung: Fehler beim Parsen der gruki.xml-Datei: ' + gkXD.querySelector('parsererror').textContent, false);
+                    } else showMsg('Warnung: Die Datei "gruki.xml" wurde im ZIP-Archiv nicht gefunden. Gruppenzuordnungen werden nicht angezeigt.', false);
+
+                    // Parse belegung.xml (child booking times)
+                    bM = new Map();
+                    if (bXC) {
+                        const bXD = parser.parseFromString(dec.decode(bXC), "text/xml");
+                        if (!bXD.querySelector('parsererror')) {
+                            const dM = ['MO', 'DI', 'MI', 'DO', 'FR', 'SA', 'SO'];
+                            bXD.querySelectorAll('BELEGUNGSBUCHUNG').forEach(n => {
+                                const k = n.querySelector('KINDNR')?.textContent.trim();
+                                const v = n.querySelector('BELVON')?.textContent.trim() || '';
+                                const b = n.querySelector('BELBIS')?.textContent.trim() || '';
+                                const z = n.querySelector('ZEITEN')?.textContent.trim();
+                                if (k) {
+                                    const belegungData = { BELVON: v, BELBIS: b };
+                                    if (z) {
+                                        z.split('#').forEach((dayTimesStr, i) => {
+                                            if (i < dM.length) {
+                                                const tP = dayTimesStr.split('|');
+                                                const dP = dM[i];
+                                                if (tP[0] && tP[0] !== '') { belegungData[`${dP}_START`] = tP[0]; }
+                                                if (tP[1] && tP[1] !== '') { belegungData[`${dP}_END`] = tP[1]; }
+                                            }
+                                        });
+                                    }
+                                    if (!bM.has(k)) { bM.set(k, []); }
+                                    bM.get(k).push(belegungData);
+                                }
+                            });
+                        } else { showMsg('Warnung: Fehler beim Parsen der belegung.xml-Datei: ' + bXD.querySelector('parsererror').textContent, false); }
+                    } else { showMsg('Warnung: Die Datei "belegung.xml" wurde im ZIP-Archiv nicht gefunden. Belegungsdaten werden nicht angezeigt.', false); }
+
+                    // Parse anstell.xml (staff employment data)
+                    rAD = [];
+                    if (aXC) {
+                        const aXD = parser.parseFromString(dec.decode(aXC), "text/xml");
+                        if (!aXD.querySelector('parsererror')) aXD.querySelectorAll('ANSTELLUNG').forEach(n => {
+                            const d = {
+                                IDNR: n.querySelector('IDNR')?.textContent.trim(),
+                                BEGINNDAT: n.querySelector('BEGINNDAT')?.textContent.trim() || '',
+                                ENDDAT: n.querySelector('ENDDAT')?.textContent.trim() || '',
+                                ARBZEIT: n.querySelector('ARBZEIT')?.textContent.trim(),
+                                URLAUB: n.querySelector('URLAUB')?.textContent.trim(),
+                                QUALIFIK: n.querySelector('QUALIFIK')?.textContent.trim(),
+                                VERTRAGART: n.querySelector('VERTRAGART')?.textContent.trim()
+                            };
+                            const z = n.querySelector('ZEITEN')?.textContent.trim();
+                            if (z) ['MO', 'DI', 'MI', 'DO', 'FR'].forEach((dP, i) => {
+                                const tP = z.split('#')[i]?.split('|');
+                                if (tP && tP[0]) d[`${dP}_START`] = tP[0];
+                                if (tP && tP[1]) d[`${dP}_END`] = tP[1];
+                            });
+                            rAD.push(d);
+                        });
+                        else showMsg('Warnung: Fehler beim Parsen der anstell.xml-Datei: ' + aXD.querySelector('parsererror').textContent, false);
+                    } else showMsg('Warnung: Die Datei "anstell.xml" wurde im ZIP-Archiv nicht gefunden. Anstellungsdaten werden nicht angezeigt.', false);
+
+                    // Process kind.xml data and link with belegungen
+                    rKD = [];
+                    kXD.querySelectorAll('KIND').forEach(n => {
+                        const childData = {
+                            KINDNR: n.querySelector('KINDNR')?.textContent.trim(),
+                            AUSTRDAT: n.querySelector('AUSTRDAT')?.textContent.trim() || '',
+                            AUFNDAT: n.querySelector('AUFNDAT')?.textContent.trim() || '',
+                            GEBDATUM: n.querySelector('GEBDATUM')?.textContent.trim() || ''
+                        };
+                        if (!aCB.checked) { // Add full name if not anonymized
+                            childData.FNAME = n.querySelector('FNAME')?.textContent.trim() || '';
+                        }
+                        childData.BELEGUNGEN = bM.get(childData.KINDNR) || []; // Link bookings
+                        rKD.push(childData);
+                    });
+
+                    // Find and display known changes
+                    allKnownChanges = findKnownChanges(rKD, rAD, gAM, bM, gNM);
+                    parsedChanges.textContent = JSON.stringify(allKnownChanges, null, 2);
+                    populateKnownChangesDateFilter(); // Populate dropdown with changes
+
+                    showMsg(`Dateien geladen. Führe Analyse durch...`, false);
+                    filterAndRender(); // Perform initial filtering and chart rendering
+                };
+
+                reader.onerror = (error) => {
+                    showMsg('Fehler beim Lesen der Datei: ' + error.message, true);
+                    pK.textContent = 'Fehler beim Lesen der Datei.';
+                    pA.textContent = '';
+                    parsedChanges.textContent = '';
+                    document.getElementById('planningChart').innerHTML = '';
+                };
+                reader.readAsArrayBuffer(file);
+            } catch (error) {
+                showMsg('Ein unerwarteter Fehler ist aufgetreten: ' + error.message, true);
+                pK.textContent = 'Ein unerwarteter Fehler ist aufgetreten.';
+                pA.textContent = '';
+                parsedChanges.textContent = '';
+                document.getElementById('planningChart').innerHTML = '';
+                console.error('Analysefehler:', error);
+            }
+        });
+
+        // Event Listener for Stichtag picker change
+        sP.addEventListener('change', () => {
+            if (rKD.length > 0) filterAndRender();
+            else showMsg('Bitte laden Sie zuerst eine ZIP-Datei hoch, um die Daten zu filtern.', true);
+        });
+
+        // Event Listener for Known Changes Date Filter change
+        knownChangesDateFilter.addEventListener('change', () => {
+            const selectedDate = knownChangesDateFilter.value;
+            if (selectedDate === 'all') {
+                // If "Alle" is selected, reset Stichtag to today
+                const today = new Date();
+                const y = today.getFullYear();
+                const m = String(today.getMonth() + 1).padStart(2, '0');
+                const d = String(today.getDate()).padStart(2, '0');
+                sP.value = `${y}-${m}-${d}`;
+            } else {
+                // Set Stichtag to the selected change date
+                sP.value = selectedDate;
+            }
+            if (rKD.length > 0) filterAndRender();
+            else showMsg('Bitte laden Sie zuerst eine ZIP-Datei hoch, um die Daten zu filtern.', true);
+        });
+
+        // Event Listener for Reset button click
+        rB.addEventListener('click', () => {
+            fS.style.display = 'block'; // Show form
+            rS.style.display = 'none'; // Hide results
+            zF.value = ''; // Clear file input
+            fN.textContent = 'Keine Datei ausgewählt';
+            aB.disabled = true; // Disable analyze button
+            pK.textContent = ''; // Clear parsed data displays
+            pA.textContent = '';
+            parsedChanges.textContent = '';
+            hideMsg(); // Hide messages
+            aCB.checked = true; // Reset anonymization checkbox
+            document.getElementById('planningChart').innerHTML = ''; // Clear chart
+            // Reset all global data arrays/maps
+            rKD = [];
+            rAD = [];
+            gNM = new Map();
+            gAM = new Map();
+            bM = new Map();
+            cFK = [];
+            cFA = [];
+            fullChildrenPerSlot = [];
+            fullStaffPerSlot = [];
+            currentStichtag = null;
+            allKnownChanges = [];
+            populateKnownChangesDateFilter(); // Repopulate filter (will just show "Alle")
+            simulationCardsContainer.innerHTML = ''; // Clear all simulation cards
+        });
+
+        // Event Listener for Anonymize checkbox change
+        aCB.addEventListener('change', async () => {
+            if (rKD.length > 0) { // Only re-process if data is already loaded
+                allKnownChanges = findKnownChanges(rKD, rAD, gAM, bM, gNM); // Re-find changes with new anonymization setting
+                parsedChanges.textContent = JSON.stringify(allKnownChanges, null, 2);
+                populateKnownChangesDateFilter(); // Re-populate dropdown to reflect anonymization in summaries
+            }
+        });
+
+        /**
+         * Adds a new simulation card to the simulation cards container.
+         */
+        function addSimulationCard() {
+            const card = document.createElement('div');
+            card.className = 'simulation-card';
+            const uniqueId = 'sim-card-' + Date.now();
+            card.id = uniqueId;
+            card.dataset.mode = 'edit'; // Start in edit mode
+
+            // Default values for a new card
+            let currentCardName = 'Neue Simulation';
+            let currentCardType = ''; // Empty string for "Bitte auswählen"
+            let currentQuantity = 1; // Default quantity
+            const today = new Date();
+            const defaultStartDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+            let currentStartDate = defaultStartDate;
+            let currentEndDate = ''; // No default end date
+            let currentGroup = '';
+            let currentQualification = '';
+
+            // Default times for each day (08:00 - 17:00 as slider values)
+            const defaultDayTimes = {
+                MO: { start: 16, end: 34 },
+                DI: { start: 16, end: 34 },
+                MI: { start: 16, end: 34 },
+                DO: { start: 16, end: 34 },
+                FR: { start: 16, end: 34 }
+            };
+            let currentDayTimes = JSON.parse(JSON.stringify(defaultDayTimes)); // Deep copy
+
+            // Populate group options
+            const groupOptions = getUniqueGroupNames().map(group => `<option value="${group}">${group}</option>`).join('');
+            // Populate qualification options
+            const qualOptions = getUniqueQualifications().map(qual => `<option value="${qual}">${qual}</option>`).join('');
+
+            // Helper to generate HTML for a single day's time sliders
+            const generateDaySlidersHtml = (dayCode, dayName, cardId, initialStartValue, initialEndValue) => `
+                <div class="day-time-group">
+                    <label for="startTimeSlider-${dayCode}-${cardId}">
+                        ${dayName}: <span id="timeDisplay-${dayCode}-${cardId}" class="time-display"></span>
+                    </label>
+                    <input type="range" id="startTimeSlider-${dayCode}-${cardId}" min="0" max="47" value="${initialStartValue}">
+                    <input type="range" id="endTimeSlider-${dayCode}-${cardId}" min="0" max="47" value="${initialEndValue}">
+                </div>
+            `;
+
+            card.innerHTML = `
+                <button class="remove-button" data-card-id="${uniqueId}">x</button>
+
+                <!-- Display Mode (initially hidden) -->
+                <div class="display-mode" style="display: none;">
+                    <h4 class="card-name-display">${currentCardName}</h4>
+                    <div class="display-columns">
+                        <div class="display-column">
+                            <p class="card-type-quantity-display">Typ: ${currentCardType === 'kapazitaet' ? 'Kapazität' : (currentCardType === 'bedarf' ? 'Bedarf' : 'Nicht ausgewählt')} | Anzahl: ${currentQuantity}</p>
+                            <p class="card-dates-display">Zeitraum: ${formatDateToGerman(currentStartDate)} - ${currentEndDate ? formatDateToGerman(currentEndDate) : 'Offen'}</p>
+                        </div>
+                        <div class="display-column">
+                            <p class="card-group-display">Gruppe: ${currentGroup || 'Nicht ausgewählt'}</p>
+                            <p class="card-qual-display" style="display: ${currentCardType === 'kapazitaet' ? 'block' : 'none'};">Qualifikation: ${currentQualification || 'Nicht ausgewählt'}</p>
+                        </div>
+                    </div>
+                    <div class="display-day-times-section">
+                        <h5>Arbeitszeiten:</h5>
+                        <div class="working-hours-grid">
+                            <p id="display-time-MO-${uniqueId}">Mo: ${convertSliderValueToTime(currentDayTimes.MO.start)} - ${convertSliderValueToTime(currentDayTimes.MO.end)}</p>
+                            <p id="display-time-DI-${uniqueId}">Di: ${convertSliderValueToTime(currentDayTimes.DI.start)} - ${convertSliderValueToTime(currentDayTimes.DI.end)}</p>
+                            <p id="display-time-MI-${uniqueId}">Mi: ${convertSliderValueToTime(currentDayTimes.MI.start)} - ${convertSliderValueToTime(currentDayTimes.MI.end)}</p>
+                            <p id="display-time-DO-${uniqueId}">Do: ${convertSliderValueToTime(currentDayTimes.DO.start)} - ${convertSliderValueToTime(currentDayTimes.DO.end)}</p>
+                            <p id="display-time-FR-${uniqueId}">Fr: ${convertSliderValueToTime(currentDayTimes.FR.start)} - ${convertSliderValueToTime(currentDayTimes.FR.end)}</p>
+                        </div>
+                    </div>
+                    <button class="edit-icon-button"><i class="fas fa-pencil-alt"></i></button>
+                </div>
+
+                <!-- Edit Mode (initially visible) -->
+                <div class="edit-mode" style="display: block;">
+                    <h4>Simulationskarte bearbeiten</h4>
+                    <div class="form-group">
+                        <label for="cardNameInput-${uniqueId}">Name:</label>
+                        <input type="text" id="cardNameInput-${uniqueId}" value="${currentCardName}">
+                    </div>
+                    <div class="type-quantity-group"> <!-- New container for side-by-side type and quantity inputs -->
+                        <div class="form-group">
+                            <label for="cardTypeSelect-${uniqueId}">Typ:</label>
+                            <select id="cardTypeSelect-${uniqueId}">
+                                <option value="">Bitte auswählen</option>
+                                <option value="kapazitaet" ${currentCardType === 'kapazitaet' ? 'selected' : ''}>Kapazität</option>
+                                <option value="bedarf" ${currentCardType === 'bedarf' ? 'selected' : ''}>Bedarf</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="cardQuantityInput-${uniqueId}">Anzahl:</label>
+                            <input type="number" id="cardQuantityInput-${uniqueId}" value="${currentQuantity}" min="1">
+                        </div>
+                    </div>
+                    <div class="date-inputs-group"> <!-- New container for side-by-side date inputs -->
+                        <div class="form-group">
+                            <label for="startDateInput-${uniqueId}">Startdatum:</label>
+                            <input type="date" id="startDateInput-${uniqueId}" value="${currentStartDate}">
+                        </div>
+                        <div class="form-group">
+                            <label for="endDateInput-${uniqueId}">Enddatum:</label>
+                            <input type="date" id="endDateInput-${uniqueId}" value="${currentEndDate}">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="groupSelect-${uniqueId}">Gruppe:</label>
+                        <select id="groupSelect-${uniqueId}">
+                            <option value="">Bitte auswählen</option>
+                            ${groupOptions}
+                        </select>
+                    </div>
+                    <div class="form-group qualification-group" style="display: ${currentCardType === 'kapazitaet' ? 'block' : 'none'};">
+                        <label for="qualSelect-${uniqueId}">Qualifikation:</label>
+                        <select id="qualSelect-${uniqueId}">
+                            <option value="">Bitte auswählen</option>
+                            ${qualOptions}
+                        </select>
+                    </div>
+
+                    <div class="time-sliders-section">
+                        <h5>Arbeitszeiten pro Tag:</h5>
+                        ${generateDaySlidersHtml('MO', 'Montag', uniqueId, currentDayTimes.MO.start, currentDayTimes.MO.end)}
+                        ${generateDaySlidersHtml('DI', 'Dienstag', uniqueId, currentDayTimes.DI.start, currentDayTimes.DI.end)}
+                        ${generateDaySlidersHtml('MI', 'Mittwoch', uniqueId, currentDayTimes.MI.start, currentDayTimes.MI.end)}
+                        ${generateDaySlidersHtml('DO', 'Donnerstag', uniqueId, currentDayTimes.DO.start, currentDayTimes.DO.end)}
+                        ${generateDaySlidersHtml('FR', 'Freitag', uniqueId, currentDayTimes.FR.start, currentDayTimes.FR.end)}
+                    </div>
+
+                    <div class="button-group">
+                        <button class="button button-save">Speichern</button>
+                        <button class="button button-cancel">Abbrechen</button>
+                    </div>
+                </div>
+            `;
+
+            simulationCardsContainer.appendChild(card);
+
+            // Get references to elements within the newly created card
+            const displayModeDiv = card.querySelector('.display-mode');
+            const editModeDiv = card.querySelector('.edit-mode');
+            const cardNameDisplay = card.querySelector('.card-name-display');
+            const cardTypeQuantityDisplay = card.querySelector('.card-type-quantity-display'); // New element
+            const cardDatesDisplay = card.querySelector('.card-dates-display');
+            const cardGroupDisplay = card.querySelector('.card-group-display');
+            const cardQualDisplay = card.querySelector('.card-qual-display');
+            const displayDayTimesSection = card.querySelector('.display-day-times-section');
+
+            const cardNameInput = card.querySelector(`#cardNameInput-${uniqueId}`);
+            const cardTypeSelect = card.querySelector(`#cardTypeSelect-${uniqueId}`);
+            const cardQuantityInput = card.querySelector(`#cardQuantityInput-${uniqueId}`); // New element
+            const startDateInput = card.querySelector(`#startDateInput-${uniqueId}`);
+            const endDateInput = card.querySelector(`#endDateInput-${uniqueId}`);
+            const groupSelect = card.querySelector(`#groupSelect-${uniqueId}`);
+            const qualSelect = card.querySelector(`#qualSelect-${uniqueId}`);
+            const qualificationGroup = card.querySelector('.qualification-group');
+
+            const editIconButton = card.querySelector('.edit-icon-button');
+            const saveButton = card.querySelector('.button-save');
+            const cancelButton = card.querySelector('.button-cancel');
+            const removeButton = card.querySelector('.remove-button');
+
+            const daysOfWeek = ['MO', 'DI', 'MI', 'DO', 'FR'];
+            const dayNames = { 'MO': 'Mo', 'DI': 'Di', 'MI': 'Mi', 'DO': 'Do', 'FR': 'Fr' };
+
+            // Function to update the time range for a specific day
+            function updateDayTimeRange(dayCode) {
+                const startTimeSlider = card.querySelector(`#startTimeSlider-${dayCode}-${uniqueId}`);
+                const endTimeSlider = card.querySelector(`#endTimeSlider-${dayCode}-${uniqueId}`);
+                const timeDisplay = card.querySelector(`#timeDisplay-${dayCode}-${uniqueId}`);
+
+                let startTimeValue = parseInt(startTimeSlider.value);
+                let endTimeValue = parseInt(endTimeSlider.value);
+
+                // Ensure end time is always greater than or equal to start time
+                if (startTimeValue > endTimeValue) {
+                    endTimeSlider.value = startTimeValue;
+                    endTimeValue = startTimeValue;
+                } else if (endTimeValue < startTimeValue) {
+                    startTimeSlider.value = endTimeValue;
+                    startTimeValue = endTimeValue;
+                }
+
+                currentDayTimes[dayCode].start = startTimeValue;
+                currentDayTimes[dayCode].end = endTimeValue;
+
+                const startTime = convertSliderValueToTime(startTimeValue);
+                const endTime = convertSliderValueToTime(endTimeValue);
+                timeDisplay.textContent = `${startTime} - ${endTime}`;
+            }
+
+            // Function to toggle qualification field visibility
+            function toggleQualificationField() {
+                if (cardTypeSelect.value === 'kapazitaet') {
+                    qualificationGroup.style.display = 'block';
+                } else {
+                    qualificationGroup.style.display = 'none';
+                    qualSelect.value = ''; // Clear qualification if type changes from capacity
+                }
+            }
+
+            // Function to switch to edit mode
+            function switchToEditMode() {
+                displayModeDiv.style.display = 'none';
+                editModeDiv.style.display = 'block';
+                card.dataset.mode = 'edit';
+                
+                // Set input values to current displayed values
+                cardNameInput.value = currentCardName;
+                cardTypeSelect.value = currentCardType;
+                cardQuantityInput.value = currentQuantity; // Set quantity input
+                startDateInput.value = currentStartDate;
+                endDateInput.value = currentEndDate;
+                groupSelect.value = currentGroup;
+                qualSelect.value = currentQualification;
+                toggleQualificationField(); // Ensure correct visibility on entering edit mode
+
+                // Set slider values and update time displays for each day
+                daysOfWeek.forEach(dayCode => {
+                    const startTimeSlider = card.querySelector(`#startTimeSlider-${dayCode}-${uniqueId}`);
+                    const endTimeSlider = card.querySelector(`#endTimeSlider-${dayCode}-${uniqueId}`);
+                    startTimeSlider.value = currentDayTimes[dayCode].start;
+                    endTimeSlider.value = currentDayTimes[dayCode].end;
+                    updateDayTimeRange(dayCode); // Update display based on slider values
+                });
+            }
+
+            // Function to switch to display mode
+            function switchToDisplayMode() {
+                editModeDiv.style.display = 'none';
+                displayModeDiv.style.display = 'block';
+                card.dataset.mode = 'display';
+            }
+
+            // Event Listeners for the new card
+            removeButton.addEventListener('click', () => {
+                card.remove();
+                showMsg('Simulationskarte entfernt.', false);
+            });
+
+            editIconButton.addEventListener('click', switchToEditMode);
+
+            cardTypeSelect.addEventListener('change', toggleQualificationField);
+
+            saveButton.addEventListener('click', () => {
+                // --- Validation Start ---
+                if (!cardTypeSelect.value) {
+                    showMsg('Bitte wählen Sie einen Typ für die Simulationskarte aus.', true);
+                    return;
+                }
+                if (!startDateInput.value) {
+                    showMsg('Bitte wählen Sie ein Startdatum für die Simulationskarte aus.', true);
+                    return;
+                }
+                if (!groupSelect.value) {
+                    showMsg('Bitte wählen Sie eine Gruppe für die Simulationskarte aus.', true);
+                    return;
+                }
+                // --- Validation End ---
+
+                currentCardName = cardNameInput.value;
+                currentCardType = cardTypeSelect.value;
+                currentQuantity = parseInt(cardQuantityInput.value) || 1; // Parse as int, default to 1
+                currentStartDate = startDateInput.value;
+                currentEndDate = endDateInput.value;
+                currentGroup = groupSelect.value;
+                currentQualification = qualSelect.value; // Will be empty if not capacity type
+
+                cardNameDisplay.textContent = currentCardName;
+                cardTypeQuantityDisplay.textContent = `Typ: ${currentCardType === 'kapazitaet' ? 'Kapazität' : (currentCardType === 'bedarf' ? 'Bedarf' : 'Nicht ausgewählt')} | Anzahl: ${currentQuantity}`;
+                // Format dates for display
+                cardDatesDisplay.textContent = `Zeitraum: ${formatDateToGerman(currentStartDate)} - ${currentEndDate ? formatDateToGerman(currentEndDate) : 'Offen'}`;
+                cardGroupDisplay.textContent = `Gruppe: ${currentGroup || 'Nicht ausgewählt'}`;
+                
+                if (currentCardType === 'kapazitaet') {
+                    cardQualDisplay.style.display = 'block';
+                    cardQualDisplay.textContent = `Qualifikation: ${currentQualification || 'Nicht ausgewählt'}`;
+                } else {
+                    cardQualDisplay.style.display = 'none';
+                    cardQualDisplay.textContent = ''; // Clear text if hidden
+                }
+
+                // Update display mode for daily times
+                daysOfWeek.forEach(dayCode => {
+                    const displayTimeElement = card.querySelector(`#display-time-${dayCode}-${uniqueId}`);
+                    const startTime = convertSliderValueToTime(currentDayTimes[dayCode].start);
+                    const endTime = convertSliderValueToTime(currentDayTimes[dayCode].end);
+                    displayTimeElement.textContent = `${dayNames[dayCode]}: ${startTime} - ${endTime}`;
+                });
+
+                switchToDisplayMode();
+                showMsg('Simulationskarte gespeichert.', false);
+            });
+
+            cancelButton.addEventListener('click', () => {
+                // Revert to last saved state (which is in currentCardName/Type etc.)
+                // Note: For simplicity, `currentDayTimes` is not reverted here.
+                // A more robust solution would involve storing a 'last saved' state.
+                switchToDisplayMode();
+                showMsg('Bearbeitung abgebrochen.', false);
+            });
+
+            // Initial setup for sliders and time display
+            daysOfWeek.forEach(dayCode => {
+                const startTimeSlider = card.querySelector(`#startTimeSlider-${dayCode}-${uniqueId}`);
+                const endTimeSlider = card.querySelector(`#endTimeSlider-${dayCode}-${uniqueId}`);
+                
+                startTimeSlider.addEventListener('input', () => updateDayTimeRange(dayCode));
+                endTimeSlider.addEventListener('input', () => updateDayTimeRange(dayCode));
+                
+                updateDayTimeRange(dayCode); // Initial update
+            });
+        }
+
+
+        // Event Listener for ZIP file input change
+        zF.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                fN.textContent = `Ausgewählte Datei: ${e.target.files[0].name}`;
+                aB.disabled = false; // Enable analyze button
+                hideMsg();
+            } else {
+                fN.textContent = 'Keine Datei ausgewählt';
+                aB.disabled = true; // Disable analyze button
+            }
+        });
+
+        // Event Listener for Analyze button click
+        aB.addEventListener('click', async () => {
+            if (zF.files.length === 0) { showMsg('Bitte wählen Sie zuerst eine ZIP-Datei aus.', true); return; }
+
+            const file = zF.files[0];
+            showMsg('Analyse wird gestartet...', false);
+
+            fS.style.display = 'none'; // Hide form section
+            rS.style.display = 'block'; // Show results section
+            pK.textContent = 'Lade und analysiere Daten...';
+            pA.textContent = 'Lade und analysiere Daten...';
+            parsedChanges.textContent = 'Lade und analysiere Daten...';
+            document.getElementById('planningChart').innerHTML = ''; // Clear chart area
+
+            try {
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    const ab = e.target.result;
+                    const zip = new JSZip();
+                    const lZ = await zip.loadAsync(ab);
+
+                    let kXC = null, gXC = null, grXC = null, bXC = null, aXC = null; // XML content variables
+
+                    // Find and load specific XML files from the ZIP
+                    for (const fN in lZ.files) {
+                        if (fN.toLowerCase().includes('kind.xml')) kXC = await lZ.files[fN].async("arraybuffer");
+                        else if (fN.toLowerCase().includes('gruki.xml')) gXC = await lZ.files[fN].async("arraybuffer");
+                        else if (fN.toLowerCase().includes('gruppe.xml')) grXC = await lZ.files[fN].async("arraybuffer");
+                        else if (fN.toLowerCase().includes('belegung.xml')) bXC = await lZ.files[fN].async("arraybuffer");
+                        else if (fN.toLowerCase().includes('anstell.xml')) aXC = await lZ.files[fN].async("arraybuffer");
+                    }
+
+                    // Check if kind.xml is present (mandatory)
+                    if (!kXC) { showMsg('Die Datei "kind.xml" wurde im ZIP-Archiv nicht gefunden.', true); pK.textContent = 'Fehler: kind.xml nicht gefunden.'; pA.textContent = ''; parsedChanges.textContent = ''; return; }
+
+                    const dec = new TextDecoder('windows-1252'); // Decoder for Windows-1252 (common for German exports)
+                    const dKXS = dec.decode(kXC);
+                    const parser = new DOMParser();
+                    const kXD = parser.parseFromString(dKXS, "text/xml"); // Parse kind.xml
+
+                    // Check for XML parsing errors
+                    if (kXD.querySelector('parsererror')) { showMsg('Fehler beim Parsen der kind.xml-Datei: ' + kXD.querySelector('parsererror').textContent, true); pK.textContent = 'Fehler beim Parsen der kind.xml-Datei.'; pA.textContent = ''; parsedChanges.textContent = ''; return; }
+
+                    // Parse gruppe.xml (group names)
+                    gNM = new Map();
+                    if (grXC) {
+                        const grXD = parser.parseFromString(dec.decode(grXC), "text/xml");
+                        if (!grXD.querySelector('parsererror')) grXD.querySelectorAll('GRUPPE').forEach(n => { const r = n.querySelector('GRUNR')?.textContent.trim(); const b = n.querySelector('BEZ')?.textContent.trim(); if (r && b) gNM.set(r, b); });
+                        else showMsg('Warnung: Fehler beim Parsen der gruppe.xml-Datei: ' + grXD.querySelector('parsererror').textContent, false);
+                    } else showMsg('Warnung: Die Datei "gruppe.xml" wurde im ZIP-Archiv nicht gefunden. Gruppenbezeichnungen werden nicht angezeigt.', false);
+
+                    // Parse gruki.xml (group assignments for children)
+                    gAM = new Map();
+                    if (gXC) {
+                        const gkXD = parser.parseFromString(dec.decode(gXC), "text/xml");
+                        if (!gkXD.querySelector('parsererror')) gkXD.querySelectorAll('GRUPPENZUORDNUNG').forEach(n => {
+                            const k = n.querySelector('KINDNR')?.textContent.trim();
+                            const r = n.querySelector('GRUNR')?.textContent.trim();
+                            const v = n.querySelector('GKVON')?.textContent.trim();
+                            const b = n.querySelector('GKBIS')?.textContent.trim() || '';
+                            if (k) {
+                                const d = { GRUNR: r, GKVON: v, GKBIS: b };
+                                if (r && gNM.has(r)) d.BEZ = gNM.get(r); // Add group name if available
+                                if (!gAM.has(k)) gAM.set(k, []);
+                                gAM.get(k).push(d);
+                            }
+                        });
+                        else showMsg('Warnung: Fehler beim Parsen der gruki.xml-Datei: ' + gkXD.querySelector('parsererror').textContent, false);
+                    } else showMsg('Warnung: Die Datei "gruki.xml" wurde im ZIP-Archiv nicht gefunden. Gruppenzuordnungen werden nicht angezeigt.', false);
+
+                    // Parse belegung.xml (child booking times)
+                    bM = new Map();
+                    if (bXC) {
+                        const bXD = parser.parseFromString(dec.decode(bXC), "text/xml");
+                        if (!bXD.querySelector('parsererror')) {
+                            const dM = ['MO', 'DI', 'MI', 'DO', 'FR', 'SA', 'SO'];
+                            bXD.querySelectorAll('BELEGUNGSBUCHUNG').forEach(n => {
+                                const k = n.querySelector('KINDNR')?.textContent.trim();
+                                const v = n.querySelector('BELVON')?.textContent.trim() || '';
+                                const b = n.querySelector('BELBIS')?.textContent.trim() || '';
+                                const z = n.querySelector('ZEITEN')?.textContent.trim();
+                                if (k) {
+                                    const belegungData = { BELVON: v, BELBIS: b };
+                                    if (z) {
+                                        z.split('#').forEach((dayTimesStr, i) => {
+                                            if (i < dM.length) {
+                                                const tP = dayTimesStr.split('|');
+                                                const dP = dM[i];
+                                                if (tP[0] && tP[0] !== '') { belegungData[`${dP}_START`] = tP[0]; }
+                                                if (tP[1] && tP[1] !== '') { belegungData[`${dP}_END`] = tP[1]; }
+                                            }
+                                        });
+                                    }
+                                    if (!bM.has(k)) { bM.set(k, []); }
+                                    bM.get(k).push(belegungData);
+                                }
+                            });
+                        } else { showMsg('Warnung: Fehler beim Parsen der belegung.xml-Datei: ' + bXD.querySelector('parsererror').textContent, false); }
+                    } else { showMsg('Warnung: Die Datei "belegung.xml" wurde im ZIP-Archiv nicht gefunden. Belegungsdaten werden nicht angezeigt.', false); }
+
+                    // Parse anstell.xml (staff employment data)
+                    rAD = [];
+                    if (aXC) {
+                        const aXD = parser.parseFromString(dec.decode(aXC), "text/xml");
+                        if (!aXD.querySelector('parsererror')) aXD.querySelectorAll('ANSTELLUNG').forEach(n => {
+                            const d = {
+                                IDNR: n.querySelector('IDNR')?.textContent.trim(),
+                                BEGINNDAT: n.querySelector('BEGINNDAT')?.textContent.trim() || '',
+                                ENDDAT: n.querySelector('ENDDAT')?.textContent.trim() || '',
+                                ARBZEIT: n.querySelector('ARBZEIT')?.textContent.trim(),
+                                URLAUB: n.querySelector('URLAUB')?.textContent.trim(),
+                                QUALIFIK: n.querySelector('QUALIFIK')?.textContent.trim(),
+                                VERTRAGART: n.querySelector('VERTRAGART')?.textContent.trim()
+                            };
+                            const z = n.querySelector('ZEITEN')?.textContent.trim();
+                            if (z) ['MO', 'DI', 'MI', 'DO', 'FR'].forEach((dP, i) => {
+                                const tP = z.split('#')[i]?.split('|');
+                                if (tP && tP[0]) d[`${dP}_START`] = tP[0];
+                                if (tP && tP[1]) d[`${dP}_END`] = tP[1];
+                            });
+                            rAD.push(d);
+                        });
+                        else showMsg('Warnung: Fehler beim Parsen der anstell.xml-Datei: ' + aXD.querySelector('parsererror').textContent, false);
+                    } else showMsg('Warnung: Die Datei "anstell.xml" wurde im ZIP-Archiv nicht gefunden. Anstellungsdaten werden nicht angezeigt.', false);
+
+                    // Process kind.xml data and link with belegungen
+                    rKD = [];
+                    kXD.querySelectorAll('KIND').forEach(n => {
+                        const childData = {
+                            KINDNR: n.querySelector('KINDNR')?.textContent.trim(),
+                            AUSTRDAT: n.querySelector('AUSTRDAT')?.textContent.trim() || '',
+                            AUFNDAT: n.querySelector('AUFNDAT')?.textContent.trim() || '',
+                            GEBDATUM: n.querySelector('GEBDATUM')?.textContent.trim() || ''
+                        };
+                        if (!aCB.checked) { // Add full name if not anonymized
+                            childData.FNAME = n.querySelector('FNAME')?.textContent.trim() || '';
+                        }
+                        childData.BELEGUNGEN = bM.get(childData.KINDNR) || []; // Link bookings
+                        rKD.push(childData);
+                    });
+
+                    // Find and display known changes
+                    allKnownChanges = findKnownChanges(rKD, rAD, gAM, bM, gNM);
+                    parsedChanges.textContent = JSON.stringify(allKnownChanges, null, 2);
+                    populateKnownChangesDateFilter(); // Populate dropdown with changes
+
+                    showMsg(`Dateien geladen. Führe Analyse durch...`, false);
+                    filterAndRender(); // Perform initial filtering and chart rendering
+                };
+
+                reader.onerror = (error) => {
+                    showMsg('Fehler beim Lesen der Datei: ' + error.message, true);
+                    pK.textContent = 'Fehler beim Lesen der Datei.';
+                    pA.textContent = '';
+                    parsedChanges.textContent = '';
+                    document.getElementById('planningChart').innerHTML = '';
+                };
+                reader.readAsArrayBuffer(file);
+            } catch (error) {
+                showMsg('Ein unerwarteter Fehler ist aufgetreten: ' + error.message, true);
+                pK.textContent = 'Ein unerwarteter Fehler ist aufgetreten.';
+                pA.textContent = '';
+                parsedChanges.textContent = '';
+                document.getElementById('planningChart').innerHTML = '';
+                console.error('Analysefehler:', error);
+            }
+        });
+
+        // Event Listener for Stichtag picker change
+        sP.addEventListener('change', () => {
+            if (rKD.length > 0) filterAndRender();
+            else showMsg('Bitte laden Sie zuerst eine ZIP-Datei hoch, um die Daten zu filtern.', true);
+        });
+
+        // Event Listener for Known Changes Date Filter change
+        knownChangesDateFilter.addEventListener('change', () => {
+            const selectedDate = knownChangesDateFilter.value;
+            if (selectedDate === 'all') {
+                // If "Alle" is selected, reset Stichtag to today
+                const today = new Date();
+                const y = today.getFullYear();
+                const m = String(today.getMonth() + 1).padStart(2, '0');
+                const d = String(today.getDate()).padStart(2, '0');
+                sP.value = `${y}-${m}-${d}`;
+            } else {
+                // Set Stichtag to the selected change date
+                sP.value = selectedDate;
+            }
+            if (rKD.length > 0) filterAndRender();
+            else showMsg('Bitte laden Sie zuerst eine ZIP-Datei hoch, um die Daten zu filtern.', true);
+        });
+
+        // Event Listener for Reset button click
+        rB.addEventListener('click', () => {
+            fS.style.display = 'block'; // Show form
+            rS.style.display = 'none'; // Hide results
+            zF.value = ''; // Clear file input
+            fN.textContent = 'Keine Datei ausgewählt';
+            aB.disabled = true; // Disable analyze button
+            pK.textContent = ''; // Clear parsed data displays
+            pA.textContent = '';
+            parsedChanges.textContent = '';
+            hideMsg(); // Hide messages
+            aCB.checked = true; // Reset anonymization checkbox
+            document.getElementById('planningChart').innerHTML = ''; // Clear chart
+            // Reset all global data arrays/maps
+            rKD = [];
+            rAD = [];
+            gNM = new Map();
+            gAM = new Map();
+            bM = new Map();
+            cFK = [];
+            cFA = [];
+            fullChildrenPerSlot = [];
+            fullStaffPerSlot = [];
+            currentStichtag = null;
+            allKnownChanges = [];
+            populateKnownChangesDateFilter(); // Repopulate filter (will just show "Alle")
+            simulationCardsContainer.innerHTML = ''; // Clear all simulation cards
+        });
+
+        // Event Listener for Anonymize checkbox change
+        aCB.addEventListener('change', async () => {
+            if (rKD.length > 0) { // Only re-process if data is already loaded
+                allKnownChanges = findKnownChanges(rKD, rAD, gAM, bM, gNM); // Re-find changes with new anonymization setting
+                parsedChanges.textContent = JSON.stringify(allKnownChanges, null, 2);
+                populateKnownChangesDateFilter(); // Re-populate dropdown to reflect anonymization in summaries
+            }
+        });
+
+        // Event listener for the new simulation button
+        addSimButton.addEventListener('click', () => {
+            addSimulationCard(); // Call the function to add a new card
+            showMsg('Neue Simulationskarte hinzugefügt.', false);
+        });
+    </script>
+</body>
+</html>
