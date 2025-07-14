@@ -1,10 +1,11 @@
 import {
-  Typography, Box, Tabs, Tab, TextField, Paper, Accordion, AccordionSummary, AccordionDetails, Switch, Slider, Divider, Radio, RadioGroup, FormControlLabel, FormControl, FormLabel, Select, MenuItem, InputLabel
+  Typography, Box, Tabs, Tab, TextField, Paper, Accordion, AccordionSummary, AccordionDetails, Switch, Slider, Divider, Radio, RadioGroup, FormControlLabel, FormControl, FormLabel, Select, MenuItem, InputLabel, Button
 } from '@mui/material';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import CommentIcon from '@mui/icons-material/Comment';
 import DataObjectIcon from '@mui/icons-material/DataObject';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import AddIcon from '@mui/icons-material/Add';
 import { useState, useEffect } from 'react';
 
 // --- Hilfsfunktionen für die neue BookingAccordion ---
@@ -161,8 +162,9 @@ function DayControl({ dayLabel, dayAbbr, dayData, onToggle, onTimeChange, onAddS
   );
 }
 
-function BookingAccordion({ booking, index, type, allGroups }) {
+function BookingAccordion({ booking, index, type, allGroups, defaultExpanded, onDelete, canDelete }) {
   const [bookingState, setBookingState] = useState(booking);
+  const [expanded, setExpanded] = useState(!!defaultExpanded);
 
   useEffect(() => {
     setBookingState(booking);
@@ -266,13 +268,23 @@ function BookingAccordion({ booking, index, type, allGroups }) {
   }
 
   return (
-    <Accordion>
+    <Accordion expanded={expanded} onChange={() => setExpanded(e => !e)}>
       <AccordionSummary expandIcon={<ExpandMoreIcon />}>
         <Typography>
           Buchung {index + 1}: {dateRangeText}
           {dateRangeText ? ': ' : ''}
           {consolidateBookingSummary(times)}
         </Typography>
+        {onDelete && canDelete && (
+          <Button
+            size="small"
+            color="error"
+            sx={{ ml: 2 }}
+            onClick={e => { e.stopPropagation(); onDelete(index); }}
+          >
+            Löschen
+          </Button>
+        )}
       </AccordionSummary>
       <AccordionDetails>
         <Box display="flex" gap={2} sx={{ mb: 2, alignItems: 'center' }}>
@@ -315,21 +327,31 @@ function BookingAccordion({ booking, index, type, allGroups }) {
   );
 }
 
-function BookingCards({ bookings, type, allGroups }) {
+function BookingCards({ bookings, type, allGroups, lastAddedIndex, onDelete, importedCount }) {
   if (!bookings || bookings.length === 0) {
     return <Typography variant="body2" color="text.secondary">Keine Buchungszeiten vorhanden.</Typography>;
   }
   return (
     <Box>
       {bookings.map((booking, idx) => (
-        <BookingAccordion key={idx} booking={booking} index={idx} type={type} allGroups={allGroups} />
+        <BookingAccordion
+          key={idx}
+          booking={booking}
+          index={idx}
+          type={type}
+          allGroups={allGroups}
+          defaultExpanded={lastAddedIndex === idx}
+          onDelete={onDelete}
+          canDelete={typeof importedCount === 'number' ? idx >= importedCount : true}
+        />
       ))}
     </Box>
   );
 }
 
-function GroupAccordion({ group, index, allGroups }) {
+function GroupAccordion({ group, index, allGroups, defaultExpanded, onDelete, canDelete }) {
   const [groupState, setGroupState] = useState(group);
+  const [expanded, setExpanded] = useState(!!defaultExpanded);
 
   useEffect(() => {
     setGroupState(group);
@@ -363,11 +385,21 @@ function GroupAccordion({ group, index, allGroups }) {
   }
 
   return (
-    <Accordion>
+    <Accordion expanded={expanded} onChange={() => setExpanded(e => !e)}>
       <AccordionSummary expandIcon={<ExpandMoreIcon />}>
         <Typography>
-          {name}{dateRangeText ? `: ${dateRangeText}` : ''}
+          {groupState.name || 'Gruppenzuordnung'}{dateRangeText ? `: ${dateRangeText}` : ''}
         </Typography>
+        {onDelete && canDelete && (
+          <Button
+            size="small"
+            color="error"
+            sx={{ ml: 2 }}
+            onClick={e => { e.stopPropagation(); onDelete(index); }}
+          >
+            Löschen
+          </Button>
+        )}
       </AccordionSummary>
       <AccordionDetails>
         <Box display="flex" flexDirection="column" gap={3}>
@@ -410,14 +442,22 @@ function GroupAccordion({ group, index, allGroups }) {
   );
 }
 
-function GroupCards({ groups, allGroups }) {
+function GroupCards({ groups, allGroups, lastAddedIndex, onDelete, importedCount }) {
   if (!groups || groups.length === 0) {
     return <Typography variant="body2" color="text.secondary">Keine Gruppenzuordnungen vorhanden.</Typography>;
   }
   return (
     <Box>
       {groups.map((group, idx) => (
-        <GroupAccordion key={idx} group={group} index={idx} allGroups={allGroups} />
+        <GroupAccordion
+          key={idx}
+          group={group}
+          index={idx}
+          allGroups={allGroups}
+          defaultExpanded={lastAddedIndex === idx}
+          onDelete={onDelete}
+          canDelete={typeof importedCount === 'number' ? idx >= importedCount : true}
+        />
       ))}
     </Box>
   );
@@ -435,6 +475,11 @@ function SimDataDetail({ item, allGroups }) {
       ? item.parseddata.enddate.split('.').reverse().join('-')
       : ''
   );
+  const [localItem, setLocalItem] = useState(item);
+  const [lastAddedBookingIdx, setLastAddedBookingIdx] = useState(null);
+  const [lastAddedGroupIdx, setLastAddedGroupIdx] = useState(null);
+  const [importedBookingCount, setImportedBookingCount] = useState(0);
+  const [importedGroupCount, setImportedGroupCount] = useState(0);
 
   const initialStartDate = item?.parseddata?.startdate ? item.parseddata.startdate.split('.').reverse().join('-') : '';
   const initialEndDate = item?.parseddata?.enddate ? item.parseddata.enddate.split('.').reverse().join('-') : '';
@@ -445,7 +490,101 @@ function SimDataDetail({ item, allGroups }) {
     setEndDate(initialEndDate);
   }, [item, initialStartDate, initialEndDate]);
 
-  if (!item) {
+  useEffect(() => {
+    setLocalItem(item);
+    setLastAddedBookingIdx(null);
+    setLastAddedGroupIdx(null);
+
+    // Zähle importierte Buchungen/Gruppen (aus Adebis)
+    if (item?.rawdata?.source === 'adebis export') {
+      setImportedBookingCount(Array.isArray(item?.originalParsedData?.booking) ? item.originalParsedData.booking.length : 0);
+      setImportedGroupCount(Array.isArray(item?.originalParsedData?.group) ? item.originalParsedData.group.length : 0);
+    } else {
+      setImportedBookingCount(0);
+      setImportedGroupCount(0);
+    }
+  }, [item]);
+
+  // Buchungszeitraum hinzufügen
+  const handleAddBooking = () => {
+    setLocalItem(prev => {
+      if (!prev) return prev;
+      const newBooking = {
+        startdate: '',
+        enddate: '',
+        times: []
+      };
+      const newBookings = [...(prev.parseddata?.booking || []), newBooking];
+      setLastAddedBookingIdx(newBookings.length - 1);
+      return {
+        ...prev,
+        parseddata: {
+          ...prev.parseddata,
+          booking: newBookings
+        }
+      };
+    });
+  };
+
+  // Buchungszeitraum löschen
+  const handleDeleteBooking = (idx) => {
+    setLocalItem(prev => {
+      if (!prev) return prev;
+      const bookings = prev.parseddata?.booking || [];
+      if (bookings.length <= idx) return prev;
+      const newBookings = bookings.slice(0, idx).concat(bookings.slice(idx + 1));
+      return {
+        ...prev,
+        parseddata: {
+          ...prev.parseddata,
+          booking: newBookings
+        }
+      };
+    });
+    setLastAddedBookingIdx(null);
+  };
+
+  // Gruppe hinzufügen
+  const handleAddGroup = () => {
+    setLocalItem(prev => {
+      if (!prev) return prev;
+      const newGroup = {
+        id: '',
+        name: '',
+        start: '',
+        end: ''
+      };
+      const newGroups = [...(prev.parseddata?.group || []), newGroup];
+      setLastAddedGroupIdx(newGroups.length - 1);
+      return {
+        ...prev,
+        parseddata: {
+          ...prev.parseddata,
+          group: newGroups
+        }
+      };
+    });
+  };
+
+  // Gruppe löschen
+  const handleDeleteGroup = (idx) => {
+    setLocalItem(prev => {
+      if (!prev) return prev;
+      const groups = prev.parseddata?.group || [];
+      if (groups.length <= idx) return prev;
+      const newGroups = groups.slice(0, idx).concat(groups.slice(idx + 1));
+      return {
+        ...prev,
+        parseddata: {
+          ...prev.parseddata,
+          group: newGroups
+        }
+      };
+    });
+    setLastAddedGroupIdx(null);
+  };
+
+  if (!localItem) {
     return (
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
         <Typography color="text.secondary">
@@ -478,6 +617,7 @@ function SimDataDetail({ item, allGroups }) {
       </Tabs>
       {tab === 0 && (
         <Box flex={1} display="flex" flexDirection="column" gap={2} sx={{ overflowY: 'auto' }}>
+          {/* Wiederhergestellte Datumsfelder für den Datensatz */}
           <Box display="flex" alignItems="center" gap={2} sx={{ mb: 2 }}>
             <Typography variant="body2" sx={{ minWidth: 90 }}>Zeitraum von</Typography>
             <TextField
@@ -500,10 +640,43 @@ function SimDataDetail({ item, allGroups }) {
               sx={{ width: 150 }}
             />
           </Box>
-          <Typography variant="h6" sx={{ mt: 1, mb: 1 }}>Buchungszeiten:</Typography>
-          <BookingCards bookings={item.parseddata?.booking} type={item.type} allGroups={allGroups} />
-          <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>Gruppen:</Typography>
-          <GroupCards groups={item.parseddata?.group} allGroups={allGroups} />
+          <Box display="flex" alignItems="center" gap={2} sx={{ mb: 1 }}>
+            <Typography variant="h6" sx={{ mt: 1, mb: 1, flex: 1 }}>Buchungszeiten:</Typography>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<AddIcon />}
+              onClick={handleAddBooking}
+            >
+              Buchungszeitraum hinzufügen
+            </Button>
+          </Box>
+          <BookingCards
+            bookings={localItem.parseddata?.booking}
+            type={localItem.type}
+            allGroups={allGroups}
+            lastAddedIndex={lastAddedBookingIdx}
+            onDelete={handleDeleteBooking}
+            importedCount={importedBookingCount}
+          />
+          <Box display="flex" alignItems="center" gap={2} sx={{ mt: 2, mb: 1 }}>
+            <Typography variant="h6" sx={{ flex: 1 }}>Gruppen:</Typography>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<AddIcon />}
+              onClick={handleAddGroup}
+            >
+              Gruppe hinzufügen
+            </Button>
+          </Box>
+          <GroupCards
+            groups={localItem.parseddata?.group}
+            allGroups={allGroups}
+            lastAddedIndex={lastAddedGroupIdx}
+            onDelete={handleDeleteGroup}
+            importedCount={importedGroupCount}
+          />
         </Box>
       )}
       {tab === 1 && (
