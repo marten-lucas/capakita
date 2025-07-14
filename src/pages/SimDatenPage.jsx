@@ -305,7 +305,9 @@ function SimDatenPage() {
       });
     }
 
-    setSimulationData(processedData);
+    if (typeof setSimulationData === 'function') {
+      setSimulationData(processedData);
+    }
     // selectedItem nicht zurücksetzen!
   };
 

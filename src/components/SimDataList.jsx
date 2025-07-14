@@ -1,4 +1,4 @@
-import { List, ListItem, ListItemText, Divider, Box, ListItemAvatar, Avatar, Chip } from '@mui/material';
+import { List, ListItem, ListItemButton, ListItemText, Divider, Box, ListItemAvatar, Avatar, Chip } from '@mui/material';
 import SentimentVerySatisfiedIcon from '@mui/icons-material/SentimentVerySatisfied';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 
@@ -96,8 +96,8 @@ function SimDataList({ data, onRowClick, selectedItem }) {
         }
         return (
           <div key={item.id}>
-            <ListItem
-              button
+            
+            <ListItemButton
               onClick={() => onRowClick(item)}
               selected={selectedItem && selectedItem.id === item.id}
               sx={selectedItem && selectedItem.id === item.id ? { bgcolor: 'action.selected' } : undefined}
@@ -114,7 +114,7 @@ function SimDataList({ data, onRowClick, selectedItem }) {
                   </Box>
                 }
                 secondary={
-                  <>
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
                     <span style={{ color: '#888' }}>{secondaryText}</span>
                     <Chip
                       label={item.rawdata?.source || 'unbekannt'}
@@ -122,10 +122,11 @@ function SimDataList({ data, onRowClick, selectedItem }) {
                       color={item.rawdata?.source === 'adebis export' ? 'primary' : 'default'}
                       sx={{ ml: 1 }}
                     />
-                  </>
+                  </Box>
                 }
+                secondaryTypographyProps={{ component: 'div' }}
               />
-            </ListItem>
+            </ListItemButton>
             <Divider />
           </div>
         );
