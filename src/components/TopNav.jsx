@@ -24,6 +24,7 @@ function TopNav() {
             noWrap
             component={NavLink}
             to="/"
+            end
             sx={{
               mr: 2,
               ml: 0,
