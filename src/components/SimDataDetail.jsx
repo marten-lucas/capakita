@@ -788,6 +788,10 @@ function SimDataDetail({ item, allGroups }) {
       ? item.parseddata.enddate.split('.').reverse().join('-')
       : ''
   );
+  // --- Pause State ---
+  const [pauseEnabled, setPauseEnabled] = useState(false);
+  const [pauseStart, setPauseStart] = useState('');
+  const [pauseEnd, setPauseEnd] = useState('');
   const [localItem, setLocalItem] = useState(item);
   const [lastAddedBookingIdx, setLastAddedBookingIdx] = useState(null);
   const [lastAddedGroupIdx, setLastAddedGroupIdx] = useState(null);
@@ -1023,6 +1027,42 @@ function SimDataDetail({ item, allGroups }) {
                 titleAccess="Enddatum auf importierten Wert zurücksetzen"
                 onClick={handleRestoreEndDate}
               />
+            )}
+          </Box>
+          {/* Pausieren unter Zeitraum, Toggle linksbündig */}
+          <Box sx={{ mb: 2, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={pauseEnabled}
+                  onChange={e => setPauseEnabled(e.target.checked)}
+                />
+              }
+              label="Pausieren"
+              sx={{ ml: 0 }}
+            />
+            {pauseEnabled && (
+              <Box display="flex" alignItems="center" gap={1} sx={{ mt: 1 }}>
+                <TextField
+                  label="von"
+                  type="date"
+                  size="small"
+                  InputLabelProps={{ shrink: true }}
+                  value={pauseStart}
+                  onChange={e => setPauseStart(e.target.value)}
+                  sx={{ width: 130 }}
+                />
+                <Typography variant="body2" sx={{ minWidth: 24, textAlign: 'center' }}>bis</Typography>
+                <TextField
+                  label="bis"
+                  type="date"
+                  size="small"
+                  InputLabelProps={{ shrink: true }}
+                  value={pauseEnd}
+                  onChange={e => setPauseEnd(e.target.value)}
+                  sx={{ width: 130 }}
+                />
+              </Box>
             )}
           </Box>
           <Box display="flex" alignItems="center" gap={2} sx={{ mb: 1 }}>
