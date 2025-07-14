@@ -6,6 +6,7 @@ import CommentIcon from '@mui/icons-material/Comment';
 import DataObjectIcon from '@mui/icons-material/DataObject';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import AddIcon from '@mui/icons-material/Add';
+import RestoreIcon from '@mui/icons-material/Restore';
 import { useState, useEffect } from 'react';
 
 // --- Hilfsfunktionen für die neue BookingAccordion ---
@@ -110,24 +111,25 @@ function DayControl({ dayLabel, dayAbbr, dayData, onToggle, onTimeChange, onAddS
           <Box>
             {segments.map((seg, idx) => (
               <Box key={idx} display="flex" alignItems="center" gap={1} sx={{ mb: 1 }}>
-                <Slider
-                  value={[
-                    timeToValue(seg.booking_start),
-                    timeToValue(seg.booking_end)
-                  ]}
-                  onChange={(_, newValue) => onTimeChange(dayAbbr, idx, newValue)}
-                  min={0}
-                  max={47}
-                  step={1}
-                  valueLabelFormat={valueToTime}
-                  valueLabelDisplay="auto"
-                  marks={[
-                    { value: 14, label: '07:00' },
-                    { value: 24, label: '12:00' },
-                    { value: 33, label: '16:30' },
-                  ]}
-                  sx={{ flex: 1 }}
-                />
+                <Box sx={{ flex: 1, minWidth: 220, maxWidth: 400 }}>
+                  <Slider
+                    value={[
+                      timeToValue(seg.booking_start),
+                      timeToValue(seg.booking_end)
+                    ]}
+                    onChange={(_, newValue) => onTimeChange(dayAbbr, idx, newValue)}
+                    min={0}
+                    max={47}
+                    step={1}
+                    valueLabelFormat={valueToTime}
+                    valueLabelDisplay="auto"
+                    marks={[
+                      { value: 14, label: '07:00' },
+                      { value: 24, label: '12:00' },
+                      { value: 33, label: '16:30' },
+                    ]}
+                  />
+                </Box>
                 {/* Gruppenzuordnung nur für Mitarbeiter */}
                 {type === 'capacity' && allGroups && (
                   <Select
@@ -162,7 +164,10 @@ function DayControl({ dayLabel, dayAbbr, dayData, onToggle, onTimeChange, onAddS
   );
 }
 
-function BookingAccordion({ booking, index, type, allGroups, defaultExpanded, onDelete, canDelete }) {
+function BookingAccordion({
+  booking, index, type, allGroups, defaultExpanded, onDelete, canDelete,
+  originalBooking, onRestoreBooking,
+}) {
   const [bookingState, setBookingState] = useState(booking);
   const [expanded, setExpanded] = useState(!!defaultExpanded);
 
@@ -251,11 +256,48 @@ function BookingAccordion({ booking, index, type, allGroups, defaultExpanded, on
     });
   };
 
+  // Prüft, ob ein einzelner Tag (Mo, Di, ...) im Booking geändert wurde
+  function isDayModified(localTimes, origTimes, dayAbbr) {
+    const l = Array.isArray(localTimes) ? localTimes.find(t => t.day_name === dayAbbr) : undefined;
+    const o = Array.isArray(origTimes) ? origTimes.find(t => t.day_name === dayAbbr) : undefined;
+    if (!l && !o) return false;
+    if (!l || !o) return true;
+    // Vergleiche Segmente
+    if (!Array.isArray(l.segments) && !Array.isArray(o.segments)) return false;
+    if (!Array.isArray(l.segments) || !Array.isArray(o.segments)) return true;
+    if (l.segments.length !== o.segments.length) return true;
+    for (let i = 0; i < l.segments.length; ++i) {
+      const ls = l.segments[i], os = o.segments[i];
+      if (ls.booking_start !== os.booking_start || ls.booking_end !== os.booking_end) return true;
+      // Prüfe auch groupId für Mitarbeiter
+      if (type === 'capacity') {
+        if ((ls.groupId || '') !== (os.groupId || '')) return true;
+      }
+    }
+    return false;
+  }
+
+  // Prüft, ob das gesamte Booking geändert wurde
+  function isBookingModified(localBooking, origBooking) {
+    if (!origBooking) return false;
+    // Vergleiche Start/Enddatum
+    if (localBooking.startdate !== origBooking.startdate || localBooking.enddate !== origBooking.enddate) return true;
+    // Vergleiche alle Tage
+    const days = ['Mo', 'Di', 'Mi', 'Do', 'Fr'];
+    for (const day of days) {
+      if (isDayModified(localBooking.times, origBooking.times, day)) return true;
+    }
+    return false;
+  }
+
   const daysOfWeek = [
     { label: 'Montag', abbr: 'Mo' }, { label: 'Dienstag', abbr: 'Di' },
     { label: 'Mittwoch', abbr: 'Mi' }, { label: 'Donnerstag', abbr: 'Do' },
     { label: 'Freitag', abbr: 'Fr' }
   ];
+
+  // Prüfe, ob Booking geändert ist
+  const isMod = originalBooking ? isBookingModified(bookingState, originalBooking) : false;
 
   const { startdate, enddate, times } = bookingState;
   let dateRangeText = '';
@@ -267,14 +309,78 @@ function BookingAccordion({ booking, index, type, allGroups, defaultExpanded, on
     dateRangeText = `bis ${enddate}`;
   }
 
+  // Restore-Funktion für einen Tag
+  const handleRestoreDay = (dayAbbr) => {
+    if (!originalBooking) return;
+    setBookingState(prev => {
+      const origDay = Array.isArray(originalBooking.times)
+        ? originalBooking.times.find(t => t.day_name === dayAbbr)
+        : undefined;
+      let newTimes = Array.isArray(prev.times) ? [...prev.times] : [];
+      const idx = newTimes.findIndex(t => t.day_name === dayAbbr);
+      if (origDay) {
+        // Tag existiert im Import: ersetze oder füge ein
+        if (idx !== -1) {
+          newTimes[idx] = JSON.parse(JSON.stringify(origDay));
+        } else {
+          newTimes.push(JSON.parse(JSON.stringify(origDay)));
+        }
+      } else {
+        // Tag existiert nicht im Import: entferne falls vorhanden
+        if (idx !== -1) {
+          newTimes = newTimes.filter((_, i) => i !== idx);
+        }
+      }
+      return { ...prev, times: newTimes };
+    });
+  };
+
+  // Restore-Funktion für das gesamte Booking
+  const handleRestoreAll = () => {
+    if (window.confirm('Buchung auf importierte Adebis-Daten zurücksetzen?')) {
+      onRestoreBooking && onRestoreBooking(index);
+    }
+  };
+
+  // Prüft, ob das Start-/Enddatum geändert wurde (analog zu isDateModified)
+  function isBookingDateModified(field) {
+    if (!originalBooking) return false;
+    const orig = originalBooking[field];
+    const local = bookingState[field];
+    if (!orig && !local) return false;
+    if (!orig || !local) return true;
+    // orig: DD.MM.YYYY, local: DD.MM.YYYY
+    return orig !== local;
+  }
+
+  // Restore für Start-/Enddatum
+  const handleRestoreBookingDate = (field) => {
+    if (!originalBooking) return;
+    setBookingState(prev => ({
+      ...prev,
+      [field]: originalBooking[field] || ''
+    }));
+  };
+
   return (
     <Accordion expanded={expanded} onChange={() => setExpanded(e => !e)}>
       <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-        <Typography>
+        <Typography sx={{ flex: 1 }}>
           Buchung {index + 1}: {dateRangeText}
           {dateRangeText ? ': ' : ''}
           {consolidateBookingSummary(times)}
         </Typography>
+        {isMod && (
+          <RestoreIcon
+            color="warning"
+            sx={{ ml: 1, cursor: 'pointer' }}
+            titleAccess="Komplette Buchung auf importierte Werte zurücksetzen"
+            onClick={e => {
+              e.stopPropagation();
+              handleRestoreAll();
+            }}
+          />
+        )}
         {onDelete && canDelete && (
           <Button
             size="small"
@@ -296,6 +402,19 @@ function BookingAccordion({ booking, index, type, allGroups, defaultExpanded, on
             value={convertDDMMYYYYtoYYYYMMDD(bookingState.startdate)}
             onChange={(e) => handleDateChange('startdate', e.target.value)}
           />
+          {/* Restore-Icon für Startdatum */}
+          {isBookingDateModified('startdate') && (
+            <RestoreIcon
+              color="warning"
+              sx={{ cursor: 'pointer' }}
+              titleAccess="Startdatum auf importierten Wert zurücksetzen"
+              onClick={() => {
+                if (window.confirm('Startdatum auf importierten Wert zurücksetzen?')) {
+                  handleRestoreBookingDate('startdate');
+                }
+              }}
+            />
+          )}
           <Typography>bis</Typography>
           <TextField
             label="Enddatum"
@@ -305,29 +424,64 @@ function BookingAccordion({ booking, index, type, allGroups, defaultExpanded, on
             value={convertDDMMYYYYtoYYYYMMDD(bookingState.enddate)}
             onChange={(e) => handleDateChange('enddate', e.target.value)}
           />
+          {/* Restore-Icon für Enddatum */}
+          {isBookingDateModified('enddate') && (
+            <RestoreIcon
+              color="warning"
+              sx={{ cursor: 'pointer' }}
+              titleAccess="Enddatum auf importierten Wert zurücksetzen"
+              onClick={() => {
+                if (window.confirm('Enddatum auf importierten Wert zurücksetzen?')) {
+                  handleRestoreBookingDate('enddate');
+                }
+              }}
+            />
+          )}
         </Box>
         <Divider sx={{ my: 2 }} />
-        {daysOfWeek.map(day => (
-          <DayControl
-            key={day.abbr}
-            dayLabel={day.label}
-            dayAbbr={day.abbr}
-            dayData={bookingState.times?.find(t => t.day_name === day.abbr)}
-            onToggle={handleDayToggle}
-            onTimeChange={handleTimeChange}
-            onAddSegment={handleAddSegment}
-            onRemoveSegment={handleRemoveSegment}
-            onGroupChange={handleGroupChange}
-            type={type}
-            allGroups={allGroups}
-          />
-        ))}
+        {daysOfWeek.map(day => {
+          const dayMod = originalBooking
+            ? isDayModified(bookingState.times, originalBooking.times, day.abbr)
+            : false;
+          return (
+            <Box key={day.abbr} display="flex" alignItems="center">
+              {/* Icon jetzt VOR dem Label */}
+              {dayMod && (
+                <RestoreIcon
+                  color="warning"
+                  sx={{ mr: 1, cursor: 'pointer' }}
+                  titleAccess="Tag auf importierte Werte zurücksetzen"
+                  onClick={() => {
+                    if (window.confirm(`${day.label} auf importierte Werte zurücksetzen?`)) {
+                      handleRestoreDay(day.abbr);
+                    }
+                  }}
+                />
+              )}
+              <DayControl
+                dayLabel={day.label}
+                dayAbbr={day.abbr}
+                dayData={bookingState.times?.find(t => t.day_name === day.abbr)}
+                onToggle={handleDayToggle}
+                onTimeChange={handleTimeChange}
+                onAddSegment={handleAddSegment}
+                onRemoveSegment={handleRemoveSegment}
+                onGroupChange={handleGroupChange}
+                type={type}
+                allGroups={allGroups}
+              />
+            </Box>
+          );
+        })}
       </AccordionDetails>
     </Accordion>
   );
 }
 
-function BookingCards({ bookings, type, allGroups, lastAddedIndex, onDelete, importedCount }) {
+function BookingCards({
+  bookings, type, allGroups, lastAddedIndex, onDelete, importedCount,
+  originalBookings, onRestoreBooking
+}) {
   if (!bookings || bookings.length === 0) {
     return <Typography variant="body2" color="text.secondary">Keine Buchungszeiten vorhanden.</Typography>;
   }
@@ -343,19 +497,17 @@ function BookingCards({ bookings, type, allGroups, lastAddedIndex, onDelete, imp
           defaultExpanded={lastAddedIndex === idx}
           onDelete={onDelete}
           canDelete={typeof importedCount === 'number' ? idx >= importedCount : true}
+          originalBooking={Array.isArray(originalBookings) ? originalBookings[idx] : undefined}
+          onRestoreBooking={onRestoreBooking}
         />
       ))}
     </Box>
   );
 }
 
-function GroupAccordion({ group, index, allGroups, defaultExpanded, onDelete, canDelete }) {
+function GroupAccordion({ group, index, allGroups, defaultExpanded, onDelete, canDelete, onRestore, originalGroup }) {
   const [groupState, setGroupState] = useState(group);
   const [expanded, setExpanded] = useState(!!defaultExpanded);
-
-  useEffect(() => {
-    setGroupState(group);
-  }, [group]);
 
   const handleDateChange = (field, value) => {
     setGroupState(prev => ({
@@ -364,17 +516,60 @@ function GroupAccordion({ group, index, allGroups, defaultExpanded, onDelete, ca
     }));
   };
 
-  const handleGroupChange = (event) => {
-    const newGroupId = parseInt(event.target.value, 10);
-    const newGroupName = allGroups[newGroupId] || `Gruppe ${newGroupId}`;
+  useEffect(() => {
+    setGroupState(group);
+  }, [group]);
+
+  // Prüft, ob ein Feld (start, end) geändert wurde
+  function isGroupDateModified(field) {
+    if (!originalGroup) return false;
+    const orig = originalGroup[field];
+    const local = groupState[field];
+    if (!orig && !local) return false;
+    if (!orig || !local) return true;
+    // orig: DD.MM.YYYY, local: DD.MM.YYYY
+    return orig !== local;
+  }
+
+  // Prüft, ob die Gruppen-ID geändert wurde
+  function isGroupIdModified() {
+    if (!originalGroup) return false;
+    // id kann Zahl oder String sein
+    return String(groupState.id ?? '') !== String(originalGroup.id ?? '');
+  }
+
+  // Prüft, ob irgendwas geändert ist (für Restore-Icon im Akkordeon)
+  function isAnyModified() {
+    return isGroupDateModified('start') || isGroupDateModified('end') || isGroupIdModified();
+  }
+
+  // Restore für Feld
+  const handleRestoreGroupDate = (field) => {
+    if (!originalGroup) return;
     setGroupState(prev => ({
       ...prev,
-      id: newGroupId,
-      name: newGroupName,
+      [field]: originalGroup[field] || ''
     }));
   };
 
-  const { id, name, start, end } = groupState;
+  // Restore für Gruppen-ID
+  const handleRestoreGroupId = () => {
+    if (!originalGroup) return;
+    setGroupState(prev => ({
+      ...prev,
+      id: originalGroup.id,
+      name: allGroups[originalGroup.id] || `Gruppe ${originalGroup.id}`,
+    }));
+  };
+
+  // Restore für alles
+  const handleRestoreAll = () => {
+    if (window.confirm('Gruppenzuordnung auf importierte Adebis-Daten zurücksetzen?')) {
+      onRestore && onRestore(index);
+    }
+  };
+
+  const { id, start, end } = groupState;
   let dateRangeText = '';
   if (start && end) {
     dateRangeText = `von ${start} bis ${end}`;
@@ -387,9 +582,22 @@ function GroupAccordion({ group, index, allGroups, defaultExpanded, onDelete, ca
   return (
     <Accordion expanded={expanded} onChange={() => setExpanded(e => !e)}>
       <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-        <Typography>
-          {groupState.name || 'Gruppenzuordnung'}{dateRangeText ? `: ${dateRangeText}` : ''}
-        </Typography>
+        <Box sx={{ flex: 1, display: 'flex', alignItems: 'center' }}>
+          <Typography sx={{ flex: 1 }}>
+            {groupState.name || 'Gruppenzuordnung'}{dateRangeText ? `: ${dateRangeText}` : ''}
+          </Typography>
+          {expanded && isAnyModified() && (
+            <RestoreIcon
+              color="warning"
+              sx={{ ml: 1, cursor: 'pointer' }}
+              titleAccess="Komplette Gruppenzuordnung auf importierte Werte zurücksetzen"
+              onClick={e => {
+                e.stopPropagation();
+                handleRestoreAll();
+              }}
+            />
+          )}
+        </Box>
         {onDelete && canDelete && (
           <Button
             size="small"
@@ -404,13 +612,35 @@ function GroupAccordion({ group, index, allGroups, defaultExpanded, onDelete, ca
       <AccordionDetails>
         <Box display="flex" flexDirection="column" gap={3}>
           <FormControl component="fieldset">
-            <FormLabel component="legend">Gruppe</FormLabel>
+            <Box display="flex" alignItems="center">
+              <FormLabel component="legend" sx={{ mr: 1 }}>Gruppe</FormLabel>
+              {isGroupIdModified() && (
+                <RestoreIcon
+                  color="warning"
+                  sx={{ cursor: 'pointer' }}
+                  titleAccess="Gruppenzuordnung auf importierten Wert zurücksetzen"
+                  onClick={() => {
+                    if (window.confirm('Gruppenzuordnung auf importierten Wert zurücksetzen?')) {
+                      handleRestoreGroupId();
+                    }
+                  }}
+                />
+              )}
+            </Box>
             <RadioGroup
               row
               aria-label="gruppe"
               name={`gruppe-radio-buttons-group-${index}`}
               value={id ? String(id) : ''}
-              onChange={handleGroupChange}
+              onChange={event => {
+                const newGroupId = parseInt(event.target.value, 10);
+                const newGroupName = allGroups[newGroupId] || `Gruppe ${newGroupId}`;
+                setGroupState(prev => ({
+                  ...prev,
+                  id: newGroupId,
+                  name: newGroupName,
+                }));
+              }}
             >
               {Object.entries(allGroups).map(([groupId, groupName]) => (
                 <FormControlLabel key={groupId} value={groupId} control={<Radio />} label={groupName} />
@@ -425,7 +655,21 @@ function GroupAccordion({ group, index, allGroups, defaultExpanded, onDelete, ca
               InputLabelProps={{ shrink: true }}
               value={convertDDMMYYYYtoYYYYMMDD(start)}
               onChange={(e) => handleDateChange('start', e.target.value)}
+              sx={{ width: 150 }}
+              inputProps={{ readOnly: false }}
             />
+            {isGroupDateModified('start') && (
+              <RestoreIcon
+                color="warning"
+                sx={{ cursor: 'pointer' }}
+                titleAccess="Startdatum auf importierten Wert zurücksetzen"
+                onClick={() => {
+                  if (window.confirm('Startdatum auf importierten Wert zurücksetzen?')) {
+                    handleRestoreGroupDate('start');
+                  }
+                }}
+              />
+            )}
             <Typography>bis</Typography>
             <TextField
               label="Enddatum"
@@ -434,7 +678,21 @@ function GroupAccordion({ group, index, allGroups, defaultExpanded, onDelete, ca
               InputLabelProps={{ shrink: true }}
               value={convertDDMMYYYYtoYYYYMMDD(end)}
               onChange={(e) => handleDateChange('end', e.target.value)}
+              sx={{ width: 150 }}
+              inputProps={{ readOnly: false }}
             />
+            {isGroupDateModified('end') && (
+              <RestoreIcon
+                color="warning"
+                sx={{ cursor: 'pointer' }}
+                titleAccess="Enddatum auf importierten Wert zurücksetzen"
+                onClick={() => {
+                  if (window.confirm('Enddatum auf importierten Wert zurücksetzen?')) {
+                    handleRestoreGroupDate('end');
+                  }
+                }}
+              />
+            )}
           </Box>
         </Box>
       </AccordionDetails>
@@ -442,25 +700,80 @@ function GroupAccordion({ group, index, allGroups, defaultExpanded, onDelete, ca
   );
 }
 
-function GroupCards({ groups, allGroups, lastAddedIndex, onDelete, importedCount }) {
+function GroupCards({ groups, allGroups, lastAddedIndex, onDelete, importedCount, originalGroups, onRestoreGroup }) {
   if (!groups || groups.length === 0) {
     return <Typography variant="body2" color="text.secondary">Keine Gruppenzuordnungen vorhanden.</Typography>;
   }
   return (
     <Box>
-      {groups.map((group, idx) => (
-        <GroupAccordion
-          key={idx}
-          group={group}
-          index={idx}
-          allGroups={allGroups}
-          defaultExpanded={lastAddedIndex === idx}
-          onDelete={onDelete}
-          canDelete={typeof importedCount === 'number' ? idx >= importedCount : true}
-        />
-      ))}
+      {groups.map((group, idx) => {
+        const orig = Array.isArray(originalGroups) ? originalGroups[idx] : undefined;
+        const isMod = orig ? groupsModified([group], [orig]) : false;
+        return (
+          <GroupAccordion
+            key={idx}
+            group={group}
+            index={idx}
+            allGroups={allGroups}
+            defaultExpanded={lastAddedIndex === idx}
+            onDelete={onDelete}
+            canDelete={typeof importedCount === 'number' ? idx >= importedCount : true}
+            isModified={isMod}
+            onRestore={onRestoreGroup}
+            originalGroup={orig}
+          />
+        );
+      })}
     </Box>
   );
+}
+
+// --- Hilfsfunktionen für Änderungsmarkierung (vor SimDataDetail einfügen) ---
+function isDateModified(local, original) {
+  if (!original && !local) return false;
+  if (!original || !local) return true;
+  const origParts = original.split('.');
+  if (origParts.length !== 3) return true;
+  const origIso = `${origParts[2]}-${origParts[1].padStart(2, '0')}-${origParts[0].padStart(2, '0')}`;
+  return origIso !== local;
+}
+
+function bookingsModified(localBookings, origBookings) {
+  if (!Array.isArray(localBookings) && !Array.isArray(origBookings)) return false;
+  if (!Array.isArray(localBookings) || !Array.isArray(origBookings)) return true;
+  if (localBookings.length !== origBookings.length) return true;
+  for (let i = 0; i < localBookings.length; ++i) {
+    const l = localBookings[i], o = origBookings[i];
+    if (l.startdate !== o.startdate || l.enddate !== o.enddate) return true;
+    if (!Array.isArray(l.times) && !Array.isArray(o.times)) continue;
+    if (!Array.isArray(l.times) || !Array.isArray(o.times)) return true;
+    if (l.times.length !== o.times.length) return true;
+    for (let j = 0; j < l.times.length; ++j) {
+      const lt = l.times[j], ot = o.times[j];
+      if (lt.day !== ot.day || lt.day_name !== ot.day_name) return true;
+      if (!Array.isArray(lt.segments) && !Array.isArray(ot.segments)) continue;
+      if (!Array.isArray(lt.segments) || !Array.isArray(ot.segments)) return true;
+      if (lt.segments.length !== ot.segments.length) return true;
+      for (let k = 0; k < lt.segments.length; ++k) {
+        const ls = lt.segments[k], os = ot.segments[k];
+        if (ls.booking_start !== os.booking_start || ls.booking_end !== os.booking_end) return true;
+      }
+    }
+  }
+  return false;
+}
+
+function groupsModified(localGroups, origGroups) {
+  if (!Array.isArray(localGroups) && !Array.isArray(origGroups)) return false;
+  if (!Array.isArray(localGroups) || !Array.isArray(origGroups)) return true;
+  if (localGroups.length !== origGroups.length) return true;
+  for (let i = 0; i < localGroups.length; ++i) {
+    const l = localGroups[i], o = origGroups[i];
+    if (String(l.id) !== String(o.id)) return true;
+    if (l.start !== o.start) return true;
+    if (l.end !== o.end) return true;
+  }
+  return false;
 }
 
 function SimDataDetail({ item, allGroups }) {
@@ -584,6 +897,59 @@ function SimDataDetail({ item, allGroups }) {
     setLastAddedGroupIdx(null);
   };
 
+  // Restore-Funktionen
+  const handleRestoreStartDate = () => {
+    if (window.confirm('Startdatum auf importierten Wert zurücksetzen?')) {
+      setStartDate(initialStartDate);
+    }
+  };
+  const handleRestoreEndDate = () => {
+    if (window.confirm('Enddatum auf importierten Wert zurücksetzen?')) {
+      setEndDate(initialEndDate);
+    }
+  };
+
+  const handleRestoreBooking = (idx) => {
+    if (!item?.originalParsedData?.booking) return;
+    setLocalItem(prev => {
+      if (!prev) return prev;
+      const orig = item.originalParsedData.booking[idx];
+      if (!orig) return prev;
+      const newBookings = [...(prev.parseddata?.booking || [])];
+      newBookings[idx] = JSON.parse(JSON.stringify(orig));
+      return {
+        ...prev,
+        parseddata: {
+          ...prev.parseddata,
+          booking: newBookings
+        }
+      };
+    });
+  };
+
+  const handleRestoreGroup = (idx) => {
+    if (!item?.originalParsedData?.group) return;
+    setLocalItem(prev => {
+      if (!prev) return prev;
+      const orig = item.originalParsedData.group[idx];
+      if (!orig) return prev;
+      const newGroups = [...(prev.parseddata?.group || [])];
+      newGroups[idx] = JSON.parse(JSON.stringify(orig));
+      return {
+        ...prev,
+        parseddata: {
+          ...prev.parseddata,
+          group: newGroups
+        }
+      };
+    });
+  };
+
+  // Markierungen für modifizierte Felder
+  const startDateModified = isDateModified(startDate, item?.originalParsedData?.startdate);
+  const endDateModified = isDateModified(endDate, item?.originalParsedData?.enddate);
+
+  // Guard: Wenn localItem nicht gesetzt, Hinweis anzeigen und return
   if (!localItem) {
     return (
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
@@ -593,6 +959,9 @@ function SimDataDetail({ item, allGroups }) {
       </Box>
     );
   }
+
+  const bookingsMod = bookingsModified(localItem?.parseddata?.booking, item?.originalParsedData?.booking);
+  const groupsMod = groupsModified(localItem?.parseddata?.group, item?.originalParsedData?.group);
 
   return (
     <Box
@@ -629,6 +998,14 @@ function SimDataDetail({ item, allGroups }) {
               onChange={e => setStartDate(e.target.value)}
               sx={{ width: 150 }}
             />
+            {startDateModified && (
+              <RestoreIcon
+                color="warning"
+                sx={{ cursor: 'pointer' }}
+                titleAccess="Startdatum auf importierten Wert zurücksetzen"
+                onClick={handleRestoreStartDate}
+              />
+            )}
             <Typography variant="body2" sx={{ minWidth: 24, textAlign: 'center' }}>bis</Typography>
             <TextField
               label=""
@@ -639,9 +1016,37 @@ function SimDataDetail({ item, allGroups }) {
               onChange={e => setEndDate(e.target.value)}
               sx={{ width: 150 }}
             />
+            {endDateModified && (
+              <RestoreIcon
+                color="warning"
+                sx={{ cursor: 'pointer' }}
+                titleAccess="Enddatum auf importierten Wert zurücksetzen"
+                onClick={handleRestoreEndDate}
+              />
+            )}
           </Box>
           <Box display="flex" alignItems="center" gap={2} sx={{ mb: 1 }}>
-            <Typography variant="h6" sx={{ mt: 1, mb: 1, flex: 1 }}>Buchungszeiten:</Typography>
+            <Typography variant="h6" sx={{ mt: 1, mb: 1, flex: 1 }}>
+              Buchungszeiten:
+              {bookingsMod && (
+                <RestoreIcon
+                  color="warning"
+                  sx={{ ml: 1, verticalAlign: 'middle' }}
+                  titleAccess="Alle Buchungen auf importierte Werte zurücksetzen"
+                  onClick={() => {
+                    if (window.confirm('Alle Buchungen auf importierte Adebis-Daten zurücksetzen?')) {
+                      setLocalItem(prev => ({
+                        ...prev,
+                        parseddata: {
+                          ...prev.parseddata,
+                          booking: JSON.parse(JSON.stringify(item.originalParsedData?.booking || []))
+                        }
+                      }));
+                    }
+                  }}
+                />
+              )}
+            </Typography>
             <Button
               variant="outlined"
               size="small"
@@ -658,9 +1063,31 @@ function SimDataDetail({ item, allGroups }) {
             lastAddedIndex={lastAddedBookingIdx}
             onDelete={handleDeleteBooking}
             importedCount={importedBookingCount}
+            originalBookings={item?.originalParsedData?.booking}
+            onRestoreBooking={handleRestoreBooking}
           />
           <Box display="flex" alignItems="center" gap={2} sx={{ mt: 2, mb: 1 }}>
-            <Typography variant="h6" sx={{ flex: 1 }}>Gruppen:</Typography>
+            <Typography variant="h6" sx={{ flex: 1 }}>
+              Gruppen:
+              {groupsMod && (
+                <RestoreIcon
+                  color="warning"
+                  sx={{ ml: 1, verticalAlign: 'middle' }}
+                  titleAccess="Alle Gruppen auf importierte Werte zurücksetzen"
+                  onClick={() => {
+                    if (window.confirm('Alle Gruppen auf importierte Adebis-Daten zurücksetzen?')) {
+                      setLocalItem(prev => ({
+                        ...prev,
+                        parseddata: {
+                          ...prev.parseddata,
+                          group: JSON.parse(JSON.stringify(item.originalParsedData?.group || []))
+                        }
+                      }));
+                    }
+                  }}
+                />
+              )}
+            </Typography>
             <Button
               variant="outlined"
               size="small"
@@ -676,6 +1103,8 @@ function SimDataDetail({ item, allGroups }) {
             lastAddedIndex={lastAddedGroupIdx}
             onDelete={handleDeleteGroup}
             importedCount={importedGroupCount}
+            originalGroups={item?.originalParsedData?.group}
+            onRestoreGroup={handleRestoreGroup}
           />
         </Box>
       )}
