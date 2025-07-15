@@ -11,53 +11,9 @@ import { useState, useEffect } from 'react';
 import GroupCards from './SimDataDetail/GroupCards';
 import BookingCards from './SimDataDetail/BookingCards';
 
-// --- Hilfsfunktionen für die neue BookingAccordion ---
-
-// Konvertiert DD.MM.YYYY zu YYYY-MM-DD
-const convertDDMMYYYYtoYYYYMMDD = (dateString) => {
-  if (!dateString) return '';
-  const parts = dateString.split('.');
-  if (parts.length === 3) {
-    return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-  }
-  return '';
-};
-
-// Konvertiert YYYY-MM-DD zu DD.MM.YYYY
-const convertYYYYMMDDtoDDMMYYYY = (dateString) => {
-  if (!dateString) return '';
-  const parts = dateString.split('-');
-  if (parts.length === 3) {
-    return `${parts[2]}.${parts[1]}.${parts[0]}`;
-  }
-  return '';
-};
-
-// Konvertiert eine Zeit (HH:MM) in einen Slider-Wert (0-47 für Halbstunden-Intervalle)
-const timeToValue = (time) => {
-  if (!time) return 0;
-  const [hours, minutes] = time.split(':').map(Number);
-  return hours * 2 + minutes / 30;
-};
-
-// Konvertiert einen Slider-Wert zurück in eine Zeit (HH:MM)
-const valueToTime = (value) => {
-  const hours = Math.floor(value / 2);
-  const minutes = (value % 2) * 30;
-  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
-};
-
-// Hilfsfunktion: Vergleicht zwei Segment-Arrays (Reihenfolge & Werte)
-function segmentsEqual(a, b) {
-  if (!Array.isArray(a) || !Array.isArray(b)) return false;
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; ++i) {
-    if (a[i].booking_start !== b[i].booking_start || a[i].booking_end !== b[i].booking_end) {
-      return false;
-    }
-  }
-  return true;
-}
+// --- Import helper functions from utils ---
+import { convertDDMMYYYYtoYYYYMMDD, convertYYYYMMDDtoDDMMYYYY, isDateModified } from '../utils/dateUtils';
+import { timeToValue, valueToTime, segmentsEqual } from '../utils/timeUtils';
 
 // Erstellt eine zusammenfassende Textdarstellung der Buchungszeiten
 function consolidateBookingSummary(times) {
@@ -884,16 +840,6 @@ function SimDataDetail({ item, allGroups }) {
       )}
     </Box>
   );
-}
-
-// --- Hilfsfunktionen für Änderungsmarkierung (vor SimDataDetail einfügen) ---
-function isDateModified(local, original) {
-  if (!original && !local) return false;
-  if (!original || !local) return true;
-  const origParts = original.split('.');
-  if (origParts.length !== 3) return true;
-  const origIso = `${origParts[2]}-${origParts[1].padStart(2, '0')}-${origParts[0].padStart(2, '0')}`;
-  return origIso !== local;
 }
 
 function bookingsModified(localBookings, origBookings) {

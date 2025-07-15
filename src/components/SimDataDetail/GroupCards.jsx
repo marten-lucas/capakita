@@ -5,26 +5,9 @@ import {
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import RestoreIcon from '@mui/icons-material/Restore';
 import React, { useState, useEffect } from 'react';
+import { convertYYYYMMDDtoDDMMYYYY, convertDDMMYYYYtoYYYYMMDD } from '../../utils/dateUtils';
 
-// Helper: convert YYYY-MM-DD to DD.MM.YYYY
-function convertYYYYMMDDtoDDMMYYYY(dateString) {
-  if (!dateString) return '';
-  const parts = dateString.split('-');
-  if (parts.length === 3) {
-    return `${parts[2]}.${parts[1]}.${parts[0]}`;
-  }
-  return '';
-}
-
-// Helper: convert DD.MM.YYYY to YYYY-MM-DD
-function convertDDMMYYYYtoYYYYMMDD(dateString) {
-  if (!dateString) return '';
-  const parts = dateString.split('.');
-  if (parts.length === 3) {
-    return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-  }
-  return '';
-}
+// Removed local definitions of convertYYYYMMDDtoDDMMYYYY, convertDDMMYYYYtoYYYYMMDD
 
 function GroupAccordion({ group, index, allGroups, defaultExpanded, onDelete, canDelete, onRestore, originalGroup }) {
   const [groupState, setGroupState] = useState(group);
