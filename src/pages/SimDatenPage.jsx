@@ -13,7 +13,7 @@ import AddIcon from '@mui/icons-material/Add';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import DataImportModal from '../components/DataImportModal';
 import SimDataList from '../components/SimDataList';
-import SimDataDetail from '../components/SimDataDetail';
+import SimDataDetailForm from '../components/SimDataDetailForm';
 import JSZip from 'jszip';
 
 function SimDatenPage() {
@@ -386,7 +386,7 @@ function SimDatenPage() {
           </Box>
           <Box sx={{ flex: 1, p: 3, overflow: 'auto', height: '100vh', maxHeight: '100vh' }}>
             {simulationData.length > 0 && (
-              <SimDataDetail item={selectedItem} allGroups={groupsLookup} />
+              <SimDataDetailForm item={selectedItem} allGroups={groupsLookup} />
             )}
           </Box>
         </>

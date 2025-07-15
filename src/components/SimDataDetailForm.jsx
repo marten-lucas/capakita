@@ -4,15 +4,13 @@ import {
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import CommentIcon from '@mui/icons-material/Comment';
 import DataObjectIcon from '@mui/icons-material/DataObject';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import AddIcon from '@mui/icons-material/Add';
-import RestoreIcon from '@mui/icons-material/Restore';
 import { useState, useEffect } from 'react';
 import GroupCards from './SimDataDetail/GroupCards';
 import BookingCards from './SimDataDetail/BookingCards';
 import ModMonitor from './SimDataDetail/ModMonitor';
 
-function SimDataDetail({ item, allGroups }) {
+function SimDataDetailForm({ item, allGroups }) {
   const [tab, setTab] = useState(0);
   const [startDate, setStartDate] = useState(
     item?.parseddata?.startdate
@@ -395,4 +393,4 @@ function SimDataDetail({ item, allGroups }) {
 
 
 
-export default SimDataDetail;
+export default SimDataDetailForm;
