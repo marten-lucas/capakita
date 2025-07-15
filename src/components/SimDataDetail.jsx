@@ -12,11 +12,6 @@ import GroupCards from './SimDataDetail/GroupCards';
 import BookingCards from './SimDataDetail/BookingCards';
 import ModMonitor from './SimDataDetail/ModMonitor';
 
-// --- Import helper functions from utils ---
-
-
-// --- Hauptkomponente ---
-
 function SimDataDetail({ item, allGroups }) {
   const [tab, setTab] = useState(0);
   const [startDate, setStartDate] = useState(
@@ -186,8 +181,6 @@ function SimDataDetail({ item, allGroups }) {
     });
   };
 
-  // Markierungen für modifizierte Felder
-
   // Guard: Wenn localItem nicht gesetzt, Hinweis anzeigen und return
   if (!localItem) {
     return (
@@ -260,7 +253,6 @@ function SimDataDetail({ item, allGroups }) {
               confirmMsg="Enddatum auf importierten Wert zurücksetzen?"
             />
           </Box>
-          {/* Pausieren unter Zeitraum, Toggle linksbündig */}
           <Box sx={{ mb: 2, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
             <FormControlLabel
               control={
