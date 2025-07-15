@@ -3,11 +3,9 @@ import {
   FormControl, FormLabel, RadioGroup, FormControlLabel, Radio, TextField
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import RestoreIcon from '@mui/icons-material/Restore';
 import React, { useState, useEffect } from 'react';
 import { convertYYYYMMDDtoDDMMYYYY, convertDDMMYYYYtoYYYYMMDD } from '../../utils/dateUtils';
-
-// Removed local definitions of convertYYYYMMDDtoDDMMYYYY, convertDDMMYYYYtoYYYYMMDD
+import ModMonitor from './ModMonitor';
 
 function GroupAccordion({ group, index, allGroups, defaultExpanded, onDelete, canDelete, onRestore, originalGroup }) {
   const [groupState, setGroupState] = useState(group);
@@ -90,15 +88,13 @@ function GroupAccordion({ group, index, allGroups, defaultExpanded, onDelete, ca
           <Typography sx={{ flex: 1 }}>
             {groupState.name || 'Gruppenzuordnung'}{dateRangeText ? `: ${dateRangeText}` : ''}
           </Typography>
-          {expanded && isAnyModified() && (
-            <RestoreIcon
-              color="warning"
-              sx={{ ml: 1, cursor: 'pointer' }}
-              titleAccess="Komplette Gruppenzuordnung auf importierte Werte zurücksetzen"
-              onClick={e => {
-                e.stopPropagation();
-                handleRestoreAll();
-              }}
+          {expanded && (
+            <ModMonitor
+              modified={isAnyModified()}
+              onRestore={handleRestoreAll}
+              title="Komplette Gruppenzuordnung auf importierte Werte zurücksetzen"
+              confirmMsg="Gruppenzuordnung auf importierte Adebis-Daten zurücksetzen?"
+              iconProps={{ sx: { ml: 1 } }}
             />
           )}
         </Box>
@@ -118,18 +114,15 @@ function GroupAccordion({ group, index, allGroups, defaultExpanded, onDelete, ca
           <FormControl component="fieldset">
             <Box display="flex" alignItems="center">
               <FormLabel component="legend" sx={{ mr: 1 }}>Gruppe</FormLabel>
-              {isGroupIdModified() && (
-                <RestoreIcon
-                  color="warning"
-                  sx={{ cursor: 'pointer' }}
-                  titleAccess="Gruppenzuordnung auf importierten Wert zurücksetzen"
-                  onClick={() => {
-                    if (window.confirm('Gruppenzuordnung auf importierten Wert zurücksetzen?')) {
-                      handleRestoreGroupId();
-                    }
-                  }}
-                />
-              )}
+              <ModMonitor
+                modified={isGroupIdModified()}
+                onRestore={() => {
+                  if (window.confirm('Gruppenzuordnung auf importierten Wert zurücksetzen?')) {
+                    handleRestoreGroupId();
+                  }
+                }}
+                title="Gruppenzuordnung auf importierten Wert zurücksetzen"
+              />
             </Box>
             <RadioGroup
               row
@@ -162,18 +155,15 @@ function GroupAccordion({ group, index, allGroups, defaultExpanded, onDelete, ca
               sx={{ width: 150 }}
               inputProps={{ readOnly: false }}
             />
-            {isGroupDateModified('start') && (
-              <RestoreIcon
-                color="warning"
-                sx={{ cursor: 'pointer' }}
-                titleAccess="Startdatum auf importierten Wert zurücksetzen"
-                onClick={() => {
-                  if (window.confirm('Startdatum auf importierten Wert zurücksetzen?')) {
-                    handleRestoreGroupDate('start');
-                  }
-                }}
-              />
-            )}
+            <ModMonitor
+              modified={isGroupDateModified('start')}
+              onRestore={() => {
+                if (window.confirm('Startdatum auf importierten Wert zurücksetzen?')) {
+                  handleRestoreGroupDate('start');
+                }
+              }}
+              title="Startdatum auf importierten Wert zurücksetzen"
+            />
             <Typography>bis</Typography>
             <TextField
               label="Enddatum"
@@ -185,18 +175,15 @@ function GroupAccordion({ group, index, allGroups, defaultExpanded, onDelete, ca
               sx={{ width: 150 }}
               inputProps={{ readOnly: false }}
             />
-            {isGroupDateModified('end') && (
-              <RestoreIcon
-                color="warning"
-                sx={{ cursor: 'pointer' }}
-                titleAccess="Enddatum auf importierten Wert zurücksetzen"
-                onClick={() => {
-                  if (window.confirm('Enddatum auf importierten Wert zurücksetzen?')) {
-                    handleRestoreGroupDate('end');
-                  }
-                }}
-              />
-            )}
+            <ModMonitor
+              modified={isGroupDateModified('end')}
+              onRestore={() => {
+                if (window.confirm('Enddatum auf importierten Wert zurücksetzen?')) {
+                  handleRestoreGroupDate('end');
+                }
+              }}
+              title="Enddatum auf importierten Wert zurücksetzen"
+            />
           </Box>
         </Box>
       </AccordionDetails>

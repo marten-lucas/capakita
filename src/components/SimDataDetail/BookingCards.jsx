@@ -3,10 +3,10 @@ import {
   Divider, TextField, Switch, Slider, Select, MenuItem
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import RestoreIcon from '@mui/icons-material/Restore';
 import { useState, useEffect } from 'react';
 import { convertYYYYMMDDtoDDMMYYYY, convertDDMMYYYYtoYYYYMMDD } from '../../utils/dateUtils';
 import { timeToValue, valueToTime, segmentsEqual } from '../../utils/timeUtils';
+import ModMonitor from './ModMonitor';
 
 // Erstellt eine zusammenfassende Textdarstellung der Buchungszeiten
 function consolidateBookingSummary(times) {
@@ -329,17 +329,13 @@ function BookingAccordion({
           {dateRangeText ? ': ' : ''}
           {consolidateBookingSummary(times)}
         </Typography>
-        {isMod && (
-          <RestoreIcon
-            color="warning"
-            sx={{ ml: 1, cursor: 'pointer' }}
-            titleAccess="Komplette Buchung auf importierte Werte zurücksetzen"
-            onClick={e => {
-              e.stopPropagation();
-              handleRestoreAll();
-            }}
-          />
-        )}
+        <ModMonitor
+          modified={isMod}
+          onRestore={handleRestoreAll}
+          title="Komplette Buchung auf importierte Werte zurücksetzen"
+          confirmMsg="Buchung auf importierte Adebis-Daten zurücksetzen?"
+          iconProps={{ sx: { ml: 1 } }}
+        />
         {onDelete && canDelete && (
           <Button
             size="small"
@@ -361,19 +357,12 @@ function BookingAccordion({
             value={convertDDMMYYYYtoYYYYMMDD(bookingState.startdate)}
             onChange={(e) => handleDateChange('startdate', e.target.value)}
           />
-          {/* Restore-Icon für Startdatum */}
-          {isBookingDateModified('startdate') && (
-            <RestoreIcon
-              color="warning"
-              sx={{ cursor: 'pointer' }}
-              titleAccess="Startdatum auf importierten Wert zurücksetzen"
-              onClick={() => {
-                if (window.confirm('Startdatum auf importierten Wert zurücksetzen?')) {
-                  handleRestoreBookingDate('startdate');
-                }
-              }}
-            />
-          )}
+          <ModMonitor
+            modified={isBookingDateModified('startdate')}
+            onRestore={() => handleRestoreBookingDate('startdate')}
+            title="Startdatum auf importierten Wert zurücksetzen"
+            confirmMsg="Startdatum auf importierten Wert zurücksetzen?"
+          />
           <Typography>bis</Typography>
           <TextField
             label="Enddatum"
@@ -383,19 +372,12 @@ function BookingAccordion({
             value={convertDDMMYYYYtoYYYYMMDD(bookingState.enddate)}
             onChange={(e) => handleDateChange('enddate', e.target.value)}
           />
-          {/* Restore-Icon für Enddatum */}
-          {isBookingDateModified('enddate') && (
-            <RestoreIcon
-              color="warning"
-              sx={{ cursor: 'pointer' }}
-              titleAccess="Enddatum auf importierten Wert zurücksetzen"
-              onClick={() => {
-                if (window.confirm('Enddatum auf importierten Wert zurücksetzen?')) {
-                  handleRestoreBookingDate('enddate');
-                }
-              }}
-            />
-          )}
+          <ModMonitor
+            modified={isBookingDateModified('enddate')}
+            onRestore={() => handleRestoreBookingDate('enddate')}
+            title="Enddatum auf importierten Wert zurücksetzen"
+            confirmMsg="Enddatum auf importierten Wert zurücksetzen?"
+          />
         </Box>
         <Divider sx={{ my: 2 }} />
         {daysOfWeek.map(day => {
@@ -406,15 +388,12 @@ function BookingAccordion({
             <Box key={day.abbr} display="flex" alignItems="center">
               {/* Icon jetzt VOR dem Label */}
               {dayMod && (
-                <RestoreIcon
-                  color="warning"
-                  sx={{ mr: 1, cursor: 'pointer' }}
-                  titleAccess="Tag auf importierte Werte zurücksetzen"
-                  onClick={() => {
-                    if (window.confirm(`${day.label} auf importierte Werte zurücksetzen?`)) {
-                      handleRestoreDay(day.abbr);
-                    }
-                  }}
+                <ModMonitor
+                  modified={dayMod}
+                  onRestore={() => handleRestoreDay(day.abbr)}
+                  title="Tag auf importierte Werte zurücksetzen"
+                  confirmMsg={`${day.label} auf importierte Werte zurücksetzen?`}
+                  iconProps={{ sx: { mr: 1 } }}
                 />
               )}
               <DayControl

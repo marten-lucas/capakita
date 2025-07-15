@@ -10,6 +10,7 @@ import RestoreIcon from '@mui/icons-material/Restore';
 import { useState, useEffect } from 'react';
 import GroupCards from './SimDataDetail/GroupCards';
 import BookingCards from './SimDataDetail/BookingCards';
+import ModMonitor from './SimDataDetail/ModMonitor';
 
 // --- Import helper functions from utils ---
 import { isDateModified } from '../utils/dateUtils';
@@ -243,14 +244,12 @@ function SimDataDetail({ item, allGroups }) {
               onChange={e => setStartDate(e.target.value)}
               sx={{ width: 150 }}
             />
-            {startDateModified && (
-              <RestoreIcon
-                color="warning"
-                sx={{ cursor: 'pointer' }}
-                titleAccess="Startdatum auf importierten Wert zurücksetzen"
-                onClick={handleRestoreStartDate}
-              />
-            )}
+            <ModMonitor
+              modified={startDateModified}
+              onRestore={handleRestoreStartDate}
+              title="Startdatum auf importierten Wert zurücksetzen"
+              confirmMsg="Startdatum auf importierten Wert zurücksetzen?"
+            />
             <Typography variant="body2" sx={{ minWidth: 24, textAlign: 'center' }}>bis</Typography>
             <TextField
               label=""
@@ -261,14 +260,12 @@ function SimDataDetail({ item, allGroups }) {
               onChange={e => setEndDate(e.target.value)}
               sx={{ width: 150 }}
             />
-            {endDateModified && (
-              <RestoreIcon
-                color="warning"
-                sx={{ cursor: 'pointer' }}
-                titleAccess="Enddatum auf importierten Wert zurücksetzen"
-                onClick={handleRestoreEndDate}
-              />
-            )}
+            <ModMonitor
+              modified={endDateModified}
+              onRestore={handleRestoreEndDate}
+              title="Enddatum auf importierten Wert zurücksetzen"
+              confirmMsg="Enddatum auf importierten Wert zurücksetzen?"
+            />
           </Box>
           {/* Pausieren unter Zeitraum, Toggle linksbündig */}
           <Box sx={{ mb: 2, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
@@ -310,11 +307,9 @@ function SimDataDetail({ item, allGroups }) {
             <Typography variant="h6" sx={{ mt: 1, mb: 1, flex: 1 }}>
               Buchungszeiten:
               {bookingsMod && (
-                <RestoreIcon
-                  color="warning"
-                  sx={{ ml: 1, verticalAlign: 'middle' }}
-                  titleAccess="Alle Buchungen auf importierte Werte zurücksetzen"
-                  onClick={() => {
+                <ModMonitor
+                  modified={bookingsMod}
+                  onRestore={() => {
                     if (window.confirm('Alle Buchungen auf importierte Adebis-Daten zurücksetzen?')) {
                       setLocalItem(prev => ({
                         ...prev,
@@ -325,6 +320,7 @@ function SimDataDetail({ item, allGroups }) {
                       }));
                     }
                   }}
+                  title="Alle Buchungen auf importierte Werte zurücksetzen"
                 />
               )}
             </Typography>
@@ -351,11 +347,9 @@ function SimDataDetail({ item, allGroups }) {
             <Typography variant="h6" sx={{ flex: 1 }}>
               Gruppen:
               {groupsMod && (
-                <RestoreIcon
-                  color="warning"
-                  sx={{ ml: 1, verticalAlign: 'middle' }}
-                  titleAccess="Alle Gruppen auf importierte Werte zurücksetzen"
-                  onClick={() => {
+                <ModMonitor
+                  modified={groupsMod}
+                  onRestore={() => {
                     if (window.confirm('Alle Gruppen auf importierte Adebis-Daten zurücksetzen?')) {
                       setLocalItem(prev => ({
                         ...prev,
@@ -366,6 +360,7 @@ function SimDataDetail({ item, allGroups }) {
                       }));
                     }
                   }}
+                  title="Alle Gruppen auf importierte Werte zurücksetzen"
                 />
               )}
             </Typography>
@@ -450,4 +445,5 @@ function groupsModified(localGroups, origGroups) {
   }
   return false;
 }
+
 export default SimDataDetail;
