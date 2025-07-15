@@ -13,7 +13,6 @@ import BookingCards from './SimDataDetail/BookingCards';
 import ModMonitor from './SimDataDetail/ModMonitor';
 
 // --- Import helper functions from utils ---
-import { isDateModified } from '../utils/dateUtils';
 
 
 // --- Hauptkomponente ---
@@ -145,14 +144,10 @@ function SimDataDetail({ item, allGroups }) {
 
   // Restore-Funktionen
   const handleRestoreStartDate = () => {
-    if (window.confirm('Startdatum auf importierten Wert zurücksetzen?')) {
-      setStartDate(initialStartDate);
-    }
+    setStartDate(initialStartDate);
   };
   const handleRestoreEndDate = () => {
-    if (window.confirm('Enddatum auf importierten Wert zurücksetzen?')) {
-      setEndDate(initialEndDate);
-    }
+    setEndDate(initialEndDate);
   };
 
   const handleRestoreBooking = (idx) => {
@@ -192,8 +187,6 @@ function SimDataDetail({ item, allGroups }) {
   };
 
   // Markierungen für modifizierte Felder
-  const startDateModified = isDateModified(startDate, item?.originalParsedData?.startdate);
-  const endDateModified = isDateModified(endDate, item?.originalParsedData?.enddate);
 
   // Guard: Wenn localItem nicht gesetzt, Hinweis anzeigen und return
   if (!localItem) {
@@ -206,8 +199,6 @@ function SimDataDetail({ item, allGroups }) {
     );
   }
 
-  const bookingsMod = bookingsModified(localItem?.parseddata?.booking, item?.originalParsedData?.booking);
-  const groupsMod = groupsModified(localItem?.parseddata?.group, item?.originalParsedData?.group);
 
   return (
     <Box
@@ -245,7 +236,8 @@ function SimDataDetail({ item, allGroups }) {
               sx={{ width: 150 }}
             />
             <ModMonitor
-              modified={startDateModified}
+              value={startDate}
+              originalValue={item?.originalParsedData?.startdate ? item.originalParsedData.startdate.split('.').reverse().join('-') : ''}
               onRestore={handleRestoreStartDate}
               title="Startdatum auf importierten Wert zurücksetzen"
               confirmMsg="Startdatum auf importierten Wert zurücksetzen?"
@@ -261,7 +253,8 @@ function SimDataDetail({ item, allGroups }) {
               sx={{ width: 150 }}
             />
             <ModMonitor
-              modified={endDateModified}
+              value={endDate}
+              originalValue={item?.originalParsedData?.enddate ? item.originalParsedData.enddate.split('.').reverse().join('-') : ''}
               onRestore={handleRestoreEndDate}
               title="Enddatum auf importierten Wert zurücksetzen"
               confirmMsg="Enddatum auf importierten Wert zurücksetzen?"
@@ -306,21 +299,21 @@ function SimDataDetail({ item, allGroups }) {
           <Box display="flex" alignItems="center" gap={2} sx={{ mb: 1 }}>
             <Typography variant="h6" sx={{ mt: 1, mb: 1, flex: 1 }}>
               Buchungszeiten:
-              {bookingsMod && (
+              {(
                 <ModMonitor
-                  modified={bookingsMod}
+                  value={JSON.stringify(localItem.parseddata?.booking)}
+                  originalValue={JSON.stringify(item.originalParsedData?.booking || [])}
                   onRestore={() => {
-                    if (window.confirm('Alle Buchungen auf importierte Adebis-Daten zurücksetzen?')) {
-                      setLocalItem(prev => ({
-                        ...prev,
-                        parseddata: {
-                          ...prev.parseddata,
-                          booking: JSON.parse(JSON.stringify(item.originalParsedData?.booking || []))
-                        }
-                      }));
-                    }
+                    setLocalItem(prev => ({
+                      ...prev,
+                      parseddata: {
+                        ...prev.parseddata,
+                        booking: JSON.parse(JSON.stringify(item.originalParsedData?.booking || []))
+                      }
+                    }));
                   }}
                   title="Alle Buchungen auf importierte Werte zurücksetzen"
+                  confirmMsg="Alle Buchungen auf importierte Adebis-Daten zurücksetzen?"
                 />
               )}
             </Typography>
@@ -346,21 +339,21 @@ function SimDataDetail({ item, allGroups }) {
           <Box display="flex" alignItems="center" gap={2} sx={{ mt: 2, mb: 1 }}>
             <Typography variant="h6" sx={{ flex: 1 }}>
               Gruppen:
-              {groupsMod && (
+              {(
                 <ModMonitor
-                  modified={groupsMod}
+                  value={JSON.stringify(localItem.parseddata?.group)}
+                  originalValue={JSON.stringify(item.originalParsedData?.group || [])}
                   onRestore={() => {
-                    if (window.confirm('Alle Gruppen auf importierte Adebis-Daten zurücksetzen?')) {
-                      setLocalItem(prev => ({
-                        ...prev,
-                        parseddata: {
-                          ...prev.parseddata,
-                          group: JSON.parse(JSON.stringify(item.originalParsedData?.group || []))
-                        }
-                      }));
-                    }
+                    setLocalItem(prev => ({
+                      ...prev,
+                      parseddata: {
+                        ...prev.parseddata,
+                        group: JSON.parse(JSON.stringify(item.originalParsedData?.group || []))
+                      }
+                    }));
                   }}
                   title="Alle Gruppen auf importierte Werte zurücksetzen"
+                  confirmMsg="Alle Gruppen auf importierte Adebis-Daten zurücksetzen?"
                 />
               )}
             </Typography>
@@ -408,42 +401,6 @@ function SimDataDetail({ item, allGroups }) {
   );
 }
 
-function bookingsModified(localBookings, origBookings) {
-  if (!Array.isArray(localBookings) && !Array.isArray(origBookings)) return false;
-  if (!Array.isArray(localBookings) || !Array.isArray(origBookings)) return true;
-  if (localBookings.length !== origBookings.length) return true;
-  for (let i = 0; i < localBookings.length; ++i) {
-    const l = localBookings[i], o = origBookings[i];
-    if (l.startdate !== o.startdate || l.enddate !== o.enddate) return true;
-    if (!Array.isArray(l.times) && !Array.isArray(o.times)) continue;
-    if (!Array.isArray(l.times) || !Array.isArray(o.times)) return true;
-    if (l.times.length !== o.times.length) return true;
-    for (let j = 0; j < l.times.length; ++j) {
-      const lt = l.times[j], ot = o.times[j];
-      if (lt.day !== ot.day || lt.day_name !== ot.day_name) return true;
-      if (!Array.isArray(lt.segments) && !Array.isArray(ot.segments)) continue;
-      if (!Array.isArray(lt.segments) || !Array.isArray(ot.segments)) return true;
-      if (lt.segments.length !== ot.segments.length) return true;
-      for (let k = 0; k < lt.segments.length; ++k) {
-        const ls = lt.segments[k], os = ot.segments[k];
-        if (ls.booking_start !== os.booking_start || ls.booking_end !== os.booking_end) return true;
-      }
-    }
-  }
-  return false;
-}
 
-function groupsModified(localGroups, origGroups) {
-  if (!Array.isArray(localGroups) && !Array.isArray(origGroups)) return false;
-  if (!Array.isArray(localGroups) || !Array.isArray(origGroups)) return true;
-  if (localGroups.length !== origGroups.length) return true;
-  for (let i = 0; i < localGroups.length; ++i) {
-    const l = localGroups[i], o = origGroups[i];
-    if (String(l.id) !== String(o.id)) return true;
-    if (l.start !== o.start) return true;
-    if (l.end !== o.end) return true;
-  }
-  return false;
-}
 
 export default SimDataDetail;

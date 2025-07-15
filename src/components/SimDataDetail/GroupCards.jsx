@@ -23,27 +23,10 @@ function GroupAccordion({ group, index, allGroups, defaultExpanded, onDelete, ca
   }, [group]);
 
   // Prüft, ob ein Feld (start, end) geändert wurde
-  function isGroupDateModified(field) {
-    if (!originalGroup) return false;
-    const orig = originalGroup[field];
-    const local = groupState[field];
-    if (!orig && !local) return false;
-    if (!orig || !local) return true;
-    // orig: DD.MM.YYYY, local: DD.MM.YYYY
-    return orig !== local;
-  }
 
   // Prüft, ob die Gruppen-ID geändert wurde
-  function isGroupIdModified() {
-    if (!originalGroup) return false;
-    // id kann Zahl oder String sein
-    return String(groupState.id ?? '') !== String(originalGroup.id ?? '');
-  }
 
   // Prüft, ob irgendwas geändert ist (für Restore-Icon im Akkordeon)
-  function isAnyModified() {
-    return isGroupDateModified('start') || isGroupDateModified('end') || isGroupIdModified();
-  }
 
   // Restore für Feld
   const handleRestoreGroupDate = (field) => {
@@ -90,7 +73,8 @@ function GroupAccordion({ group, index, allGroups, defaultExpanded, onDelete, ca
           </Typography>
           {expanded && (
             <ModMonitor
-              modified={isAnyModified()}
+              value={JSON.stringify(groupState)}
+              originalValue={originalGroup ? JSON.stringify(originalGroup) : undefined}
               onRestore={handleRestoreAll}
               title="Komplette Gruppenzuordnung auf importierte Werte zurücksetzen"
               confirmMsg="Gruppenzuordnung auf importierte Adebis-Daten zurücksetzen?"
@@ -115,13 +99,11 @@ function GroupAccordion({ group, index, allGroups, defaultExpanded, onDelete, ca
             <Box display="flex" alignItems="center">
               <FormLabel component="legend" sx={{ mr: 1 }}>Gruppe</FormLabel>
               <ModMonitor
-                modified={isGroupIdModified()}
-                onRestore={() => {
-                  if (window.confirm('Gruppenzuordnung auf importierten Wert zurücksetzen?')) {
-                    handleRestoreGroupId();
-                  }
-                }}
+                value={groupState.id}
+                originalValue={originalGroup ? originalGroup.id : undefined}
+                onRestore={handleRestoreGroupId}
                 title="Gruppenzuordnung auf importierten Wert zurücksetzen"
+                confirmMsg="Gruppenzuordnung auf importierten Wert zurücksetzen?"
               />
             </Box>
             <RadioGroup
@@ -156,13 +138,11 @@ function GroupAccordion({ group, index, allGroups, defaultExpanded, onDelete, ca
               inputProps={{ readOnly: false }}
             />
             <ModMonitor
-              modified={isGroupDateModified('start')}
-              onRestore={() => {
-                if (window.confirm('Startdatum auf importierten Wert zurücksetzen?')) {
-                  handleRestoreGroupDate('start');
-                }
-              }}
+              value={start}
+              originalValue={originalGroup ? originalGroup.start : undefined}
+              onRestore={() => handleRestoreGroupDate('start')}
               title="Startdatum auf importierten Wert zurücksetzen"
+              confirmMsg="Startdatum auf importierten Wert zurücksetzen?"
             />
             <Typography>bis</Typography>
             <TextField
@@ -176,13 +156,11 @@ function GroupAccordion({ group, index, allGroups, defaultExpanded, onDelete, ca
               inputProps={{ readOnly: false }}
             />
             <ModMonitor
-              modified={isGroupDateModified('end')}
-              onRestore={() => {
-                if (window.confirm('Enddatum auf importierten Wert zurücksetzen?')) {
-                  handleRestoreGroupDate('end');
-                }
-              }}
+              value={end}
+              originalValue={originalGroup ? originalGroup.end : undefined}
+              onRestore={() => handleRestoreGroupDate('end')}
               title="Enddatum auf importierten Wert zurücksetzen"
+              confirmMsg="Enddatum auf importierten Wert zurücksetzen?"
             />
           </Box>
         </Box>

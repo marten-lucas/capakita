@@ -5,47 +5,9 @@ import {
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useState, useEffect } from 'react';
 import { convertYYYYMMDDtoDDMMYYYY, convertDDMMYYYYtoYYYYMMDD } from '../../utils/dateUtils';
-import { timeToValue, valueToTime, segmentsEqual } from '../../utils/timeUtils';
+import { timeToValue, valueToTime } from '../../utils/timeUtils';
 import ModMonitor from './ModMonitor';
-
-// Erstellt eine zusammenfassende Textdarstellung der Buchungszeiten
-function consolidateBookingSummary(times) {
-  if (!times || times.length === 0) return 'Keine Zeiten definiert';
-
-  const dayOrder = ['Mo', 'Di', 'Mi', 'Do', 'Fr'];
-  const relevantTimes = times
-    .filter(t => t.segments && t.segments.length > 0)
-    .sort((a, b) => dayOrder.indexOf(a.day_name) - dayOrder.indexOf(b.day_name));
-
-  if (relevantTimes.length === 0) return 'Keine Zeiten definiert';
-
-  const grouped = [];
-  let currentGroup = null;
-
-  for (const dayTime of relevantTimes) {
-    // Vergleiche Segmente als Array, nicht als String!
-    if (
-      currentGroup &&
-      segmentsEqual(currentGroup.segments, dayTime.segments)
-    ) {
-      currentGroup.endDay = dayTime.day_name;
-    } else {
-      if (currentGroup) grouped.push(currentGroup);
-      currentGroup = {
-        startDay: dayTime.day_name,
-        endDay: dayTime.day_name,
-        segments: dayTime.segments
-      };
-    }
-  }
-  if (currentGroup) grouped.push(currentGroup);
-
-  return grouped.map(g => {
-    const dayPart = g.startDay === g.endDay ? g.startDay : `${g.startDay}-${g.endDay}`;
-    const timeStr = g.segments.map(s => `${s.booking_start}-${s.booking_end}`).join(', ');
-    return `${dayPart} ${timeStr}`;
-  }).join(', ');
-}
+import { consolidateBookingSummary } from '../../utils/bookingUtils';
 
 // --- Neue interaktive Komponenten ---
 
@@ -237,17 +199,6 @@ function BookingAccordion({
   }
 
   // Prüft, ob das gesamte Booking geändert wurde
-  function isBookingModified(localBooking, origBooking) {
-    if (!origBooking) return false;
-    // Vergleiche Start/Enddatum
-    if (localBooking.startdate !== origBooking.startdate || localBooking.enddate !== origBooking.enddate) return true;
-    // Vergleiche alle Tage
-    const days = ['Mo', 'Di', 'Mi', 'Do', 'Fr'];
-    for (const day of days) {
-      if (isDayModified(localBooking.times, origBooking.times, day)) return true;
-    }
-    return false;
-  }
 
   const daysOfWeek = [
     { label: 'Montag', abbr: 'Mo' }, { label: 'Dienstag', abbr: 'Di' },
@@ -256,7 +207,6 @@ function BookingAccordion({
   ];
 
   // Prüfe, ob Booking geändert ist
-  const isMod = originalBooking ? isBookingModified(bookingState, originalBooking) : false;
 
   const { startdate, enddate, times } = bookingState;
   let dateRangeText = '';
@@ -296,21 +246,10 @@ function BookingAccordion({
 
   // Restore-Funktion für das gesamte Booking
   const handleRestoreAll = () => {
-    if (window.confirm('Buchung auf importierte Adebis-Daten zurücksetzen?')) {
-      onRestoreBooking && onRestoreBooking(index);
-    }
+    onRestoreBooking && onRestoreBooking(index);
   };
 
   // Prüft, ob das Start-/Enddatum geändert wurde (analog zu isDateModified)
-  function isBookingDateModified(field) {
-    if (!originalBooking) return false;
-    const orig = originalBooking[field];
-    const local = bookingState[field];
-    if (!orig && !local) return false;
-    if (!orig || !local) return true;
-    // orig: DD.MM.YYYY, local: DD.MM.YYYY
-    return orig !== local;
-  }
 
   // Restore für Start-/Enddatum
   const handleRestoreBookingDate = (field) => {
@@ -330,7 +269,8 @@ function BookingAccordion({
           {consolidateBookingSummary(times)}
         </Typography>
         <ModMonitor
-          modified={isMod}
+          value={JSON.stringify(bookingState)}
+          originalValue={originalBooking ? JSON.stringify(originalBooking) : undefined}
           onRestore={handleRestoreAll}
           title="Komplette Buchung auf importierte Werte zurücksetzen"
           confirmMsg="Buchung auf importierte Adebis-Daten zurücksetzen?"
@@ -358,7 +298,8 @@ function BookingAccordion({
             onChange={(e) => handleDateChange('startdate', e.target.value)}
           />
           <ModMonitor
-            modified={isBookingDateModified('startdate')}
+            value={bookingState.startdate}
+            originalValue={originalBooking ? originalBooking.startdate : undefined}
             onRestore={() => handleRestoreBookingDate('startdate')}
             title="Startdatum auf importierten Wert zurücksetzen"
             confirmMsg="Startdatum auf importierten Wert zurücksetzen?"
@@ -373,7 +314,8 @@ function BookingAccordion({
             onChange={(e) => handleDateChange('enddate', e.target.value)}
           />
           <ModMonitor
-            modified={isBookingDateModified('enddate')}
+            value={bookingState.enddate}
+            originalValue={originalBooking ? originalBooking.enddate : undefined}
             onRestore={() => handleRestoreBookingDate('enddate')}
             title="Enddatum auf importierten Wert zurücksetzen"
             confirmMsg="Enddatum auf importierten Wert zurücksetzen?"
@@ -389,7 +331,12 @@ function BookingAccordion({
               {/* Icon jetzt VOR dem Label */}
               {dayMod && (
                 <ModMonitor
-                  modified={dayMod}
+                  value={JSON.stringify(bookingState.times?.find(t => t.day_name === day.abbr))}
+                  originalValue={
+                    originalBooking
+                      ? JSON.stringify(originalBooking.times?.find(t => t.day_name === day.abbr))
+                      : undefined
+                  }
                   onRestore={() => handleRestoreDay(day.abbr)}
                   title="Tag auf importierte Werte zurücksetzen"
                   confirmMsg={`${day.label} auf importierte Werte zurücksetzen?`}

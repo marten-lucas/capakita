@@ -1,15 +1,18 @@
 import RestoreIcon from '@mui/icons-material/Restore';
 
 /**
- * ModMonitor: Shows a restore icon if modified, and calls onRestore on click (with optional confirmation).
+ * ModMonitor: Shows a restore icon if value !== originalValue, and calls onRestore on click (with optional confirmation).
  * Props:
- *   modified: boolean
+ *   value: any
+ *   originalValue: any
  *   onRestore: function
  *   title: string (tooltip)
  *   confirmMsg: string (optional, confirmation message)
  *   iconProps: object (optional, extra props for icon)
  */
-function ModMonitor({ modified, onRestore, title, confirmMsg, iconProps }) {
+function ModMonitor({ value, originalValue, onRestore, title, confirmMsg, iconProps }) {
+  // Compare values for modification (shallow)
+  const modified = value !== originalValue;
   if (!modified) return null;
   const handleClick = (e) => {
     e.stopPropagation?.();
