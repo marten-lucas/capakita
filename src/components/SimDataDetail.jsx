@@ -9,6 +9,7 @@ import AddIcon from '@mui/icons-material/Add';
 import RestoreIcon from '@mui/icons-material/Restore';
 import { useState, useEffect } from 'react';
 import GroupCards from './SimDataDetail/GroupCards';
+import BookingCards from './SimDataDetail/BookingCards';
 
 // --- Hilfsfunktionen für die neue BookingAccordion ---
 
@@ -147,16 +148,24 @@ function DayControl({ dayLabel, dayAbbr, dayData, onToggle, onTimeChange, onAddS
                   </Select>
                 )}
                 {segments.length > 1 && (
-                  <button
-                    style={{ marginLeft: 4 }}
+                  <Button
+                    size="small"
+                    color="error"
+                    variant="outlined"
+                    sx={{ minWidth: 32, px: 1, ml: 0.5 }}
                     onClick={() => onRemoveSegment(dayAbbr, idx)}
                     title="Segment entfernen"
-                  >−</button>
+                  >−</Button>
                 )}
               </Box>
             ))}
             {type === 'capacity' && (
-              <button onClick={() => onAddSegment(dayAbbr)} style={{ marginTop: 2 }}>+ Zeitbereich</button>
+              <Button
+                size="small"
+                variant="outlined"
+                sx={{ mt: 0.5 }}
+                onClick={() => onAddSegment(dayAbbr)}
+              >+ Zeitbereich</Button>
             )}
           </Box>
         )}
@@ -476,33 +485,6 @@ function BookingAccordion({
         })}
       </AccordionDetails>
     </Accordion>
-  );
-}
-
-function BookingCards({
-  bookings, type, allGroups, lastAddedIndex, onDelete, importedCount,
-  originalBookings, onRestoreBooking
-}) {
-  if (!bookings || bookings.length === 0) {
-    return <Typography variant="body2" color="text.secondary">Keine Buchungszeiten vorhanden.</Typography>;
-  }
-  return (
-    <Box>
-      {bookings.map((booking, idx) => (
-        <BookingAccordion
-          key={idx}
-          booking={booking}
-          index={idx}
-          type={type}
-          allGroups={allGroups}
-          defaultExpanded={lastAddedIndex === idx}
-          onDelete={onDelete}
-          canDelete={typeof importedCount === 'number' ? idx >= importedCount : true}
-          originalBooking={Array.isArray(originalBookings) ? originalBookings[idx] : undefined}
-          onRestoreBooking={onRestoreBooking}
-        />
-      ))}
-    </Box>
   );
 }
 
