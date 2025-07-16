@@ -12,6 +12,7 @@ import {
   Radio
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import DeleteIcon from '@mui/icons-material/Delete';
 import GroupCards from './GroupCards';
 import BookingCards from './BookingCards';
 import ModMonitor from './ModMonitor';
@@ -42,7 +43,10 @@ function SimulationDataTab({
     updateItemGeburtsdatum,
     getItemGeburtsdatum,
     updateItemQualification,
-    getItemQualification
+    getItemQualification,
+    simulationData,
+    setSimulationData,
+    setSelectedItem
   } = useSimulationDataStore((state) => ({
     updateItemPausedState: state.updateItemPausedState,
     getItemPausedState: state.getItemPausedState,
@@ -60,6 +64,10 @@ function SimulationDataTab({
     getItemGeburtsdatum: state.getItemGeburtsdatum,
     updateItemQualification: state.updateItemQualification,
     getItemQualification: state.getItemQualification,
+    simulationData: state.simulationData,
+    setSimulationData: state.setSimulationData,
+    selectedItem: state.selectedItem,
+    setSelectedItem: state.setSelectedItem,
   }));
 
   const pausedState = getItemPausedState(item.id);
@@ -95,6 +103,9 @@ function SimulationDataTab({
   const itemQualificationFromStore = getItemQualification ? getItemQualification(item.id) : '';
   const itemQualification = itemQualificationFromStore || '';
   const initialQualification = item?.originalParsedData?.qualification || '';
+
+  // Check if item is manually added
+  const isManualEntry = item?.rawdata?.source === 'manual entry';
 
   // Restore-Funktionen
   const handleRestoreStartDate = () => {
@@ -194,8 +205,31 @@ function SimulationDataTab({
     updateItemQualification(item.id, originalQualification);
   };
 
+  const handleDeleteItem = () => {
+    if (window.confirm(`Möchten Sie "${item.name}" wirklich löschen?`)) {
+      const updatedData = simulationData.filter(i => i.id !== item.id);
+      setSimulationData(updatedData);
+      setSelectedItem(null);
+    }
+  };
+
   return (
     <Box flex={1} display="flex" flexDirection="column" gap={2} sx={{ overflowY: 'auto' }}>
+      {/* Delete button for manually added items */}
+      {isManualEntry && (
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+          <Button
+            variant="outlined"
+            color="error"
+            startIcon={<DeleteIcon />}
+            onClick={handleDeleteItem}
+            size="small"
+          >
+            Eintrag löschen
+          </Button>
+        </Box>
+      )}
+
       {/* Editable Name and Note Fields */}
       <Box display="flex" alignItems="center" gap={2} sx={{ mb: 2 }}>
         <Typography variant="body2" sx={{ minWidth: 90 }}>Name</Typography>
@@ -363,19 +397,17 @@ function SimulationDataTab({
       <Box display="flex" alignItems="center" gap={2} sx={{ mb: 1 }}>
         <Typography variant="h6" sx={{ mt: 1, mb: 1, flex: 1 }}>
           Buchungszeiten:
-          {(
-            <ModMonitor
-              itemId={item.id}
-              field="bookings"
-              value={JSON.stringify(bookings)}
-              originalValue={JSON.stringify(item.originalParsedData?.booking || [])}
-              onRestore={() => {
-                updateItemBookings(item.id, JSON.parse(JSON.stringify(item.originalParsedData?.booking || [])));
-              }}
-              title="Alle Buchungen auf importierte Werte zurücksetzen"
-              confirmMsg="Alle Buchungen auf importierten Wert zurücksetzen?"
-            />
-          )}
+          <ModMonitor
+            itemId={item.id}
+            field="bookings"
+            value={JSON.stringify(bookings)}
+            originalValue={JSON.stringify(item.originalParsedData?.booking || [])}
+            onRestore={() => {
+              updateItemBookings(item.id, JSON.parse(JSON.stringify(item.originalParsedData?.booking || [])));
+            }}
+            title="Alle Buchungen auf importierte Werte zurücksetzen"
+            confirmMsg="Alle Buchungen auf importierten Wert zurücksetzen?"
+          />
         </Typography>
         <Button
           variant="outlined"
@@ -394,22 +426,21 @@ function SimulationDataTab({
         importedCount={importedBookingCount}
         originalBookings={item?.originalParsedData?.booking}
         onRestoreBooking={handleRestoreBooking}
-        onDelete={handleDeleteBooking} // Pass handleDeleteBooking
+        onDelete={handleDeleteBooking}
+        isManualEntry={isManualEntry} // Pass isManualEntry flag
       />
       <Box display="flex" alignItems="center" gap={2} sx={{ mt: 2, mb: 1 }}>
         <Typography variant="h6" sx={{ flex: 1 }}>
           Gruppen:
-          {(
-            <ModMonitor
-              itemId={item.id}
-              field="groups"
-              value={JSON.stringify(groups)}
-              originalValue={JSON.stringify(item.originalParsedData?.group || [])}
-              onRestore={() => updateItemGroups(item.id, JSON.parse(JSON.stringify(item.originalParsedData?.group || [])))}
-              title="Alle Gruppen auf importierte Werte zurücksetzen"
-              confirmMsg="Alle Gruppen auf importierten Wert zurücksetzen?"
-            />
-          )}
+          <ModMonitor
+            itemId={item.id}
+            field="groups"
+            value={JSON.stringify(groups)}
+            originalValue={JSON.stringify(item.originalParsedData?.group || [])}
+            onRestore={() => updateItemGroups(item.id, JSON.parse(JSON.stringify(item.originalParsedData?.group || [])))}
+            title="Alle Gruppen auf importierte Werte zurücksetzen"
+            confirmMsg="Alle Gruppen auf importierten Wert zurücksetzen?"
+          />
         </Typography>
         <Button
           variant="outlined"
@@ -429,6 +460,7 @@ function SimulationDataTab({
         importedCount={importedGroupCount}
         originalGroups={item?.originalParsedData?.group}
         onRestoreGroup={handleRestoreGroup}
+        isManualEntry={isManualEntry} // Pass isManualEntry flag
       />
     </Box>
   );

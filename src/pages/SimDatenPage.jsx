@@ -12,6 +12,7 @@ import FileUploadIcon from '@mui/icons-material/FileUpload';
 import AddIcon from '@mui/icons-material/Add';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import DataImportModal from '../components/DataImportModal';
+import AddItemModal from '../components/AddItemModal';
 import SimDataList from '../components/SimDataList';
 import SimDataDetailForm from '../components/SimDataDetailForm';
 import JSZip from 'jszip';
@@ -19,6 +20,7 @@ import useSimulationDataStore from '../store/simulationDataStore';
 
 function SimDatenPage() {
   const [modalOpen, setModalOpen] = useState(false);
+  const [addItemModalOpen, setAddItemModalOpen] = useState(false);
   const simulationData = useSimulationDataStore(state => state.simulationData);
   const groupsLookup = useSimulationDataStore(state => state.groupsLookup);
   const selectedItem = useSimulationDataStore(state => state.selectedItem);
@@ -30,6 +32,8 @@ function SimDatenPage() {
 
   const handleOpenModal = () => setModalOpen(true);
   const handleCloseModal = () => setModalOpen(false);
+  const handleOpenAddItemModal = () => setAddItemModalOpen(true);
+  const handleCloseAddItemModal = () => setAddItemModalOpen(false);
 
   // --- Hilfsfunktionen wie in simulator_poc.html ---
   // Parse DD.MM.YYYY zu Date
@@ -318,6 +322,11 @@ function SimDatenPage() {
     setModalOpen(false);
   };
 
+  const handleAddItem = (newItem) => {
+    setSimulationData([...simulationData, newItem]);
+    setSelectedItem(newItem);
+  };
+
   const handleRowClick = (item) => {
     if (selectedItem?.id === item.id) {
       setSelectedItem(null);
@@ -332,7 +341,7 @@ function SimDatenPage() {
 
   const actions = [
     { icon: <FileUploadIcon />, name: 'Import', onClick: handleOpenModal },
-    { icon: <AddIcon />, name: 'Add' },
+    { icon: <AddIcon />, name: 'Add', onClick: handleOpenAddItemModal },
     { icon: <RestartAltIcon />, name: 'Reset', onClick: handleResetData },
   ];
 
@@ -356,6 +365,11 @@ function SimDatenPage() {
         open={modalOpen}
         onClose={handleCloseModal}
         onImport={handleImport}
+      />
+      <AddItemModal
+        open={addItemModalOpen}
+        onClose={handleCloseAddItemModal}
+        onAdd={handleAddItem}
       />
       <Box sx={{ flex: 1, display: 'flex', flexDirection: 'row', pt: 0 }}>
         <>

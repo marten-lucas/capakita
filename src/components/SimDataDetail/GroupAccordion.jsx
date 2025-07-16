@@ -7,7 +7,7 @@ import React, { useState } from 'react';
 import { convertYYYYMMDDtoDDMMYYYY, convertDDMMYYYYtoYYYYMMDD } from '../../utils/dateUtils';
 import ModMonitor from './ModMonitor';
 
-function GroupAccordion({ group, index, allGroups, defaultExpanded, onDelete, canDelete, onRestore, originalGroup, onUpdateGroup }) {
+function GroupAccordion({ group, index, allGroups, defaultExpanded, onDelete, canDelete, onRestore, originalGroup, onUpdateGroup, parentItemId }) {
   const [expanded, setExpanded] = useState(!!defaultExpanded);
 
   const handleDateChange = (field, value) => {
@@ -59,6 +59,8 @@ function GroupAccordion({ group, index, allGroups, defaultExpanded, onDelete, ca
           </Typography>
           {expanded && (
             <ModMonitor
+              itemId={parentItemId} // Use parentItemId instead of hardcoded value
+              field={`group-${index}`}
               value={JSON.stringify(group)}
               originalValue={originalGroup ? JSON.stringify(originalGroup) : undefined}
               onRestore={handleRestoreAll}
@@ -85,8 +87,8 @@ function GroupAccordion({ group, index, allGroups, defaultExpanded, onDelete, ca
             <Box display="flex" alignItems="center">
               <FormLabel component="legend" sx={{ mr: 1 }}>Gruppe</FormLabel>
               <ModMonitor
-                itemId={`group-${index}`}
-                field="id"
+                itemId={parentItemId} // Use parentItemId
+                field={`group-${index}-id`}
                 value={group.id}
                 originalValue={originalGroup ? originalGroup.id : undefined}
                 onRestore={handleRestoreGroupId}
@@ -123,8 +125,8 @@ function GroupAccordion({ group, index, allGroups, defaultExpanded, onDelete, ca
               inputProps={{ readOnly: false }}
             />
             <ModMonitor
-              itemId={`group-${index}`}
-              field="start"
+              itemId={parentItemId} // Use parentItemId
+              field={`group-${index}-start`}
               value={group.start}
               originalValue={originalGroup ? originalGroup.start : undefined}
               onRestore={() => handleRestoreGroupDate('start')}
@@ -143,8 +145,8 @@ function GroupAccordion({ group, index, allGroups, defaultExpanded, onDelete, ca
               inputProps={{ readOnly: false }}
             />
             <ModMonitor
-              itemId={`group-${index}`}
-              field="end"
+              itemId={parentItemId} // Use parentItemId
+              field={`group-${index}-end`}
               value={group.end}
               originalValue={originalGroup ? originalGroup.end : undefined}
               onRestore={() => handleRestoreGroupDate('end')}
@@ -159,4 +161,5 @@ function GroupAccordion({ group, index, allGroups, defaultExpanded, onDelete, ca
 }
 
 export default GroupAccordion;
+
 

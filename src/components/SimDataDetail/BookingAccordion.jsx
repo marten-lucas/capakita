@@ -86,7 +86,7 @@ function DayControl({ dayLabel, dayAbbr, dayData, onToggle, onTimeChange, onAddS
 
 function BookingAccordion({
   booking, index, type, allGroups, defaultExpanded, canDelete,
-  originalBooking, onUpdateBooking, onDelete
+  originalBooking, onUpdateBooking, onDelete, isManualEntry, parentItemId // Add parentItemId prop
 }) {
   const [expanded, setExpanded] = useState(!!defaultExpanded);
 
@@ -272,7 +272,7 @@ function BookingAccordion({
           {consolidateBookingSummary(times)}
         </Typography>
         <ModMonitor
-          itemId={booking.id}
+          itemId={parentItemId} // Use parentItemId instead of booking.id
           field={`booking-${index}`}
           value={JSON.stringify(booking)}
           originalValue={JSON.stringify(originalBooking || {})}
@@ -304,7 +304,7 @@ function BookingAccordion({
             onChange={(e) => handleDateChange('startdate', e.target.value)}
           />
           <ModMonitor
-            itemId={booking.id}
+            itemId={parentItemId} // Use parentItemId
             field={`booking-${index}-startdate`}
             value={booking.startdate}
             originalValue={originalBooking ? originalBooking.startdate : undefined}
@@ -322,7 +322,7 @@ function BookingAccordion({
             onChange={(e) => handleDateChange('enddate', e.target.value)}
           />
           <ModMonitor
-            itemId={booking.id}
+            itemId={parentItemId} // Use parentItemId
             field={`booking-${index}-enddate`}
             value={booking.enddate}
             originalValue={originalBooking ? originalBooking.enddate : undefined}
@@ -333,14 +333,15 @@ function BookingAccordion({
         </Box>
         <Divider sx={{ my: 2 }} />
         {daysOfWeek.map(day => {
-          const dayMod = originalBooking
+          const dayMod = originalBooking && !isManualEntry
             ? isDayModified(booking.times, originalBooking.times, day.abbr)
             : false;
           return (
             <Box key={day.abbr} display="flex" alignItems="center">
-              {/* Icon jetzt VOR dem Label */}
               {dayMod && (
                 <ModMonitor
+                  itemId={parentItemId} // Use parentItemId
+                  field={`booking-${index}-${day.abbr}`}
                   value={JSON.stringify(booking.times?.find(t => t.day_name === day.abbr))}
                   originalValue={
                     originalBooking
@@ -374,3 +375,4 @@ function BookingAccordion({
 }
 
 export default BookingAccordion;
+

@@ -1,6 +1,7 @@
 import RestoreIcon from '@mui/icons-material/Restore';
 import { useEffect } from 'react';
 import useModMonitorStore from '../../store/modMonitorStore';
+import useSimulationDataStore from '../../store/simulationDataStore';
 
 /**
  * ModMonitor: Monitors a specific field of an item for modifications.
@@ -16,6 +17,11 @@ import useModMonitorStore from '../../store/modMonitorStore';
  */
 function ModMonitor({ itemId, field, value, originalValue, onRestore, title, confirmMsg, iconProps }) {
   const { setFieldModification, resetFieldModification, isFieldModified } = useModMonitorStore();
+  const simulationData = useSimulationDataStore(state => state.simulationData);
+
+  // Check if item is manually added
+  const item = simulationData.find(item => item.id === itemId);
+  const isManualEntry = item?.rawdata?.source === 'manual entry';
 
   // Track modifications using useEffect
   useEffect(() => {
@@ -26,6 +32,9 @@ function ModMonitor({ itemId, field, value, originalValue, onRestore, title, con
       resetFieldModification(itemId, field);
     }
   }, [itemId, field, value, originalValue, setFieldModification, resetFieldModification]);
+
+  // Don't show ModMonitor for manually added items
+  if (isManualEntry) return null;
 
   if (!isFieldModified(itemId, field)) return null;
 

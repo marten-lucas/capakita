@@ -19,7 +19,7 @@ function groupsModified(localGroups, origGroups) {
   return false;
 }
 
-function GroupCards({ itemId, allGroups, lastAddedIndex, importedCount, originalGroups, onRestoreGroup }) {
+function GroupCards({ itemId, allGroups, lastAddedIndex, importedCount, originalGroups, onRestoreGroup, isManualEntry }) {
   const { getItemGroups, updateItemGroups } = useSimulationDataStore((state) => ({
     getItemGroups: state.getItemGroups,
     updateItemGroups: state.updateItemGroups,
@@ -54,6 +54,8 @@ function GroupCards({ itemId, allGroups, lastAddedIndex, importedCount, original
             onRestore={onRestoreGroup}
             originalGroup={orig}
             onUpdateGroup={(updatedGroup) => handleUpdateGroup(idx, updatedGroup)}
+            isManualEntry={isManualEntry}
+            parentItemId={itemId} // Pass the parent item ID
           />
         );
       })}

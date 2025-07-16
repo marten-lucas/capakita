@@ -330,6 +330,18 @@ const useSimulationDataStore = create((set, get) => ({
     const item = state.simulationData.find((i) => i.id === itemId);
     return item?.parseddata?.qualification || '';
   },
+
+  deleteItem: (itemId) => {
+    set(
+      produce((state) => {
+        state.simulationData = state.simulationData.filter(item => item.id !== itemId);
+        // Clear selected item if it was the deleted item
+        if (state.selectedItem && state.selectedItem.id === itemId) {
+          state.selectedItem = null;
+        }
+      })
+    );
+  },
 }));
 
 export default useSimulationDataStore;

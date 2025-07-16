@@ -154,6 +154,9 @@ function SimDataList({ data, onRowClick, selectedItem }) {
         const modificationStatus = getModificationStatus(item);
         const modChipProps = getModificationChipProps(modificationStatus);
 
+        // Check if item is manually added
+        const isManualEntry = item?.rawdata?.source === 'manual entry';
+
         return (
           <div key={item.id}>
             <ListItemButton
@@ -179,9 +182,12 @@ function SimDataList({ data, onRowClick, selectedItem }) {
                       label={item.rawdata?.source || 'unbekannt'}
                       size="small"
                       color={item.rawdata?.source === 'adebis export' ? 'primary' : 'default'}
+                      variant={item.rawdata?.source === 'manual entry' ? 'outlined' : 'filled'}
                       sx={{ mt: 0.5 }}
                     />
-                    <Chip {...modChipProps} size="small" sx={{ mt: 0.5 }} />
+                    {!isManualEntry && (
+                      <Chip {...modChipProps} size="small" sx={{ mt: 0.5 }} />
+                    )}
                   </Box>
                 }
                 secondaryTypographyProps={{ component: 'div' }}
