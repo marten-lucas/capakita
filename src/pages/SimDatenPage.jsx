@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   Box,
   SpeedDial,
@@ -15,24 +15,23 @@ import DataImportModal from '../components/DataImportModal';
 import SimDataList from '../components/SimDataList';
 import SimDataDetailForm from '../components/SimDataDetailForm';
 import JSZip from 'jszip';
+import useSimulationDataStore from '../store/simulationDataStore';
 
 function SimDatenPage() {
   const [modalOpen, setModalOpen] = useState(false);
-  const [simulationData, setSimulationData] = useState(() => {
-    const saved = localStorage.getItem('simulationData');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [selectedItem, setSelectedItem] = useState(null);
-  const [groupsLookup, setGroupsLookup] = useState(() => {
-    const saved = localStorage.getItem('groupsLookup');
-    return saved ? JSON.parse(saved) : {};
-  });
+  const simulationData = useSimulationDataStore(state => state.simulationData);
+  const groupsLookup = useSimulationDataStore(state => state.groupsLookup);
+  const selectedItem = useSimulationDataStore(state => state.selectedItem);
+
+  const setSimulationData = useSimulationDataStore(state => state.setSimulationData);
+  const setGroupsLookup = useSimulationDataStore(state => state.setGroupsLookup);
+  const setSelectedItem = useSimulationDataStore(state => state.setSelectedItem);
+  const clearAllData = useSimulationDataStore(state => state.clearAllData); // Reset all imported data
 
   const handleOpenModal = () => setModalOpen(true);
   const handleCloseModal = () => setModalOpen(false);
 
   // --- Hilfsfunktionen wie in simulator_poc.html ---
-
   // Parse DD.MM.YYYY zu Date
   const parseDate = (dateString) => {
     if (!dateString) return null;
@@ -305,17 +304,12 @@ function SimDatenPage() {
       });
     }
 
-    if (typeof setSimulationData === 'function') {
-      setSimulationData(processedData);
-    }
-    // selectedItem nicht zurücksetzen!
+    setSimulationData(processedData);
   };
 
-  // Speichere simulationData bei Änderung im localStorage
-  useEffect(() => {
-    localStorage.setItem('simulationData', JSON.stringify(simulationData));
-    localStorage.setItem('groupsLookup', JSON.stringify(groupsLookup));
-  }, [simulationData, groupsLookup]);
+  //   setSelectedItem(prev => (prev?.id === item.id ? null : item));
+  // };
+
 
   const handleImport = async ({ file, isAnonymized }) => {
     await extractZipFile(file, isAnonymized);
@@ -323,17 +317,17 @@ function SimDatenPage() {
   };
 
   const handleRowClick = (item) => {
-    setSelectedItem(prev => (prev?.id === item.id ? null : item));
+    if (selectedItem?.id === item.id) {
+      console.log('Updated selected item:', null); // Log the updated selected item
+      setSelectedItem(null);
+    } else {
+      console.log('Updated selected item:', item); // Log the updated selected item
+      setSelectedItem(item);
+    }
   };
 
   const handleResetData = () => {
-    // Clear state
-    setSimulationData([]);
-    setGroupsLookup({});
-    setSelectedItem(null);
-    // Clear localStorage
-    localStorage.removeItem('simulationData');
-    localStorage.removeItem('groupsLookup');
+    clearAllData(); // Reset all imported data
   };
 
   const actions = [
@@ -385,7 +379,7 @@ function SimDatenPage() {
             />
           </Box>
           <Box sx={{ flex: 1, p: 3, overflow: 'auto', height: '100vh', maxHeight: '100vh' }}>
-            {simulationData.length > 0 && (
+            {simulationData.length > 0 && selectedItem && (
               <SimDataDetailForm item={selectedItem} allGroups={groupsLookup} />
             )}
           </Box>
