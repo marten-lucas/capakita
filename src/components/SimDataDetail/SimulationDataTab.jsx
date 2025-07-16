@@ -1,3 +1,4 @@
+import React, { useState, useEffect } from 'react';
 import { 
   Typography, 
   Box, 
@@ -21,7 +22,20 @@ function SimulationDataTab({
   importedGroupCount, 
   handleRestoreBooking 
 }) {
-  const { updateItemPausedState, getItemPausedState, getItemBookings, updateItemBookings, getItemGroups, updateItemGroups, updateItemDates, getItemDates } = useSimulationDataStore((state) => ({
+  const { 
+    updateItemPausedState, 
+    getItemPausedState, 
+    getItemBookings, 
+    updateItemBookings, 
+    getItemGroups, 
+    updateItemGroups, 
+    updateItemDates, 
+    getItemDates,
+    updateItemName,
+    getItemName,
+    updateItemNote,
+    getItemNote
+  } = useSimulationDataStore((state) => ({
     updateItemPausedState: state.updateItemPausedState,
     getItemPausedState: state.getItemPausedState,
     getItemBookings: state.getItemBookings,
@@ -30,12 +44,20 @@ function SimulationDataTab({
     updateItemGroups: state.updateItemGroups,
     updateItemDates: state.updateItemDates,
     getItemDates: state.getItemDates,
+    updateItemName: state.updateItemName,
+    getItemName: state.getItemName,
+    updateItemNote: state.updateItemNote,
+    getItemNote: state.getItemNote,
   }));
 
   const pausedState = getItemPausedState(item.id);
   const bookings = getItemBookings(item.id);
   const groups = getItemGroups(item.id);
   const currentDates = getItemDates(item.id);
+  const itemNameFromStore = getItemName ? getItemName(item.id) : '';
+  const itemName = itemNameFromStore || item.name || '';
+  const itemNoteFromStore = getItemNote ? getItemNote(item.id) : '';
+  const itemNote = itemNoteFromStore || item.note || '';
 
   // Convert dates to input format
   const startDate = currentDates?.startdate
@@ -111,8 +133,44 @@ function SimulationDataTab({
 
   const today = new Date().toISOString().split('T')[0]; // Get today's date in YYYY-MM-DD format
 
+  // Lokaler State für Name und Bemerkungen
+  const [localName, setLocalName] = useState(itemName);
+  const [localNote, setLocalNote] = useState(itemNote);
+
+  // Synchronisiere lokalen State, wenn Item wechselt
+  useEffect(() => {
+    setLocalName(itemName);
+  }, [itemName]);
+  useEffect(() => {
+    setLocalNote(itemNote);
+  }, [itemNote]);
+
   return (
     <Box flex={1} display="flex" flexDirection="column" gap={2} sx={{ overflowY: 'auto' }}>
+      {/* Editable Name and Note Fields */}
+      <Box display="flex" alignItems="center" gap={2} sx={{ mb: 2 }}>
+        <Typography variant="body2" sx={{ minWidth: 90 }}>Name</Typography>
+        <TextField
+          value={localName}
+          onChange={(e) => setLocalName(e.target.value)}
+          onBlur={() => updateItemName(item.id, localName)}
+          size="small"
+          sx={{ width: 300 }}
+          InputLabelProps={{ shrink: true }}
+        />
+        <Typography variant="body2" sx={{ minWidth: 90 }}>Bemerkungen</Typography>
+        <TextField
+          value={localNote}
+          onChange={(e) => setLocalNote(e.target.value)}
+          onBlur={() => updateItemNote(item.id, localNote)}
+          size="small"
+          sx={{ width: 300 }}
+          multiline
+          minRows={2}
+          maxRows={4}
+          InputLabelProps={{ shrink: true }}
+        />
+      </Box>
       {/* Wiederhergestellte Datumsfelder für den Datensatz */}
       <Box display="flex" alignItems="center" gap={2} sx={{ mb: 2 }}>
         <Typography variant="body2" sx={{ minWidth: 90 }}>Zeitraum von</Typography>
@@ -266,5 +324,6 @@ function SimulationDataTab({
 }
 
 export default SimulationDataTab;
+
 
 

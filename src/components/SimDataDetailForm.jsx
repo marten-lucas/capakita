@@ -24,10 +24,6 @@ function SimDataDetailForm({ item, allGroups }) {
     setLastAddedBookingIdx(null);
     setLastAddedGroupIdx(null);
 
-    // Debugging the item and modifications
-    console.log('SimDataDetailForm - item:', item);
-    console.log('SimDataDetailForm - modifications:', item?.modifications);
-
     // Zähle importierte Buchungen/Gruppen (aus Adebis)
     if (item?.rawdata?.source === 'adebis export') {
       setImportedBookingCount(Array.isArray(item?.originalParsedData?.booking) ? item.originalParsedData.booking.length : 0);

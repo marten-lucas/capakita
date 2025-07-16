@@ -214,6 +214,51 @@ const useSimulationDataStore = create((set, get) => ({
     const item = state.simulationData.find((i) => i.id === itemId);
     return item?.parseddata?.group || [];
   },
+
+  updateItemName: (itemId, newName) => {
+    set(
+      produce((state) => {
+        if (Array.isArray(state.simulationData)) {
+          const item = state.simulationData.find((i) => i.id === itemId);
+          if (item) {
+            item.name = newName;
+            // Update selectedItem if it's the same item
+            if (state.selectedItem && state.selectedItem.id === itemId) {
+              state.selectedItem = item;
+            }
+          }
+        }
+      })
+    );
+  },
+  getItemName: (itemId) => {
+    const state = get();
+    const items = state.simulationData ?? [];
+    const item = items.find((i) => i.id === itemId);
+    return item && typeof item.name === 'string' ? item.name : '';
+  },
+
+  updateItemNote: (itemId, newNote) => {
+    set(
+      produce((state) => {
+        if (Array.isArray(state.simulationData)) {
+          const item = state.simulationData.find((i) => i.id === itemId);
+          if (item) {
+            item.note = newNote;
+            if (state.selectedItem && state.selectedItem.id === itemId) {
+              state.selectedItem = item;
+            }
+          }
+        }
+      })
+    );
+  },
+  getItemNote: (itemId) => {
+    const state = get();
+    const items = state.simulationData ?? [];
+    const item = items.find((i) => i.id === itemId);
+    return item && typeof item.note === 'string' ? item.note : '';
+  },
 }));
 
 export default useSimulationDataStore;
