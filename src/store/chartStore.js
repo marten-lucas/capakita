@@ -29,6 +29,11 @@ const useChartStore = create(
       availableGroups: [], // Store available groups
       availableQualifications: [], // Store available qualifications
       
+      // Midterm chart settings
+      midtermTimeDimension: 'Wochen', // 'Wochen', 'Monate', 'Jahre'
+      midtermSelectedGroups: [],
+      midtermSelectedQualifications: [],
+      
       // Actions
       setStichtag: (date) => set(produce((state) => {
         state.stichtag = date;
@@ -38,6 +43,17 @@ const useChartStore = create(
       })),
       setSelectedQualifications: (qualifications) => set(produce((state) => {
         state.selectedQualifications = qualifications;
+      })),
+      
+      // Midterm actions
+      setMidtermTimeDimension: (dimension) => set(produce((state) => {
+        state.midtermTimeDimension = dimension;
+      })),
+      setMidtermSelectedGroups: (groups) => set(produce((state) => {
+        state.midtermSelectedGroups = groups;
+      })),
+      setMidtermSelectedQualifications: (qualifications) => set(produce((state) => {
+        state.midtermSelectedQualifications = qualifications;
       })),
       
       // Update available groups and auto-sync selection
@@ -370,7 +386,324 @@ const useChartStore = create(
             .map(item => item.name);
         }
         return [];
-      }
+      },
+      
+      // Calculate midterm chart data
+      calculateMidtermChartData: (simulationData) => {
+        const { midtermTimeDimension, midtermSelectedGroups, midtermSelectedQualifications } = get();
+        
+        // Get last date of interest to determine end date
+        const lastDateOfInterest = get().getLastDateOfInterest(simulationData);
+        
+        // Generate time periods based on dimension
+        const periods = get().generateMidtermPeriods(midtermTimeDimension, lastDateOfInterest);
+        
+        const bedarf = [];
+        const kapazitaet = [];
+        const baykibigAnstellungsschluessel = [];
+        
+        periods.forEach(period => {
+          // Calculate demand for this period
+          const demandItems = simulationData.filter(item => {
+            if (item.type !== 'demand') return false;
+            if (!get().isItemValidForPeriod(item, period, midtermSelectedGroups, midtermSelectedQualifications)) return false;
+            return get().hasBookingInPeriod(item, period);
+          });
+          
+          // Calculate capacity for this period
+          const capacityItems = simulationData.filter(item => {
+            if (item.type !== 'capacity') return false;
+            if (!get().isItemValidForPeriod(item, period, midtermSelectedGroups, midtermSelectedQualifications)) return false;
+            return get().hasBookingInPeriod(item, period);
+          });
+          
+          bedarf.push(demandItems.length);
+          kapazitaet.push(capacityItems.length);
+          
+          // Calculate BayKiBig ratio for this period (using average hours per period)
+          const periodHours = get().calculatePeriodHours(period, midtermTimeDimension);
+          const baykibigRatio = get().calculateBayKiBigRatioForPeriod(demandItems, capacityItems, periodHours, period);
+          baykibigAnstellungsschluessel.push(baykibigRatio);
+        });
+        
+        // Calculate max values for axes
+        const maxBedarf = Math.max(...bedarf, 1);
+        const maxKapazitaet = Math.ceil(maxBedarf / 5);
+        
+        const anstellungsschluesselValues = baykibigAnstellungsschluessel.map(item => {
+          if (!item || item.totalBookingHours === 0) return 0;
+          return item.totalStaffHours > 0 ? item.totalBookingHours / item.totalStaffHours : 0;
+        });
+        
+        const fachkraftquoteValues = baykibigAnstellungsschluessel.map(item => {
+          return item?.fachkraftQuotePercent || 0;
+        });
+        
+        const maxAnstellungsschluessel = Math.max(...anstellungsschluesselValues, 15);
+        const maxFachkraftquote = Math.max(...fachkraftquoteValues, 100);
+        
+        return {
+          categories: periods.map(p => p.label),
+          bedarf,
+          kapazitaet,
+          baykibigAnstellungsschluessel,
+          maxBedarf,
+          maxKapazitaet,
+          maxAnstellungsschluessel,
+          maxFachkraftquote
+        };
+      },
+      
+      // Get last date of interest from simulation data
+      getLastDateOfInterest: (simulationData) => {
+        const today = new Date();
+        let lastDate = today;
+        
+        simulationData.forEach(item => {
+          // Check item dates
+          if (item.parseddata?.enddate) {
+            const endDate = new Date(item.parseddata.enddate.split('.').reverse().join('-'));
+            if (endDate > lastDate) lastDate = endDate;
+          }
+          
+          // Check group dates
+          if (item.parseddata?.group) {
+            item.parseddata.group.forEach(group => {
+              if (group.end) {
+                const groupEnd = new Date(group.end.split('.').reverse().join('-'));
+                if (groupEnd > lastDate) lastDate = groupEnd;
+              }
+            });
+          }
+          
+          // Check booking dates
+          if (item.parseddata?.booking) {
+            item.parseddata.booking.forEach(booking => {
+              if (booking.enddate) {
+                const bookingEnd = new Date(booking.enddate.split('.').reverse().join('-'));
+                if (bookingEnd > lastDate) lastDate = bookingEnd;
+              }
+            });
+          }
+          
+          // Check pause dates
+          if (item.parseddata?.paused?.enabled && item.parseddata.paused.end) {
+            const pauseEnd = new Date(item.parseddata.paused.end);
+            if (pauseEnd > lastDate) lastDate = pauseEnd;
+          }
+        });
+        
+        return lastDate;
+      },
+      
+      // Generate time periods based on dimension
+      generateMidtermPeriods: (dimension, endDate) => {
+        const today = new Date();
+        const periods = [];
+        
+        if (dimension === 'Wochen') {
+          // Generate weeks until endDate
+          let currentDate = new Date(today);
+          // Start from beginning of current week (Monday)
+          currentDate.setDate(currentDate.getDate() - currentDate.getDay() + 1);
+          
+          while (currentDate <= endDate) {
+            const startDate = new Date(currentDate);
+            const weekEnd = new Date(currentDate);
+            weekEnd.setDate(currentDate.getDate() + 6);
+            
+            periods.push({
+              label: `KW ${get().getWeekNumber(startDate)} ${startDate.getFullYear()}`,
+              start: startDate,
+              end: weekEnd
+            });
+            
+            currentDate.setDate(currentDate.getDate() + 7);
+          }
+        } else if (dimension === 'Monate') {
+          // Generate months until endDate
+          let currentDate = new Date(today.getFullYear(), today.getMonth(), 1);
+          
+          while (currentDate <= endDate) {
+            const startDate = new Date(currentDate);
+            const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+            
+            periods.push({
+              label: startDate.toLocaleDateString('de-DE', { month: 'short', year: 'numeric' }),
+              start: startDate,
+              end: monthEnd
+            });
+            
+            currentDate.setMonth(currentDate.getMonth() + 1);
+          }
+        } else if (dimension === 'Jahre') {
+          // Generate years until endDate
+          let currentYear = today.getFullYear();
+          const endYear = endDate.getFullYear();
+          
+          while (currentYear <= endYear) {
+            const startDate = new Date(currentYear, 0, 1);
+            const yearEnd = new Date(currentYear, 11, 31);
+            
+            periods.push({
+              label: currentYear.toString(),
+              start: startDate,
+              end: yearEnd
+            });
+            
+            currentYear++;
+          }
+        }
+        
+        return periods;
+      },
+      
+      // Calculate average hours per period based on dimension
+      calculatePeriodHours: (period, dimension) => {
+        if (dimension === 'Wochen') {
+          return 25; // 5 Tage × 5 Stunden durchschnittlich
+        } else if (dimension === 'Monate') {
+          return 110; // ca. 22 Arbeitstage × 5 Stunden
+        } else if (dimension === 'Jahre') {
+          return 1300; // ca. 260 Arbeitstage × 5 Stunden
+        }
+        return 25; // Fallback
+      },
+      
+      // Calculate BayKiBig ratio for a specific period
+      calculateBayKiBigRatioForPeriod: (demandItems, capacityItems, periodHours, period) => {
+        const stichtagDate = new Date(period.start.getTime() + (period.end.getTime() - period.start.getTime()) / 2); // Middle of period
+        
+        // Calculate total booking hours for children (with weighting factor)
+        let totalBookingHours = 0;
+        let totalBookingHoursForFachkraftquote = 0;
+        
+        demandItems.forEach(child => {
+          const weightingFactor = get().calculateWeightingFactor(child, stichtagDate);
+          const fachkraftWeightingFactor = get().calculateFachkraftWeightingFactor(child, stichtagDate);
+          
+          totalBookingHours += periodHours * weightingFactor;
+          totalBookingHoursForFachkraftquote += periodHours * fachkraftWeightingFactor;
+        });
+        
+        // Calculate available staff hours
+        let totalStaffHours = 0;
+        let fachkraftHours = 0;
+        let totalStaffCount = capacityItems.length;
+        let fachkraftCount = 0;
+        
+        capacityItems.forEach(staff => {
+          const isFachkraft = get().isFachkraft(staff);
+          totalStaffHours += periodHours;
+          if (isFachkraft) {
+            fachkraftHours += periodHours;
+            fachkraftCount++;
+          }
+        });
+        
+        // BayKiBig requirements
+        const requiredStaffHours = totalBookingHours / 11.0;
+        const requiredFachkraftHours = (totalBookingHoursForFachkraftquote / 11.0) * 0.5;
+        
+        const anstellungsschluesselOk = totalStaffHours >= requiredStaffHours;
+        const fachkraftquoteOk = fachkraftHours >= requiredFachkraftHours;
+        
+        const staffRatio = requiredStaffHours > 0 ? totalStaffHours / requiredStaffHours : 0;
+        const fachkraftRatio = requiredFachkraftHours > 0 ? fachkraftHours / requiredFachkraftHours : 0;
+        
+        const fachkraftQuotePercent = totalStaffCount > 0 ? (fachkraftCount / totalStaffCount) * 100 : 0;
+        
+        return {
+          staffRatio,
+          fachkraftRatio,
+          anstellungsschluesselOk,
+          fachkraftquoteOk,
+          totalBookingHours,
+          totalBookingHoursForFachkraftquote,
+          requiredStaffHours,
+          totalStaffHours,
+          requiredFachkraftHours,
+          fachkraftHours,
+          fachkraftQuotePercent,
+          totalStaffCount,
+          fachkraftCount
+        };
+      },
+
+      // Get week number
+      getWeekNumber: (date) => {
+        const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+        const dayNum = d.getUTCDay() || 7;
+        d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+        const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+        return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+      },
+      
+      // Check if item is valid for period with filters
+      isItemValidForPeriod: (item, period, groupFilter, qualificationFilter) => {
+        // Check if item's date range overlaps with period
+        const itemStart = item.parseddata?.startdate ? new Date(item.parseddata.startdate.split('.').reverse().join('-')) : null;
+        const itemEnd = item.parseddata?.enddate ? new Date(item.parseddata.enddate.split('.').reverse().join('-')) : null;
+        
+        // Item must be active during the period
+        if (itemStart && itemStart > period.end) return false;
+        if (itemEnd && itemEnd < period.start) return false;
+        
+        // Check pause state - if paused during entire period, item is not valid
+        const pausedState = item.parseddata?.paused;
+        if (pausedState?.enabled && pausedState.start && pausedState.end) {
+          const pauseStart = new Date(pausedState.start);
+          const pauseEnd = new Date(pausedState.end);
+          
+          // If the pause period completely covers the time period, item is not valid
+          if (pauseStart <= period.start && pauseEnd >= period.end) {
+            return false;
+          }
+        }
+        
+        // Filter by groups
+        const groups = item.parseddata?.group ?? [];
+        if (groups.length === 0) {
+          if (!groupFilter.includes('keine Gruppe')) return false;
+        } else {
+          const hasValidGroup = groups.some(g => {
+            if (!groupFilter.includes(g.name)) return false;
+            const groupStart = g.start ? new Date(g.start.split('.').reverse().join('-')) : null;
+            const groupEnd = g.end ? new Date(g.end.split('.').reverse().join('-')) : null;
+            
+            // Group must be active during the period
+            if (groupStart && groupStart > period.end) return false;
+            if (groupEnd && groupEnd < period.start) return false;
+            return true;
+          });
+          if (!hasValidGroup) return false;
+        }
+        
+        // Filter by qualification (only for capacity items)
+        if (item.type === 'capacity' && qualificationFilter && qualificationFilter.length > 0) {
+          const qualification = item.parseddata?.qualification || 'keine Qualifikation';
+          if (!qualificationFilter.includes(qualification)) return false;
+        }
+        
+        return true;
+      },
+      
+      // Check if item has booking in period
+      hasBookingInPeriod: (item, period) => {
+        const bookings = item.parseddata?.booking ?? [];
+        
+        return bookings.some(booking => {
+          const bookingStart = booking.startdate ? new Date(booking.startdate.split('.').reverse().join('-')) : null;
+          const bookingEnd = booking.enddate ? new Date(booking.enddate.split('.').reverse().join('-')) : null;
+          
+          // Booking must overlap with period
+          if (bookingStart && bookingStart > period.end) return false;
+          if (bookingEnd && bookingEnd < period.start) return false;
+          
+          // Check if booking has any times defined
+          return booking.times && booking.times.length > 0;
+        });
+      },
     }),
     {
       name: 'chart-storage',
@@ -379,7 +712,10 @@ const useChartStore = create(
         selectedGroups: state.selectedGroups,
         selectedQualifications: state.selectedQualifications,
         availableGroups: state.availableGroups,
-        availableQualifications: state.availableQualifications
+        availableQualifications: state.availableQualifications,
+        midtermTimeDimension: state.midtermTimeDimension,
+        midtermSelectedGroups: state.midtermSelectedGroups,
+        midtermSelectedQualifications: state.midtermSelectedQualifications
       })
     }
   )
