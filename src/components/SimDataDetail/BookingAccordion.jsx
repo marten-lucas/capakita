@@ -112,21 +112,22 @@ function BookingAccordion({
 
 
   const handleAddSegment = (dayAbbr) => {
-    setBookingState((prev) => {
-      const newTimes = prev.times.map((t) =>
+    const updatedBooking = {
+      ...bookingState,
+      times: bookingState.times.map((t) =>
         t.day_name === dayAbbr
           ? { ...t, segments: [...t.segments, { booking_start: '13:00', booking_end: '16:00' }] }
           : t
-      );
-      const updatedBooking = { ...prev, times: newTimes };
-      onUpdateBooking(updatedBooking);
-      return updatedBooking;
-    });
+      ),
+    };
+    setBookingState(updatedBooking); // Update local state
+    onUpdateBooking(updatedBooking); // Trigger global state update
   };
 
   const handleTimeChange = (dayAbbr, segIdx, newValues) => {
-    setBookingState((prev) => {
-      const newTimes = prev.times.map((t) => {
+    const updatedBooking = {
+      ...bookingState,
+      times: bookingState.times.map((t) => {
         if (t.day_name === dayAbbr) {
           const newSegments = t.segments.map((seg, i) =>
             i === segIdx
@@ -136,33 +137,34 @@ function BookingAccordion({
           return { ...t, segments: newSegments };
         }
         return t;
-      });
-      const updatedBooking = { ...prev, times: newTimes };
-      onUpdateBooking(updatedBooking);
-      return updatedBooking;
-    });
+      }),
+    };
+    setBookingState(updatedBooking); // Update local state
+    onUpdateBooking(updatedBooking); // Trigger global state update
   };
 
   const handleRemoveSegment = (dayAbbr, segIdx) => {
-    setBookingState((prev) => {
-      const newTimes = prev.times.map((t) => {
+    const updatedBooking = {
+      ...bookingState,
+      times: bookingState.times.map((t) => {
         if (t.day_name === dayAbbr && t.segments.length > 1) {
           const newSegments = t.segments.filter((_, i) => i !== segIdx);
           return { ...t, segments: newSegments };
         }
         return t;
-      });
-      const updatedBooking = { ...prev, times: newTimes };
-      onUpdateBooking(updatedBooking);
-      return updatedBooking;
-    });
+      }),
+    };
+    setBookingState(updatedBooking); // Update local state
+    onUpdateBooking(updatedBooking); // Trigger global state update
   };
 
   const handleDateChange = (field, value) => {
-    setBookingState(prev => ({
-      ...prev,
-      [field]: convertYYYYMMDDtoDDMMYYYY(value)
-    }));
+    const updatedBooking = {
+      ...bookingState,
+      [field]: convertYYYYMMDDtoDDMMYYYY(value),
+    };
+    setBookingState(updatedBooking); // Update local state
+    onUpdateBooking(updatedBooking); // Trigger global state update
   };
 
   const handleGroupChange = (dayAbbr, segIdx, groupId) => {

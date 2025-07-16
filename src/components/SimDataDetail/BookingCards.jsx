@@ -35,7 +35,7 @@ function BookingCards({
           originalBooking={Array.isArray(originalBookings) ? originalBookings[idx] : undefined}
           onRestoreBooking={onRestoreBooking}
           onUpdateBooking={(updatedBooking) => handleUpdateBooking(idx, updatedBooking)}
-          onDelete={onDelete} // Pass the onDelete prop
+          onDelete={onDelete}
         />
       ))}
     </Box>
