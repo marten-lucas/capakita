@@ -129,6 +129,8 @@ function SimulationDataTab({
           sx={{ width: 150 }}
         />
         <ModMonitor
+          itemId={item.id}
+          field="startdate"
           value={startDate}
           originalValue={item?.originalParsedData?.startdate ? item.originalParsedData.startdate.split('.').reverse().join('-') : ''}
           onRestore={handleRestoreStartDate}
@@ -146,6 +148,8 @@ function SimulationDataTab({
           sx={{ width: 150 }}
         />
         <ModMonitor
+          itemId={item.id}
+          field="enddate"
           value={endDate}
           originalValue={item?.originalParsedData?.enddate ? item.originalParsedData.enddate.split('.').reverse().join('-') : ''}
           onRestore={handleRestoreEndDate}
@@ -195,11 +199,15 @@ function SimulationDataTab({
           Buchungszeiten:
           {(
             <ModMonitor
+              itemId={item.id}
+              field="bookings"
               value={JSON.stringify(bookings)}
               originalValue={JSON.stringify(item.originalParsedData?.booking || [])}
-              onRestore={() => updateItemBookings(item.id, JSON.parse(JSON.stringify(item.originalParsedData?.booking || [])))}
+              onRestore={() => {
+                updateItemBookings(item.id, JSON.parse(JSON.stringify(item.originalParsedData?.booking || [])));
+              }}
               title="Alle Buchungen auf importierte Werte zurücksetzen"
-              confirmMsg="Alle Buchungen auf importierte Adebis-Daten zurücksetzen?"
+              confirmMsg="Alle Buchungen auf importierten Wert zurücksetzen?"
             />
           )}
         </Typography>
@@ -227,11 +235,13 @@ function SimulationDataTab({
           Gruppen:
           {(
             <ModMonitor
+              itemId={item.id}
+              field="groups"
               value={JSON.stringify(groups)}
               originalValue={JSON.stringify(item.originalParsedData?.group || [])}
               onRestore={() => updateItemGroups(item.id, JSON.parse(JSON.stringify(item.originalParsedData?.group || [])))}
               title="Alle Gruppen auf importierte Werte zurücksetzen"
-              confirmMsg="Alle Gruppen auf importierte Adebis-Daten zurücksetzen?"
+              confirmMsg="Alle Gruppen auf importierten Wert zurücksetzen?"
             />
           )}
         </Typography>

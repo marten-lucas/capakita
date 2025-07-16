@@ -96,18 +96,23 @@ function BookingAccordion({
   }, [booking]);
 
   const handleDayToggle = (dayAbbr, isEnabled) => {
-    setBookingState((prev) => {
-      const newTimes = [...(prev.times || [])];
-      const dayIndex = newTimes.findIndex((t) => t.day_name === dayAbbr);
+    const updatedBooking = {
+      ...bookingState,
+      times: (() => {
+        const newTimes = [...(bookingState.times || [])];
+        const dayIndex = newTimes.findIndex((t) => t.day_name === dayAbbr);
 
-      if (isEnabled && dayIndex === -1) {
-        const dayNr = ['Mo', 'Di', 'Mi', 'Do', 'Fr'].indexOf(dayAbbr) + 1;
-        newTimes.push({ day: dayNr, day_name: dayAbbr, segments: [{ booking_start: '08:00', booking_end: '16:00' }] });
-      } else if (!isEnabled && dayIndex !== -1) {
-        newTimes.splice(dayIndex, 1);
-      }
-      return { ...prev, times: newTimes };
-    });
+        if (isEnabled && dayIndex === -1) {
+          const dayNr = ['Mo', 'Di', 'Mi', 'Do', 'Fr'].indexOf(dayAbbr) + 1;
+          newTimes.push({ day: dayNr, day_name: dayAbbr, segments: [{ booking_start: '08:00', booking_end: '16:00' }] });
+        } else if (!isEnabled && dayIndex !== -1) {
+          newTimes.splice(dayIndex, 1);
+        }
+        return newTimes;
+      })(),
+    };
+    setBookingState(updatedBooking); // Update local state
+    onUpdateBooking(updatedBooking); // Persist changes to global state
   };
 
 
@@ -224,41 +229,51 @@ function BookingAccordion({
   // Restore-Funktion für einen Tag
   const handleRestoreDay = (dayAbbr) => {
     if (!originalBooking) return;
-    setBookingState(prev => {
-      const origDay = Array.isArray(originalBooking.times)
-        ? originalBooking.times.find(t => t.day_name === dayAbbr)
-        : undefined;
-      let newTimes = Array.isArray(prev.times) ? [...prev.times] : [];
-      const idx = newTimes.findIndex(t => t.day_name === dayAbbr);
-      if (origDay) {
-        // Tag existiert im Import: ersetze oder füge ein
-        if (idx !== -1) {
-          newTimes[idx] = JSON.parse(JSON.stringify(origDay));
+    const updatedBooking = {
+      ...bookingState,
+      times: (() => {
+        const origDay = Array.isArray(originalBooking.times)
+          ? originalBooking.times.find(t => t.day_name === dayAbbr)
+          : undefined;
+        let newTimes = Array.isArray(bookingState.times) ? [...bookingState.times] : [];
+        const idx = newTimes.findIndex(t => t.day_name === dayAbbr);
+        if (origDay) {
+          // Replace or add the restored day
+          if (idx !== -1) {
+            newTimes[idx] = JSON.parse(JSON.stringify(origDay));
+          } else {
+            newTimes.push(JSON.parse(JSON.stringify(origDay)));
+          }
         } else {
-          newTimes.push(JSON.parse(JSON.stringify(origDay)));
+          // Remove the day if it doesn't exist in the original booking
+          if (idx !== -1) {
+            newTimes = newTimes.filter((_, i) => i !== idx);
+          }
         }
-      } else {
-        // Tag existiert nicht im Import: entferne falls vorhanden
-        if (idx !== -1) {
-          newTimes = newTimes.filter((_, i) => i !== idx);
-        }
-      }
-      return { ...prev, times: newTimes };
-    });
+        return newTimes;
+      })(),
+    };
+    setBookingState(updatedBooking); // Update local state
+    onUpdateBooking(updatedBooking); // Persist restored booking to global state
   };
 
   // Restore-Funktion für das gesamte Booking
   const handleRestoreAll = () => {
-    onRestoreBooking && onRestoreBooking(index);
+    if (!originalBooking) return;
+    const restoredBooking = JSON.parse(JSON.stringify(originalBooking));
+    setBookingState(restoredBooking); // Update local state
+    onUpdateBooking(restoredBooking); // Persist restored booking to global state
   };
 
   // Restore für Start-/Enddatum
   const handleRestoreBookingDate = (field) => {
     if (!originalBooking) return;
-    setBookingState(prev => ({
-      ...prev,
-      [field]: originalBooking[field] || ''
-    }));
+    const updatedBooking = {
+      ...bookingState,
+      [field]: originalBooking[field] || '',
+    };
+    setBookingState(updatedBooking); // Update local state
+    onUpdateBooking(updatedBooking); // Persist restored value to global state
   };
 
   return (
@@ -270,8 +285,10 @@ function BookingAccordion({
           {consolidateBookingSummary(times)}
         </Typography>
         <ModMonitor
+          itemId={booking.id}
+          field={`booking-${index}`}
           value={JSON.stringify(bookingState)}
-          originalValue={originalBooking ? JSON.stringify(originalBooking) : undefined}
+          originalValue={JSON.stringify(originalBooking || {})}
           onRestore={handleRestoreAll}
           title="Komplette Buchung auf importierte Werte zurücksetzen"
           confirmMsg="Buchung auf importierte Adebis-Daten zurücksetzen?"
@@ -299,6 +316,8 @@ function BookingAccordion({
             onChange={(e) => handleDateChange('startdate', e.target.value)}
           />
           <ModMonitor
+            itemId={booking.id}
+            field={`booking-${index}-startdate`}
             value={bookingState.startdate}
             originalValue={originalBooking ? originalBooking.startdate : undefined}
             onRestore={() => handleRestoreBookingDate('startdate')}
@@ -315,6 +334,8 @@ function BookingAccordion({
             onChange={(e) => handleDateChange('enddate', e.target.value)}
           />
           <ModMonitor
+            itemId={booking.id}
+            field={`booking-${index}-enddate`}
             value={bookingState.enddate}
             originalValue={originalBooking ? originalBooking.enddate : undefined}
             onRestore={() => handleRestoreBookingDate('enddate')}

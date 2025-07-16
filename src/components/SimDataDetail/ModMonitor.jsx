@@ -1,8 +1,12 @@
 import RestoreIcon from '@mui/icons-material/Restore';
+import { useEffect } from 'react';
+import useModMonitorStore from '../../store/modMonitorStore';
 
 /**
- * ModMonitor: Shows a restore icon if value !== originalValue, and calls onRestore on click (with optional confirmation).
+ * ModMonitor: Monitors a specific field of an item for modifications.
  * Props:
+ *   itemId: string | number (unique identifier for the monitored item)
+ *   field: string (name of the field being monitored)
  *   value: any
  *   originalValue: any
  *   onRestore: function
@@ -10,17 +14,28 @@ import RestoreIcon from '@mui/icons-material/Restore';
  *   confirmMsg: string (optional, confirmation message)
  *   iconProps: object (optional, extra props for icon)
  */
-function ModMonitor({ value, originalValue, onRestore, title, confirmMsg, iconProps }) {
-  // Compare values for modification (shallow)
-  const modified = value !== originalValue;
-  if (!modified) return null;
+function ModMonitor({ itemId, field, value, originalValue, onRestore, title, confirmMsg, iconProps }) {
+  const { setFieldModification, resetFieldModification, isFieldModified } = useModMonitorStore();
+
+  // Track modifications using useEffect
+  useEffect(() => {
+    const modified = value !== originalValue;
+    if (modified) {
+      setFieldModification(itemId, field, true);
+    } else {
+      resetFieldModification(itemId, field);
+    }
+  }, [itemId, field, value, originalValue, setFieldModification, resetFieldModification]);
+
+  if (!isFieldModified(itemId, field)) return null;
+
   const handleClick = (e) => {
     e.stopPropagation?.();
-    if (confirmMsg) {
-      if (!window.confirm(confirmMsg)) return;
-    }
+    if (confirmMsg && !window.confirm(confirmMsg)) return;
     onRestore?.();
+    resetFieldModification(itemId, field); // Reset modification state after restoring
   };
+
   return (
     <RestoreIcon
       color="warning"

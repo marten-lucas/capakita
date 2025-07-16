@@ -33,11 +33,13 @@ function GroupAccordion({ group, index, allGroups, defaultExpanded, onDelete, ca
   // Restore für Gruppen-ID
   const handleRestoreGroupId = () => {
     if (!originalGroup) return;
-    setGroupState(prev => ({
-      ...prev,
+    const updatedGroup = {
+      ...groupState,
       id: originalGroup.id,
       name: allGroups[originalGroup.id] || `Gruppe ${originalGroup.id}`,
-    }));
+    };
+    setGroupState(updatedGroup); // Update local state
+    onUpdateGroup(updatedGroup); // Persist restored value to global state
   };
 
   // Restore für alles
@@ -92,6 +94,8 @@ function GroupAccordion({ group, index, allGroups, defaultExpanded, onDelete, ca
             <Box display="flex" alignItems="center">
               <FormLabel component="legend" sx={{ mr: 1 }}>Gruppe</FormLabel>
               <ModMonitor
+                itemId={`group-${index}`}
+                field="id"
                 value={groupState.id}
                 originalValue={originalGroup ? originalGroup.id : undefined}
                 onRestore={handleRestoreGroupId}
@@ -103,15 +107,13 @@ function GroupAccordion({ group, index, allGroups, defaultExpanded, onDelete, ca
               row
               aria-label="gruppe"
               name={`gruppe-radio-buttons-group-${index}`}
-              value={id ? String(id) : ''}
-              onChange={event => {
+              value={groupState.id ? String(groupState.id) : ''}
+              onChange={(event) => {
                 const newGroupId = parseInt(event.target.value, 10);
                 const newGroupName = allGroups[newGroupId] || `Gruppe ${newGroupId}`;
-                setGroupState(prev => ({
-                  ...prev,
-                  id: newGroupId,
-                  name: newGroupName,
-                }));
+                const updatedGroup = { ...groupState, id: newGroupId, name: newGroupName };
+                setGroupState(updatedGroup); // Update local state
+                onUpdateGroup(updatedGroup); // Persist changes to global state
               }}
             >
               {Object.entries(allGroups).map(([groupId, groupName]) => (
@@ -125,13 +127,15 @@ function GroupAccordion({ group, index, allGroups, defaultExpanded, onDelete, ca
               type="date"
               size="small"
               InputLabelProps={{ shrink: true }}
-              value={convertDDMMYYYYtoYYYYMMDD(start)}
+              value={convertDDMMYYYYtoYYYYMMDD(groupState.start)}
               onChange={(e) => handleDateChange('start', e.target.value)}
               sx={{ width: 150 }}
               inputProps={{ readOnly: false }}
             />
             <ModMonitor
-              value={start}
+              itemId={`group-${index}`}
+              field="start"
+              value={groupState.start}
               originalValue={originalGroup ? originalGroup.start : undefined}
               onRestore={() => handleRestoreGroupDate('start')}
               title="Startdatum auf importierten Wert zurücksetzen"
@@ -143,13 +147,15 @@ function GroupAccordion({ group, index, allGroups, defaultExpanded, onDelete, ca
               type="date"
               size="small"
               InputLabelProps={{ shrink: true }}
-              value={convertDDMMYYYYtoYYYYMMDD(end)}
+              value={convertDDMMYYYYtoYYYYMMDD(groupState.end)}
               onChange={(e) => handleDateChange('end', e.target.value)}
               sx={{ width: 150 }}
               inputProps={{ readOnly: false }}
             />
             <ModMonitor
-              value={end}
+              itemId={`group-${index}`}
+              field="end"
+              value={groupState.end}
               originalValue={originalGroup ? originalGroup.end : undefined}
               onRestore={() => handleRestoreGroupDate('end')}
               title="Enddatum auf importierten Wert zurücksetzen"
