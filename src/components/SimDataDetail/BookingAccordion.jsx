@@ -3,7 +3,7 @@ import {
   Divider, TextField, Switch, Slider, Select, MenuItem
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { convertYYYYMMDDtoDDMMYYYY, convertDDMMYYYYtoYYYYMMDD } from '../../utils/dateUtils';
 import { timeToValue, valueToTime } from '../../utils/timeUtils';
 import ModMonitor from './ModMonitor';
@@ -86,20 +86,15 @@ function DayControl({ dayLabel, dayAbbr, dayData, onToggle, onTimeChange, onAddS
 
 function BookingAccordion({
   booking, index, type, allGroups, defaultExpanded, canDelete,
-  originalBooking, onRestoreBooking, onUpdateBooking, onDelete
+  originalBooking, onUpdateBooking, onDelete
 }) {
-  const [bookingState, setBookingState] = useState(booking);
   const [expanded, setExpanded] = useState(!!defaultExpanded);
-
-  useEffect(() => {
-    setBookingState(booking);
-  }, [booking]);
 
   const handleDayToggle = (dayAbbr, isEnabled) => {
     const updatedBooking = {
-      ...bookingState,
+      ...booking,
       times: (() => {
-        const newTimes = [...(bookingState.times || [])];
+        const newTimes = [...(booking.times || [])];
         const dayIndex = newTimes.findIndex((t) => t.day_name === dayAbbr);
 
         if (isEnabled && dayIndex === -1) {
@@ -111,28 +106,25 @@ function BookingAccordion({
         return newTimes;
       })(),
     };
-    setBookingState(updatedBooking); // Update local state
-    onUpdateBooking(updatedBooking); // Persist changes to global state
+    onUpdateBooking(updatedBooking);
   };
-
 
   const handleAddSegment = (dayAbbr) => {
     const updatedBooking = {
-      ...bookingState,
-      times: bookingState.times.map((t) =>
+      ...booking,
+      times: booking.times.map((t) =>
         t.day_name === dayAbbr
           ? { ...t, segments: [...t.segments, { booking_start: '13:00', booking_end: '16:00' }] }
           : t
       ),
     };
-    setBookingState(updatedBooking); // Update local state
-    onUpdateBooking(updatedBooking); // Trigger global state update
+    onUpdateBooking(updatedBooking);
   };
 
   const handleTimeChange = (dayAbbr, segIdx, newValues) => {
     const updatedBooking = {
-      ...bookingState,
-      times: bookingState.times.map((t) => {
+      ...booking,
+      times: booking.times.map((t) => {
         if (t.day_name === dayAbbr) {
           const newSegments = t.segments.map((seg, i) =>
             i === segIdx
@@ -144,14 +136,13 @@ function BookingAccordion({
         return t;
       }),
     };
-    setBookingState(updatedBooking); // Update local state
-    onUpdateBooking(updatedBooking); // Trigger global state update
+    onUpdateBooking(updatedBooking);
   };
 
   const handleRemoveSegment = (dayAbbr, segIdx) => {
     const updatedBooking = {
-      ...bookingState,
-      times: bookingState.times.map((t) => {
+      ...booking,
+      times: booking.times.map((t) => {
         if (t.day_name === dayAbbr && t.segments.length > 1) {
           const newSegments = t.segments.filter((_, i) => i !== segIdx);
           return { ...t, segments: newSegments };
@@ -159,22 +150,21 @@ function BookingAccordion({
         return t;
       }),
     };
-    setBookingState(updatedBooking); // Update local state
-    onUpdateBooking(updatedBooking); // Trigger global state update
+    onUpdateBooking(updatedBooking);
   };
 
   const handleDateChange = (field, value) => {
     const updatedBooking = {
-      ...bookingState,
+      ...booking,
       [field]: convertYYYYMMDDtoDDMMYYYY(value),
     };
-    setBookingState(updatedBooking); // Update local state
-    onUpdateBooking(updatedBooking); // Trigger global state update
+    onUpdateBooking(updatedBooking);
   };
 
   const handleGroupChange = (dayAbbr, segIdx, groupId) => {
-    setBookingState(prev => {
-      const newTimes = prev.times.map(t => {
+    const updatedBooking = {
+      ...booking,
+      times: booking.times.map(t => {
         if (t.day_name === dayAbbr) {
           const newSegments = t.segments.map((seg, i) =>
             i === segIdx
@@ -184,9 +174,9 @@ function BookingAccordion({
           return { ...t, segments: newSegments };
         }
         return t;
-      });
-      return { ...prev, times: newTimes };
-    });
+      }),
+    };
+    onUpdateBooking(updatedBooking);
   };
 
   // Prüft, ob ein einzelner Tag (Mo, Di, ...) im Booking geändert wurde
@@ -216,7 +206,7 @@ function BookingAccordion({
     { label: 'Freitag', abbr: 'Fr' }
   ];
 
-  const { startdate, enddate, times } = bookingState;
+  const { startdate, enddate, times } = booking;
   let dateRangeText = '';
   if (startdate && enddate) {
     dateRangeText = `von ${startdate} bis ${enddate}`;
@@ -230,12 +220,12 @@ function BookingAccordion({
   const handleRestoreDay = (dayAbbr) => {
     if (!originalBooking) return;
     const updatedBooking = {
-      ...bookingState,
+      ...booking,
       times: (() => {
         const origDay = Array.isArray(originalBooking.times)
           ? originalBooking.times.find(t => t.day_name === dayAbbr)
           : undefined;
-        let newTimes = Array.isArray(bookingState.times) ? [...bookingState.times] : [];
+        let newTimes = Array.isArray(booking.times) ? [...booking.times] : [];
         const idx = newTimes.findIndex(t => t.day_name === dayAbbr);
         if (origDay) {
           // Replace or add the restored day
@@ -253,27 +243,24 @@ function BookingAccordion({
         return newTimes;
       })(),
     };
-    setBookingState(updatedBooking); // Update local state
-    onUpdateBooking(updatedBooking); // Persist restored booking to global state
+    onUpdateBooking(updatedBooking);
   };
 
   // Restore-Funktion für das gesamte Booking
   const handleRestoreAll = () => {
     if (!originalBooking) return;
     const restoredBooking = JSON.parse(JSON.stringify(originalBooking));
-    setBookingState(restoredBooking); // Update local state
-    onUpdateBooking(restoredBooking); // Persist restored booking to global state
+    onUpdateBooking(restoredBooking);
   };
 
   // Restore für Start-/Enddatum
   const handleRestoreBookingDate = (field) => {
     if (!originalBooking) return;
     const updatedBooking = {
-      ...bookingState,
+      ...booking,
       [field]: originalBooking[field] || '',
     };
-    setBookingState(updatedBooking); // Update local state
-    onUpdateBooking(updatedBooking); // Persist restored value to global state
+    onUpdateBooking(updatedBooking);
   };
 
   return (
@@ -287,7 +274,7 @@ function BookingAccordion({
         <ModMonitor
           itemId={booking.id}
           field={`booking-${index}`}
-          value={JSON.stringify(bookingState)}
+          value={JSON.stringify(booking)}
           originalValue={JSON.stringify(originalBooking || {})}
           onRestore={handleRestoreAll}
           title="Komplette Buchung auf importierte Werte zurücksetzen"
@@ -299,7 +286,7 @@ function BookingAccordion({
             size="small"
             color="error"
             sx={{ ml: 2 }}
-            onClick={e => { e.stopPropagation(); onDelete(index); }} // Use onDelete
+            onClick={e => { e.stopPropagation(); onDelete(index); }}
           >
             Löschen
           </Button>
@@ -312,13 +299,13 @@ function BookingAccordion({
             type="date"
             size="small"
             InputLabelProps={{ shrink: true }}
-            value={convertDDMMYYYYtoYYYYMMDD(bookingState.startdate)}
+            value={convertDDMMYYYYtoYYYYMMDD(booking.startdate)}
             onChange={(e) => handleDateChange('startdate', e.target.value)}
           />
           <ModMonitor
             itemId={booking.id}
             field={`booking-${index}-startdate`}
-            value={bookingState.startdate}
+            value={booking.startdate}
             originalValue={originalBooking ? originalBooking.startdate : undefined}
             onRestore={() => handleRestoreBookingDate('startdate')}
             title="Startdatum auf importierten Wert zurücksetzen"
@@ -330,13 +317,13 @@ function BookingAccordion({
             type="date"
             size="small"
             InputLabelProps={{ shrink: true }}
-            value={convertDDMMYYYYtoYYYYMMDD(bookingState.enddate)}
+            value={convertDDMMYYYYtoYYYYMMDD(booking.enddate)}
             onChange={(e) => handleDateChange('enddate', e.target.value)}
           />
           <ModMonitor
             itemId={booking.id}
             field={`booking-${index}-enddate`}
-            value={bookingState.enddate}
+            value={booking.enddate}
             originalValue={originalBooking ? originalBooking.enddate : undefined}
             onRestore={() => handleRestoreBookingDate('enddate')}
             title="Enddatum auf importierten Wert zurücksetzen"
@@ -346,14 +333,14 @@ function BookingAccordion({
         <Divider sx={{ my: 2 }} />
         {daysOfWeek.map(day => {
           const dayMod = originalBooking
-            ? isDayModified(bookingState.times, originalBooking.times, day.abbr)
+            ? isDayModified(booking.times, originalBooking.times, day.abbr)
             : false;
           return (
             <Box key={day.abbr} display="flex" alignItems="center">
               {/* Icon jetzt VOR dem Label */}
               {dayMod && (
                 <ModMonitor
-                  value={JSON.stringify(bookingState.times?.find(t => t.day_name === day.abbr))}
+                  value={JSON.stringify(booking.times?.find(t => t.day_name === day.abbr))}
                   originalValue={
                     originalBooking
                       ? JSON.stringify(originalBooking.times?.find(t => t.day_name === day.abbr))
@@ -368,7 +355,7 @@ function BookingAccordion({
               <DayControl
                 dayLabel={day.label}
                 dayAbbr={day.abbr}
-                dayData={bookingState.times?.find(t => t.day_name === day.abbr)}
+                dayData={booking.times?.find(t => t.day_name === day.abbr)}
                 onToggle={handleDayToggle}
                 onTimeChange={handleTimeChange}
                 onAddSegment={handleAddSegment}

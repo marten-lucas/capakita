@@ -8,12 +8,12 @@ import { useState, useEffect } from 'react';
 import SimulationDataTab from './SimDataDetail/SimulationDataTab';
 import ModificationsTab from './SimDataDetail/ModificationsTab';
 import useSimulationDataStore from '../store/simulationDataStore';
+import React from 'react';
 
 function SimDataDetailForm({ item, allGroups }) {
   const updateItemDates = useSimulationDataStore(state => state.updateItemDates); // Move hook call to top
 
   const [tab, setTab] = useState(0);
-  const [localItem, setLocalItem] = useState(item);
   const [lastAddedBookingIdx, setLastAddedBookingIdx] = useState(null);
   const [lastAddedGroupIdx, setLastAddedGroupIdx] = useState(null);
   const [importedBookingCount, setImportedBookingCount] = useState(0);
@@ -21,9 +21,12 @@ function SimDataDetailForm({ item, allGroups }) {
 
   // Update local state if item changes
   useEffect(() => {
-    setLocalItem(item);
     setLastAddedBookingIdx(null);
     setLastAddedGroupIdx(null);
+
+    // Debugging the item and modifications
+    console.log('SimDataDetailForm - item:', item);
+    console.log('SimDataDetailForm - modifications:', item?.modifications);
 
     // Zähle importierte Buchungen/Gruppen (aus Adebis)
     if (item?.rawdata?.source === 'adebis export') {
@@ -35,12 +38,8 @@ function SimDataDetailForm({ item, allGroups }) {
     }
   }, [item]);
 
-
-
-  
-
-  // Guard: Wenn localItem nicht gesetzt, Hinweis anzeigen und return
-  if (!localItem) {
+  // Guard: Wenn item nicht gesetzt, Hinweis anzeigen und return
+  if (!item) {
     return (
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
         <Typography color="text.secondary">
@@ -49,6 +48,12 @@ function SimDataDetailForm({ item, allGroups }) {
       </Box>
     );
   }
+
+  const MemoizedModificationsTab = React.memo(ModificationsTab);
+
+  const handleTabChange = (_, newTab) => {
+    setTab(newTab);
+  };
 
   return (
     <Box
@@ -63,7 +68,7 @@ function SimDataDetailForm({ item, allGroups }) {
     >
       <Tabs
         value={tab}
-        onChange={(_, v) => setTab(v)}
+        onChange={handleTabChange}
         variant="fullWidth"
         sx={{ mb: 2 }}
       >
@@ -83,7 +88,10 @@ function SimDataDetailForm({ item, allGroups }) {
         />
       )}
       {tab === 1 && (
-        <ModificationsTab item={item} />
+        <>
+          {console.log('SimDataDetailForm - item passed to ModificationsTab:', item)} // Debug item passed to ModificationsTab
+          <MemoizedModificationsTab item={item} />
+        </>
       )}
       {tab === 2 && (
         <Box flex={1} display="flex" flexDirection="column">
@@ -100,4 +108,5 @@ function SimDataDetailForm({ item, allGroups }) {
 }
 
 export default SimDataDetailForm;
+
 

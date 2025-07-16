@@ -7,7 +7,6 @@ import {
   Button 
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import { useState, useEffect } from 'react';
 import GroupCards from './GroupCards';
 import BookingCards from './BookingCards';
 import ModMonitor from './ModMonitor';
@@ -22,7 +21,7 @@ function SimulationDataTab({
   importedGroupCount, 
   handleRestoreBooking 
 }) {
-  const { updateItemPausedState, getItemPausedState, getItemBookings, updateItemBookings, getItemGroups, updateItemGroups, updateItemDates } = useSimulationDataStore((state) => ({
+  const { updateItemPausedState, getItemPausedState, getItemBookings, updateItemBookings, getItemGroups, updateItemGroups, updateItemDates, getItemDates } = useSimulationDataStore((state) => ({
     updateItemPausedState: state.updateItemPausedState,
     getItemPausedState: state.getItemPausedState,
     getItemBookings: state.getItemBookings,
@@ -30,38 +29,36 @@ function SimulationDataTab({
     getItemGroups: state.getItemGroups,
     updateItemGroups: state.updateItemGroups,
     updateItemDates: state.updateItemDates,
+    getItemDates: state.getItemDates,
   }));
 
   const pausedState = getItemPausedState(item.id);
   const bookings = getItemBookings(item.id);
   const groups = getItemGroups(item.id);
+  const currentDates = getItemDates(item.id);
 
-  const [startDate, setStartDate] = useState(
-    item?.parseddata?.startdate
-      ? item.parseddata.startdate.split('.').reverse().join('-')
-      : ''
-  );
-  const [endDate, setEndDate] = useState(
-    item?.parseddata?.enddate
-      ? item.parseddata.enddate.split('.').reverse().join('-')
-      : ''
-  );
+  // Convert dates to input format
+  const startDate = currentDates?.startdate
+    ? currentDates.startdate.split('.').reverse().join('-')
+    : '';
+  const endDate = currentDates?.enddate
+    ? currentDates.enddate.split('.').reverse().join('-')
+    : '';
 
-  const initialStartDate = item?.parseddata?.startdate ? item.parseddata.startdate.split('.').reverse().join('-') : '';
-  const initialEndDate = item?.parseddata?.enddate ? item.parseddata.enddate.split('.').reverse().join('-') : '';
-
-  // Update local state if item changes
-  useEffect(() => {
-    setStartDate(initialStartDate);
-    setEndDate(initialEndDate);
-  }, [item, initialStartDate, initialEndDate]);
+  const initialStartDate = item?.originalParsedData?.startdate ? item.originalParsedData.startdate.split('.').reverse().join('-') : '';
+  const initialEndDate = item?.originalParsedData?.enddate ? item.originalParsedData.enddate.split('.').reverse().join('-') : '';
 
   // Restore-Funktionen
   const handleRestoreStartDate = () => {
-    setStartDate(initialStartDate);
+    const originalStartDate = item?.originalParsedData?.startdate || '';
+    const originalEndDate = currentDates?.enddate || '';
+    updateItemDates(item.id, originalStartDate, originalEndDate);
   };
+  
   const handleRestoreEndDate = () => {
-    setEndDate(initialEndDate);
+    const originalEndDate = item?.originalParsedData?.enddate || '';
+    const currentStartDate = currentDates?.startdate || '';
+    updateItemDates(item.id, currentStartDate, originalEndDate);
   };
 
   const handlePauseChange = (enabled, start, end) => {
@@ -103,13 +100,13 @@ function SimulationDataTab({
   };
 
   const handleStartDateChange = (newStartDate) => {
-    setStartDate(newStartDate);
-    updateItemDates(item.id, newStartDate, endDate); // Persist changes to global state
+    const formattedDate = newStartDate.split('-').reverse().join('.');
+    updateItemDates(item.id, formattedDate, currentDates?.enddate || '');
   };
 
   const handleEndDateChange = (newEndDate) => {
-    setEndDate(newEndDate);
-    updateItemDates(item.id, startDate, newEndDate); // Persist changes to global state
+    const formattedDate = newEndDate.split('-').reverse().join('.');
+    updateItemDates(item.id, currentDates?.startdate || '', formattedDate);
   };
 
   const today = new Date().toISOString().split('T')[0]; // Get today's date in YYYY-MM-DD format
@@ -125,14 +122,14 @@ function SimulationDataTab({
           size="small"
           InputLabelProps={{ shrink: true }}
           value={startDate}
-          onChange={(e) => handleStartDateChange(e.target.value)} // Use updated handler
+          onChange={(e) => handleStartDateChange(e.target.value)}
           sx={{ width: 150 }}
         />
         <ModMonitor
           itemId={item.id}
           field="startdate"
           value={startDate}
-          originalValue={item?.originalParsedData?.startdate ? item.originalParsedData.startdate.split('.').reverse().join('-') : ''}
+          originalValue={initialStartDate}
           onRestore={handleRestoreStartDate}
           title="Startdatum auf importierten Wert zurücksetzen"
           confirmMsg="Startdatum auf importierten Wert zurücksetzen?"
@@ -144,14 +141,14 @@ function SimulationDataTab({
           size="small"
           InputLabelProps={{ shrink: true }}
           value={endDate}
-          onChange={(e) => handleEndDateChange(e.target.value)} // Use updated handler
+          onChange={(e) => handleEndDateChange(e.target.value)}
           sx={{ width: 150 }}
         />
         <ModMonitor
           itemId={item.id}
           field="enddate"
           value={endDate}
-          originalValue={item?.originalParsedData?.enddate ? item.originalParsedData.enddate.split('.').reverse().join('-') : ''}
+          originalValue={initialEndDate}
           onRestore={handleRestoreEndDate}
           title="Enddatum auf importierten Wert zurücksetzen"
           confirmMsg="Enddatum auf importierten Wert zurücksetzen?"

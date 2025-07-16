@@ -23,8 +23,26 @@ const useSimulationDataStore = create((set) => ({
       produce((state) => {
         const item = state.simulationData.find((i) => i.id === itemId);
         if (item) {
+          if (!item.modifications) {
+            item.modifications = []; // Ensure modifications array is initialized
+          }
+          if (item.parseddata.startdate !== startDate) {
+            item.modifications.push({
+              field: 'startdate',
+              previousValue: item.parseddata.startdate,
+              newValue: startDate,
+            });
+          }
+          if (item.parseddata.enddate !== endDate) {
+            item.modifications.push({
+              field: 'enddate',
+              previousValue: item.parseddata.enddate,
+              newValue: endDate,
+            });
+          }
           item.parseddata.startdate = startDate; // Update start date
           item.parseddata.enddate = endDate; // Update end date
+          console.log('updateItemDates - modifications:', JSON.stringify(item.modifications)); // Debug modifications array
         }
       })
     ),
@@ -56,7 +74,13 @@ const useSimulationDataStore = create((set) => ({
       produce((state) => {
         const item = state.simulationData.find((i) => i.id === itemId);
         if (item) {
+          item.modifications.push({
+            field: 'bookings',
+            previousValue: JSON.stringify(item.parseddata.booking),
+            newValue: JSON.stringify(bookings),
+          });
           item.parseddata.booking = bookings;
+          console.log('updateItemBookings - modifications:', item.modifications); // Debug modifications array
         }
       })
     ),
@@ -70,7 +94,13 @@ const useSimulationDataStore = create((set) => ({
       produce((state) => {
         const item = state.simulationData.find((i) => i.id === itemId);
         if (item) {
+          item.modifications.push({
+            field: 'groups',
+            previousValue: JSON.stringify(item.parseddata.group),
+            newValue: JSON.stringify(groups),
+          });
           item.parseddata.group = groups; // Update groups in global state
+          console.log('updateItemGroups - modifications:', item.modifications); // Debug modifications array
         }
       })
     ),
