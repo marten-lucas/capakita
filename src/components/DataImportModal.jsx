@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Modal,
   Box,
@@ -25,6 +25,13 @@ const modalStyle = {
 function DatenImportModal({ open, onClose, onImport }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [isAnonymized, setIsAnonymized] = useState(true);
+
+  useEffect(() => {
+    if (open) {
+      setIsAnonymized(true);
+      setSelectedFile(null);
+    }
+  }, [open]);
 
   const handleFileChange = (event) => {
     if (event.target.files && event.target.files[0]) {
@@ -61,7 +68,7 @@ return (
                     <input type="file" hidden accept=".zip,application/zip" onChange={handleFileChange} />
                 </Button>
                 {selectedFile && <Typography variant="body2">Ausgewählte Datei: {selectedFile.name}</Typography>}
-                <FormControlLabel control={<Checkbox checked={isAnonymized} onChange={handleCheckboxChange}  />} label="anonymisiert" />
+                <FormControlLabel control={<Checkbox checked={isAnonymized} onChange={handleCheckboxChange}  />} label="Daten anonymisieren" />
                 <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ pt: 2 }}>
                     <Button onClick={handleInternalClose}>Abbrechen</Button>
                     <Button variant="contained" onClick={handleImportClick} disabled={!selectedFile}>

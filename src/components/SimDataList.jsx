@@ -1,6 +1,7 @@
 import { List, ListItem, ListItemButton, ListItemText, Divider, Box, ListItemAvatar, Avatar, Chip } from '@mui/material';
 import SentimentVerySatisfiedIcon from '@mui/icons-material/SentimentVerySatisfied';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import useModMonitorStore from '../store/modMonitorStore';
 
 // Farbpalette für Gruppen (z.B. 10 Farben)
 const GROUP_COLORS = [
@@ -81,6 +82,35 @@ function consolidateBookingTimes(booking) {
 }
 
 function SimDataList({ data, onRowClick, selectedItem }) {
+  // Selector: serialisiere alle Modifikationen, damit React neu rendert bei jeder Änderung
+  const modificationsStore = useModMonitorStore(state => state.modifications);
+
+  function getModificationStatus(item) {
+    const mods = item.modifications || [];
+    if (mods.length === 0) return 'unchanged';
+    const storeMods = modificationsStore[item.id] || {};
+    let active = 0;
+    let inactive = 0;
+    mods.forEach(mod => {
+      if (storeMods[mod.field]) active++;
+      else inactive++;
+    });
+    if (active > 0 && inactive > 0) return 'inactive modification';
+    if (active > 0) return 'modified';
+    return 'unchanged';
+  }
+
+  function getModificationChipProps(status) {
+    switch (status) {
+      case 'modified':
+        return { label: 'Geändert', color: 'warning', variant: 'filled' };
+      case 'inactive modification':
+        return { label: 'Inaktive Modifikation', color: 'default', variant: 'outlined' };
+      default:
+        return { label: 'Unverändert', color: 'success', variant: 'outlined' };
+    }
+  }
+
   if (!data || data.length === 0) {
     return (
       <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -121,9 +151,11 @@ function SimDataList({ data, onRowClick, selectedItem }) {
         }
         // Hinweis: segmentsPerDay enthält jetzt für Mitarbeiter mehrere Zeitsegmente pro Tag
         // Diese Struktur kann an die Slider-Komponente weitergegeben werden!
+        const modificationStatus = getModificationStatus(item);
+        const modChipProps = getModificationChipProps(modificationStatus);
+
         return (
           <div key={item.id}>
-            
             <ListItemButton
               onClick={() => onRowClick(item)}
               selected={selectedItem && selectedItem.id === item.id}
@@ -141,14 +173,15 @@ function SimDataList({ data, onRowClick, selectedItem }) {
                   </Box>
                 }
                 secondary={
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 0.5 }}>
                     <span style={{ color: '#888' }}>{secondaryText}</span>
                     <Chip
                       label={item.rawdata?.source || 'unbekannt'}
                       size="small"
                       color={item.rawdata?.source === 'adebis export' ? 'primary' : 'default'}
-                      sx={{ ml: 1 }}
+                      sx={{ mt: 0.5 }}
                     />
+                    <Chip {...modChipProps} size="small" sx={{ mt: 0.5 }} />
                   </Box>
                 }
                 secondaryTypographyProps={{ component: 'div' }}
