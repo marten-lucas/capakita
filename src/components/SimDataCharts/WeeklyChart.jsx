@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useMemo } from 'react';
 import HighchartsReact from 'highcharts-react-official';
 import Highcharts from 'highcharts';
 import useSimulationDataStore from '../../store/simulationDataStore';
+import useChartStore from '../../store/chartStore';
 // Material UI imports
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
@@ -10,205 +11,47 @@ import FormGroup from '@mui/material/FormGroup';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Checkbox from '@mui/material/Checkbox';
 
-// Hilfsfunktion für Zeitsegmente
-function generateTimeSegments() {
-  const days = ['Mo', 'Di', 'Mi', 'Do', 'Fr'];
-  const startHour = 7;
-  const endHour = 16.5; // 16:30
-  const segments = [];
-  for (let d = 0; d < days.length; d++) {
-    for (let h = startHour; h <= endHour; h += 0.5) {
-      const hour = Math.floor(h);
-      const min = h % 1 === 0 ? '00' : '30';
-      segments.push(`${days[d]} ${hour}:${min}`);
-    }
-  }
-  return segments;
-}
-
-const categories = generateTimeSegments();
-
 export default function WeeklyChart() {
-  // Filter State
-  const [stichtag, setStichtag] = useState(() => {
-    const today = new Date();
-    return today.toISOString().slice(0, 10);
-  });
-
-  // SimulationData aus Store holen
+  // Store data
   const simulationData = useSimulationDataStore(state => state.simulationData);
-
-  // Gruppen aus Store holen (immer aktuell)
   const groupsLookup = useSimulationDataStore(state => state.groupsLookup);
+  
+  // Chart store
+  const {
+    stichtag,
+    selectedGroups,
+    categories,
+    setStichtag,
+    setSelectedGroups,
+    calculateChartData,
+    getNamesForSegment,
+    updateAvailableGroups
+  } = useChartStore();
 
-  // Wenn groupsLookup ein Objekt wie { "1": "Fuchsgruppe", ... } ist:
+  // Gruppe names from lookup
   const groupKeys = Object.keys(groupsLookup);
   const groupNames = groupKeys.map(key => groupsLookup[key]);
 
-  // Zusätzliche Gruppe "keine Gruppe" falls vorhanden
-  const hasNoGroup = React.useMemo(() => (
+  // Check for items without groups
+  const hasNoGroup = useMemo(() => (
     simulationData.some(item =>
       (item.type === 'demand' || item.type === 'capacity') &&
       (!item.parseddata?.group || item.parseddata.group.length === 0)
     )
   ), [simulationData]);
 
-  const allGroupNames = React.useMemo(() => (
-    hasNoGroup ? [...groupNames, 'keine Gruppe'] : groupNames
-  ), [groupNames, hasNoGroup]);
+  const allGroupNames = useMemo(() => {
+    const groups = hasNoGroup ? [...groupNames, 'keine Gruppe'] : groupNames;
+    // Update available groups in store (this will auto-sync selection if needed)
+    updateAvailableGroups(groups);
+    return groups;
+  }, [groupNames, hasNoGroup, updateAvailableGroups]);
 
-  // Initialauswahl: alle Gruppen
-  const [selectedGroups, setSelectedGroups] = useState([]);
-
-  // Wenn sich die Gruppen im Store ändern, passe die Auswahl an
-  React.useEffect(() => {
-    // Only update if the groups have actually changed
-    const currentGroupsString = JSON.stringify(allGroupNames.sort());
-    const selectedGroupsString = JSON.stringify(selectedGroups.sort());
-    
-    if (currentGroupsString !== selectedGroupsString) {
-      setSelectedGroups(allGroupNames);
-    }
-  }, [allGroupNames.join(',')]); // Use join to create a stable string dependency
-
-  // Hilfsfunktion: prüft ob ein Kind/Mitarbeiter im Segment gebucht ist und zum Stichtag gültig ist
-  function isBookedInSegment(item, dayIdx, segmentStart, segmentEnd, groupNamesFilter, isDemand, stichtag) {
-    // Stichtag als Date
-    const stichtagDate = new Date(stichtag);
-
-    // Filter nach Gruppen (für beide: Bedarf/Kinder und Kapazität/Mitarbeiter)
-    const groups = item.parseddata?.group ?? [];
-    if (groups.length === 0) {
-      // Keine Gruppe - nur anzeigen wenn "keine Gruppe" ausgewählt ist
-      if (!groupNamesFilter.includes('keine Gruppe')) return false;
-    } else {
-      // Hat Gruppen - prüfen ob mindestens eine ausgewählte Gruppe zum Stichtag gültig ist
-      const hasValidGroup = groups.some(g => {
-        if (!groupNamesFilter.includes(g.name)) return false;
-        const start = g.start ? new Date(g.start.split('.').reverse().join('-')) : null;
-        const end = g.end ? new Date(g.end.split('.').reverse().join('-')) : null;
-        if (start && stichtagDate < start) return false;
-        if (end && end !== '' && stichtagDate > end) return false;
-        return true;
-      });
-      if (!hasValidGroup) return false;
-    }
-
-    // Buchungen prüfen: Nur Buchungen, die zum Stichtag gültig sind
-    const bookings = item.parseddata?.booking ?? [];
-    for (const booking of bookings) {
-      const bookingStart = booking.startdate ? new Date(booking.startdate.split('.').reverse().join('-')) : null;
-      const bookingEnd = booking.enddate ? new Date(booking.enddate.split('.').reverse().join('-')) : null;
-      
-      if (bookingStart && stichtagDate < bookingStart) continue;
-      if (bookingEnd && bookingEnd !== '' && stichtagDate > bookingEnd) continue;
-      for (const time of booking.times ?? []) {
-        if (time.day !== dayIdx + 1) continue;
-        for (const seg of time.segments ?? []) {
-          // Zeitvergleich
-          if (
-            seg.booking_start &&
-            seg.booking_end &&
-            seg.booking_start <= segmentEnd &&
-            seg.booking_end >= segmentStart
-          ) {
-            return true;
-          }
-        }
-      }
-    }
-    return false;
-  }
-
-  // Diagrammdaten berechnen, abhängig von stichtag und selectedGroups
-  const [chartData, setChartData] = useState({
-    bedarf: [],
-    kapazitaet: [],
-    betreuungsschluessel: [],
-    maxBedarf: 1,
-    maxKapazitaet: 1
-  });
-
-  React.useEffect(() => {
-    const n = categories.length;
-    const bedarf = [];
-    const kapazitaet = [];
-    for (let i = 0; i < n; i++) {
-      const cat = categories[i];
-      const [dayName, timeStr] = cat.split(' ');
-      const dayIdx = ['Mo', 'Di', 'Mi', 'Do', 'Fr'].indexOf(dayName);
-      const [hour, min] = timeStr.split(':');
-      const segmentStart = `${hour.padStart(2, '0')}:${min}`;
-      let endHour = parseInt(hour, 10);
-      let endMin = parseInt(min, 10) + 30;
-      if (endMin >= 60) {
-        endHour += 1;
-        endMin -= 60;
-      }
-      const segmentEnd = `${String(endHour).padStart(2, '0')}:${String(endMin).padStart(2, '0')}`;
-
-      // Bedarf: Kinder mit Buchung im Segment und Gruppe ausgewählt und zum Stichtag gültig
-      const demandCount = simulationData.filter(
-        item =>
-          item.type === 'demand' &&
-          isBookedInSegment(item, dayIdx, segmentStart, segmentEnd, selectedGroups, true, stichtag)
-      ).length;
-      bedarf.push(demandCount);
-
-      // Kapazität: Mitarbeiter mit Buchung im Segment und Gruppe ausgewählt und zum Stichtag gültig
-      const capacityCount = simulationData.filter(
-        item =>
-          item.type === 'capacity' &&
-          isBookedInSegment(item, dayIdx, segmentStart, segmentEnd, selectedGroups, false, stichtag)
-      ).length;
-      kapazitaet.push(capacityCount);
-    }
-    const betreuungsschluessel = Array(n).fill(4);
-    const maxBedarf = Math.max(...bedarf, 1);
-    const maxKapazitaet = Math.ceil(maxBedarf / 5);
-
-    setChartData({
-      bedarf,
-      kapazitaet,
-      betreuungsschluessel,
-      maxBedarf,
-      maxKapazitaet
-    });
-  }, [simulationData, selectedGroups, stichtag]);
-
-  // Hilfsfunktion: Namen für Segment und Serie (Bedarf/Kapazität) holen
-  function getNamesForSegment(i, seriesType) {
-    const cat = categories[i];
-    const [dayName, timeStr] = cat.split(' ');
-    const dayIdx = ['Mo', 'Di', 'Mi', 'Do', 'Fr'].indexOf(dayName);
-    const [hour, min] = timeStr.split(':');
-    const segmentStart = `${hour.padStart(2, '0')}:${min}`;
-    let endHour = parseInt(hour, 10);
-    let endMin = parseInt(min, 10) + 30;
-    if (endMin >= 60) {
-      endHour += 1;
-      endMin -= 60;
-    }
-    const segmentEnd = `${String(endHour).padStart(2, '0')}:${String(endMin).padStart(2, '0')}`;
-
-    if (seriesType === 'Bedarf') {
-      return simulationData
-        .filter(item =>
-          item.type === 'demand' &&
-          isBookedInSegment(item, dayIdx, segmentStart, segmentEnd, selectedGroups, true, stichtag)
-        )
-        .map(item => item.name);
-    }
-    if (seriesType === 'Kapazität') {
-      return simulationData
-        .filter(item =>
-          item.type === 'capacity' &&
-          isBookedInSegment(item, dayIdx, segmentStart, segmentEnd, selectedGroups, false, stichtag)
-        )
-        .map(item => item.name);
-    }
-    return [];
-  }
+  // Calculate chart data
+  const chartData = useMemo(() => 
+    calculateChartData(simulationData), 
+    [simulationData, selectedGroups, stichtag, calculateChartData]
+  );
 
   const weeklyOptions = {
     chart: { type: 'line' },
@@ -309,7 +152,7 @@ export default function WeeklyChart() {
       formatter: function () {
         let s = `<b>${this.x}</b><br/>`;
         this.points.forEach(point => {
-          let names = getNamesForSegment(point.point.index, point.series.name);
+          let names = getNamesForSegment(simulationData, point.point.index, point.series.name);
           if (names.length > 0) {
             s += `<span style="color:${point.color}">\u25CF</span> <b>${point.series.name}:</b> ${point.y}<br/>`;
             s += `<span style="margin-left:16px;font-size:0.95em;">${names.join(', ')}</span><br/>`;
@@ -322,13 +165,6 @@ export default function WeeklyChart() {
     }
   };
 
-  // Handler für Gruppen-Checkboxen
-
-  // Handler für Stichtag
-  const handleStichtagChange = (e) => {
-    setStichtag(e.target.value);
-  };
-
   return (
     <Box>
       {/* Material UI Filterformular */}
@@ -338,7 +174,7 @@ export default function WeeklyChart() {
           <TextField
             type="date"
             value={stichtag}
-            onChange={handleStichtagChange}
+            onChange={(e) => setStichtag(e.target.value)}
             size="small"
             InputLabelProps={{ shrink: true }}
           />
@@ -352,11 +188,12 @@ export default function WeeklyChart() {
                 control={
                   <Checkbox
                     checked={selectedGroups.includes(groupName)}
-                    onChange={() => setSelectedGroups(prev =>
-                      prev.includes(groupName)
-                        ? prev.filter(g => g !== groupName)
-                        : [...prev, groupName]
-                    )}
+                    onChange={() => {
+                      const newGroups = selectedGroups.includes(groupName)
+                        ? selectedGroups.filter(g => g !== groupName)
+                        : [...selectedGroups, groupName];
+                      setSelectedGroups(newGroups);
+                    }}
                   />
                 }
                 label={groupName}
