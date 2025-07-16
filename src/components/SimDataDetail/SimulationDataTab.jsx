@@ -34,7 +34,9 @@ function SimulationDataTab({
     updateItemName,
     getItemName,
     updateItemNote,
-    getItemNote
+    getItemNote,
+    updateItemGeburtsdatum,
+    getItemGeburtsdatum
   } = useSimulationDataStore((state) => ({
     updateItemPausedState: state.updateItemPausedState,
     getItemPausedState: state.getItemPausedState,
@@ -48,6 +50,8 @@ function SimulationDataTab({
     getItemName: state.getItemName,
     updateItemNote: state.updateItemNote,
     getItemNote: state.getItemNote,
+    updateItemGeburtsdatum: state.updateItemGeburtsdatum,
+    getItemGeburtsdatum: state.getItemGeburtsdatum,
   }));
 
   const pausedState = getItemPausedState(item.id);
@@ -69,6 +73,16 @@ function SimulationDataTab({
 
   const initialStartDate = item?.originalParsedData?.startdate ? item.originalParsedData.startdate.split('.').reverse().join('-') : '';
   const initialEndDate = item?.originalParsedData?.enddate ? item.originalParsedData.enddate.split('.').reverse().join('-') : '';
+
+  const itemGeburtsdatumFromStore = getItemGeburtsdatum ? getItemGeburtsdatum(item.id) : '';
+  const itemGeburtsdatum = itemGeburtsdatumFromStore || '';
+  
+  // Convert geburtsdatum to input format
+  const geburtsdatum = itemGeburtsdatum
+    ? itemGeburtsdatum.split('.').reverse().join('-')
+    : '';
+  
+  const initialGeburtsdatum = item?.originalParsedData?.geburtsdatum ? item.originalParsedData.geburtsdatum.split('.').reverse().join('-') : '';
 
   // Restore-Funktionen
   const handleRestoreStartDate = () => {
@@ -136,6 +150,7 @@ function SimulationDataTab({
   // Lokaler State für Name und Bemerkungen
   const [localName, setLocalName] = useState(itemName);
   const [localNote, setLocalNote] = useState(itemNote);
+  const [localGeburtsdatum, setLocalGeburtsdatum] = useState(geburtsdatum);
 
   // Synchronisiere lokalen State, wenn Item wechselt
   useEffect(() => {
@@ -144,6 +159,19 @@ function SimulationDataTab({
   useEffect(() => {
     setLocalNote(itemNote);
   }, [itemNote]);
+  useEffect(() => {
+    setLocalGeburtsdatum(geburtsdatum);
+  }, [geburtsdatum]);
+
+  const handleGeburtsdatumChange = (newGeburtsdatum) => {
+    const formattedDate = newGeburtsdatum.split('-').reverse().join('.');
+    updateItemGeburtsdatum(item.id, formattedDate);
+  };
+
+  const handleRestoreGeburtsdatum = () => {
+    const originalGeburtsdatum = item?.originalParsedData?.geburtsdatum || '';
+    updateItemGeburtsdatum(item.id, originalGeburtsdatum);
+  };
 
   return (
     <Box flex={1} display="flex" flexDirection="column" gap={2} sx={{ overflowY: 'auto' }}>
@@ -171,6 +199,34 @@ function SimulationDataTab({
           InputLabelProps={{ shrink: true }}
         />
       </Box>
+
+      {/* Geburtsdatum nur für Kinder (demand) */}
+      {item.type === 'demand' && (
+        <Box display="flex" alignItems="center" gap={2} sx={{ mb: 2 }}>
+          <Typography variant="body2" sx={{ minWidth: 90 }}>Geburtsdatum</Typography>
+          <TextField
+            type="date"
+            value={localGeburtsdatum}
+            onChange={(e) => {
+              setLocalGeburtsdatum(e.target.value);
+              handleGeburtsdatumChange(e.target.value);
+            }}
+            size="small"
+            sx={{ width: 150 }}
+            InputLabelProps={{ shrink: true }}
+          />
+          <ModMonitor
+            itemId={item.id}
+            field="geburtsdatum"
+            value={localGeburtsdatum}
+            originalValue={initialGeburtsdatum}
+            onRestore={handleRestoreGeburtsdatum}
+            title="Geburtsdatum auf importierten Wert zurücksetzen"
+            confirmMsg="Geburtsdatum auf importierten Wert zurücksetzen?"
+          />
+        </Box>
+      )}
+
       {/* Wiederhergestellte Datumsfelder für den Datensatz */}
       <Box display="flex" alignItems="center" gap={2} sx={{ mb: 2 }}>
         <Typography variant="body2" sx={{ minWidth: 90 }}>Zeitraum von</Typography>

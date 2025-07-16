@@ -231,12 +231,14 @@ function SimDatenPage() {
         parseddata: {
           startdate: kind.AUFNDAT,
           enddate: kind.AUSTRDAT,
+          geburtsdatum: kind.GEBDATUM,
           group: groups,
           booking: bookings
         },
         originalParsedData: JSON.parse(JSON.stringify({
           startdate: kind.AUFNDAT,
           enddate: kind.AUSTRDAT,
+          geburtsdatum: kind.GEBDATUM,
           group: groups,
           booking: bookings
         })),
