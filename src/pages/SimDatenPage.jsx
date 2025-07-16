@@ -211,7 +211,7 @@ function SimDatenPage() {
         times: parseZeiten(b.ZEITEN)
       }));
 
-      processedData.push({
+      const obj = {
         id: idCounter++,
         type: "demand",
         name: isAnonymized ? `Kind ${kind.KINDNR}` : kind.FNAME,
@@ -239,11 +239,9 @@ function SimDatenPage() {
           enddate: kind.AUSTRDAT,
           group: groups,
           booking: bookings
-        })),
-        modifications: [],
-        modifiers: {},
-        simudata: {}
-      });
+        }))
+      };
+      processedData.push(obj);
     }
 
     // Employees (capacity)
@@ -253,7 +251,7 @@ function SimDatenPage() {
         segments: dayTime.segments.map(segment => ({ ...segment, groupId: '' }))
       }));
 
-      processedData.push({
+      const obj = {
         id: idCounter++,
         type: "capacity",
         name: `Mitarbeiter ${a.IDNR}`,
@@ -297,11 +295,13 @@ function SimDatenPage() {
             times: initialBookingTimes
           }],
           group: []
-        })),
-        modifications: [],
-        modifiers: {},
-        simudata: {}
-      });
+        }))
+      };
+      // Entferne Modifikationsfelder, falls vorhanden
+      delete obj.modifications;
+      delete obj.modifiers;
+      delete obj.simudata;
+      processedData.push(obj);
     }
 
     setSimulationData(processedData);
@@ -388,3 +388,4 @@ function SimDatenPage() {
 }
 
 export default SimDatenPage;
+
