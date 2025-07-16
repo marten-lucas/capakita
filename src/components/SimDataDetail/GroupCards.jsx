@@ -3,6 +3,7 @@ import {
 } from '@mui/material';
 import React from 'react';
 import GroupAccordion from './GroupAccordion';
+import useSimulationDataStore from '../../store/simulationDataStore';
 
 // Helper: compare groups for modification
 function groupsModified(localGroups, origGroups) {
@@ -18,10 +19,23 @@ function groupsModified(localGroups, origGroups) {
   return false;
 }
 
-function GroupCards({ groups, allGroups, lastAddedIndex, onDelete, importedCount, originalGroups, onRestoreGroup }) {
+function GroupCards({ itemId, allGroups, lastAddedIndex, importedCount, originalGroups, onRestoreGroup }) {
+  const { getItemGroups, updateItemGroups } = useSimulationDataStore((state) => ({
+    getItemGroups: state.getItemGroups,
+    updateItemGroups: state.updateItemGroups,
+  }));
+
+  const groups = getItemGroups(itemId);
+
+  const handleUpdateGroup = (index, updatedGroup) => {
+    const updatedGroups = groups.map((g, idx) => (idx === index ? updatedGroup : g));
+    updateItemGroups(itemId, updatedGroups);
+  };
+
   if (!groups || groups.length === 0) {
     return <Typography variant="body2" color="text.secondary">Keine Gruppenzuordnungen vorhanden.</Typography>;
   }
+
   return (
     <Box>
       {groups.map((group, idx) => {
@@ -34,11 +48,12 @@ function GroupCards({ groups, allGroups, lastAddedIndex, onDelete, importedCount
             index={idx}
             allGroups={allGroups}
             defaultExpanded={lastAddedIndex === idx}
-            onDelete={onDelete}
+            onDelete={(index) => updateItemGroups(itemId, groups.filter((_, i) => i !== index))}
             canDelete={typeof importedCount === 'number' ? idx >= importedCount : true}
             isModified={isMod}
             onRestore={onRestoreGroup}
             originalGroup={orig}
+            onUpdateGroup={(updatedGroup) => handleUpdateGroup(idx, updatedGroup)}
           />
         );
       })}

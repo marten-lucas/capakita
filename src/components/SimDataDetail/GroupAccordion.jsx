@@ -7,16 +7,16 @@ import React, { useState, useEffect } from 'react';
 import { convertYYYYMMDDtoDDMMYYYY, convertDDMMYYYYtoYYYYMMDD } from '../../utils/dateUtils';
 import ModMonitor from './ModMonitor';
 
-function GroupAccordion({ group, index, allGroups, defaultExpanded, onDelete, canDelete, onRestore, originalGroup }) {
+function GroupAccordion({ group, index, allGroups, defaultExpanded, onDelete, canDelete, onRestore, originalGroup, onUpdateGroup }) {
   const [groupState, setGroupState] = useState(group);
   const [expanded, setExpanded] = useState(!!defaultExpanded);
 
   const handleDateChange = (field, value) => {
-    setGroupState(prev => ({
-      ...prev,
-      [field]: convertYYYYMMDDtoDDMMYYYY(value)
-    }));
+    const updatedGroup = { ...groupState, [field]: convertYYYYMMDDtoDDMMYYYY(value) };
+    setGroupState(updatedGroup);
+    onUpdateGroup(updatedGroup);
   };
+
 
   useEffect(() => {
     setGroupState(group);

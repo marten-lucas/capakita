@@ -20,20 +20,20 @@ function SimulationDataTab({
   lastAddedGroupIdx, 
   importedBookingCount, 
   importedGroupCount, 
-  handleAddGroup, 
-  handleDeleteGroup, 
-  handleRestoreBooking, 
-  handleRestoreGroup 
+  handleRestoreBooking 
 }) {
-  const { updateItemPausedState, getItemPausedState, getItemBookings, updateItemBookings } = useSimulationDataStore((state) => ({
+  const { updateItemPausedState, getItemPausedState, getItemBookings, updateItemBookings, getItemGroups, updateItemGroups } = useSimulationDataStore((state) => ({
     updateItemPausedState: state.updateItemPausedState,
     getItemPausedState: state.getItemPausedState,
     getItemBookings: state.getItemBookings,
     updateItemBookings: state.updateItemBookings,
+    getItemGroups: state.getItemGroups,
+    updateItemGroups: state.updateItemGroups,
   }));
 
   const pausedState = getItemPausedState(item.id);
   const bookings = getItemBookings(item.id);
+  const groups = getItemGroups(item.id);
 
   const [startDate, setStartDate] = useState(
     item?.parseddata?.startdate
@@ -81,6 +81,25 @@ function SimulationDataTab({
     updateItemBookings(item.id, updatedBookings);
   };
 
+  const handleAddGroup = () => {
+    const newGroup = {
+      id: '',
+      name: '',
+      start: '',
+      end: ''
+    };
+    updateItemGroups(item.id, [...groups, newGroup]);
+  };
+
+  const handleDeleteGroup = (index) => {
+    const updatedGroups = groups.filter((_, idx) => idx !== index);
+    updateItemGroups(item.id, updatedGroups);
+  };
+
+  const handleRestoreGroup = () => {
+    const originalGroups = item.originalParsedData?.group || [];
+    updateItemGroups(item.id, originalGroups);
+  };
 
   const today = new Date().toISOString().split('T')[0]; // Get today's date in YYYY-MM-DD format
 
@@ -197,9 +216,9 @@ function SimulationDataTab({
           Gruppen:
           {(
             <ModMonitor
-              value={JSON.stringify(item.parseddata?.group)}
+              value={JSON.stringify(groups)}
               originalValue={JSON.stringify(item.originalParsedData?.group || [])}
-              onRestore={() => updateItemBookings(item.id, JSON.parse(JSON.stringify(item.originalParsedData?.group || [])))}
+              onRestore={() => updateItemGroups(item.id, JSON.parse(JSON.stringify(item.originalParsedData?.group || [])))}
               title="Alle Gruppen auf importierte Werte zurücksetzen"
               confirmMsg="Alle Gruppen auf importierte Adebis-Daten zurücksetzen?"
             />
@@ -215,7 +234,8 @@ function SimulationDataTab({
         </Button>
       </Box>
       <GroupCards
-        groups={item.parseddata?.group}
+        itemId={item.id}
+        groups={groups}
         allGroups={allGroups}
         lastAddedIndex={lastAddedGroupIdx}
         onDelete={handleDeleteGroup}

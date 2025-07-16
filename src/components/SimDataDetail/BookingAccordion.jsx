@@ -110,19 +110,6 @@ function BookingAccordion({
     });
   };
 
-  const handleDayToggleCommit = (dayAbbr, isEnabled) => {
-    const newTimes = [...(bookingState.times || [])];
-    const dayIndex = newTimes.findIndex((t) => t.day_name === dayAbbr);
-
-    if (isEnabled && dayIndex === -1) {
-      const dayNr = ['Mo', 'Di', 'Mi', 'Do', 'Fr'].indexOf(dayAbbr) + 1;
-      newTimes.push({ day: dayNr, day_name: dayAbbr, segments: [{ booking_start: '08:00', booking_end: '16:00' }] });
-    } else if (!isEnabled && dayIndex !== -1) {
-      newTimes.splice(dayIndex, 1);
-    }
-    const updatedBooking = { ...bookingState, times: newTimes };
-    onUpdateBooking(updatedBooking);
-  };
 
   const handleAddSegment = (dayAbbr) => {
     setBookingState((prev) => {

@@ -65,6 +65,20 @@ const useSimulationDataStore = create((set) => ({
     const item = state.simulationData.find((i) => i.id === itemId);
     return item?.parseddata?.booking || [];
   },
+  updateItemGroups: (itemId, groups) =>
+    set(
+      produce((state) => {
+        const item = state.simulationData.find((i) => i.id === itemId);
+        if (item) {
+          item.parseddata.group = groups;
+        }
+      })
+    ),
+  getItemGroups: (itemId) => {
+    const state = useSimulationDataStore.getState();
+    const item = state.simulationData.find((i) => i.id === itemId);
+    return item?.parseddata?.group || [];
+  },
 }));
 
 export default useSimulationDataStore;
