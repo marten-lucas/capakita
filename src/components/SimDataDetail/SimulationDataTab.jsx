@@ -15,26 +15,25 @@ import useSimulationDataStore from '../../store/simulationDataStore';
 
 function SimulationDataTab({ 
   item, 
-  localItem, 
-  setLocalItem, 
   allGroups, 
   lastAddedBookingIdx, 
   lastAddedGroupIdx, 
   importedBookingCount, 
   importedGroupCount, 
-  handleAddBooking, 
-  handleDeleteBooking, 
   handleAddGroup, 
   handleDeleteGroup, 
   handleRestoreBooking, 
   handleRestoreGroup 
 }) {
-  const { updateItemPausedState, getItemPausedState } = useSimulationDataStore((state) => ({
+  const { updateItemPausedState, getItemPausedState, getItemBookings, updateItemBookings } = useSimulationDataStore((state) => ({
     updateItemPausedState: state.updateItemPausedState,
     getItemPausedState: state.getItemPausedState,
+    getItemBookings: state.getItemBookings,
+    updateItemBookings: state.updateItemBookings,
   }));
 
   const pausedState = getItemPausedState(item.id);
+  const bookings = getItemBookings(item.id);
 
   const [startDate, setStartDate] = useState(
     item?.parseddata?.startdate
@@ -67,6 +66,21 @@ function SimulationDataTab({
   const handlePauseChange = (enabled, start, end) => {
     updateItemPausedState(item.id, enabled, start, end);
   };
+
+  const handleAddBooking = () => {
+    const newBooking = {
+      startdate: '',
+      enddate: '',
+      times: []
+    };
+    updateItemBookings(item.id, [...bookings, newBooking]);
+  };
+
+  const handleDeleteBooking = (index) => {
+    const updatedBookings = bookings.filter((_, idx) => idx !== index);
+    updateItemBookings(item.id, updatedBookings);
+  };
+
 
   const today = new Date().toISOString().split('T')[0]; // Get today's date in YYYY-MM-DD format
 
@@ -151,17 +165,9 @@ function SimulationDataTab({
           Buchungszeiten:
           {(
             <ModMonitor
-              value={JSON.stringify(localItem.parseddata?.booking)}
+              value={JSON.stringify(bookings)}
               originalValue={JSON.stringify(item.originalParsedData?.booking || [])}
-              onRestore={() => {
-                setLocalItem(prev => ({
-                  ...prev,
-                  parseddata: {
-                    ...prev.parseddata,
-                    booking: JSON.parse(JSON.stringify(item.originalParsedData?.booking || []))
-                  }
-                }));
-              }}
+              onRestore={() => updateItemBookings(item.id, JSON.parse(JSON.stringify(item.originalParsedData?.booking || [])))}
               title="Alle Buchungen auf importierte Werte zurücksetzen"
               confirmMsg="Alle Buchungen auf importierte Adebis-Daten zurücksetzen?"
             />
@@ -177,31 +183,23 @@ function SimulationDataTab({
         </Button>
       </Box>
       <BookingCards
-        bookings={localItem.parseddata?.booking}
-        type={localItem.type}
+        itemId={item.id}
+        type={item.type}
         allGroups={allGroups}
         lastAddedIndex={lastAddedBookingIdx}
-        onDelete={handleDeleteBooking}
         importedCount={importedBookingCount}
         originalBookings={item?.originalParsedData?.booking}
         onRestoreBooking={handleRestoreBooking}
+        onDelete={handleDeleteBooking} // Pass handleDeleteBooking
       />
       <Box display="flex" alignItems="center" gap={2} sx={{ mt: 2, mb: 1 }}>
         <Typography variant="h6" sx={{ flex: 1 }}>
           Gruppen:
           {(
             <ModMonitor
-              value={JSON.stringify(localItem.parseddata?.group)}
+              value={JSON.stringify(item.parseddata?.group)}
               originalValue={JSON.stringify(item.originalParsedData?.group || [])}
-              onRestore={() => {
-                setLocalItem(prev => ({
-                  ...prev,
-                  parseddata: {
-                    ...prev.parseddata,
-                    group: JSON.parse(JSON.stringify(item.originalParsedData?.group || []))
-                  }
-                }));
-              }}
+              onRestore={() => updateItemBookings(item.id, JSON.parse(JSON.stringify(item.originalParsedData?.group || [])))}
               title="Alle Gruppen auf importierte Werte zurücksetzen"
               confirmMsg="Alle Gruppen auf importierte Adebis-Daten zurücksetzen?"
             />
@@ -217,7 +215,7 @@ function SimulationDataTab({
         </Button>
       </Box>
       <GroupCards
-        groups={localItem.parseddata?.group}
+        groups={item.parseddata?.group}
         allGroups={allGroups}
         lastAddedIndex={lastAddedGroupIdx}
         onDelete={handleDeleteGroup}
@@ -230,3 +228,5 @@ function SimulationDataTab({
 }
 
 export default SimulationDataTab;
+
+

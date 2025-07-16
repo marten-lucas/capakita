@@ -51,6 +51,20 @@ const useSimulationDataStore = create((set) => ({
     const item = state.simulationData.find((i) => i.id === itemId);
     return item?.parseddata?.paused || { enabled: false, start: '', end: '' };
   },
+  updateItemBookings: (itemId, bookings) =>
+    set(
+      produce((state) => {
+        const item = state.simulationData.find((i) => i.id === itemId);
+        if (item) {
+          item.parseddata.booking = bookings;
+        }
+      })
+    ),
+  getItemBookings: (itemId) => {
+    const state = useSimulationDataStore.getState();
+    const item = state.simulationData.find((i) => i.id === itemId);
+    return item?.parseddata?.booking || [];
+  },
 }));
 
 export default useSimulationDataStore;

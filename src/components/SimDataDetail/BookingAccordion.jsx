@@ -85,8 +85,8 @@ function DayControl({ dayLabel, dayAbbr, dayData, onToggle, onTimeChange, onAddS
 }
 
 function BookingAccordion({
-  booking, index, type, allGroups, defaultExpanded, onDelete, canDelete,
-  originalBooking, onRestoreBooking,
+  booking, index, type, allGroups, defaultExpanded, canDelete,
+  originalBooking, onRestoreBooking, onUpdateBooking, onDelete
 }) {
   const [bookingState, setBookingState] = useState(booking);
   const [expanded, setExpanded] = useState(!!defaultExpanded);
@@ -96,9 +96,9 @@ function BookingAccordion({
   }, [booking]);
 
   const handleDayToggle = (dayAbbr, isEnabled) => {
-    setBookingState(prev => {
+    setBookingState((prev) => {
       const newTimes = [...(prev.times || [])];
-      const dayIndex = newTimes.findIndex(t => t.day_name === dayAbbr);
+      const dayIndex = newTimes.findIndex((t) => t.day_name === dayAbbr);
 
       if (isEnabled && dayIndex === -1) {
         const dayNr = ['Mo', 'Di', 'Mi', 'Do', 'Fr'].indexOf(dayAbbr) + 1;
@@ -110,21 +110,36 @@ function BookingAccordion({
     });
   };
 
-  // Bugfix: Segmente tief kopieren, damit nur ein Segment hinzugefügt wird
+  const handleDayToggleCommit = (dayAbbr, isEnabled) => {
+    const newTimes = [...(bookingState.times || [])];
+    const dayIndex = newTimes.findIndex((t) => t.day_name === dayAbbr);
+
+    if (isEnabled && dayIndex === -1) {
+      const dayNr = ['Mo', 'Di', 'Mi', 'Do', 'Fr'].indexOf(dayAbbr) + 1;
+      newTimes.push({ day: dayNr, day_name: dayAbbr, segments: [{ booking_start: '08:00', booking_end: '16:00' }] });
+    } else if (!isEnabled && dayIndex !== -1) {
+      newTimes.splice(dayIndex, 1);
+    }
+    const updatedBooking = { ...bookingState, times: newTimes };
+    onUpdateBooking(updatedBooking);
+  };
+
   const handleAddSegment = (dayAbbr) => {
-    setBookingState(prev => {
-      const newTimes = prev.times.map(t =>
+    setBookingState((prev) => {
+      const newTimes = prev.times.map((t) =>
         t.day_name === dayAbbr
           ? { ...t, segments: [...t.segments, { booking_start: '13:00', booking_end: '16:00' }] }
           : t
       );
-      return { ...prev, times: newTimes };
+      const updatedBooking = { ...prev, times: newTimes };
+      onUpdateBooking(updatedBooking);
+      return updatedBooking;
     });
   };
 
   const handleTimeChange = (dayAbbr, segIdx, newValues) => {
-    setBookingState(prev => {
-      const newTimes = prev.times.map(t => {
+    setBookingState((prev) => {
+      const newTimes = prev.times.map((t) => {
         if (t.day_name === dayAbbr) {
           const newSegments = t.segments.map((seg, i) =>
             i === segIdx
@@ -135,20 +150,24 @@ function BookingAccordion({
         }
         return t;
       });
-      return { ...prev, times: newTimes };
+      const updatedBooking = { ...prev, times: newTimes };
+      onUpdateBooking(updatedBooking);
+      return updatedBooking;
     });
   };
 
   const handleRemoveSegment = (dayAbbr, segIdx) => {
-    setBookingState(prev => {
-      const newTimes = prev.times.map(t => {
+    setBookingState((prev) => {
+      const newTimes = prev.times.map((t) => {
         if (t.day_name === dayAbbr && t.segments.length > 1) {
           const newSegments = t.segments.filter((_, i) => i !== segIdx);
           return { ...t, segments: newSegments };
         }
         return t;
       });
-      return { ...prev, times: newTimes };
+      const updatedBooking = { ...prev, times: newTimes };
+      onUpdateBooking(updatedBooking);
+      return updatedBooking;
     });
   };
 
@@ -274,7 +293,7 @@ function BookingAccordion({
             size="small"
             color="error"
             sx={{ ml: 2 }}
-            onClick={e => { e.stopPropagation(); onDelete(index); }}
+            onClick={e => { e.stopPropagation(); onDelete(index); }} // Use onDelete
           >
             Löschen
           </Button>
