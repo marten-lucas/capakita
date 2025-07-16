@@ -293,6 +293,43 @@ const useSimulationDataStore = create((set, get) => ({
     const item = state.simulationData.find((i) => i.id === itemId);
     return item?.parseddata?.geburtsdatum || '';
   },
+
+  updateItemQualification: (itemId, qualification) => {
+    set(
+      produce((state) => {
+        const item = state.simulationData.find((i) => i.id === itemId);
+        if (item) {
+          const previousValue = item.parseddata.qualification;
+          item.parseddata.qualification = qualification;
+          
+          // Track modification
+          if (!item.modifications) {
+            item.modifications = [];
+          }
+          item.modifications = item.modifications.filter(m => m.field !== 'qualification');
+          if (previousValue !== qualification) {
+            item.modifications.push({
+              field: 'qualification',
+              previousValue,
+              newValue: qualification,
+              timestamp: new Date().toISOString()
+            });
+          }
+          
+          // Update selectedItem if it's the same item
+          if (state.selectedItem && state.selectedItem.id === itemId) {
+            state.selectedItem = item;
+          }
+        }
+      })
+    );
+  },
+
+  getItemQualification: (itemId) => {
+    const state = get();
+    const item = state.simulationData.find((i) => i.id === itemId);
+    return item?.parseddata?.qualification || '';
+  },
 }));
 
 export default useSimulationDataStore;

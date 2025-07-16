@@ -5,7 +5,11 @@ import {
   TextField, 
   Switch, 
   FormControlLabel, 
-  Button 
+  Button,
+  FormControl,
+  FormLabel,
+  RadioGroup,
+  Radio
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import GroupCards from './GroupCards';
@@ -36,7 +40,9 @@ function SimulationDataTab({
     updateItemNote,
     getItemNote,
     updateItemGeburtsdatum,
-    getItemGeburtsdatum
+    getItemGeburtsdatum,
+    updateItemQualification,
+    getItemQualification
   } = useSimulationDataStore((state) => ({
     updateItemPausedState: state.updateItemPausedState,
     getItemPausedState: state.getItemPausedState,
@@ -52,6 +58,8 @@ function SimulationDataTab({
     getItemNote: state.getItemNote,
     updateItemGeburtsdatum: state.updateItemGeburtsdatum,
     getItemGeburtsdatum: state.getItemGeburtsdatum,
+    updateItemQualification: state.updateItemQualification,
+    getItemQualification: state.getItemQualification,
   }));
 
   const pausedState = getItemPausedState(item.id);
@@ -83,6 +91,10 @@ function SimulationDataTab({
     : '';
   
   const initialGeburtsdatum = item?.originalParsedData?.geburtsdatum ? item.originalParsedData.geburtsdatum.split('.').reverse().join('-') : '';
+
+  const itemQualificationFromStore = getItemQualification ? getItemQualification(item.id) : '';
+  const itemQualification = itemQualificationFromStore || '';
+  const initialQualification = item?.originalParsedData?.qualification || '';
 
   // Restore-Funktionen
   const handleRestoreStartDate = () => {
@@ -151,6 +163,7 @@ function SimulationDataTab({
   const [localName, setLocalName] = useState(itemName);
   const [localNote, setLocalNote] = useState(itemNote);
   const [localGeburtsdatum, setLocalGeburtsdatum] = useState(geburtsdatum);
+  const [localQualification, setLocalQualification] = useState(itemQualification);
 
   // Synchronisiere lokalen State, wenn Item wechselt
   useEffect(() => {
@@ -162,6 +175,9 @@ function SimulationDataTab({
   useEffect(() => {
     setLocalGeburtsdatum(geburtsdatum);
   }, [geburtsdatum]);
+  useEffect(() => {
+    setLocalQualification(itemQualification);
+  }, [itemQualification]);
 
   const handleGeburtsdatumChange = (newGeburtsdatum) => {
     const formattedDate = newGeburtsdatum.split('-').reverse().join('.');
@@ -171,6 +187,11 @@ function SimulationDataTab({
   const handleRestoreGeburtsdatum = () => {
     const originalGeburtsdatum = item?.originalParsedData?.geburtsdatum || '';
     updateItemGeburtsdatum(item.id, originalGeburtsdatum);
+  };
+
+  const handleRestoreQualification = () => {
+    const originalQualification = item?.originalParsedData?.qualification || '';
+    updateItemQualification(item.id, originalQualification);
   };
 
   return (
@@ -224,6 +245,40 @@ function SimulationDataTab({
             title="Geburtsdatum auf importierten Wert zurücksetzen"
             confirmMsg="Geburtsdatum auf importierten Wert zurücksetzen?"
           />
+        </Box>
+      )}
+
+      {/* Qualifikation nur für Mitarbeiter (capacity) */}
+      {item.type === 'capacity' && (
+        <Box sx={{ mb: 2 }}>
+          <FormControl component="fieldset">
+            <Box display="flex" alignItems="center" gap={1}>
+              <FormLabel component="legend">Qualifikation</FormLabel>
+              <ModMonitor
+                itemId={item.id}
+                field="qualification"
+                value={localQualification}
+                originalValue={initialQualification}
+                onRestore={handleRestoreQualification}
+                title="Qualifikation auf importierten Wert zurücksetzen"
+                confirmMsg="Qualifikation auf importierten Wert zurücksetzen?"
+              />
+            </Box>
+            <RadioGroup
+              row
+              value={localQualification}
+              onChange={(e) => {
+                setLocalQualification(e.target.value);
+                updateItemQualification(item.id, e.target.value);
+              }}
+            >
+              <FormControlLabel value="E" control={<Radio />} label="Erzieher (E)" />
+              <FormControlLabel value="K" control={<Radio />} label="Kinderpfleger (K)" />
+              <FormControlLabel value="H" control={<Radio />} label="Hilfskraft (H)" />
+              <FormControlLabel value="P" control={<Radio />} label="Praktikant (P)" />
+              <FormControlLabel value="" control={<Radio />} label="Keine Qualifikation" />
+            </RadioGroup>
+          </FormControl>
         </Box>
       )}
 

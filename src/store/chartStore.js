@@ -24,8 +24,10 @@ const useChartStore = create(
       // Chart settings
       stichtag: new Date().toISOString().slice(0, 10),
       selectedGroups: [],
+      selectedQualifications: [], // Add qualification filter
       categories: generateTimeSegments(),
       availableGroups: [], // Store available groups
+      availableQualifications: [], // Store available qualifications
       
       // Actions
       setStichtag: (date) => set(produce((state) => {
@@ -33,6 +35,9 @@ const useChartStore = create(
       })),
       setSelectedGroups: (groups) => set(produce((state) => {
         state.selectedGroups = groups;
+      })),
+      setSelectedQualifications: (qualifications) => set(produce((state) => {
+        state.selectedQualifications = qualifications;
       })),
       
       // Update available groups and auto-sync selection
@@ -51,8 +56,24 @@ const useChartStore = create(
         }
       },
       
+      // Update available qualifications and auto-sync selection
+      updateAvailableQualifications: (allQualifications) => {
+        const state = get();
+        const qualificationsCopy = [...allQualifications];
+        const currentQualificationsString = JSON.stringify(qualificationsCopy.sort());
+        const availableQualificationsString = JSON.stringify([...state.availableQualifications].sort());
+        
+        if (currentQualificationsString !== availableQualificationsString) {
+          set(produce((draft) => {
+            draft.availableQualifications = qualificationsCopy;
+            // Auto-select all qualifications when available qualifications change
+            draft.selectedQualifications = qualificationsCopy;
+          }));
+        }
+      },
+      
       // Helper to check if item is booked in segment
-      isBookedInSegment: (item, dayIdx, segmentStart, segmentEnd, groupNamesFilter, isDemand, stichtag) => {
+      isBookedInSegment: (item, dayIdx, segmentStart, segmentEnd, groupNamesFilter, isDemand, stichtag, qualificationFilter) => {
         // Stichtag als Date
         const stichtagDate = new Date(stichtag);
 
@@ -64,6 +85,14 @@ const useChartStore = create(
           
           // If stichtag falls within pause period, item is not booked
           if (stichtagDate >= pauseStart && stichtagDate <= pauseEnd) {
+            return false;
+          }
+        }
+
+        // Filter by qualification (only for capacity items) - moved to correct position
+        if (item.type === 'capacity' && qualificationFilter && qualificationFilter.length > 0) {
+          const qualification = item.parseddata?.qualification || 'keine Qualifikation';
+          if (!qualificationFilter.includes(qualification)) {
             return false;
           }
         }
@@ -114,7 +143,7 @@ const useChartStore = create(
       
       // Calculate chart data - simplified without caching
       calculateChartData: (simulationData) => {
-        const { categories, selectedGroups, stichtag, isBookedInSegment } = get();
+        const { categories, selectedGroups, selectedQualifications, stichtag, isBookedInSegment } = get();
         const n = categories.length;
         const bedarf = [];
         const kapazitaet = [];
@@ -138,7 +167,7 @@ const useChartStore = create(
           const demandItems = simulationData.filter(
             item =>
               item.type === 'demand' &&
-              isBookedInSegment(item, dayIdx, segmentStart, segmentEnd, selectedGroups, true, stichtag)
+              isBookedInSegment(item, dayIdx, segmentStart, segmentEnd, selectedGroups, true, stichtag, selectedQualifications)
           );
           bedarf.push(demandItems.length);
 
@@ -146,7 +175,7 @@ const useChartStore = create(
           const capacityItems = simulationData.filter(
             item =>
               item.type === 'capacity' &&
-              isBookedInSegment(item, dayIdx, segmentStart, segmentEnd, selectedGroups, false, stichtag)
+              isBookedInSegment(item, dayIdx, segmentStart, segmentEnd, selectedGroups, false, stichtag, selectedQualifications)
           );
           kapazitaet.push(capacityItems.length);
 
@@ -310,7 +339,7 @@ const useChartStore = create(
 
       // Get names for segment
       getNamesForSegment: (simulationData, i, seriesType) => {
-        const { categories, selectedGroups, stichtag, isBookedInSegment } = get();
+        const { categories, selectedGroups, selectedQualifications, stichtag, isBookedInSegment } = get();
         const cat = categories[i];
         const [dayName, timeStr] = cat.split(' ');
         const dayIdx = ['Mo', 'Di', 'Mi', 'Do', 'Fr'].indexOf(dayName);
@@ -328,7 +357,7 @@ const useChartStore = create(
           return simulationData
             .filter(item =>
               item.type === 'demand' &&
-              isBookedInSegment(item, dayIdx, segmentStart, segmentEnd, selectedGroups, true, stichtag)
+              isBookedInSegment(item, dayIdx, segmentStart, segmentEnd, selectedGroups, true, stichtag, selectedQualifications)
             )
             .map(item => item.name);
         }
@@ -336,7 +365,7 @@ const useChartStore = create(
           return simulationData
             .filter(item =>
               item.type === 'capacity' &&
-              isBookedInSegment(item, dayIdx, segmentStart, segmentEnd, selectedGroups, false, stichtag)
+              isBookedInSegment(item, dayIdx, segmentStart, segmentEnd, selectedGroups, false, stichtag, selectedQualifications)
             )
             .map(item => item.name);
         }
@@ -348,7 +377,9 @@ const useChartStore = create(
       partialize: (state) => ({
         stichtag: state.stichtag,
         selectedGroups: state.selectedGroups,
-        availableGroups: state.availableGroups
+        selectedQualifications: state.selectedQualifications,
+        availableGroups: state.availableGroups,
+        availableQualifications: state.availableQualifications
       })
     }
   )

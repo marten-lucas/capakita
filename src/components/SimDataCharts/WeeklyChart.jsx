@@ -21,12 +21,15 @@ export default function WeeklyChart() {
   const {
     stichtag,
     selectedGroups,
+    selectedQualifications,
     categories,
     setStichtag,
     setSelectedGroups,
+    setSelectedQualifications,
     calculateChartData,
     getNamesForSegment,
-    updateAvailableGroups
+    updateAvailableGroups,
+    updateAvailableQualifications
   } = useChartStore();
 
   // Optimized: Only recalculate when groupsLookup changes
@@ -50,15 +53,33 @@ export default function WeeklyChart() {
     return groups;
   }, [groupNames, hasNoGroup, updateAvailableGroups]);
 
+  // Extract available qualifications from simulation data
+  const qualificationNames = useMemo(() => {
+    const qualificationSet = new Set();
+    simulationData.forEach(item => {
+      if (item.type === 'capacity') {
+        const qualification = item.parseddata?.qualification || 'keine Qualifikation';
+        qualificationSet.add(qualification);
+      }
+    });
+    return Array.from(qualificationSet).sort();
+  }, [simulationData]);
+
+  // Update available qualifications
+  const allQualificationNames = useMemo(() => {
+    updateAvailableQualifications(qualificationNames);
+    return qualificationNames;
+  }, [qualificationNames, updateAvailableQualifications]);
+
   // Stable reference for chart data calculation
-  const getChartData = useCallback((stichtag, selectedGroups) => {
-    return calculateChartData(simulationData, stichtag, selectedGroups);
+  const getChartData = useCallback((stichtag, selectedGroups, selectedQualifications) => {
+    return calculateChartData(simulationData, stichtag, selectedGroups, selectedQualifications);
   }, [simulationData, calculateChartData]);
 
   // Optimized: Use stable callback with explicit filter dependency
   const chartData = useMemo(() => 
-    getChartData(stichtag, selectedGroups), 
-    [getChartData, stichtag, selectedGroups]
+    getChartData(stichtag, selectedGroups, selectedQualifications), 
+    [getChartData, stichtag, selectedGroups, selectedQualifications]
   );
 
   // Optimized: Only recalculate when chartData changes
@@ -265,6 +286,28 @@ export default function WeeklyChart() {
                   />
                 }
                 label={groupName}
+              />
+            ))}
+          </FormGroup>
+        </Box>
+        <Box>
+          <Typography variant="body1" sx={{ mb: 1 }}>Qualifikationen:</Typography>
+          <FormGroup row>
+            {allQualificationNames.map(qualification => (
+              <FormControlLabel
+                key={qualification}
+                control={
+                  <Checkbox
+                    checked={selectedQualifications.includes(qualification)}
+                    onChange={() => {
+                      const newQualifications = selectedQualifications.includes(qualification)
+                        ? selectedQualifications.filter(q => q !== qualification)
+                        : [...selectedQualifications, qualification];
+                      setSelectedQualifications(newQualifications);
+                    }}
+                  />
+                }
+                label={qualification}
               />
             ))}
           </FormGroup>
