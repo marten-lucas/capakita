@@ -56,6 +56,18 @@ const useChartStore = create(
         // Stichtag als Date
         const stichtagDate = new Date(stichtag);
 
+        // Check if item is paused on the stichtag
+        const pausedState = item.parseddata?.paused;
+        if (pausedState?.enabled && pausedState.start && pausedState.end) {
+          const pauseStart = new Date(pausedState.start);
+          const pauseEnd = new Date(pausedState.end);
+          
+          // If stichtag falls within pause period, item is not booked
+          if (stichtagDate >= pauseStart && stichtagDate <= pauseEnd) {
+            return false;
+          }
+        }
+
         // Filter nach Gruppen (für beide: Bedarf/Kinder und Kapazität/Mitarbeiter)
         const groups = item.parseddata?.group ?? [];
         if (groups.length === 0) {
