@@ -281,18 +281,19 @@ function BookingAccordion({
           confirmMsg="Buchung auf importierte Adebis-Daten zurücksetzen?"
           iconProps={{ sx: { ml: 1 } }}
         />
+      </AccordionSummary>
+      <AccordionDetails>
+        {/* Move the delete button here */}
         {onDelete && canDelete && (
           <Button
             size="small"
             color="error"
-            sx={{ ml: 2 }}
+            sx={{ ml: 2, mb: 2 }}
             onClick={e => { e.stopPropagation(); onDelete(index); }}
           >
             Löschen
           </Button>
         )}
-      </AccordionSummary>
-      <AccordionDetails>
         <Box display="flex" gap={2} sx={{ mb: 2, alignItems: 'center' }}>
           <TextField
             label="Startdatum"
