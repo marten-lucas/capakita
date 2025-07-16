@@ -154,7 +154,8 @@ export default function WeeklyChart() {
         data: chartData.bedarf,
         yAxis: 0,
         color: 'rgba(124,181,236,0.5)',
-        fillOpacity: 0.3
+        fillOpacity: 0.3,
+        marker: { enabled: false }
       },
       {
         name: 'Kapazität',
@@ -173,7 +174,7 @@ export default function WeeklyChart() {
         }),
         yAxis: 2,
         color: '#f45b5b',
-
+        marker: { enabled: false }
       },
       {
         name: 'BayKiBig Fachkraftquote',
@@ -183,6 +184,7 @@ export default function WeeklyChart() {
         }),
         yAxis: 3,
         color: '#ff9800',
+        marker: { enabled: false }
       }
     ],
     legend: { align: 'center', verticalAlign: 'bottom' },
@@ -223,7 +225,7 @@ export default function WeeklyChart() {
   }), [chartData, categories, simulationData, getNamesForSegment]);
 
   return (
-    <Box>
+    <Box sx={{ flex: 1, p: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       {/* Material UI Filterformular */}
       <Box sx={{ mb: 2, display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
         <Box>
@@ -269,7 +271,9 @@ export default function WeeklyChart() {
         </Box>
       </Box>
       {/* Chart */}
-      <HighchartsReact highcharts={Highcharts} options={weeklyOptions} />
+      <Box sx={{ flex: 1, minHeight: 0 }}>
+        <HighchartsReact highcharts={Highcharts} options={weeklyOptions} />
+      </Box>
     </Box>
   );
 }

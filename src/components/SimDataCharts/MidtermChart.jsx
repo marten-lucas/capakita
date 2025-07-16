@@ -13,5 +13,9 @@ const midtermOptions = {
 };
 
 export default function MidtermChart() {
-  return <HighchartsReact highcharts={Highcharts} options={midtermOptions} />;
+  return (
+    <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+      <HighchartsReact highcharts={Highcharts} options={midtermOptions} />
+    </div>
+  );
 }

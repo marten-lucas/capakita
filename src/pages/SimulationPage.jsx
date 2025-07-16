@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Container, Tabs, Tab, Box, Typography, Paper, Button } from '@mui/material'
+import { Box, Tabs, Tab, Typography, Paper, Button } from '@mui/material'
 import BarChartIcon from '@mui/icons-material/BarChart'
 import TimelineIcon from '@mui/icons-material/Timeline'
 import FileUploadIcon from '@mui/icons-material/FileUpload'
@@ -16,16 +16,15 @@ function SimulationPage() {
   // Prüfe ob Simulationsdaten vorhanden sind
   if (!simulationData || simulationData.length === 0) {
     return (
-      <Container maxWidth="md" sx={{ mt: 4 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
-          Simulation
-        </Typography>
+      <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#f0f2f5' }}>
         <Paper 
           sx={{ 
+            m: 'auto',
             p: 4, 
             textAlign: 'center', 
             bgcolor: '#f5f5f5',
-            border: '2px dashed #ccc'
+            border: '2px dashed #ccc',
+            maxWidth: 480
           }}
         >
           <Typography variant="h6" gutterBottom>
@@ -43,30 +42,29 @@ function SimulationPage() {
             Zu Sim-Daten wechseln
           </Button>
         </Paper>
-      </Container>
+      </Box>
     )
   }
 
   return (
-    <Container maxWidth="md" sx={{ mt: 4 }}>
-      <Typography variant="h4" component="h1" gutterBottom>
-        Simulation
-      </Typography>
-      <Tabs
-        value={tab}
-        onChange={(_, v) => setTab(v)}
-        aria-label="Simulation Tabs"
-        centered
-        sx={{ mb: 3 }}
-      >
-        <Tab icon={<BarChartIcon />} label="Weekly" />
-        <Tab icon={<TimelineIcon />} label="Midterm" />
-      </Tabs>
-      <Box>
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#f0f2f5' }}>
+      <Box sx={{ px: 0, pt: 4 }}>
+        <Tabs
+          value={tab}
+          onChange={(_, v) => setTab(v)}
+          aria-label="Simulation Tabs"
+          centered
+          sx={{ mb: 3 }}
+        >
+          <Tab icon={<BarChartIcon />} label="Weekly" />
+          <Tab icon={<TimelineIcon />} label="Midterm" />
+        </Tabs>
+      </Box>
+      <Box sx={{ flex: 1, p: 0, display: 'flex', flexDirection: 'column', overflow: 'auto', height: '100vh', maxHeight: '100vh' }}>
         {tab === 0 && <WeeklyChart />}
         {tab === 1 && <MidtermChart />}
       </Box>
-    </Container>
+    </Box>
   )
 }
 
