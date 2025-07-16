@@ -85,7 +85,6 @@ function SimDataDetailForm({ item, allGroups }) {
       )}
       {tab === 1 && (
         <>
-          {console.log('SimDataDetailForm - item passed to ModificationsTab:', item)}
           <MemoizedModificationsTab item={item} />
         </>
       )}

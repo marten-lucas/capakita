@@ -318,10 +318,8 @@ function SimDatenPage() {
 
   const handleRowClick = (item) => {
     if (selectedItem?.id === item.id) {
-      console.log('Updated selected item:', null); // Log the updated selected item
       setSelectedItem(null);
     } else {
-      console.log('Updated selected item:', item); // Log the updated selected item
       setSelectedItem(item);
     }
   };

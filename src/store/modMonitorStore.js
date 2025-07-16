@@ -10,7 +10,14 @@ const useModMonitorStore = create((set) => ({
         if (!state.modifications[itemId]) {
           state.modifications[itemId] = {};
         }
-        state.modifications[itemId][field] = modified;
+        if (modified) {
+          state.modifications[itemId][field] = true;
+        } else {
+          delete state.modifications[itemId][field];
+          if (Object.keys(state.modifications[itemId]).length === 0) {
+            delete state.modifications[itemId];
+          }
+        }
       })
     ),
 
@@ -33,3 +40,4 @@ const useModMonitorStore = create((set) => ({
 }));
 
 export default useModMonitorStore;
+

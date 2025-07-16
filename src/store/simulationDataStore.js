@@ -86,7 +86,6 @@ const useSimulationDataStore = create((set, get) => ({
           if (state.selectedItem && state.selectedItem.id === itemId) {
             state.selectedItem = item;
           }
-          console.log('updateItemDates - modifications:', JSON.stringify(item.modifications));
         }
       })
     ),
@@ -166,7 +165,6 @@ const useSimulationDataStore = create((set, get) => ({
           if (state.selectedItem && state.selectedItem.id === itemId) {
             state.selectedItem = item;
           }
-          console.log('updateItemBookings - modifications:', item.modifications);
         }
       })
     ),
@@ -204,7 +202,6 @@ const useSimulationDataStore = create((set, get) => ({
           if (state.selectedItem && state.selectedItem.id === itemId) {
             state.selectedItem = item;
           }
-          console.log('updateItemGroups - modifications:', item.modifications);
         }
       })
     ),
