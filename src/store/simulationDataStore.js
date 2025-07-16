@@ -37,6 +37,20 @@ const useSimulationDataStore = create((set) => ({
     }
     return item.parseddata ? { startdate: item.parseddata.startdate, enddate: item.parseddata.enddate } : null;
   },
+  updateItemPausedState: (itemId, enabled, start, end) =>
+    set(
+      produce((state) => {
+        const item = state.simulationData.find((i) => i.id === itemId);
+        if (item) {
+          item.parseddata.paused = { enabled, start, end };
+        }
+      })
+    ),
+  getItemPausedState: (itemId) => {
+    const state = useSimulationDataStore.getState();
+    const item = state.simulationData.find((i) => i.id === itemId);
+    return item?.parseddata?.paused || { enabled: false, start: '', end: '' };
+  },
 }));
 
 export default useSimulationDataStore;

@@ -11,6 +11,7 @@ import { useState, useEffect } from 'react';
 import GroupCards from './GroupCards';
 import BookingCards from './BookingCards';
 import ModMonitor from './ModMonitor';
+import useSimulationDataStore from '../../store/simulationDataStore';
 
 function SimulationDataTab({ 
   item, 
@@ -28,6 +29,13 @@ function SimulationDataTab({
   handleRestoreBooking, 
   handleRestoreGroup 
 }) {
+  const { updateItemPausedState, getItemPausedState } = useSimulationDataStore((state) => ({
+    updateItemPausedState: state.updateItemPausedState,
+    getItemPausedState: state.getItemPausedState,
+  }));
+
+  const pausedState = getItemPausedState(item.id);
+
   const [startDate, setStartDate] = useState(
     item?.parseddata?.startdate
       ? item.parseddata.startdate.split('.').reverse().join('-')
@@ -38,10 +46,6 @@ function SimulationDataTab({
       ? item.parseddata.enddate.split('.').reverse().join('-')
       : ''
   );
-  // --- Pause State ---
-  const [pauseEnabled, setPauseEnabled] = useState(false);
-  const [pauseStart, setPauseStart] = useState('');
-  const [pauseEnd, setPauseEnd] = useState('');
 
   const initialStartDate = item?.parseddata?.startdate ? item.parseddata.startdate.split('.').reverse().join('-') : '';
   const initialEndDate = item?.parseddata?.enddate ? item.parseddata.enddate.split('.').reverse().join('-') : '';
@@ -59,6 +63,12 @@ function SimulationDataTab({
   const handleRestoreEndDate = () => {
     setEndDate(initialEndDate);
   };
+
+  const handlePauseChange = (enabled, start, end) => {
+    updateItemPausedState(item.id, enabled, start, end);
+  };
+
+  const today = new Date().toISOString().split('T')[0]; // Get today's date in YYYY-MM-DD format
 
   return (
     <Box flex={1} display="flex" flexDirection="column" gap={2} sx={{ overflowY: 'auto' }}>
@@ -103,23 +113,24 @@ function SimulationDataTab({
         <FormControlLabel
           control={
             <Switch
-              checked={pauseEnabled}
-              onChange={e => setPauseEnabled(e.target.checked)}
+              checked={pausedState.enabled}
+              onChange={(e) => handlePauseChange(e.target.checked, pausedState.start, pausedState.end)}
             />
           }
           label="Pausieren"
           sx={{ ml: 0 }}
         />
-        {pauseEnabled && (
+        {pausedState.enabled && (
           <Box display="flex" alignItems="center" gap={1} sx={{ mt: 1 }}>
             <TextField
               label="von"
               type="date"
               size="small"
               InputLabelProps={{ shrink: true }}
-              value={pauseStart}
-              onChange={e => setPauseStart(e.target.value)}
+              value={pausedState.start}
+              onChange={(e) => handlePauseChange(pausedState.enabled, e.target.value, pausedState.end)}
               sx={{ width: 130 }}
+              inputProps={{ min: today }} // Restrict to future dates
             />
             <Typography variant="body2" sx={{ minWidth: 24, textAlign: 'center' }}>bis</Typography>
             <TextField
@@ -127,9 +138,10 @@ function SimulationDataTab({
               type="date"
               size="small"
               InputLabelProps={{ shrink: true }}
-              value={pauseEnd}
-              onChange={e => setPauseEnd(e.target.value)}
+              value={pausedState.end}
+              onChange={(e) => handlePauseChange(pausedState.enabled, pausedState.start, e.target.value)}
               sx={{ width: 130 }}
+              inputProps={{ min: today }} // Restrict to future dates
             />
           </Box>
         )}
