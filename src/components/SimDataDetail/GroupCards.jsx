@@ -29,7 +29,7 @@ function GroupCards({ itemId, allGroups, lastAddedIndex, importedCount, original
 
   const handleUpdateGroup = (index, updatedGroup) => {
     const updatedGroups = groups.map((g, idx) => (idx === index ? updatedGroup : g));
-    updateItemGroups(itemId, updatedGroups);
+    updateItemGroups(itemId, updatedGroups); // Persist changes to global state
   };
 
   if (!groups || groups.length === 0) {

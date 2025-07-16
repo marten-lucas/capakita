@@ -70,14 +70,14 @@ const useSimulationDataStore = create((set) => ({
       produce((state) => {
         const item = state.simulationData.find((i) => i.id === itemId);
         if (item) {
-          item.parseddata.group = groups;
+          item.parseddata.group = groups; // Update groups in global state
         }
       })
     ),
   getItemGroups: (itemId) => {
     const state = useSimulationDataStore.getState();
     const item = state.simulationData.find((i) => i.id === itemId);
-    return item?.parseddata?.group || [];
+    return item?.parseddata?.group || []; // Retrieve groups from global state
   },
 }));
 

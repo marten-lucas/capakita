@@ -13,8 +13,8 @@ function GroupAccordion({ group, index, allGroups, defaultExpanded, onDelete, ca
 
   const handleDateChange = (field, value) => {
     const updatedGroup = { ...groupState, [field]: convertYYYYMMDDtoDDMMYYYY(value) };
-    setGroupState(updatedGroup);
-    onUpdateGroup(updatedGroup);
+    setGroupState(updatedGroup); // Update local state
+    onUpdateGroup(updatedGroup); // Persist changes to global state
   };
 
 
@@ -25,10 +25,9 @@ function GroupAccordion({ group, index, allGroups, defaultExpanded, onDelete, ca
   // Restore für Feld
   const handleRestoreGroupDate = (field) => {
     if (!originalGroup) return;
-    setGroupState(prev => ({
-      ...prev,
-      [field]: originalGroup[field] || ''
-    }));
+    const updatedGroup = { ...groupState, [field]: originalGroup[field] || '' };
+    setGroupState(updatedGroup); // Update local state
+    onUpdateGroup(updatedGroup); // Persist restored value to global state
   };
 
   // Restore für Gruppen-ID
