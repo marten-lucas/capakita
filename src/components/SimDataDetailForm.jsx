@@ -7,8 +7,11 @@ import DataObjectIcon from '@mui/icons-material/DataObject';
 import { useState, useEffect } from 'react';
 import SimulationDataTab from './SimDataDetail/SimulationDataTab';
 import ModificationsTab from './SimDataDetail/ModificationsTab';
+import useSimulationDataStore from '../store/simulationDataStore';
 
 function SimDataDetailForm({ item, allGroups }) {
+  const updateItemDates = useSimulationDataStore(state => state.updateItemDates); // Move hook call to top
+
   const [tab, setTab] = useState(0);
   const [localItem, setLocalItem] = useState(item);
   const [lastAddedBookingIdx, setLastAddedBookingIdx] = useState(null);
@@ -182,19 +185,12 @@ function SimDataDetailForm({ item, allGroups }) {
       {tab === 0 && (
         <SimulationDataTab 
           item={item}
-          localItem={localItem}
-          setLocalItem={setLocalItem}
           allGroups={allGroups}
           lastAddedBookingIdx={lastAddedBookingIdx}
           lastAddedGroupIdx={lastAddedGroupIdx}
           importedBookingCount={importedBookingCount}
           importedGroupCount={importedGroupCount}
-          handleAddBooking={handleAddBooking}
-          handleDeleteBooking={handleDeleteBooking}
-          handleAddGroup={handleAddGroup}
-          handleDeleteGroup={handleDeleteGroup}
-          handleRestoreBooking={handleRestoreBooking}
-          handleRestoreGroup={handleRestoreGroup}
+          updateItemDates={updateItemDates} // Pass updateItemDates directly
         />
       )}
       {tab === 1 && (

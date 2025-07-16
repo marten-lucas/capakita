@@ -22,13 +22,14 @@ function SimulationDataTab({
   importedGroupCount, 
   handleRestoreBooking 
 }) {
-  const { updateItemPausedState, getItemPausedState, getItemBookings, updateItemBookings, getItemGroups, updateItemGroups } = useSimulationDataStore((state) => ({
+  const { updateItemPausedState, getItemPausedState, getItemBookings, updateItemBookings, getItemGroups, updateItemGroups, updateItemDates } = useSimulationDataStore((state) => ({
     updateItemPausedState: state.updateItemPausedState,
     getItemPausedState: state.getItemPausedState,
     getItemBookings: state.getItemBookings,
     updateItemBookings: state.updateItemBookings,
     getItemGroups: state.getItemGroups,
     updateItemGroups: state.updateItemGroups,
+    updateItemDates: state.updateItemDates,
   }));
 
   const pausedState = getItemPausedState(item.id);
@@ -101,6 +102,16 @@ function SimulationDataTab({
     updateItemGroups(item.id, originalGroups);
   };
 
+  const handleStartDateChange = (newStartDate) => {
+    setStartDate(newStartDate);
+    updateItemDates(item.id, newStartDate, endDate); // Persist changes to global state
+  };
+
+  const handleEndDateChange = (newEndDate) => {
+    setEndDate(newEndDate);
+    updateItemDates(item.id, startDate, newEndDate); // Persist changes to global state
+  };
+
   const today = new Date().toISOString().split('T')[0]; // Get today's date in YYYY-MM-DD format
 
   return (
@@ -114,7 +125,7 @@ function SimulationDataTab({
           size="small"
           InputLabelProps={{ shrink: true }}
           value={startDate}
-          onChange={e => setStartDate(e.target.value)}
+          onChange={(e) => handleStartDateChange(e.target.value)} // Use updated handler
           sx={{ width: 150 }}
         />
         <ModMonitor
@@ -131,7 +142,7 @@ function SimulationDataTab({
           size="small"
           InputLabelProps={{ shrink: true }}
           value={endDate}
-          onChange={e => setEndDate(e.target.value)}
+          onChange={(e) => handleEndDateChange(e.target.value)} // Use updated handler
           sx={{ width: 150 }}
         />
         <ModMonitor

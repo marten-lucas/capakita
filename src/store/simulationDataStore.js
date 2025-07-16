@@ -23,8 +23,8 @@ const useSimulationDataStore = create((set) => ({
       produce((state) => {
         const item = state.simulationData.find((i) => i.id === itemId);
         if (item) {
-          item.parseddata.startdate = startDate;
-          item.parseddata.enddate = endDate;
+          item.parseddata.startdate = startDate; // Update start date
+          item.parseddata.enddate = endDate; // Update end date
         }
       })
     ),
