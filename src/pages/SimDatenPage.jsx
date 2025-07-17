@@ -17,6 +17,8 @@ import SimDataList from '../components/SimDataList';
 import SimDataDetailForm from '../components/SimDataDetailForm';
 import JSZip from 'jszip';
 import useSimulationDataStore from '../store/simulationDataStore';
+import useChartStore from '../store/chartStore';
+import useModMonitorStore from '../store/modMonitorStore';
 
 function SimDatenPage() {
   const [modalOpen, setModalOpen] = useState(false);
@@ -339,10 +341,67 @@ function SimDatenPage() {
     clearAllData(); // Reset all imported data
   };
 
+  // --- Save/Load functions ---
+  const saveStoresToFile = () => {
+    const simData = useSimulationDataStore.getState();
+    const chartData = useChartStore.getState();
+    const modMonitorData = useModMonitorStore.getState();
+
+    // Only save relevant parts
+    const data = {
+      simulationData: simData.simulationData,
+      groupsLookup: simData.groupsLookup,
+      chartStore: {
+        stichtag: chartData.stichtag,
+        selectedGroups: chartData.selectedGroups,
+        selectedQualifications: chartData.selectedQualifications,
+        availableGroups: chartData.availableGroups,
+        availableQualifications: chartData.availableQualifications,
+        midtermTimeDimension: chartData.midtermTimeDimension,
+        midtermSelectedGroups: chartData.midtermSelectedGroups,
+        midtermSelectedQualifications: chartData.midtermSelectedQualifications
+      },
+      modMonitor: modMonitorData.modifications
+    };
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'kiga-simulator-data.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const loadStoresFromFile = async () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/json';
+    input.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const text = await file.text();
+      try {
+        const data = JSON.parse(text);
+        setSimulationData(data.simulationData || []);
+        setGroupsLookup(data.groupsLookup || {});
+        useChartStore.setState(data.chartStore || {});
+        useModMonitorStore.setState({ modifications: data.modMonitor || {} });
+        // Optionally, clear selectedItem
+        setSelectedItem(null);
+      } catch (err) {
+        alert('Fehler beim Laden der Datei: ' + err.message);
+      }
+    };
+    input.click();
+  };
+
   const actions = [
     { icon: <FileUploadIcon />, name: 'Import', onClick: handleOpenModal },
     { icon: <AddIcon />, name: 'Add', onClick: handleOpenAddItemModal },
     { icon: <RestartAltIcon />, name: 'Reset', onClick: handleResetData },
+    { icon: <span>💾</span>, name: 'Speichern', onClick: saveStoresToFile },
+    { icon: <span>📂</span>, name: 'Laden', onClick: loadStoresFromFile },
   ];
 
   return (
