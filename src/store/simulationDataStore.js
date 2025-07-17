@@ -5,6 +5,7 @@ const useSimulationDataStore = create((set, get) => ({
   simulationData: [], // Removed localStorage loading
   groupsLookup: {}, // Removed localStorage loading
   selectedItem: null, // Add selectedItem state
+  lastImportAnonymized: true, // NEW: track last import anonymization
 
   setSimulationData: (data) => {
     set({ simulationData: data });
@@ -14,6 +15,9 @@ const useSimulationDataStore = create((set, get) => ({
   },
   setSelectedItem: (item) => {
     set({ selectedItem: item }); // Add setSelectedItem function
+  },
+  setLastImportAnonymized: (value) => {
+    set({ lastImportAnonymized: value });
   },
   clearAllData: () => {
     set({ simulationData: [], groupsLookup: {}, selectedItem: null });

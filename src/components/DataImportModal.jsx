@@ -9,6 +9,7 @@ import {
   Stack,
 } from '@mui/material';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
+import useSimulationDataStore from '../store/simulationDataStore';
 
 const modalStyle = {
   position: 'absolute',
@@ -25,6 +26,7 @@ const modalStyle = {
 function DatenImportModal({ open, onClose, onImport }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [isAnonymized, setIsAnonymized] = useState(true);
+  const setLastImportAnonymized = useSimulationDataStore(state => state.setLastImportAnonymized);
 
   useEffect(() => {
     if (open) {
@@ -51,6 +53,7 @@ function DatenImportModal({ open, onClose, onImport }) {
 
   const handleImportClick = () => {
     if (selectedFile) {
+      setLastImportAnonymized(isAnonymized); // Track checkbox state
       onImport({ file: selectedFile, isAnonymized });
       handleInternalClose();
     }

@@ -396,11 +396,18 @@ function SimDatenPage() {
     input.click();
   };
 
+  const lastImportAnonymized = useSimulationDataStore(state => state.lastImportAnonymized);
+
   const actions = [
     { icon: <FileUploadIcon />, name: 'Import', onClick: handleOpenModal },
     { icon: <AddIcon />, name: 'Add', onClick: handleOpenAddItemModal },
     { icon: <RestartAltIcon />, name: 'Reset', onClick: handleResetData },
-    { icon: <span>💾</span>, name: 'Speichern', onClick: saveStoresToFile },
+    {
+      icon: <span>💾</span>,
+      name: 'Speichern',
+      onClick: saveStoresToFile,
+      disabled: !lastImportAnonymized // Disable if not anonymized
+    },
     { icon: <span>📂</span>, name: 'Laden', onClick: loadStoresFromFile },
   ];
 
@@ -417,6 +424,7 @@ function SimDatenPage() {
             icon={action.icon}
             tooltipTitle={action.name}
             onClick={action.onClick}
+            disabled={action.disabled} // <-- Add this line!
           />
         ))}
       </SpeedDial>
