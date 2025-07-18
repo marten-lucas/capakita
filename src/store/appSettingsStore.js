@@ -156,12 +156,21 @@ const useAppSettingsStore = create(
       
       // Clear all qualifications
       clearQualifications: () => set({ qualifications: [] }),
+
+      // Scenario-related UI state
+      selectedItem: null,
+      setSelectedItem: (item) => set({ selectedItem: item }),
+
+      lastImportAnonymized: true,
+      setLastImportAnonymized: (value) => set({ lastImportAnonymized: value }),
     }),
     {
       name: 'app-settings-storage',
       partialize: (state) => ({
         groups: state.groups,
-        qualifications: state.qualifications
+        qualifications: state.qualifications,
+        selectedItem: state.selectedItem,
+        lastImportAnonymized: state.lastImportAnonymized,
       })
     }
   )

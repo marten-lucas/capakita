@@ -4,8 +4,6 @@ import { produce } from 'immer';
 const useSimulationDataStore = create((set, get) => ({
   simulationData: [], // Removed localStorage loading
   groupsLookup: {}, // Removed localStorage loading
-  selectedItem: null, // Add selectedItem state
-  lastImportAnonymized: true, // NEW: track last import anonymization
 
   setSimulationData: (data) => {
     set({ simulationData: data });
@@ -13,14 +11,8 @@ const useSimulationDataStore = create((set, get) => ({
   setGroupsLookup: (lookup) => {
     set({ groupsLookup: lookup });
   },
-  setSelectedItem: (item) => {
-    set({ selectedItem: item }); // Add setSelectedItem function
-  },
-  setLastImportAnonymized: (value) => {
-    set({ lastImportAnonymized: value });
-  },
   clearAllData: () => {
-    set({ simulationData: [], groupsLookup: {}, selectedItem: null });
+    set({ simulationData: [], groupsLookup: {} });
   },
 
   // Helper function to add modification to item
@@ -42,10 +34,6 @@ const useSimulationDataStore = create((set, get) => ({
               newValue,
               timestamp: new Date().toISOString()
             });
-          }
-          // Update selectedItem if it's the same item
-          if (state.selectedItem && state.selectedItem.id === itemId) {
-            state.selectedItem = item;
           }
         }
       })
@@ -86,10 +74,6 @@ const useSimulationDataStore = create((set, get) => ({
           }
           item.parseddata.startdate = startDate;
           item.parseddata.enddate = endDate;
-          // Update selectedItem if it's the same item
-          if (state.selectedItem && state.selectedItem.id === itemId) {
-            state.selectedItem = item;
-          }
         }
       })
     ),
@@ -126,11 +110,6 @@ const useSimulationDataStore = create((set, get) => ({
               newValue,
               timestamp: new Date().toISOString()
             });
-          }
-          
-          // Update selectedItem if it's the same item
-          if (state.selectedItem && state.selectedItem.id === itemId) {
-            state.selectedItem = item;
           }
         }
       })
@@ -205,11 +184,6 @@ const useSimulationDataStore = create((set, get) => ({
           }
           
           item.parseddata.booking = bookingsWithIds;
-          
-          // Update selectedItem if it's the same item
-          if (state.selectedItem && state.selectedItem.id === itemId) {
-            state.selectedItem = item;
-          }
         }
       })
     ),
@@ -242,11 +216,6 @@ const useSimulationDataStore = create((set, get) => ({
           }
           
           item.parseddata.group = groups;
-          
-          // Update selectedItem if it's the same item
-          if (state.selectedItem && state.selectedItem.id === itemId) {
-            state.selectedItem = item;
-          }
         }
       })
     ),
@@ -264,10 +233,6 @@ const useSimulationDataStore = create((set, get) => ({
           const item = state.simulationData.find((i) => i.id === itemId);
           if (item) {
             item.name = newName;
-            // Update selectedItem if it's the same item
-            if (state.selectedItem && state.selectedItem.id === itemId) {
-              state.selectedItem = item;
-            }
           }
         }
       })
@@ -287,9 +252,6 @@ const useSimulationDataStore = create((set, get) => ({
           const item = state.simulationData.find((i) => i.id === itemId);
           if (item) {
             item.note = newNote;
-            if (state.selectedItem && state.selectedItem.id === itemId) {
-              state.selectedItem = item;
-            }
           }
         }
       })
@@ -323,11 +285,6 @@ const useSimulationDataStore = create((set, get) => ({
               timestamp: new Date().toISOString()
             });
           }
-          
-          // Update selectedItem if it's the same item
-          if (state.selectedItem && state.selectedItem.id === itemId) {
-            state.selectedItem = item;
-          }
         }
       })
     );
@@ -360,11 +317,6 @@ const useSimulationDataStore = create((set, get) => ({
               timestamp: new Date().toISOString()
             });
           }
-          
-          // Update selectedItem if it's the same item
-          if (state.selectedItem && state.selectedItem.id === itemId) {
-            state.selectedItem = item;
-          }
         }
       })
     );
@@ -381,9 +333,6 @@ const useSimulationDataStore = create((set, get) => ({
       produce((state) => {
         state.simulationData = state.simulationData.filter(item => item.id !== itemId);
         // Clear selected item if it was the deleted item
-        if (state.selectedItem && state.selectedItem.id === itemId) {
-          state.selectedItem = null;
-        }
       })
     );
   },

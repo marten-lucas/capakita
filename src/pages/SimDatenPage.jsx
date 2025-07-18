@@ -45,11 +45,13 @@ function SimDatenPage() {
 
   const simulationData = useSimulationDataStore(state => state.simulationData);
   const groupsLookup = useSimulationDataStore(state => state.groupsLookup);
-  const selectedItem = useSimulationDataStore(state => state.selectedItem);
+  // Remove selectedItem from simulationDataStore, use from appSettingsStore
+  const selectedItem = useAppSettingsStore(state => state.selectedItem);
+  const setSelectedItem = useAppSettingsStore(state => state.setSelectedItem);
+  const lastImportAnonymized = useAppSettingsStore(state => state.lastImportAnonymized);
 
   const setSimulationData = useSimulationDataStore(state => state.setSimulationData);
   const setGroupsLookup = useSimulationDataStore(state => state.setGroupsLookup);
-  const setSelectedItem = useSimulationDataStore(state => state.setSelectedItem);
   const clearAllData = useSimulationDataStore(state => state.clearAllData);
   
   // Add AppSettingsStore
@@ -478,6 +480,7 @@ function SimDatenPage() {
           setGroupsLookup(data.groupsLookup || {});
           useChartStore.setState(data.chartStore || {});
           useModMonitorStore.setState({ modifications: data.modMonitor || {} });
+          // In loadStoresFromFile, setSelectedItem(null) should use appSettingsStore
           setSelectedItem(null);
         } catch (err) {
           alert('Fehler beim Entschlüsseln/Laden: ' + err.message);
@@ -486,8 +489,6 @@ function SimDatenPage() {
     };
     input.click();
   };
-
-  const lastImportAnonymized = useSimulationDataStore(state => state.lastImportAnonymized);
 
   const actions = [
     { icon: <FileUploadIcon />, name: 'Import', onClick: handleOpenModal },
