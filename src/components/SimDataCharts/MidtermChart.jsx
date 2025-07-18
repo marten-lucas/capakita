@@ -1,7 +1,7 @@
 import React, { useMemo, useEffect, useCallback } from 'react';
 import HighchartsReact from 'highcharts-react-official';
 import Highcharts from 'highcharts';
-import useSimScenarioDataStore from '../../store/simScenarioStore';
+import useSimScenarioStore from '../../store/simScenarioStore';
 import useChartStore from '../../store/chartStore';
 import useAppSettingsStore from '../../store/appSettingsStore';
 import Box from '@mui/material/Box';
@@ -11,11 +11,21 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 import Checkbox from '@mui/material/Checkbox';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
+import MenuItem from '@mui/material/MenuItem';
+import Select from '@mui/material/Select';
 
 export default function MidtermChart() {
-  // Store data
-  const simulationData = useSimScenarioDataStore(state => state.simulationData);
-  // const groupsLookup = useSimScenarioDataStore(state => state.groupsLookup);
+  // Scenario selection state in chartStore
+  const scenarios = useSimScenarioStore(state => state.scenarios);
+  const chartSelectedScenarioId = useChartStore(state => state.midtermSelectedScenarioId);
+  const setMidtermSelectedScenarioId = useChartStore(state => state.setMidtermSelectedScenarioId);
+
+  // Get simulationData for selected scenario
+  const simulationData = useSimScenarioStore(state => {
+    const scenario = state.scenarios.find(s => s.id === chartSelectedScenarioId);
+    return scenario?.simulationData ?? [];
+  });
+
   const groupsLookup = useAppSettingsStore(state => state.getGroupsLookup());
   const qualifications = useAppSettingsStore(state => state.qualifications);
   
@@ -213,6 +223,24 @@ export default function MidtermChart() {
 
   return (
     <Box sx={{ flex: 1, p: 2, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      {/* Scenario Selector */}
+      <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Typography variant="subtitle1" sx={{ minWidth: 120 }}>Szenario:</Typography>
+        <Select
+          size="small"
+          value={chartSelectedScenarioId || ''}
+          onChange={e => setMidtermSelectedScenarioId(e.target.value)}
+          sx={{ minWidth: 280 }}
+          displayEmpty
+        >
+          {scenarios.map(scenario => (
+            <MenuItem key={scenario.id} value={scenario.id}>
+              {scenario.name || `Szenario ${scenario.id}`}
+            </MenuItem>
+          ))}
+        </Select>
+      </Box>
+      
       {/* Filter Form */}
       <Box sx={{ mb: 2, display: 'flex', gap: 4, alignItems: 'flex-start', flexWrap: 'wrap' }}>
         <Box>

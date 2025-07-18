@@ -6,12 +6,20 @@ import FileUploadIcon from '@mui/icons-material/FileUpload'
 import { useNavigate } from 'react-router-dom'
 import WeeklyChart from '../components/SimDataCharts/WeeklyChart'
 import MidtermChart from '../components/SimDataCharts/MidtermChart'
-import useSimScenarioDataStore from '../store/simScenarioStore'
+import useSimScenarioStore from '../store/simScenarioStore'
 
 function SimulationPage() {
   const [tab, setTab] = useState(0)
   const navigate = useNavigate()
-  const simulationData = useSimScenarioDataStore(state => state.simulationData)
+  // Use scenarios and selectedScenarioId from simScenarioStore
+  const scenarios = useSimScenarioStore(state => state.scenarios);
+  const selectedScenarioId = useSimScenarioStore(state => state.selectedScenarioId);
+
+  // Find the selected scenario's simulationData
+  const simulationData = useSimScenarioStore(state => {
+    const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+    return scenario?.simulationData ?? [];
+  });
 
   // Prüfe ob Simulationsdaten vorhanden sind
   if (!simulationData || simulationData.length === 0) {

@@ -1,10 +1,9 @@
 import { useMemo, useCallback } from 'react';
 import HighchartsReact from 'highcharts-react-official';
 import Highcharts from 'highcharts';
-import useSimScenarioDataStore from '../../store/simScenarioStore';
+import useSimScenarioStore from '../../store/simScenarioStore';
 import useChartStore from '../../store/chartStore';
 import useAppSettingsStore from '../../store/appSettingsStore';
-// Material UI imports
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import TextField from '@mui/material/TextField';
@@ -18,9 +17,17 @@ import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
 
 export default function WeeklyChart() {
-  // Store data
-  const simulationData = useSimScenarioDataStore(state => state.simulationData);
-  // const groupsLookup = useSimScenarioDataStore(state => state.groupsLookup);
+  // Scenario selection state in chartStore
+  const scenarios = useSimScenarioStore(state => state.scenarios);
+  const chartSelectedScenarioId = useChartStore(state => state.weeklySelectedScenarioId);
+  const setWeeklySelectedScenarioId = useChartStore(state => state.setWeeklySelectedScenarioId);
+
+  // Get simulationData for selected scenario
+  const simulationData = useSimScenarioStore(state => {
+    const scenario = state.scenarios.find(s => s.id === chartSelectedScenarioId);
+    return scenario?.simulationData ?? [];
+  });
+
   const groupsLookup = useAppSettingsStore(state => state.getGroupsLookup());
   const qualifications = useAppSettingsStore(state => state.qualifications);
   
@@ -336,8 +343,26 @@ export default function WeeklyChart() {
     }
   }), [chartData, categories, simulationData, getNamesForSegment]);
 
+  // Scenario selector for chart
   return (
     <Box sx={{ flex: 1, p: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      {/* Scenario Selector */}
+      <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Typography variant="subtitle1" sx={{ minWidth: 120 }}>Szenario:</Typography>
+        <Select
+          size="small"
+          value={chartSelectedScenarioId || ''}
+          onChange={e => setWeeklySelectedScenarioId(e.target.value)}
+          sx={{ minWidth: 280 }}
+          displayEmpty
+        >
+          {scenarios.map(scenario => (
+            <MenuItem key={scenario.id} value={scenario.id}>
+              {scenario.name || `Szenario ${scenario.id}`}
+            </MenuItem>
+          ))}
+        </Select>
+      </Box>
       {/* Material UI Filterformular */}
       <Box sx={{ mb: 2, display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
         <Box>

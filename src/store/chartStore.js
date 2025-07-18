@@ -34,6 +34,12 @@ const useChartStore = create(
       midtermSelectedGroups: [],
       midtermSelectedQualifications: [],
       
+      // Scenario selection for charts
+      weeklySelectedScenarioId: null,
+      setWeeklySelectedScenarioId: (id) => set({ weeklySelectedScenarioId: id }),
+      midtermSelectedScenarioId: null,
+      setMidtermSelectedScenarioId: (id) => set({ midtermSelectedScenarioId: id }),
+
       // Actions
       setStichtag: (date) => set(produce((state) => {
         state.stichtag = date;
@@ -774,7 +780,9 @@ const useChartStore = create(
         availableQualifications: state.availableQualifications,
         midtermTimeDimension: state.midtermTimeDimension,
         midtermSelectedGroups: state.midtermSelectedGroups,
-        midtermSelectedQualifications: state.midtermSelectedQualifications
+        midtermSelectedQualifications: state.midtermSelectedQualifications,
+        weeklySelectedScenarioId: state.weeklySelectedScenarioId,
+        midtermSelectedScenarioId: state.midtermSelectedScenarioId,
       })
     }
   )
