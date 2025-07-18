@@ -12,7 +12,115 @@ const useSimScenarioStore = create(
     (set, get) => ({
       scenarios: [],
       selectedScenarioId: null,
+      
       setSelectedScenarioId: (id) => set({ selectedScenarioId: id }),
+      
+      // Get original value for a field (handles both root and based scenarios)
+      getOriginalValue: (itemId, field) => {
+        const state = get();
+        const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+        if (!scenario) return undefined;
+
+        // For root scenarios, get from originalParsedData
+        if (!scenario.baseScenarioId) {
+          const item = scenario.simulationData?.find(i => i.id === itemId);
+          if (!item) return undefined;
+          
+          // Handle nested field paths like "booking-0-startdate"
+          if (field.includes('-')) {
+            const parts = field.split('-');
+            if (parts[0] === 'booking' && parts.length >= 3) {
+              const bookingIndex = parseInt(parts[1]);
+              const bookingField = parts[2];
+              const originalBookings = item.originalParsedData?.booking;
+              if (Array.isArray(originalBookings) && originalBookings[bookingIndex]) {
+                return originalBookings[bookingIndex][bookingField];
+              }
+            }
+            if (parts[0] === 'group' && parts.length >= 2) {
+              const groupIndex = parseInt(parts[1]);
+              const originalGroups = item.originalParsedData?.group;
+              if (Array.isArray(originalGroups) && originalGroups[groupIndex]) {
+                if (parts.length === 2) return originalGroups[groupIndex];
+                const groupField = parts[2];
+                return originalGroups[groupIndex][groupField];
+              }
+            }
+          }
+          
+          // Handle simple fields
+          switch (field) {
+            case 'startdate':
+            case 'enddate':
+            case 'geburtsdatum':
+            case 'qualification':
+              return item.originalParsedData?.[field];
+            case 'bookings':
+              return item.originalParsedData?.booking;
+            case 'groups':
+              return item.originalParsedData?.group;
+            default:
+              return item.originalParsedData?.[field];
+          }
+        }
+
+        // For based scenarios, get from base scenario data
+        const baseScenario = state.scenarios.find(s => s.id === scenario.baseScenarioId);
+        if (!baseScenario) return undefined;
+
+        const baseData = baseScenario.baseScenarioId 
+          ? get().computeOverlayData(baseScenario)
+          : (baseScenario.simulationData || []);
+        
+        const baseItem = baseData.find(i => i.id === itemId);
+        if (!baseItem) return undefined;
+
+        // Handle nested field paths
+        if (field.includes('-')) {
+          const parts = field.split('-');
+          if (parts[0] === 'booking' && parts.length >= 3) {
+            const bookingIndex = parseInt(parts[1]);
+            const bookingField = parts[2];
+            const baseBookings = baseItem.parseddata?.booking;
+            if (Array.isArray(baseBookings) && baseBookings[bookingIndex]) {
+              return baseBookings[bookingIndex][bookingField];
+            }
+          }
+          if (parts[0] === 'group' && parts.length >= 2) {
+            const groupIndex = parseInt(parts[1]);
+            const baseGroups = baseItem.parseddata?.group;
+            if (Array.isArray(baseGroups) && baseGroups[groupIndex]) {
+              if (parts.length === 2) return baseGroups[groupIndex];
+              const groupField = parts[2];
+              return baseGroups[groupIndex][groupField];
+            }
+          }
+        }
+
+        // Handle simple fields
+        switch (field) {
+          case 'startdate':
+          case 'enddate':
+          case 'geburtsdatum':
+          case 'qualification':
+            return baseItem.parseddata?.[field];
+          case 'bookings':
+            return baseItem.parseddata?.booking;
+          case 'groups':
+            return baseItem.parseddata?.group;
+          default:
+            return baseItem.parseddata?.[field];
+        }
+      },
+
+      // Check if field is modified (pure function, no state updates)
+      isFieldModified: (itemId, field, currentValue, originalValue) => {
+        const computedOriginalValue = originalValue !== undefined 
+          ? originalValue 
+          : get().getOriginalValue(itemId, field);
+        return JSON.stringify(currentValue) !== JSON.stringify(computedOriginalValue);
+      },
+
       addScenario: ({ name, remark = '', confidence = 50, likelihood = 50, baseScenarioId = null, simulationData = [] }) =>
         set(produce((state) => {
           const id = Date.now().toString();
@@ -32,6 +140,7 @@ const useSimScenarioStore = create(
           });
           state.selectedScenarioId = id;
         })),
+
       updateScenario: (id, updates) =>
         set(produce((state) => {
           const idx = state.scenarios.findIndex(s => s.id === id);
@@ -39,18 +148,38 @@ const useSimScenarioStore = create(
             state.scenarios[idx] = { ...state.scenarios[idx], ...updates };
           }
         })),
+
       deleteScenario: (id) =>
         set(produce((state) => {
-          state.scenarios = state.scenarios.filter(s => s.id !== id);
-          if (state.selectedScenarioId === id) {
+          const scenarioToDelete = state.scenarios.find(s => s.id === id);
+          if (!scenarioToDelete) return;
+          
+          // Collect all descendant scenario IDs for deletion
+          const collectDescendants = (parentId) => {
+            const descendants = state.scenarios.filter(s => s.baseScenarioId === parentId);
+            let allDescendants = descendants.map(d => d.id);
+            descendants.forEach(descendant => {
+              allDescendants = allDescendants.concat(collectDescendants(descendant.id));
+            });
+            return allDescendants;
+          };
+          
+          const idsToDelete = [id, ...collectDescendants(id)];
+          state.scenarios = state.scenarios.filter(s => !idsToDelete.includes(s.id));
+          
+          // Update selectedScenarioId if needed
+          if (idsToDelete.includes(state.selectedScenarioId)) {
             state.selectedScenarioId = state.scenarios.length > 0 ? state.scenarios[0].id : null;
           }
         })),
+
       setScenarios: (scenarios) => set({ scenarios }),
+
       getScenarioById: (id) => {
         const state = get();
         return state.scenarios.find(s => s.id === id);
       },
+
       // --- Simulation Data State and Methods (now per scenario) ---
       // Get effective simulation data (overlay changes on base scenario)
       getEffectiveSimulationData: () => {
@@ -172,6 +301,7 @@ const useSimScenarioStore = create(
         // For based scenarios, we don't set bulk data - this should not happen in normal flow
         console.warn('Cannot set bulk simulation data on based scenario');
       },
+
       clearAllData: () => {
         const state = get();
         const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);

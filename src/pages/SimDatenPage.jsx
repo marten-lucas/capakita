@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   SpeedDial,
@@ -20,7 +20,6 @@ import SimDataDetailForm from '../components/SimDataDetailForm';
 import JSZip from 'jszip';
 import useSimScenarioStore from '../store/simScenarioStore';
 import useChartStore from '../store/chartStore';
-import useModMonitorStore from '../store/modMonitorStore';
 import CryptoJS from 'crypto-js';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -47,10 +46,10 @@ function SimDatenPage() {
 
   const selectedScenarioId = useSimScenarioStore(state => state.selectedScenarioId);
   const setSelectedScenarioId = useSimScenarioStore(state => state.setSelectedScenarioId);
+  const scenarios = useSimScenarioStore(state => state.scenarios);
 
   // Use effective simulation data (overlay-aware)
   const simulationData = useSimScenarioStore(state => state.getEffectiveSimulationData());
-  const setSimulationData = useSimScenarioStore(state => state.setSimulationData);
   const clearAllData = useSimScenarioStore(state => state.clearAllData);
   const addScenario = useSimScenarioStore(state => state.addScenario);
   const addItemToScenario = useSimScenarioStore(state => state.addItemToScenario);
@@ -452,7 +451,6 @@ function SimDatenPage() {
     openPwDialog('save', (password) => {
       const simState = useSimScenarioStore.getState();
       const chartData = useChartStore.getState();
-      const modMonitorData = useModMonitorStore.getState();
 
       // Only save relevant parts
       const data = {
@@ -467,8 +465,7 @@ function SimDatenPage() {
           midtermTimeDimension: chartData.midtermTimeDimension,
           midtermSelectedGroups: chartData.midtermSelectedGroups,
           midtermSelectedQualifications: chartData.midtermSelectedQualifications
-        },
-        modMonitor: modMonitorData.modifications
+        }
       };
 
       // Encrypt
@@ -505,7 +502,6 @@ function SimDatenPage() {
             selectedScenarioId: data.selectedScenarioId || null
           });
           useChartStore.setState(data.chartStore || {});
-          useModMonitorStore.setState({ modifications: data.modMonitor || {} });
           setSelectedItem(null);
         } catch (err) {
           alert('Fehler beim Entschlüsseln/Laden: ' + err.message);
@@ -528,7 +524,19 @@ function SimDatenPage() {
     { icon: <span>📂</span>, name: 'Laden', onClick: loadStoresFromFile },
   ];
 
-  const scenarios = useSimScenarioStore(state => state.scenarios);
+  // Check if selected scenario still exists, if not select the first available one
+  React.useEffect(() => {
+    if (selectedScenarioId && scenarios.length > 0) {
+      const scenarioExists = scenarios.some(s => s.id === selectedScenarioId);
+      if (!scenarioExists) {
+        // Selected scenario was deleted, select the first available one
+        setSelectedScenarioId(scenarios[0].id);
+      }
+    } else if (!selectedScenarioId && scenarios.length > 0) {
+      // No scenario selected but scenarios exist, select the first one
+      setSelectedScenarioId(scenarios[0].id);
+    }
+  }, [selectedScenarioId, scenarios, setSelectedScenarioId]);
 
   // Show notice if no scenario exists
   if (!scenarios || scenarios.length === 0) {
@@ -703,4 +711,6 @@ function SimDatenPage() {
 }
 
 export default SimDatenPage;
+
+
 

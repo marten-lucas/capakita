@@ -1,6 +1,4 @@
 import RestoreIcon from '@mui/icons-material/Restore';
-import { useEffect } from 'react';
-import useModMonitorStore from '../../store/modMonitorStore';
 import useSimScenarioDataStore from '../../store/simScenarioStore';
 
 /**
@@ -9,40 +7,41 @@ import useSimScenarioDataStore from '../../store/simScenarioStore';
  *   itemId: string | number (unique identifier for the monitored item)
  *   field: string (name of the field being monitored)
  *   value: any
- *   originalValue: any
+ *   originalValue: any (optional, will be computed if not provided)
  *   onRestore: function
  *   title: string (tooltip)
  *   confirmMsg: string (optional, confirmation message)
  *   iconProps: object (optional, extra props for icon)
  */
 function ModMonitor({ itemId, field, value, originalValue, onRestore, title, confirmMsg, iconProps }) {
-  const { setFieldModification, resetFieldModification, isFieldModified } = useModMonitorStore();
-  const simulationData = useSimScenarioDataStore(state => state.simulationData ?? []);
+  const { 
+    isFieldModified, 
+    getOriginalValue,
+    getEffectiveSimulationData 
+  } = useSimScenarioDataStore();
 
   // Check if item is manually added
-  const item = simulationData.find(item => item.id === itemId);
+  const effectiveData = getEffectiveSimulationData();
+  const item = effectiveData.find(item => item.id === itemId);
   const isManualEntry = item?.rawdata?.source === 'manual entry';
-
-  // Track modifications using useEffect
-  useEffect(() => {
-    const modified = value !== originalValue;
-    if (modified) {
-      setFieldModification(itemId, field, true);
-    } else {
-      resetFieldModification(itemId, field);
-    }
-  }, [itemId, field, value, originalValue, setFieldModification, resetFieldModification]);
 
   // Don't show ModMonitor for manually added items
   if (isManualEntry) return null;
 
-  if (!isFieldModified(itemId, field)) return null;
+  // Get original value if not provided
+  const computedOriginalValue = originalValue !== undefined 
+    ? originalValue 
+    : getOriginalValue(itemId, field);
+
+  // Check if field is modified (pure function call, no state updates)
+  const modified = isFieldModified(itemId, field, value, computedOriginalValue);
+
+  if (!modified) return null;
 
   const handleClick = (e) => {
     e.stopPropagation?.();
     if (confirmMsg && !window.confirm(confirmMsg)) return;
     onRestore?.();
-    resetFieldModification(itemId, field); // Reset modification state after restoring
   };
 
   return (
@@ -57,3 +56,4 @@ function ModMonitor({ itemId, field, value, originalValue, onRestore, title, con
 }
 
 export default ModMonitor;
+

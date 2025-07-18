@@ -29,9 +29,7 @@ function SimulationDataTab({
   lastAddedGroupIdx, 
   importedBookingCount, 
   importedGroupCount, 
-  handleRestoreBooking,
-  addItemToScenario
-}) {
+  handleRestoreBooking}) {
   const [activeTab, setActiveTab] = useState(0);
 
   const { 
@@ -52,7 +50,6 @@ function SimulationDataTab({
     updateItemQualification,
     getItemQualification,
     deleteItem,
-    getEffectiveSimulationData,
     setSelectedItem
   } = useSimScenarioDataStore((state) => ({
     updateItemPausedState: state.updateItemPausedState,

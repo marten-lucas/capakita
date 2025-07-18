@@ -1,6 +1,6 @@
 import { List, ListItem, ListItemButton, ListItemText, Divider, Box, ListItemAvatar, Avatar, Chip } from '@mui/material';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
-import useModMonitorStore from '../store/modMonitorStore';
+import useSimScenarioStore from '../store/simScenarioStore';
 import useAppSettingsStore from '../store/appSettingsStore';
 
 
@@ -57,11 +57,8 @@ function consolidateBookingTimes(booking) {
 }
 
 function SimDataList({ data, onRowClick, selectedItem }) {
-  // Use the passed data directly - it should already be the effective data
-  // from the parent component that calls getEffectiveSimulationData()
-  
-  // Selector: serialisiere alle Modifikationen, damit React neu rendert bei jeder Änderung
-  const modificationsStore = useModMonitorStore(state => state.modifications);
+  // Use the simScenarioStore for modification checking
+  const isFieldModified = useSimScenarioStore(state => state.isFieldModified);
   
   // Get groups from AppSettingsStore for icons
   const getGroupById = useAppSettingsStore(state => state.getGroupById);
@@ -73,11 +70,12 @@ function SimDataList({ data, onRowClick, selectedItem }) {
   function getModificationStatus(item) {
     const mods = item.modifications || [];
     if (mods.length === 0) return 'unchanged';
-    const storeMods = modificationsStore[item.id] || {};
+    
     let active = 0;
     let inactive = 0;
     mods.forEach(mod => {
-      if (storeMods[mod.field]) active++;
+      const modified = isFieldModified(item.id, mod.field, undefined, undefined);
+      if (modified) active++;
       else inactive++;
     });
     if (active > 0 && inactive > 0) return 'inactive modification';
@@ -200,3 +198,4 @@ function SimDataList({ data, onRowClick, selectedItem }) {
 }
 
 export default SimDataList;
+

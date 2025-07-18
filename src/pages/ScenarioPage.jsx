@@ -136,7 +136,8 @@ function ScenarioDetailForm({ scenarioId, scenarios, onCancel }) {
         `Szenario "${form.name}" und alle darauf basierenden Szenarien (${idsToDelete.length - 1} weitere) wirklich löschen?`
       )
     ) {
-      idsToDelete.forEach(id => deleteScenario(id));
+      // Delete the main scenario - the store will handle cascading deletes and selection updates
+      deleteScenario(scenario.id);
       onCancel?.();
     }
   };
