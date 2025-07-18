@@ -12,6 +12,7 @@ const pages = [
   { label: 'Simulation', path: '/simulation' },
   { label: 'Data', path: '/data' },
   { label: 'Settings', path: '/settings' },
+  { label: 'Scenarios', path: '/scenarios' },
 ]
 
 function TopNav() {

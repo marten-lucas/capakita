@@ -4,6 +4,7 @@ import TopNav from './components/TopNav'
 import SimDatenPage from './pages/SimDatenPage'
 import SimulationPage from './pages/SimulationPage'
 import SettingsPage from './pages/SettingsPage'
+import ScenarioPage from './pages/ScenarioPage';
 import './App.css'
 
 function App() {
@@ -20,6 +21,7 @@ function App() {
             <Route path="/simulation" element={<SimulationPage />} />
             <Route path="/data" element={<SimDatenPage />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/scenarios" element={<ScenarioPage />} />
           </Routes>
         </Container>
       </Box>
