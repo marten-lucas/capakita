@@ -8,7 +8,7 @@ import { convertYYYYMMDDtoDDMMYYYY, convertDDMMYYYYtoYYYYMMDD } from '../../util
 import ModMonitor from './ModMonitor';
 import useSimulationDataStore from '../../store/simulationDataStore';
 
-function GroupAccordion({ group, index, allGroups, defaultExpanded, onDelete, canDelete, onRestore, originalGroup, onUpdateGroup, parentItemId }) {
+function GroupDetail({ group, index, allGroups, onDelete, canDelete, onRestore, originalGroup, onUpdateGroup, parentItemId }) {
   const { getItemBookings, updateItemBookings } = useSimulationDataStore((state) => ({
     getItemBookings: state.getItemBookings,
     updateItemBookings: state.updateItemBookings,
@@ -315,6 +315,6 @@ function GroupAccordion({ group, index, allGroups, defaultExpanded, onDelete, ca
   );
 }
 
-export default GroupAccordion;
+export default GroupDetail;
 
 

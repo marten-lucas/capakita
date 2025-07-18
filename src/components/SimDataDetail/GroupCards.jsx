@@ -2,7 +2,7 @@ import {
   Typography, Box,
 } from '@mui/material';
 import React from 'react';
-import GroupAccordion from './GroupAccordion';
+import GroupDetail from './GroupDetail';
 import useSimulationDataStore from '../../store/simulationDataStore';
 
 // Helper: compare groups for modification
@@ -49,7 +49,7 @@ function GroupCards({ itemId, allGroups, lastAddedIndex, importedCount, original
         const orig = Array.isArray(originalGroups) ? originalGroups[idx] : undefined;
         const isMod = orig ? groupsModified([group], [orig]) : false;
         return (
-          <GroupAccordion
+          <GroupDetail
             key={`${idx}-${bookings.length}`} // Add bookings.length to force re-render
             group={group}
             index={idx}
