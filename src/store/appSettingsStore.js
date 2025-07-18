@@ -104,11 +104,64 @@ const useAppSettingsStore = create(
       
       // Clear all groups
       clearGroups: () => set({ groups: [] }),
+      
+      // Qualifications management
+      qualifications: [], // Array of { key, name }
+
+      addQualification: (qualification) => set(produce((state) => {
+        // Prevent duplicates by key
+        if (!state.qualifications.some(q => q.key === qualification.key)) {
+          state.qualifications.push({ key: qualification.key, name: qualification.name });
+        }
+      })),
+
+      updateQualification: (key, updates) => set(produce((state) => {
+        const idx = state.qualifications.findIndex(q => q.key === key);
+        if (idx !== -1) {
+          state.qualifications[idx] = { ...state.qualifications[idx], ...updates };
+        }
+      })),
+
+      deleteQualification: (key) => set(produce((state) => {
+        state.qualifications = state.qualifications.filter(q => q.key !== key);
+      })),
+
+      setQualifications: (qualifications) => set({ qualifications }),
+
+      getQualificationByKey: (key) => {
+        const state = get();
+        return state.qualifications.find(q => q.key === key);
+      },
+
+      // Import qualifications from employees (array of employee items)
+      importQualificationsFromEmployees: (employees) => set(produce((state) => {
+        const found = {};
+        employees.forEach(emp => {
+          const key = emp.parseddata?.qualification || '';
+          if (key && !found[key]) {
+            found[key] = true;
+            // Try to keep display name if already present
+            const existing = state.qualifications.find(q => q.key === key);
+            state.qualifications.push({
+              key,
+              name: existing?.name || key
+            });
+          }
+        });
+        // Remove duplicates
+        state.qualifications = state.qualifications.filter(
+          (q, idx, arr) => arr.findIndex(qq => qq.key === q.key) === idx
+        );
+      })),
+      
+      // Clear all qualifications
+      clearQualifications: () => set({ qualifications: [] }),
     }),
     {
       name: 'app-settings-storage',
       partialize: (state) => ({
-        groups: state.groups
+        groups: state.groups,
+        qualifications: state.qualifications
       })
     }
   )

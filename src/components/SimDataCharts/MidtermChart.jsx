@@ -17,6 +17,7 @@ export default function MidtermChart() {
   const simulationData = useSimulationDataStore(state => state.simulationData);
   // const groupsLookup = useSimulationDataStore(state => state.groupsLookup);
   const groupsLookup = useAppSettingsStore(state => state.getGroupsLookup());
+  const qualifications = useAppSettingsStore(state => state.qualifications);
   
   // Chart store
   const {
@@ -50,8 +51,12 @@ export default function MidtermChart() {
     return groups;
   }, [groupNames, hasNoGroup, updateAvailableGroups]);
 
-  // Qualification names logic (same as WeeklyChart)
+  // Use qualification keys from app settings for filter
   const qualificationNames = useMemo(() => {
+    if (qualifications && qualifications.length > 0) {
+      return qualifications.map(q => q.key);
+    }
+    // fallback: extract from simulationData if not set
     const qualificationSet = new Set();
     simulationData.forEach(item => {
       if (item.type === 'capacity') {
@@ -60,7 +65,7 @@ export default function MidtermChart() {
       }
     });
     return Array.from(qualificationSet).sort();
-  }, [simulationData]);
+  }, [qualifications, simulationData]);
 
   // Update available qualifications
   const allQualificationNames = useMemo(() => {
@@ -254,23 +259,27 @@ export default function MidtermChart() {
         <Box>
           <Typography variant="body1" sx={{ mb: 1 }}>Qualifikationen:</Typography>
           <FormGroup row>
-            {qualificationNames.map(qualification => (
-              <FormControlLabel
-                key={qualification}
-                control={
-                  <Checkbox
-                    checked={midtermSelectedQualifications.includes(qualification)}
-                    onChange={() => {
-                      const newQualifications = midtermSelectedQualifications.includes(qualification)
-                        ? midtermSelectedQualifications.filter(q => q !== qualification)
-                        : [...midtermSelectedQualifications, qualification];
-                      setMidtermSelectedQualifications(newQualifications);
-                    }}
-                  />
-                }
-                label={qualification}
-              />
-            ))}
+            {allQualificationNames.map(qualification => {
+              const displayName =
+                qualifications.find(q => q.key === qualification)?.name || qualification;
+              return (
+                <FormControlLabel
+                  key={qualification}
+                  control={
+                    <Checkbox
+                      checked={midtermSelectedQualifications.includes(qualification)}
+                      onChange={() => {
+                        const newQualifications = midtermSelectedQualifications.includes(qualification)
+                          ? midtermSelectedQualifications.filter(q => q !== qualification)
+                          : [...midtermSelectedQualifications, qualification];
+                        setMidtermSelectedQualifications(newQualifications);
+                      }}
+                    />
+                  }
+                  label={displayName}
+                />
+              );
+            })}
           </FormGroup>
         </Box>
       </Box>

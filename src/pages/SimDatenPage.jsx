@@ -53,7 +53,7 @@ function SimDatenPage() {
   const clearAllData = useSimulationDataStore(state => state.clearAllData);
   
   // Add AppSettingsStore
-  const { importGroupsFromAdebis, getGroupsLookup } = useAppSettingsStore();
+  const { importGroupsFromAdebis, getGroupsLookup, importQualificationsFromEmployees } = useAppSettingsStore();
 
   const handleOpenModal = () => setModalOpen(true);
   const handleCloseModal = () => setModalOpen(false);
@@ -284,13 +284,14 @@ function SimDatenPage() {
     }
 
     // Employees (capacity)
+    const employeeItems = [];
     for (const a of anstellList) {
       const initialBookingTimes = parseZeiten(a.ZEITEN).map(dayTime => ({
         ...dayTime,
         segments: dayTime.segments.map(segment => ({ ...segment, groupId: '' }))
       }));
 
-      processedData.push({
+      const employeeItem = {
         id: idCounter++,
         type: "capacity",
         name: `Mitarbeiter ${a.IDNR}`,
@@ -338,8 +339,13 @@ function SimDatenPage() {
         modifications: [],
         modifiers: {},
         simudata: {}
-      });
+      };
+      processedData.push(employeeItem);
+      employeeItems.push(employeeItem);
     }
+
+    // Import qualifications from employees
+    importQualificationsFromEmployees(employeeItems);
 
     setSimulationData(processedData);
   };

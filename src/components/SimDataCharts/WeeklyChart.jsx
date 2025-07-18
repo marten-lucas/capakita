@@ -22,6 +22,7 @@ export default function WeeklyChart() {
   const simulationData = useSimulationDataStore(state => state.simulationData);
   // const groupsLookup = useSimulationDataStore(state => state.groupsLookup);
   const groupsLookup = useAppSettingsStore(state => state.getGroupsLookup());
+  const qualifications = useAppSettingsStore(state => state.qualifications);
   
   // Chart store - explizit extrahieren für useMemo
   const {
@@ -139,8 +140,12 @@ export default function WeeklyChart() {
     return groups;
   }, [groupNames, hasNoGroup, updateAvailableGroups]);
 
-  // Extract available qualifications from simulation data
+  // Use qualification keys from app settings for filter
   const qualificationNames = useMemo(() => {
+    if (qualifications && qualifications.length > 0) {
+      return qualifications.map(q => q.key);
+    }
+    // fallback: extract from simulationData if not set
     const qualificationSet = new Set();
     simulationData.forEach(item => {
       if (item.type === 'capacity') {
@@ -149,7 +154,7 @@ export default function WeeklyChart() {
       }
     });
     return Array.from(qualificationSet).sort();
-  }, [simulationData]);
+  }, [qualifications, simulationData]);
 
   // Update available qualifications
   const allQualificationNames = useMemo(() => {
@@ -416,23 +421,27 @@ export default function WeeklyChart() {
         <Box>
           <Typography variant="body1" sx={{ mb: 1 }}>Qualifikationen:</Typography>
           <FormGroup row>
-            {allQualificationNames.map(qualification => (
-              <FormControlLabel
-                key={qualification}
-                control={
-                  <Checkbox
-                    checked={selectedQualifications.includes(qualification)}
-                    onChange={() => {
-                      const newQualifications = selectedQualifications.includes(qualification)
-                        ? selectedQualifications.filter(q => q !== qualification)
-                        : [...selectedQualifications, qualification];
-                      setSelectedQualifications(newQualifications);
-                    }}
-                  />
-                }
-                label={qualification}
-              />
-            ))}
+            {allQualificationNames.map(qualification => {
+              const displayName =
+                qualifications.find(q => q.key === qualification)?.name || qualification;
+              return (
+                <FormControlLabel
+                  key={qualification}
+                  control={
+                    <Checkbox
+                      checked={selectedQualifications.includes(qualification)}
+                      onChange={() => {
+                        const newQualifications = selectedQualifications.includes(qualification)
+                          ? selectedQualifications.filter(q => q !== qualification)
+                          : [...selectedQualifications, qualification];
+                        setSelectedQualifications(newQualifications);
+                      }}
+                    />
+                  }
+                  label={displayName}
+                />
+              );
+            })}
           </FormGroup>
         </Box>
       </Box>
