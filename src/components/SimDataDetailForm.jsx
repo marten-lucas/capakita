@@ -4,10 +4,21 @@ import {
 import { useState, useEffect } from 'react';
 import SimulationDataTab from './SimDataDetail/SimulationDataTab';
 import useSimulationDataStore from '../store/simulationDataStore';
+import useAppSettingsStore from '../store/appSettingsStore';
 import React from 'react';
 
-function SimDataDetailForm({ item, allGroups }) {
-  const updateItemDates = useSimulationDataStore(state => state.updateItemDates); // Move hook call to top
+function SimDataDetailForm({ item }) {
+  const updateItemDates = useSimulationDataStore(state => state.updateItemDates);
+
+  // Get all groups from AppSettingsStore
+  const allGroups = useAppSettingsStore(state => {
+    const groups = state.groups;
+    const lookup = {};
+    groups.forEach(g => {
+      lookup[g.id] = g.name;
+    });
+    return lookup;
+  });
 
   const [lastAddedBookingIdx, setLastAddedBookingIdx] = useState(null);
   const [lastAddedGroupIdx, setLastAddedGroupIdx] = useState(null);
@@ -65,4 +76,3 @@ function SimDataDetailForm({ item, allGroups }) {
 }
 
 export default SimDataDetailForm;
- 

@@ -4,6 +4,7 @@ import {
 import React from 'react';
 import GroupDetail from './GroupDetail';
 import useSimulationDataStore from '../../store/simulationDataStore';
+import useAppSettingsStore from '../../store/appSettingsStore';
 
 // Helper: compare groups for modification
 function groupsModified(localGroups, origGroups) {
@@ -19,12 +20,22 @@ function groupsModified(localGroups, origGroups) {
   return false;
 }
 
-function GroupCards({ itemId, allGroups, lastAddedIndex, importedCount, originalGroups, onRestoreGroup, isManualEntry }) {
+function GroupCards({ itemId, lastAddedIndex, importedCount, originalGroups, onRestoreGroup, isManualEntry }) {
   const { getItemGroups, updateItemGroups, getItemBookings } = useSimulationDataStore((state) => ({
     getItemGroups: state.getItemGroups,
     updateItemGroups: state.updateItemGroups,
     getItemBookings: state.getItemBookings,
   }));
+
+  // Get all groups from AppSettingsStore
+  const allGroups = useAppSettingsStore(state => {
+    const groups = state.groups;
+    const lookup = {};
+    groups.forEach(g => {
+      lookup[g.id] = g.name;
+    });
+    return lookup;
+  });
 
   const groups = getItemGroups(itemId);
   const bookings = getItemBookings(itemId); // Add this to trigger re-renders when bookings change
@@ -50,7 +61,7 @@ function GroupCards({ itemId, allGroups, lastAddedIndex, importedCount, original
         const isMod = orig ? groupsModified([group], [orig]) : false;
         return (
           <GroupDetail
-            key={`${idx}-${bookings.length}`} // Add bookings.length to force re-render
+            key={`${idx}-${bookings.length}`} 
             group={group}
             index={idx}
             allGroups={allGroups}

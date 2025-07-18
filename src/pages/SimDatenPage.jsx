@@ -29,6 +29,7 @@ import IconButton from '@mui/material/IconButton';
 import InputAdornment from '@mui/material/InputAdornment';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
+import useAppSettingsStore from '../store/appSettingsStore';
 
 function SimDatenPage() {
   const [modalOpen, setModalOpen] = useState(false);
@@ -49,7 +50,10 @@ function SimDatenPage() {
   const setSimulationData = useSimulationDataStore(state => state.setSimulationData);
   const setGroupsLookup = useSimulationDataStore(state => state.setGroupsLookup);
   const setSelectedItem = useSimulationDataStore(state => state.setSelectedItem);
-  const clearAllData = useSimulationDataStore(state => state.clearAllData); // Reset all imported data
+  const clearAllData = useSimulationDataStore(state => state.clearAllData);
+  
+  // Add AppSettingsStore
+  const { importGroupsFromAdebis, getGroupsLookup } = useAppSettingsStore();
 
   const handleOpenModal = () => setModalOpen(true);
   const handleCloseModal = () => setModalOpen(false);
@@ -151,7 +155,13 @@ function SimDatenPage() {
         if (id) newGroupsLookup[id] = name;
       });
     }
-    setGroupsLookup(newGroupsLookup);
+    
+    // Import groups into AppSettingsStore
+    importGroupsFromAdebis(newGroupsLookup);
+    
+    // Use the updated groups lookup for simulation data
+    const updatedGroupsLookup = getGroupsLookup();
+    setGroupsLookup(updatedGroupsLookup);
 
     // --- GRUKI (Gruppenzuordnung) filtern wie simulator_poc ---
     let grukiList = [];

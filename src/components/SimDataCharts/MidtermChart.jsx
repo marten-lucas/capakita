@@ -3,6 +3,7 @@ import HighchartsReact from 'highcharts-react-official';
 import Highcharts from 'highcharts';
 import useSimulationDataStore from '../../store/simulationDataStore';
 import useChartStore from '../../store/chartStore';
+import useAppSettingsStore from '../../store/appSettingsStore';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import FormGroup from '@mui/material/FormGroup';
@@ -14,7 +15,8 @@ import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 export default function MidtermChart() {
   // Store data
   const simulationData = useSimulationDataStore(state => state.simulationData);
-  const groupsLookup = useSimulationDataStore(state => state.groupsLookup);
+  // const groupsLookup = useSimulationDataStore(state => state.groupsLookup);
+  const groupsLookup = useAppSettingsStore(state => state.getGroupsLookup());
   
   // Chart store
   const {
@@ -29,7 +31,7 @@ export default function MidtermChart() {
     updateAvailableQualifications
   } = useChartStore();
 
-  // Group names logic (same as WeeklyChart)
+  // Use only AppSettingsStore groups
   const groupNames = useMemo(() => {
     const groupKeys = Object.keys(groupsLookup);
     return groupKeys.map(key => groupsLookup[key]);

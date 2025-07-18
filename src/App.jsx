@@ -3,6 +3,7 @@ import { Box, Container } from '@mui/material'
 import TopNav from './components/TopNav'
 import SimDatenPage from './pages/SimDatenPage'
 import SimulationPage from './pages/SimulationPage'
+import SettingsPage from './pages/SettingsPage'
 import './App.css'
 
 function App() {
@@ -15,16 +16,10 @@ function App() {
       <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
         <Container maxWidth='l'> {/* Der Container ist jetzt nur für den Inhalt */}
           <Routes>
-            <Route path="/" element={<Navigate to="/data" replace />} />
-            <Route
-              path="/data"
-              element={
-                <SimDatenPage />
-              }
-            />
-            <Route path="/simulation"
-                   element={<SimulationPage />}
-            />
+            <Route path="/" element={<Navigate to="/simulation" replace />} />
+            <Route path="/simulation" element={<SimulationPage />} />
+            <Route path="/data" element={<SimDatenPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
           </Routes>
         </Container>
       </Box>
@@ -32,3 +27,4 @@ function App() {
   )
 }
 export default App
+

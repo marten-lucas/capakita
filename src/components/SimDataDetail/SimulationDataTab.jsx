@@ -25,7 +25,6 @@ import useSimulationDataStore from '../../store/simulationDataStore';
 
 function SimulationDataTab({ 
   item, 
-  allGroups, 
   lastAddedBookingIdx, 
   lastAddedGroupIdx, 
   importedBookingCount, 
@@ -438,7 +437,6 @@ function SimulationDataTab({
       <BookingCards
         itemId={item.id}
         type={item.type}
-        allGroups={allGroups}
         lastAddedIndex={lastAddedBookingIdx}
         importedCount={importedBookingCount}
         originalBookings={item?.originalParsedData?.booking}
@@ -477,7 +475,6 @@ function SimulationDataTab({
       <GroupCards
         itemId={item.id}
         groups={groups}
-        allGroups={allGroups}
         lastAddedIndex={lastAddedGroupIdx}
         onDelete={handleDeleteGroup}
         importedCount={importedGroupCount}

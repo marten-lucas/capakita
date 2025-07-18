@@ -3,12 +3,13 @@ import BookingAccordion from './BookingAccordion';
 import useSimulationDataStore from '../../store/simulationDataStore';
 
 function BookingCards({
-  itemId, type, allGroups, lastAddedIndex, importedCount, originalBookings, onRestoreBooking, onDelete, isManualEntry
+  itemId, type, lastAddedIndex, importedCount, originalBookings, onRestoreBooking, onDelete, isManualEntry
 }) {
   const { getItemBookings, updateItemBookings } = useSimulationDataStore((state) => ({
     getItemBookings: state.getItemBookings,
     updateItemBookings: state.updateItemBookings,
   }));
+
 
   const bookings = getItemBookings(itemId);
 
@@ -29,7 +30,6 @@ function BookingCards({
           booking={booking}
           index={idx}
           type={type}
-          allGroups={allGroups}
           defaultExpanded={lastAddedIndex === idx}
           canDelete={typeof importedCount === 'number' ? idx >= importedCount : true}
           originalBooking={Array.isArray(originalBookings) ? originalBookings[idx] : undefined}

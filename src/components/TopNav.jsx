@@ -11,6 +11,7 @@ import { NavLink } from 'react-router-dom'
 const pages = [
   { label: 'Simulation', path: '/simulation' },
   { label: 'Data', path: '/data' },
+  { label: 'Settings', path: '/settings' },
 ]
 
 function TopNav() {

@@ -3,6 +3,7 @@ import HighchartsReact from 'highcharts-react-official';
 import Highcharts from 'highcharts';
 import useSimulationDataStore from '../../store/simulationDataStore';
 import useChartStore from '../../store/chartStore';
+import useAppSettingsStore from '../../store/appSettingsStore';
 // Material UI imports
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
@@ -19,7 +20,8 @@ import InputLabel from '@mui/material/InputLabel';
 export default function WeeklyChart() {
   // Store data
   const simulationData = useSimulationDataStore(state => state.simulationData);
-  const groupsLookup = useSimulationDataStore(state => state.groupsLookup);
+  // const groupsLookup = useSimulationDataStore(state => state.groupsLookup);
+  const groupsLookup = useAppSettingsStore(state => state.getGroupsLookup());
   
   // Chart store - explizit extrahieren für useMemo
   const {

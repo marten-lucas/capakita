@@ -70,7 +70,7 @@ function DayControl({ dayLabel, dayAbbr, dayData, onToggle, onTimeChange, onAddS
 }
 
 function BookingAccordion({
-  booking, index, type, allGroups, defaultExpanded, canDelete,
+  booking, index, type, defaultExpanded, canDelete,
   originalBooking, onUpdateBooking, onDelete, isManualEntry, parentItemId
 }) {
   const [expanded, setExpanded] = useState(!!defaultExpanded);

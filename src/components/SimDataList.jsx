@@ -1,35 +1,10 @@
 import { List, ListItem, ListItemButton, ListItemText, Divider, Box, ListItemAvatar, Avatar, Chip } from '@mui/material';
-import SentimentVerySatisfiedIcon from '@mui/icons-material/SentimentVerySatisfied';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import useModMonitorStore from '../store/modMonitorStore';
+import useAppSettingsStore from '../store/appSettingsStore';
 
-// Farbpalette für Gruppen (z.B. 10 Farben)
-const GROUP_COLORS = [
-  '#1976d2', // blau
-  '#388e3c', // grün
-  '#fbc02d', // gelb
-  '#d32f2f', // rot
-  '#7b1fa2', // violett
-  '#0288d1', // türkis
-  '#c2185b', // pink
-  '#ffa000', // orange
-  '#455a64', // grau
-  '#388e8e', // petrol
-];
 
-// Hilfsfunktion: Bestimme Farbe für Gruppe anhand ID oder Name
-function getGroupColor(group) {
-  if (!group) return '#bdbdbd';
-  // Nutze id, sonst name, sonst fallback
-  const key = group.id ?? group.name ?? '';
-  let idx = 0;
-  if (typeof key === 'number') idx = key % GROUP_COLORS.length;
-  else if (typeof key === 'string') {
-    // Hashcode aus String
-    idx = Math.abs([...key].reduce((acc, c) => acc + c.charCodeAt(0), 0)) % GROUP_COLORS.length;
-  }
-  return GROUP_COLORS[idx];
-}
+
 
 function consolidateBookingTimes(booking) {
   if (!booking || booking.length === 0) return { text: 'Keine Buchungszeiten', hours: 0, segmentsPerDay: {} };
@@ -84,6 +59,13 @@ function consolidateBookingTimes(booking) {
 function SimDataList({ data, onRowClick, selectedItem }) {
   // Selector: serialisiere alle Modifikationen, damit React neu rendert bei jeder Änderung
   const modificationsStore = useModMonitorStore(state => state.modifications);
+  
+  // Get groups from AppSettingsStore for icons
+  const getGroupById = useAppSettingsStore(state => state.getGroupById);
+
+  // Define colors for demand/capacity
+  const DEMAND_COLOR = '#c0d9f3ff';   // blue for children
+  const CAPACITY_COLOR = '#a3c7a5ff'; // green for employees
 
   function getModificationStatus(item) {
     const mods = item.modifications || [];
@@ -137,12 +119,23 @@ function SimDataList({ data, onRowClick, selectedItem }) {
         const { hours } = consolidateBookingTimes(item.parseddata?.booking, item.type);
         // Für demand: erste Gruppe bestimmen
         let group = null;
+        let groupIcon = '👥'; // Default icon
         let groupName = '';
         if (item.type === 'demand' && item.parseddata?.group && item.parseddata.group.length > 0) {
           group = item.parseddata.group[0];
           groupName = group?.name || 'Gruppe unbekannt';
+          // Get icon from settings store
+          const settingsGroup = getGroupById(group?.id);
+          if (settingsGroup && settingsGroup.icon) {
+            groupIcon = settingsGroup.icon;
+          }
+        } else if (item.type === 'demand') {
+          // No group set for child
+          groupIcon = '🙂';
+          groupName = 'keine Gruppe';
         }
-        const groupColor = item.type === 'demand' ? getGroupColor(group) : '#bdbdbd';
+        // Use color by type only
+        const avatarColor = item.type === 'demand' ? DEMAND_COLOR : CAPACITY_COLOR;
         let secondaryText = '';
         if (item.type === 'demand') {
           secondaryText = `${hours} h in ${groupName}`;
@@ -165,8 +158,10 @@ function SimDataList({ data, onRowClick, selectedItem }) {
               sx={selectedItem && selectedItem.id === item.id ? { bgcolor: 'action.selected' } : undefined}
             >
               <ListItemAvatar>
-                <Avatar sx={{ bgcolor: groupColor }}>
-                  {item.type === 'demand' ? <SentimentVerySatisfiedIcon /> : <AccountCircleIcon />}
+                <Avatar sx={{ bgcolor: avatarColor }}>
+                  {item.type === 'demand'
+                    ? groupIcon
+                    : <AccountCircleIcon />}
                 </Avatar>
               </ListItemAvatar>
               <ListItemText
