@@ -1,11 +1,11 @@
 import { Typography, Box } from '@mui/material';
 import BookingDetail from './BookingDetail';
-import useSimulationDataStore from '../../store/simulationDataStore';
+import useSimScenarioDataStore from '../../store/simScenarioStore';
 
 function BookingDetails({
   itemId, type, importedCount, originalBookings, onRestoreBooking, onDelete, isManualEntry
 }) {
-  const { getItemBookings, updateItemBookings } = useSimulationDataStore((state) => ({
+  const { getItemBookings, updateItemBookings } = useSimScenarioDataStore((state) => ({
     getItemBookings: state.getItemBookings,
     updateItemBookings: state.updateItemBookings,
   }));

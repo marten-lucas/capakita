@@ -3,7 +3,7 @@ import {
 } from '@mui/material';
 import React from 'react';
 import GroupDetail from './GroupDetail';
-import useSimulationDataStore from '../../store/simulationDataStore';
+import useSimScenarioDataStore from '../../store/simScenarioStore';
 import useAppSettingsStore from '../../store/appSettingsStore';
 
 // Helper: compare groups for modification
@@ -21,7 +21,7 @@ function groupsModified(localGroups, origGroups) {
 }
 
 function GroupCards({ itemId, lastAddedIndex, importedCount, originalGroups, onRestoreGroup, isManualEntry }) {
-  const { getItemGroups, updateItemGroups, getItemBookings } = useSimulationDataStore((state) => ({
+  const { getItemGroups, updateItemGroups, getItemBookings } = useSimScenarioDataStore((state) => ({
     getItemGroups: state.getItemGroups,
     updateItemGroups: state.updateItemGroups,
     getItemBookings: state.getItemBookings,

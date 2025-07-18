@@ -6,12 +6,12 @@ import FileUploadIcon from '@mui/icons-material/FileUpload'
 import { useNavigate } from 'react-router-dom'
 import WeeklyChart from '../components/SimDataCharts/WeeklyChart'
 import MidtermChart from '../components/SimDataCharts/MidtermChart'
-import useSimulationDataStore from '../store/simulationDataStore'
+import useSimScenarioDataStore from '../store/simScenarioStore'
 
 function SimulationPage() {
   const [tab, setTab] = useState(0)
   const navigate = useNavigate()
-  const simulationData = useSimulationDataStore(state => state.simulationData)
+  const simulationData = useSimScenarioDataStore(state => state.simulationData)
 
   // Prüfe ob Simulationsdaten vorhanden sind
   if (!simulationData || simulationData.length === 0) {

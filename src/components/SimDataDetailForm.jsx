@@ -3,12 +3,12 @@ import {
 } from '@mui/material';
 import { useState, useEffect } from 'react';
 import SimulationDataTab from './SimDataDetail/SimulationDataTab';
-import useSimulationDataStore from '../store/simulationDataStore';
+import useSimScenarioDataStore from '../store/simScenarioStore';
 import useAppSettingsStore from '../store/appSettingsStore';
 import React from 'react';
 
 function SimDataDetailForm({ item }) {
-  const updateItemDates = useSimulationDataStore(state => state.updateItemDates);
+  const updateItemDates = useSimScenarioDataStore(state => state.updateItemDates);
 
   // Get all groups from AppSettingsStore
   const allGroups = useAppSettingsStore(state => {

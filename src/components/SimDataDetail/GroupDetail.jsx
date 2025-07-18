@@ -6,10 +6,10 @@ import {
 import React, { useMemo } from 'react';
 import { convertYYYYMMDDtoDDMMYYYY, convertDDMMYYYYtoYYYYMMDD } from '../../utils/dateUtils';
 import ModMonitor from './ModMonitor';
-import useSimulationDataStore from '../../store/simulationDataStore';
+import useSimScenarioDataStore from '../../store/simScenarioStore';
 
 function GroupDetail({ group, index, allGroups, onDelete, canDelete, onRestore, originalGroup, onUpdateGroup, parentItemId }) {
-  const { getItemBookings, updateItemBookings } = useSimulationDataStore((state) => ({
+  const { getItemBookings, updateItemBookings } = useSimScenarioDataStore((state) => ({
     getItemBookings: state.getItemBookings,
     updateItemBookings: state.updateItemBookings,
   }));

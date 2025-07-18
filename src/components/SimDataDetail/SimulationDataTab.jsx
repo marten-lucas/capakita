@@ -21,7 +21,7 @@ import GroupIcon from '@mui/icons-material/Group';
 import GroupCards from './GroupCards';
 import BookingCards from './BookingCards';
 import ModMonitor from './ModMonitor';
-import useSimulationDataStore from '../../store/simulationDataStore';
+import useSimScenarioDataStore from '../../store/simScenarioStore';
 
 function SimulationDataTab({ 
   item, 
@@ -53,7 +53,7 @@ function SimulationDataTab({
     simulationData,
     setSimulationData,
     setSelectedItem
-  } = useSimulationDataStore((state) => ({
+  } = useSimScenarioDataStore((state) => ({
     updateItemPausedState: state.updateItemPausedState,
     getItemPausedState: state.getItemPausedState,
     getItemBookings: state.getItemBookings,

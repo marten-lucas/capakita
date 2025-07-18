@@ -1,7 +1,7 @@
 import RestoreIcon from '@mui/icons-material/Restore';
 import { useEffect } from 'react';
 import useModMonitorStore from '../../store/modMonitorStore';
-import useSimulationDataStore from '../../store/simulationDataStore';
+import useSimScenarioDataStore from '../../store/simScenarioStore';
 
 /**
  * ModMonitor: Monitors a specific field of an item for modifications.
@@ -17,7 +17,7 @@ import useSimulationDataStore from '../../store/simulationDataStore';
  */
 function ModMonitor({ itemId, field, value, originalValue, onRestore, title, confirmMsg, iconProps }) {
   const { setFieldModification, resetFieldModification, isFieldModified } = useModMonitorStore();
-  const simulationData = useSimulationDataStore(state => state.simulationData);
+  const simulationData = useSimScenarioDataStore(state => state.simulationData);
 
   // Check if item is manually added
   const item = simulationData.find(item => item.id === itemId);

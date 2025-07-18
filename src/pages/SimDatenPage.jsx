@@ -16,7 +16,7 @@ import AddItemModal from '../components/AddItemModal';
 import SimDataList from '../components/SimDataList';
 import SimDataDetailForm from '../components/SimDataDetailForm';
 import JSZip from 'jszip';
-import useSimulationDataStore from '../store/simulationDataStore';
+import useSimScenarioStore from '../store/simScenarioStore';
 import useChartStore from '../store/chartStore';
 import useModMonitorStore from '../store/modMonitorStore';
 import CryptoJS from 'crypto-js';
@@ -43,16 +43,16 @@ function SimDatenPage() {
   const [pendingSave, setPendingSave] = useState(null);
   const [pendingLoad, setPendingLoad] = useState(null);
 
-  const simulationData = useSimulationDataStore(state => state.simulationData);
-  const groupsLookup = useSimulationDataStore(state => state.groupsLookup);
+  const simulationData = useSimScenarioStore(state => state.simulationData);
+  const groupsLookup = useSimScenarioStore(state => state.groupsLookup);
   // Remove selectedItem from simulationDataStore, use from appSettingsStore
   const selectedItem = useAppSettingsStore(state => state.selectedItem);
   const setSelectedItem = useAppSettingsStore(state => state.setSelectedItem);
   const lastImportAnonymized = useAppSettingsStore(state => state.lastImportAnonymized);
 
-  const setSimulationData = useSimulationDataStore(state => state.setSimulationData);
-  const setGroupsLookup = useSimulationDataStore(state => state.setGroupsLookup);
-  const clearAllData = useSimulationDataStore(state => state.clearAllData);
+  const setSimulationData = useSimScenarioStore(state => state.setSimulationData);
+  const setGroupsLookup = useSimScenarioStore(state => state.setGroupsLookup);
+  const clearAllData = useSimScenarioStore(state => state.clearAllData);
   
   // Add AppSettingsStore
   const { importGroupsFromAdebis, getGroupsLookup, importQualificationsFromEmployees } = useAppSettingsStore();
@@ -427,7 +427,7 @@ function SimDatenPage() {
   // --- Save/Load functions ---
   const saveStoresToFile = () => {
     openPwDialog('save', (password) => {
-      const simData = useSimulationDataStore.getState();
+      const simData = useSimScenarioStore.getState();
       const chartData = useChartStore.getState();
       const modMonitorData = useModMonitorStore.getState();
 

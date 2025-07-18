@@ -1,7 +1,7 @@
 import { useMemo, useCallback } from 'react';
 import HighchartsReact from 'highcharts-react-official';
 import Highcharts from 'highcharts';
-import useSimulationDataStore from '../../store/simulationDataStore';
+import useSimScenarioDataStore from '../../store/simScenarioStore';
 import useChartStore from '../../store/chartStore';
 import useAppSettingsStore from '../../store/appSettingsStore';
 // Material UI imports
@@ -19,8 +19,8 @@ import InputLabel from '@mui/material/InputLabel';
 
 export default function WeeklyChart() {
   // Store data
-  const simulationData = useSimulationDataStore(state => state.simulationData);
-  // const groupsLookup = useSimulationDataStore(state => state.groupsLookup);
+  const simulationData = useSimScenarioDataStore(state => state.simulationData);
+  // const groupsLookup = useSimScenarioDataStore(state => state.groupsLookup);
   const groupsLookup = useAppSettingsStore(state => state.getGroupsLookup());
   const qualifications = useAppSettingsStore(state => state.qualifications);
   
