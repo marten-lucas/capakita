@@ -1,9 +1,8 @@
+import React from 'react';
 import {
-  Typography, Box, Accordion, AccordionSummary, AccordionDetails, Button,
-  Divider, TextField, Switch, Slider
+  Typography, Box, Button, Divider, TextField, Switch, Slider,
+  Card, CardContent, CardHeader, CardActions
 } from '@mui/material';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import { useState } from 'react';
 import { convertYYYYMMDDtoDDMMYYYY, convertDDMMYYYYtoYYYYMMDD } from '../../utils/dateUtils';
 import { timeToValue, valueToTime } from '../../utils/timeUtils';
 import ModMonitor from './ModMonitor';
@@ -12,7 +11,28 @@ import { consolidateBookingSummary } from '../../utils/bookingUtils';
 // DayControl component
 function DayControl({ dayLabel, dayAbbr, dayData, onToggle, onTimeChange, onAddSegment, onRemoveSegment, type }) {
   const isActive = !!dayData;
-  const segments = isActive ? dayData.segments : [];
+  const segments = React.useMemo(() => 
+    isActive ? dayData.segments : [], 
+    [isActive, dayData?.segments]
+  );
+
+  // Local state for slider values per segment
+  const [sliderValues, setSliderValues] = React.useState(
+    segments.map(seg => [
+      timeToValue(seg.booking_start),
+      timeToValue(seg.booking_end)
+    ])
+  );
+
+  // Sync local slider state if segments change (e.g. add/remove)
+  React.useEffect(() => {
+    setSliderValues(
+      segments.map(seg => [
+        timeToValue(seg.booking_start),
+        timeToValue(seg.booking_end)
+      ])
+    );
+  }, [segments, segments.length]);
 
   return (
     <Box display="flex" alignItems="flex-start" gap={2} sx={{ mb: 1 }}>
@@ -25,11 +45,21 @@ function DayControl({ dayLabel, dayAbbr, dayData, onToggle, onTimeChange, onAddS
               <Box key={idx} display="flex" alignItems="center" gap={1} sx={{ mb: 1 }}>
                 <Box sx={{ flex: 1, minWidth: 220, maxWidth: 400 }}>
                   <Slider
-                    value={[
+                    value={sliderValues[idx] || [
                       timeToValue(seg.booking_start),
                       timeToValue(seg.booking_end)
                     ]}
-                    onChange={(_, newValue) => onTimeChange(dayAbbr, idx, newValue)}
+                    onChange={(_, newValue) => {
+                      // Update local slider state only
+                      setSliderValues(vals => {
+                        const next = [...vals];
+                        next[idx] = newValue;
+                        return next;
+                      });
+                    }}
+                    onChangeCommitted={(_, newValue) => {
+                      onTimeChange(dayAbbr, idx, newValue);
+                    }}
                     min={0}
                     max={47}
                     step={1}
@@ -69,11 +99,11 @@ function DayControl({ dayLabel, dayAbbr, dayData, onToggle, onTimeChange, onAddS
   );
 }
 
-function BookingAccordion({
-  booking, index, type, defaultExpanded, canDelete,
+function BookingDetail({
+  booking, index, type, canDelete,
   originalBooking, onUpdateBooking, onDelete, isManualEntry, parentItemId
 }) {
-  const [expanded, setExpanded] = useState(!!defaultExpanded);
+  // Remove expanded state and Accordion logic
 
   const handleDayToggle = (dayAbbr, isEnabled) => {
     const updatedBooking = {
@@ -253,36 +283,30 @@ function BookingAccordion({
   };
 
   return (
-    <Accordion expanded={expanded} onChange={() => setExpanded(e => !e)}>
-      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-        <Typography sx={{ flex: 1 }}>
-          Buchung {index + 1}: {dateRangeText}
-          {dateRangeText ? ': ' : ''}
-          {consolidateBookingSummary(times)}
-        </Typography>
-        <ModMonitor
-          itemId={parentItemId} // Use parentItemId instead of booking.id
-          field={`booking-${index}`}
-          value={JSON.stringify(booking)}
-          originalValue={JSON.stringify(originalBooking || {})}
-          onRestore={handleRestoreAll}
-          title="Komplette Buchung auf importierte Werte zurücksetzen"
-          confirmMsg="Buchung auf importierte Adebis-Daten zurücksetzen?"
-          iconProps={{ sx: { ml: 1 } }}
-        />
-      </AccordionSummary>
-      <AccordionDetails>
-        {/* Move the delete button here */}
-        {onDelete && canDelete && (
-          <Button
-            size="small"
-            color="error"
-            sx={{ ml: 2, mb: 2 }}
-            onClick={e => { e.stopPropagation(); onDelete(index); }}
-          >
-            Löschen
-          </Button>
-        )}
+    <Card sx={{ mb: 3 }}>
+      <CardHeader
+        title={
+          <Box display="flex" alignItems="center">
+            <Typography sx={{ flex: 1 }}>
+              Buchung {index + 1}: {dateRangeText}
+              {dateRangeText ? ': ' : ''}
+              {consolidateBookingSummary(times)}
+            </Typography>
+            <ModMonitor
+              itemId={parentItemId}
+              field={`booking-${index}`}
+              value={JSON.stringify(booking)}
+              originalValue={JSON.stringify(originalBooking || {})}
+              onRestore={handleRestoreAll}
+              title="Komplette Buchung auf importierte Werte zurücksetzen"
+              confirmMsg="Buchung auf importierte Adebis-Daten zurücksetzen?"
+              iconProps={{ sx: { ml: 1 } }}
+            />
+          </Box>
+        }
+        sx={{ pb: 0 }}
+      />
+      <CardContent>
         <Box display="flex" gap={2} sx={{ mb: 2, alignItems: 'center' }}>
           <TextField
             label="Startdatum"
@@ -293,7 +317,7 @@ function BookingAccordion({
             onChange={(e) => handleDateChange('startdate', e.target.value)}
           />
           <ModMonitor
-            itemId={parentItemId} // Use parentItemId
+            itemId={parentItemId}
             field={`booking-${index}-startdate`}
             value={booking.startdate}
             originalValue={originalBooking ? originalBooking.startdate : undefined}
@@ -311,7 +335,7 @@ function BookingAccordion({
             onChange={(e) => handleDateChange('enddate', e.target.value)}
           />
           <ModMonitor
-            itemId={parentItemId} // Use parentItemId
+            itemId={parentItemId}
             field={`booking-${index}-enddate`}
             value={booking.enddate}
             originalValue={originalBooking ? originalBooking.enddate : undefined}
@@ -329,7 +353,7 @@ function BookingAccordion({
             <Box key={day.abbr} display="flex" alignItems="center">
               {dayMod && (
                 <ModMonitor
-                  itemId={parentItemId} // Use parentItemId
+                  itemId={parentItemId}
                   field={`booking-${index}-${day.abbr}`}
                   value={JSON.stringify(booking.times?.find(t => t.day_name === day.abbr))}
                   originalValue={
@@ -356,10 +380,21 @@ function BookingAccordion({
             </Box>
           );
         })}
-      </AccordionDetails>
-    </Accordion>
+      </CardContent>
+      {(onDelete && canDelete) && (
+        <CardActions sx={{ justifyContent: 'flex-end' }}>
+          <Button
+            size="small"
+            color="error"
+            onClick={e => { e.stopPropagation(); onDelete(index); }}
+          >
+            Löschen
+          </Button>
+        </CardActions>
+      )}
+    </Card>
   );
 }
 
-export default BookingAccordion;
+export default BookingDetail;
 

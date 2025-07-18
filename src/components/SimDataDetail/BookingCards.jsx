@@ -1,15 +1,14 @@
 import { Typography, Box } from '@mui/material';
-import BookingAccordion from './BookingAccordion';
+import BookingDetail from './BookingDetail';
 import useSimulationDataStore from '../../store/simulationDataStore';
 
-function BookingCards({
-  itemId, type, lastAddedIndex, importedCount, originalBookings, onRestoreBooking, onDelete, isManualEntry
+function BookingDetails({
+  itemId, type, importedCount, originalBookings, onRestoreBooking, onDelete, isManualEntry
 }) {
   const { getItemBookings, updateItemBookings } = useSimulationDataStore((state) => ({
     getItemBookings: state.getItemBookings,
     updateItemBookings: state.updateItemBookings,
   }));
-
 
   const bookings = getItemBookings(itemId);
 
@@ -25,23 +24,22 @@ function BookingCards({
   return (
     <Box>
       {bookings.map((booking, idx) => (
-        <BookingAccordion
+        <BookingDetail
           key={idx}
           booking={booking}
           index={idx}
           type={type}
-          defaultExpanded={lastAddedIndex === idx}
           canDelete={typeof importedCount === 'number' ? idx >= importedCount : true}
           originalBooking={Array.isArray(originalBookings) ? originalBookings[idx] : undefined}
           onRestoreBooking={onRestoreBooking}
           onUpdateBooking={(updatedBooking) => handleUpdateBooking(idx, updatedBooking)}
           onDelete={onDelete}
           isManualEntry={isManualEntry}
-          parentItemId={itemId} // Pass the parent item ID
+          parentItemId={itemId}
         />
       ))}
     </Box>
   );
 }
 
-export default BookingCards;
+export default BookingDetails;
