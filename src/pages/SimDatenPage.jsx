@@ -19,6 +19,7 @@ import JSZip from 'jszip';
 import useSimulationDataStore from '../store/simulationDataStore';
 import useChartStore from '../store/chartStore';
 import useModMonitorStore from '../store/modMonitorStore';
+import CryptoJS from 'crypto-js';
 
 function SimDatenPage() {
   const [modalOpen, setModalOpen] = useState(false);
@@ -341,8 +342,25 @@ function SimDatenPage() {
     clearAllData(); // Reset all imported data
   };
 
+  // Helper: Prompt for password (replace with a modal for better UX)
+  const promptPassword = async (confirm = false) => {
+    let pw = window.prompt('Bitte Passwort eingeben:');
+    if (!pw) return null;
+    if (confirm) {
+      let pw2 = window.prompt('Passwort bestätigen:');
+      if (pw !== pw2) {
+        alert('Passwörter stimmen nicht überein.');
+        return null;
+      }
+    }
+    return pw;
+  };
+
   // --- Save/Load functions ---
-  const saveStoresToFile = () => {
+  const saveStoresToFile = async () => {
+    const password = await promptPassword(true);
+    if (!password) return;
+
     const simData = useSimulationDataStore.getState();
     const chartData = useChartStore.getState();
     const modMonitorData = useModMonitorStore.getState();
@@ -364,11 +382,15 @@ function SimDatenPage() {
       modMonitor: modMonitorData.modifications
     };
 
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    // Encrypt
+    const json = JSON.stringify(data, null, 2);
+    const ciphertext = CryptoJS.AES.encrypt(json, password).toString();
+
+    const blob = new Blob([ciphertext], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'kiga-simulator-data.json';
+    a.download = 'kiga-simulator-data.enc';
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -376,21 +398,25 @@ function SimDatenPage() {
   const loadStoresFromFile = async () => {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = 'application/json';
+    input.accept = '.enc,.txt';
     input.onchange = async (e) => {
       const file = e.target.files[0];
       if (!file) return;
-      const text = await file.text();
+      const ciphertext = await file.text();
+      const password = await promptPassword(false);
+      if (!password) return;
       try {
-        const data = JSON.parse(text);
+        const bytes = CryptoJS.AES.decrypt(ciphertext, password);
+        const decrypted = bytes.toString(CryptoJS.enc.Utf8);
+        if (!decrypted) throw new Error('Falsches Passwort oder beschädigte Datei.');
+        const data = JSON.parse(decrypted);
         setSimulationData(data.simulationData || []);
         setGroupsLookup(data.groupsLookup || {});
         useChartStore.setState(data.chartStore || {});
         useModMonitorStore.setState({ modifications: data.modMonitor || {} });
-        // Optionally, clear selectedItem
         setSelectedItem(null);
       } catch (err) {
-        alert('Fehler beim Laden der Datei: ' + err.message);
+        alert('Fehler beim Entschlüsseln/Laden: ' + err.message);
       }
     };
     input.click();
