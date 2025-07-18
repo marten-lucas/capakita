@@ -7,6 +7,7 @@ import useSimScenarioDataStore from '../store/simScenarioStore';
 
 function SimDataDetailForm({ item }) {
   const updateItemDates = useSimScenarioDataStore(state => state.updateItemDates);
+  const addItemToScenario = useSimScenarioDataStore(state => state.addItemToScenario);
 
   const [lastAddedBookingIdx, setLastAddedBookingIdx] = useState(null);
   const [lastAddedGroupIdx, setLastAddedGroupIdx] = useState(null);
@@ -57,6 +58,7 @@ function SimDataDetailForm({ item }) {
         importedBookingCount={importedBookingCount}
         importedGroupCount={importedGroupCount}
         updateItemDates={updateItemDates}
+        addItemToScenario={addItemToScenario}
       />
     </Box>
   );

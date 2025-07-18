@@ -22,10 +22,15 @@ export default function WeeklyChart() {
   const chartSelectedScenarioId = useChartStore(state => state.weeklySelectedScenarioId);
   const setWeeklySelectedScenarioId = useChartStore(state => state.setWeeklySelectedScenarioId);
 
-  // Get simulationData for selected scenario
+  // Get effective simulationData for selected scenario (overlay-aware)
   const simulationData = useSimScenarioStore(state => {
+    // Use overlay-aware data for the selected scenario
     const scenario = state.scenarios.find(s => s.id === chartSelectedScenarioId);
-    return scenario?.simulationData ?? [];
+    if (!scenario) return [];
+    if (!scenario.baseScenarioId) {
+      return scenario.simulationData ?? [];
+    }
+    return state.computeOverlayData(scenario);
   });
 
   const groupsLookup = useAppSettingsStore(state => state.getGroupsLookup());

@@ -22,8 +22,17 @@ export default function MidtermChart() {
 
   // Get simulationData for selected scenario
   const simulationData = useSimScenarioStore(state => {
+    // Use overlay-aware data for the selected scenario
     const scenario = state.scenarios.find(s => s.id === chartSelectedScenarioId);
-    return scenario?.simulationData ?? [];
+    if (!scenario) return [];
+    if (!scenario.baseScenarioId) {
+      return scenario.simulationData ?? [];
+    }
+    const baseScenario = state.scenarios.find(s => s.id === scenario.baseScenarioId);
+    if (!baseScenario) return [];
+    return state.getEffectiveSimulationData
+      ? state.getEffectiveSimulationData.call({ ...state, selectedScenarioId: chartSelectedScenarioId })
+      : [];
   });
 
   const groupsLookup = useAppSettingsStore(state => state.getGroupsLookup());

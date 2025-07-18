@@ -11,15 +11,9 @@ import useSimScenarioStore from '../store/simScenarioStore'
 function SimulationPage() {
   const [tab, setTab] = useState(0)
   const navigate = useNavigate()
-  // Use scenarios and selectedScenarioId from simScenarioStore
-  const scenarios = useSimScenarioStore(state => state.scenarios);
-  const selectedScenarioId = useSimScenarioStore(state => state.selectedScenarioId);
 
-  // Find the selected scenario's simulationData
-  const simulationData = useSimScenarioStore(state => {
-    const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
-    return scenario?.simulationData ?? [];
-  });
+  // Find the selected scenario's effective simulationData (overlay-aware)
+  const simulationData = useSimScenarioStore(state => state.getEffectiveSimulationData());
 
   // Prüfe ob Simulationsdaten vorhanden sind
   if (!simulationData || simulationData.length === 0) {

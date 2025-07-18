@@ -29,7 +29,8 @@ function SimulationDataTab({
   lastAddedGroupIdx, 
   importedBookingCount, 
   importedGroupCount, 
-  handleRestoreBooking 
+  handleRestoreBooking,
+  addItemToScenario
 }) {
   const [activeTab, setActiveTab] = useState(0);
 
@@ -50,8 +51,8 @@ function SimulationDataTab({
     getItemGeburtsdatum,
     updateItemQualification,
     getItemQualification,
-    simulationData,
-    setSimulationData,
+    deleteItem,
+    getEffectiveSimulationData,
     setSelectedItem
   } = useSimScenarioDataStore((state) => ({
     updateItemPausedState: state.updateItemPausedState,
@@ -70,8 +71,8 @@ function SimulationDataTab({
     getItemGeburtsdatum: state.getItemGeburtsdatum,
     updateItemQualification: state.updateItemQualification,
     getItemQualification: state.getItemQualification,
-    simulationData: state.simulationData,
-    setSimulationData: state.setSimulationData,
+    deleteItem: state.deleteItem,
+    getEffectiveSimulationData: state.getEffectiveSimulationData,
     selectedItem: state.selectedItem,
     setSelectedItem: state.setSelectedItem,
   }));
@@ -206,8 +207,7 @@ function SimulationDataTab({
 
   const handleDeleteItem = () => {
     if (window.confirm(`Möchten Sie "${item.name}" wirklich löschen?`)) {
-      const updatedData = simulationData.filter(i => i.id !== item.id);
-      setSimulationData(updatedData);
+      deleteItem(item.id);
       setSelectedItem(null);
     }
   };

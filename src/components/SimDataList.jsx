@@ -57,6 +57,9 @@ function consolidateBookingTimes(booking) {
 }
 
 function SimDataList({ data, onRowClick, selectedItem }) {
+  // Use the passed data directly - it should already be the effective data
+  // from the parent component that calls getEffectiveSimulationData()
+  
   // Selector: serialisiere alle Modifikationen, damit React neu rendert bei jeder Änderung
   const modificationsStore = useModMonitorStore(state => state.modifications);
   

@@ -48,11 +48,12 @@ function SimDatenPage() {
   const selectedScenarioId = useSimScenarioStore(state => state.selectedScenarioId);
   const setSelectedScenarioId = useSimScenarioStore(state => state.setSelectedScenarioId);
 
-  // Use simulationData from selected scenario
-  const simulationData = useSimScenarioStore(state => state.getSimulationData?.() ?? []);
+  // Use effective simulation data (overlay-aware)
+  const simulationData = useSimScenarioStore(state => state.getEffectiveSimulationData());
   const setSimulationData = useSimScenarioStore(state => state.setSimulationData);
   const clearAllData = useSimScenarioStore(state => state.clearAllData);
   const addScenario = useSimScenarioStore(state => state.addScenario);
+  const addItemToScenario = useSimScenarioStore(state => state.addItemToScenario);
 
   // Use AppSettingsStore for group and selected item management
   const importGroupsFromAdebis = useAppSettingsStore(state => state.importGroupsFromAdebis);
@@ -383,7 +384,8 @@ function SimDatenPage() {
   };
 
   const handleAddItem = (newItem) => {
-    setSimulationData([...simulationData, newItem]);
+    // Use the new method that handles both root and based scenarios
+    addItemToScenario(newItem);
     setSelectedItem(newItem);
   };
 
@@ -576,8 +578,8 @@ function SimDatenPage() {
           value={selectedScenarioId || ''}
           onChange={e => {
             setSelectedScenarioId(e.target.value);
-            // Log the entire simScenarioStore state
-            console.log('simScenarioStore:', useSimScenarioStore.getState());
+            // Clear selected item when switching scenarios
+            setSelectedItem(null);
           }}
           sx={{ minWidth: 280 }}
           displayEmpty
@@ -585,6 +587,7 @@ function SimDatenPage() {
           {scenarios.map(scenario => (
             <MenuItem key={scenario.id} value={scenario.id}>
               {scenario.name || `Szenario ${scenario.id}`}
+              {scenario.baseScenarioId && ' (basiert auf)'}
             </MenuItem>
           ))}
         </Select>

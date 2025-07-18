@@ -17,7 +17,19 @@ const useSimScenarioStore = create(
         set(produce((state) => {
           const id = Date.now().toString();
           const uid = generateUID();
-          state.scenarios.push({ id, uid, name, remark, confidence, likelihood, baseScenarioId, simulationData });
+          // If this is a based scenario, don't store simulationData, only changes
+          const scenarioData = baseScenarioId ? [] : simulationData;
+          state.scenarios.push({ 
+            id, 
+            uid, 
+            name, 
+            remark, 
+            confidence, 
+            likelihood, 
+            baseScenarioId, 
+            simulationData: scenarioData,
+            dataChanges: baseScenarioId ? {} : undefined // Track changes for based scenarios
+          });
           state.selectedScenarioId = id;
         })),
       updateScenario: (id, updates) =>
@@ -40,34 +52,161 @@ const useSimScenarioStore = create(
         return state.scenarios.find(s => s.id === id);
       },
       // --- Simulation Data State and Methods (now per scenario) ---
-      getSimulationData: () => {
+      // Get effective simulation data (overlay changes on base scenario)
+      getEffectiveSimulationData: () => {
         const state = get();
         const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
-        return scenario?.simulationData || [];
+        if (!scenario) return [];
+        
+        // If it's a root scenario, return its data directly
+        if (!scenario.baseScenarioId) {
+          return scenario.simulationData || [];
+        }
+        
+        // For based scenarios, overlay changes on base scenario data
+        return get().computeOverlayData(scenario);
       },
-      setSimulationData: (data) => {
-        set(produce((state) => {
-          const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
-          if (scenario) {
-            scenario.simulationData = data;
+
+      // Compute overlay data by applying changes to base scenario
+      computeOverlayData: (scenario) => {
+        const state = get();
+        if (!scenario.baseScenarioId) {
+          return scenario.simulationData || [];
+        }
+        
+        const baseScenario = state.scenarios.find(s => s.id === scenario.baseScenarioId);
+        if (!baseScenario) {
+          console.warn(`Base scenario ${scenario.baseScenarioId} not found`);
+          return [];
+        }
+        
+        // Get base data (recursively if base scenario is also based)
+        const baseData = baseScenario.baseScenarioId 
+          ? get().computeOverlayData(baseScenario)
+          : (baseScenario.simulationData || []);
+        
+        // Apply changes from current scenario
+        const changes = scenario.dataChanges || {};
+        const effectiveData = baseData.map(item => {
+          const itemChanges = changes[item.id];
+          if (!itemChanges) return item;
+          
+          // Apply modifications to the item
+          const modifiedItem = { ...item };
+          if (itemChanges.modifications) {
+            modifiedItem.modifications = [...(item.modifications || []), ...itemChanges.modifications];
           }
+          if (itemChanges.parseddata) {
+            modifiedItem.parseddata = { ...item.parseddata, ...itemChanges.parseddata };
+          }
+          if (itemChanges.name !== undefined) {
+            modifiedItem.name = itemChanges.name;
+          }
+          if (itemChanges.note !== undefined) {
+            modifiedItem.note = itemChanges.note;
+          }
+          if (itemChanges.deleted) {
+            return null; // Mark for deletion
+          }
+          
+          return modifiedItem;
+        }).filter(item => item !== null); // Remove deleted items
+        
+        // Add new items created in this scenario
+        Object.values(changes).forEach(change => {
+          if (change.isNew && change.item) {
+            effectiveData.push(change.item);
+          }
+        });
+        
+        return effectiveData;
+      },
+
+      // Modified getSimulationData to use effective data
+      getSimulationData: () => {
+        return get().getEffectiveSimulationData();
+      },
+
+      // Track changes instead of directly modifying data for based scenarios
+      trackItemChange: (itemId, changeType, changeData) => {
+        const state = get();
+        const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+        if (!scenario) return;
+        
+        // If it's a root scenario, modify data directly
+        if (!scenario.baseScenarioId) {
+          return; // Let existing methods handle root scenarios
+        }
+        
+        // For based scenarios, track the change
+        set(produce((draft) => {
+          const draftScenario = draft.scenarios.find(s => s.id === state.selectedScenarioId);
+          if (!draftScenario.dataChanges) {
+            draftScenario.dataChanges = {};
+          }
+          if (!draftScenario.dataChanges[itemId]) {
+            draftScenario.dataChanges[itemId] = {};
+          }
+          
+          Object.assign(draftScenario.dataChanges[itemId], changeData);
         }));
+      },
+
+      // Modified setSimulationData for based scenarios
+      setSimulationData: (data) => {
+        const state = get();
+        const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+        if (!scenario) return;
+        
+        // If it's a root scenario, set data directly
+        if (!scenario.baseScenarioId) {
+          set(produce((draft) => {
+            const draftScenario = draft.scenarios.find(s => s.id === state.selectedScenarioId);
+            if (draftScenario) {
+              draftScenario.simulationData = data;
+            }
+          }));
+          return;
+        }
+        
+        // For based scenarios, we don't set bulk data - this should not happen in normal flow
+        console.warn('Cannot set bulk simulation data on based scenario');
       },
       clearAllData: () => {
-        set(produce((state) => {
-          const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
-          if (scenario) {
-            scenario.simulationData = [];
-          }
-        }));
+        const state = get();
+        const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+        if (!scenario) return;
+
+        if (!scenario.baseScenarioId) {
+          // Root scenario - clear data
+          set(produce((draft) => {
+            const draftScenario = draft.scenarios.find(s => s.id === state.selectedScenarioId);
+            if (draftScenario) {
+              draftScenario.simulationData = [];
+            }
+          }));
+        } else {
+          // Based scenario - clear changes (revert to base)
+          set(produce((draft) => {
+            const draftScenario = draft.scenarios.find(s => s.id === state.selectedScenarioId);
+            if (draftScenario) {
+              draftScenario.dataChanges = {};
+            }
+          }));
+        }
       },
       // All item-related methods now operate on the selected scenario's simulationData
       addModification: (itemId, field, previousValue, newValue) => {
-        set(
-          produce((state) => {
-            const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
-            if (!scenario) return;
-            const item = scenario.simulationData.find((i) => i.id === itemId);
+        const state = get();
+        const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+        if (!scenario) return;
+
+        if (!scenario.baseScenarioId) {
+          // Root scenario - modify directly
+          set(produce((draft) => {
+            const draftScenario = draft.scenarios.find(s => s.id === state.selectedScenarioId);
+            if (!draftScenario) return;
+            const item = draftScenario.simulationData.find((i) => i.id === itemId);
             if (item) {
               if (!item.modifications) {
                 item.modifications = [];
@@ -82,15 +221,30 @@ const useSimScenarioStore = create(
                 });
               }
             }
-          })
-        );
+          }));
+        } else {
+          // Based scenario - track change
+          get().trackItemChange(itemId, 'modification', {
+            modifications: [{
+              field,
+              previousValue,
+              newValue,
+              timestamp: new Date().toISOString()
+            }]
+          });
+        }
       },
-      updateItemDates: (itemId, startDate, endDate) =>
-        set(
-          produce((state) => {
-            const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
-            if (!scenario) return;
-            const item = scenario.simulationData.find((i) => i.id === itemId);
+      updateItemDates: (itemId, startDate, endDate) => {
+        const state = get();
+        const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+        if (!scenario) return;
+
+        if (!scenario.baseScenarioId) {
+          // Root scenario - existing implementation
+          set(produce((draft) => {
+            const draftScenario = draft.scenarios.find(s => s.id === state.selectedScenarioId);
+            if (!draftScenario) return;
+            const item = draftScenario.simulationData.find((i) => i.id === itemId);
             if (item) {
               if (!item.modifications) {
                 item.modifications = [];
@@ -120,25 +274,34 @@ const useSimScenarioStore = create(
               item.parseddata.startdate = startDate;
               item.parseddata.enddate = endDate;
             }
-          })
-        ),
+          }));
+        } else {
+          // Based scenario - track change
+          get().trackItemChange(itemId, 'dates', {
+            parseddata: { startdate: startDate, enddate: endDate }
+          });
+        }
+      },
       getItemDates: (itemId) => {
-        const state = get();
-        const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
-        if (!scenario) return null;
-        const item = scenario.simulationData.find((i) => i.id === itemId);
+        const effectiveData = get().getEffectiveSimulationData();
+        const item = effectiveData.find((i) => i.id === itemId);
         if (!item) {
-          console.error(`Item with ID ${itemId} not found in simulationData`);
+          console.error(`Item with ID ${itemId} not found in effective simulation data`);
           return null;
         }
         return item.parseddata ? { startdate: item.parseddata.startdate, enddate: item.parseddata.enddate } : null;
       },
-      updateItemPausedState: (itemId, enabled, start, end) =>
-        set(
-          produce((state) => {
-            const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
-            if (!scenario) return;
-            const item = scenario.simulationData.find((i) => i.id === itemId);
+      updateItemPausedState: (itemId, enabled, start, end) => {
+        const state = get();
+        const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+        if (!scenario) return;
+
+        if (!scenario.baseScenarioId) {
+          // Root scenario - existing implementation
+          set(produce((draft) => {
+            const draftScenario = draft.scenarios.find(s => s.id === state.selectedScenarioId);
+            if (!draftScenario) return;
+            const item = draftScenario.simulationData.find((i) => i.id === itemId);
             if (item) {
               const previousValue = JSON.stringify(item.parseddata.paused || { enabled: false, start: '', end: '' });
               const newValue = JSON.stringify({ enabled, start, end });
@@ -156,21 +319,30 @@ const useSimScenarioStore = create(
                 });
               }
             }
-          })
-        ),
+          }));
+        } else {
+          // Based scenario - track change
+          get().trackItemChange(itemId, 'paused', {
+            parseddata: { paused: { enabled, start, end } }
+          });
+        }
+      },
       getItemPausedState: (itemId) => {
-        const state = get();
-        const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
-        if (!scenario) return { enabled: false, start: '', end: '' };
-        const item = scenario.simulationData.find((i) => i.id === itemId);
+        const effectiveData = get().getEffectiveSimulationData();
+        const item = effectiveData.find((i) => i.id === itemId);
         return item?.parseddata?.paused || { enabled: false, start: '', end: '' };
       },
-      updateItemBookings: (itemId, bookings) =>
-        set(
-          produce((state) => {
-            const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
-            if (!scenario) return;
-            const item = scenario.simulationData.find((i) => i.id === itemId);
+      updateItemBookings: (itemId, bookings) => {
+        const state = get();
+        const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+        if (!scenario) return;
+
+        if (!scenario.baseScenarioId) {
+          // Root scenario - existing implementation
+          set(produce((draft) => {
+            const draftScenario = draft.scenarios.find(s => s.id === state.selectedScenarioId);
+            if (!draftScenario) return;
+            const item = draftScenario.simulationData.find((i) => i.id === itemId);
             if (item) {
               const previousValue = JSON.stringify(item.parseddata.booking);
               const bookingsWithIds = bookings.map((booking, bookingIdx) => ({
@@ -222,21 +394,30 @@ const useSimScenarioStore = create(
               }
               item.parseddata.booking = bookingsWithIds;
             }
-          })
-        ),
+          }));
+        } else {
+          // Based scenario - track change
+          get().trackItemChange(itemId, 'bookings', {
+            parseddata: { booking: bookings }
+          });
+        }
+      },
       getItemBookings: (itemId) => {
-        const state = get();
-        const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
-        if (!scenario) return [];
-        const item = scenario.simulationData.find((i) => i.id === itemId);
+        const effectiveData = get().getEffectiveSimulationData();
+        const item = effectiveData.find((i) => i.id === itemId);
         return item?.parseddata?.booking || [];
       },
-      updateItemGroups: (itemId, groups) =>
-        set(
-          produce((state) => {
-            const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
-            if (!scenario) return;
-            const item = scenario.simulationData.find((i) => i.id === itemId);
+      updateItemGroups: (itemId, groups) => {
+        const state = get();
+        const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+        if (!scenario) return;
+
+        if (!scenario.baseScenarioId) {
+          // Root scenario - existing implementation
+          set(produce((draft) => {
+            const draftScenario = draft.scenarios.find(s => s.id === state.selectedScenarioId);
+            if (!draftScenario) return;
+            const item = draftScenario.simulationData.find((i) => i.id === itemId);
             if (item) {
               const previousValue = JSON.stringify(item.parseddata.group);
               const newValue = JSON.stringify(groups);
@@ -254,65 +435,84 @@ const useSimScenarioStore = create(
               }
               item.parseddata.group = groups;
             }
-          })
-        ),
+          }));
+        } else {
+          // Based scenario - track change
+          get().trackItemChange(itemId, 'groups', {
+            parseddata: { group: groups }
+          });
+        }
+      },
       getItemGroups: (itemId) => {
-        const state = get();
-        const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
-        if (!scenario) return [];
-        const item = scenario.simulationData.find((i) => i.id === itemId);
+        const effectiveData = get().getEffectiveSimulationData();
+        const item = effectiveData.find((i) => i.id === itemId);
         return item?.parseddata?.group || [];
       },
       updateItemName: (itemId, newName) => {
-        set(
-          produce((state) => {
-            const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
-            if (!scenario) return;
-            if (Array.isArray(scenario.simulationData)) {
-              const item = scenario.simulationData.find((i) => i.id === itemId);
+        const state = get();
+        const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+        if (!scenario) return;
+
+        if (!scenario.baseScenarioId) {
+          // Root scenario - existing implementation
+          set(produce((draft) => {
+            const draftScenario = draft.scenarios.find(s => s.id === state.selectedScenarioId);
+            if (!draftScenario) return;
+            if (Array.isArray(draftScenario.simulationData)) {
+              const item = draftScenario.simulationData.find((i) => i.id === itemId);
               if (item) {
                 item.name = newName;
               }
             }
-          })
-        );
+          }));
+        } else {
+          // Based scenario - track change
+          get().trackItemChange(itemId, 'name', { name: newName });
+        }
       },
       getItemName: (itemId) => {
-        const state = get();
-        const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
-        if (!scenario) return '';
-        const items = scenario.simulationData ?? [];
-        const item = items.find((i) => i.id === itemId);
+        const effectiveData = get().getEffectiveSimulationData();
+        const item = effectiveData.find((i) => i.id === itemId);
         return item && typeof item.name === 'string' ? item.name : '';
       },
       updateItemNote: (itemId, newNote) => {
-        set(
-          produce((state) => {
-            const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
-            if (!scenario) return;
-            if (Array.isArray(scenario.simulationData)) {
-              const item = scenario.simulationData.find((i) => i.id === itemId);
+        const state = get();
+        const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+        if (!scenario) return;
+
+        if (!scenario.baseScenarioId) {
+          // Root scenario - existing implementation
+          set(produce((draft) => {
+            const draftScenario = draft.scenarios.find(s => s.id === state.selectedScenarioId);
+            if (!draftScenario) return;
+            if (Array.isArray(draftScenario.simulationData)) {
+              const item = draftScenario.simulationData.find((i) => i.id === itemId);
               if (item) {
                 item.note = newNote;
               }
             }
-          })
-        );
+          }));
+        } else {
+          // Based scenario - track change
+          get().trackItemChange(itemId, 'note', { note: newNote });
+        }
       },
       getItemNote: (itemId) => {
-        const state = get();
-        const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
-        if (!scenario) return '';
-        const items = scenario.simulationData ?? [];
-        const item = items.find((i) => i.id === itemId);
+        const effectiveData = get().getEffectiveSimulationData();
+        const item = effectiveData.find((i) => i.id === itemId);
         return item && typeof item.note === 'string' ? item.note : '';
       },
       updateItemGeburtsdatum: (itemId, geburtsdatum) => {
-        set(
-          produce((state) => {
-            const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
-            if (!scenario) return;
-            const item = scenario.simulationData.find((i) => i.id === itemId);
+        const state = get();
+        const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+        if (!scenario) return;
+
+        if (!scenario.baseScenarioId) {
+          // Root scenario - existing implementation
+          set(produce((draft) => {
+            const draftScenario = draft.scenarios.find(s => s.id === state.selectedScenarioId);
+            if (!draftScenario) return;
+            const item = draftScenario.simulationData.find((i) => i.id === itemId);
             if (item) {
               const previousValue = item.parseddata.geburtsdatum;
               item.parseddata.geburtsdatum = geburtsdatum;
@@ -329,22 +529,30 @@ const useSimScenarioStore = create(
                 });
               }
             }
-          })
-        );
+          }));
+        } else {
+          // Based scenario - track change
+          get().trackItemChange(itemId, 'geburtsdatum', {
+            parseddata: { geburtsdatum }
+          });
+        }
       },
       getItemGeburtsdatum: (itemId) => {
-        const state = get();
-        const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
-        if (!scenario) return '';
-        const item = scenario.simulationData.find((i) => i.id === itemId);
+        const effectiveData = get().getEffectiveSimulationData();
+        const item = effectiveData.find((i) => i.id === itemId);
         return item?.parseddata?.geburtsdatum || '';
       },
       updateItemQualification: (itemId, qualification) => {
-        set(
-          produce((state) => {
-            const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
-            if (!scenario) return;
-            const item = scenario.simulationData.find((i) => i.id === itemId);
+        const state = get();
+        const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+        if (!scenario) return;
+
+        if (!scenario.baseScenarioId) {
+          // Root scenario - existing implementation
+          set(produce((draft) => {
+            const draftScenario = draft.scenarios.find(s => s.id === state.selectedScenarioId);
+            if (!draftScenario) return;
+            const item = draftScenario.simulationData.find((i) => i.id === itemId);
             if (item) {
               const previousValue = item.parseddata.qualification;
               item.parseddata.qualification = qualification;
@@ -361,24 +569,57 @@ const useSimScenarioStore = create(
                 });
               }
             }
-          })
-        );
+          }));
+        } else {
+          // Based scenario - track change
+          get().trackItemChange(itemId, 'qualification', {
+            parseddata: { qualification }
+          });
+        }
       },
       getItemQualification: (itemId) => {
-        const state = get();
-        const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
-        if (!scenario) return '';
-        const item = scenario.simulationData.find((i) => i.id === itemId);
+        const effectiveData = get().getEffectiveSimulationData();
+        const item = effectiveData.find((i) => i.id === itemId);
         return item?.parseddata?.qualification || '';
       },
       deleteItem: (itemId) => {
-        set(
-          produce((state) => {
-            const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
-            if (!scenario) return;
-            scenario.simulationData = scenario.simulationData.filter(item => item.id !== itemId);
-          })
-        );
+        const state = get();
+        const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+        if (!scenario) return;
+
+        if (!scenario.baseScenarioId) {
+          // Root scenario - existing implementation
+          set(produce((draft) => {
+            const draftScenario = draft.scenarios.find(s => s.id === state.selectedScenarioId);
+            if (!draftScenario) return;
+            draftScenario.simulationData = draftScenario.simulationData.filter(item => item.id !== itemId);
+          }));
+        } else {
+          // Based scenario - mark as deleted
+          get().trackItemChange(itemId, 'delete', { deleted: true });
+        }
+      },
+      // Method to add new items to based scenarios
+      addItemToScenario: (newItem) => {
+        const state = get();
+        const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+        if (!scenario) return;
+
+        if (!scenario.baseScenarioId) {
+          // Root scenario - add directly
+          set(produce((draft) => {
+            const draftScenario = draft.scenarios.find(s => s.id === state.selectedScenarioId);
+            if (draftScenario) {
+              draftScenario.simulationData.push(newItem);
+            }
+          }));
+        } else {
+          // Based scenario - track as new item
+          get().trackItemChange(newItem.id, 'add', {
+            isNew: true,
+            item: newItem
+          });
+        }
       },
     }),
     {
