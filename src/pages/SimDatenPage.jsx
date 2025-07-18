@@ -20,10 +20,28 @@ import useSimulationDataStore from '../store/simulationDataStore';
 import useChartStore from '../store/chartStore';
 import useModMonitorStore from '../store/modMonitorStore';
 import CryptoJS from 'crypto-js';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import TextField from '@mui/material/TextField';
+import IconButton from '@mui/material/IconButton';
+import InputAdornment from '@mui/material/InputAdornment';
+import Visibility from '@mui/icons-material/Visibility';
+import VisibilityOff from '@mui/icons-material/VisibilityOff';
 
 function SimDatenPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [addItemModalOpen, setAddItemModalOpen] = useState(false);
+  const [pwDialogOpen, setPwDialogOpen] = useState(false);
+  const [pwDialogMode, setPwDialogMode] = useState(''); // 'save' | 'load'
+  const [pwValue, setPwValue] = useState('');
+  const [pwValue2, setPwValue2] = useState('');
+  const [pwError, setPwError] = useState('');
+  const [showPw, setShowPw] = useState(false);
+  const [pendingSave, setPendingSave] = useState(null);
+  const [pendingLoad, setPendingLoad] = useState(null);
+
   const simulationData = useSimulationDataStore(state => state.simulationData);
   const groupsLookup = useSimulationDataStore(state => state.groupsLookup);
   const selectedItem = useSimulationDataStore(state => state.selectedItem);
@@ -342,60 +360,91 @@ function SimDatenPage() {
     clearAllData(); // Reset all imported data
   };
 
-  // Helper: Prompt for password (replace with a modal for better UX)
-  const promptPassword = async (confirm = false) => {
-    let pw = window.prompt('Bitte Passwort eingeben:');
-    if (!pw) return null;
-    if (confirm) {
-      let pw2 = window.prompt('Passwort bestätigen:');
-      if (pw !== pw2) {
-        alert('Passwörter stimmen nicht überein.');
-        return null;
+  // Open password dialog for save/load
+  const openPwDialog = (mode, cb) => {
+    setPwDialogMode(mode);
+    setPwValue('');
+    setPwValue2('');
+    setPwError('');
+    setShowPw(false);
+    if (mode === 'save') setPendingSave(() => cb);
+    if (mode === 'load') setPendingLoad(() => cb);
+    setPwDialogOpen(true);
+  };
+
+  // Handle dialog close
+  const handlePwDialogClose = () => {
+    setPwDialogOpen(false);
+    setPendingSave(null);
+    setPendingLoad(null);
+    setPwError('');
+  };
+
+  // Handle dialog submit
+  const handlePwDialogSubmit = () => {
+    if (pwDialogMode === 'save') {
+      if (!pwValue) {
+        setPwError('Bitte Passwort eingeben.');
+        return;
       }
+      if (pwValue !== pwValue2) {
+        setPwError('Passwörter stimmen nicht überein.');
+        return;
+      }
+      setPwDialogOpen(false);
+      if (pendingSave) pendingSave(pwValue);
+      setPendingSave(null);
+    } else if (pwDialogMode === 'load') {
+      if (!pwValue) {
+        setPwError('Bitte Passwort eingeben.');
+        return;
+      }
+      setPwDialogOpen(false);
+      if (pendingLoad) pendingLoad(pwValue);
+      setPendingLoad(null);
     }
-    return pw;
+    setPwError('');
   };
 
   // --- Save/Load functions ---
-  const saveStoresToFile = async () => {
-    const password = await promptPassword(true);
-    if (!password) return;
+  const saveStoresToFile = () => {
+    openPwDialog('save', (password) => {
+      const simData = useSimulationDataStore.getState();
+      const chartData = useChartStore.getState();
+      const modMonitorData = useModMonitorStore.getState();
 
-    const simData = useSimulationDataStore.getState();
-    const chartData = useChartStore.getState();
-    const modMonitorData = useModMonitorStore.getState();
+      // Only save relevant parts
+      const data = {
+        simulationData: simData.simulationData,
+        groupsLookup: simData.groupsLookup,
+        chartStore: {
+          stichtag: chartData.stichtag,
+          selectedGroups: chartData.selectedGroups,
+          selectedQualifications: chartData.selectedQualifications,
+          availableGroups: chartData.availableGroups,
+          availableQualifications: chartData.availableQualifications,
+          midtermTimeDimension: chartData.midtermTimeDimension,
+          midtermSelectedGroups: chartData.midtermSelectedGroups,
+          midtermSelectedQualifications: chartData.midtermSelectedQualifications
+        },
+        modMonitor: modMonitorData.modifications
+      };
 
-    // Only save relevant parts
-    const data = {
-      simulationData: simData.simulationData,
-      groupsLookup: simData.groupsLookup,
-      chartStore: {
-        stichtag: chartData.stichtag,
-        selectedGroups: chartData.selectedGroups,
-        selectedQualifications: chartData.selectedQualifications,
-        availableGroups: chartData.availableGroups,
-        availableQualifications: chartData.availableQualifications,
-        midtermTimeDimension: chartData.midtermTimeDimension,
-        midtermSelectedGroups: chartData.midtermSelectedGroups,
-        midtermSelectedQualifications: chartData.midtermSelectedQualifications
-      },
-      modMonitor: modMonitorData.modifications
-    };
+      // Encrypt
+      const json = JSON.stringify(data, null, 2);
+      const ciphertext = CryptoJS.AES.encrypt(json, password).toString();
 
-    // Encrypt
-    const json = JSON.stringify(data, null, 2);
-    const ciphertext = CryptoJS.AES.encrypt(json, password).toString();
-
-    const blob = new Blob([ciphertext], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'kiga-simulator-data.enc';
-    a.click();
-    URL.revokeObjectURL(url);
+      const blob = new Blob([ciphertext], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'kiga-simulator-data.enc';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
   };
 
-  const loadStoresFromFile = async () => {
+  const loadStoresFromFile = () => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.enc,.txt';
@@ -403,21 +452,21 @@ function SimDatenPage() {
       const file = e.target.files[0];
       if (!file) return;
       const ciphertext = await file.text();
-      const password = await promptPassword(false);
-      if (!password) return;
-      try {
-        const bytes = CryptoJS.AES.decrypt(ciphertext, password);
-        const decrypted = bytes.toString(CryptoJS.enc.Utf8);
-        if (!decrypted) throw new Error('Falsches Passwort oder beschädigte Datei.');
-        const data = JSON.parse(decrypted);
-        setSimulationData(data.simulationData || []);
-        setGroupsLookup(data.groupsLookup || {});
-        useChartStore.setState(data.chartStore || {});
-        useModMonitorStore.setState({ modifications: data.modMonitor || {} });
-        setSelectedItem(null);
-      } catch (err) {
-        alert('Fehler beim Entschlüsseln/Laden: ' + err.message);
-      }
+      openPwDialog('load', (password) => {
+        try {
+          const bytes = CryptoJS.AES.decrypt(ciphertext, password);
+          const decrypted = bytes.toString(CryptoJS.enc.Utf8);
+          if (!decrypted) throw new Error('Falsches Passwort oder beschädigte Datei.');
+          const data = JSON.parse(decrypted);
+          setSimulationData(data.simulationData || []);
+          setGroupsLookup(data.groupsLookup || {});
+          useChartStore.setState(data.chartStore || {});
+          useModMonitorStore.setState({ modifications: data.modMonitor || {} });
+          setSelectedItem(null);
+        } catch (err) {
+          alert('Fehler beim Entschlüsseln/Laden: ' + err.message);
+        }
+      });
     };
     input.click();
   };
@@ -464,6 +513,57 @@ function SimDatenPage() {
         onClose={handleCloseAddItemModal}
         onAdd={handleAddItem}
       />
+      <Dialog open={pwDialogOpen} onClose={handlePwDialogClose}>
+        <DialogTitle>
+          {pwDialogMode === 'save' ? 'Passwort zum Speichern' : 'Passwort zum Laden'}
+        </DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Passwort"
+            type={showPw ? 'text' : 'password'}
+            fullWidth
+            value={pwValue}
+            onChange={e => setPwValue(e.target.value)}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    aria-label="Passwort anzeigen"
+                    onClick={() => setShowPw(s => !s)}
+                    edge="end"
+                  >
+                    {showPw ? <VisibilityOff /> : <Visibility />}
+                  </IconButton>
+                </InputAdornment>
+              )
+            }}
+          />
+          {pwDialogMode === 'save' && (
+            <TextField
+              margin="dense"
+              label="Passwort bestätigen"
+              type={showPw ? 'text' : 'password'}
+              fullWidth
+              value={pwValue2}
+              onChange={e => setPwValue2(e.target.value)}
+              sx={{ mt: 2 }}
+            />
+          )}
+          {pwError && (
+            <Typography color="error" variant="body2" sx={{ mt: 1 }}>
+              {pwError}
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handlePwDialogClose}>Abbrechen</Button>
+          <Button onClick={handlePwDialogSubmit} variant="contained">
+            OK
+          </Button>
+        </DialogActions>
+      </Dialog>
       <Box sx={{ flex: 1, display: 'flex', flexDirection: 'row', pt: 0 }}>
         <>
           <Box sx={{ width: 320, flexShrink: 0, borderRight: 1, borderColor: 'divider', bgcolor: 'background.paper', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
