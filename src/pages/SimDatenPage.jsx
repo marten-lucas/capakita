@@ -42,6 +42,8 @@ function SimDatenPage() {
   const [showPw, setShowPw] = useState(false);
   const [pendingSave, setPendingSave] = useState(null);
   const [pendingLoad, setPendingLoad] = useState(null);
+  const selectedScenarioId = useSimScenarioStore(state => state.selectedScenarioId);
+  const setSelectedScenarioId = useSimScenarioStore(state => state.setSelectedScenarioId);
 
   const simulationData = useSimScenarioStore(state => state.simulationData);
   const groupsLookup = useSimScenarioStore(state => state.groupsLookup);
@@ -53,6 +55,7 @@ function SimDatenPage() {
   const setSimulationData = useSimScenarioStore(state => state.setSimulationData);
   const setGroupsLookup = useSimScenarioStore(state => state.setGroupsLookup);
   const clearAllData = useSimScenarioStore(state => state.clearAllData);
+  const addScenario = useSimScenarioStore(state => state.addScenario);
   
   // Add AppSettingsStore
   const { importGroupsFromAdebis, getGroupsLookup, importQualificationsFromEmployees } = useAppSettingsStore();
@@ -278,10 +281,7 @@ function SimDatenPage() {
           geburtsdatum: kind.GEBDATUM,
           group: groups,
           booking: bookings
-        })),
-        modifications: [],
-        modifiers: {},
-        simudata: {}
+        }))
       });
     }
 
@@ -337,10 +337,7 @@ function SimDatenPage() {
             times: initialBookingTimes
           }],
           group: []
-        })),
-        modifications: [],
-        modifiers: {},
-        simudata: {}
+        }))
       };
       processedData.push(employeeItem);
       employeeItems.push(employeeItem);
@@ -359,6 +356,23 @@ function SimDatenPage() {
   const handleImport = async ({ file, isAnonymized }) => {
     await extractZipFile(file, isAnonymized);
     setModalOpen(false);
+
+    // Create a new scenario as root after import
+    const scenarioName = isAnonymized ? 'Importiertes Szenario (anonymisiert)' : 'Importiertes Szenario';
+    const newScenario = {
+      name: scenarioName,
+      remark: '',
+      confidence: 50,
+      likelihood: 50,
+      baseScenarioId: null
+    };
+    addScenario(newScenario);
+    // Find the new scenario's id (last added)
+    const scenarios = useSimScenarioStore.getState().scenarios;
+    const lastScenario = scenarios[scenarios.length - 1];
+    if (lastScenario) {
+      setSelectedScenarioId(lastScenario.id);
+    }
   };
 
   const handleAddItem = (newItem) => {
@@ -600,6 +614,8 @@ function SimDatenPage() {
               data={simulationData}
               onRowClick={handleRowClick}
               selectedItem={selectedItem}
+              selectedScenarioId={selectedScenarioId}
+              onScenarioChange={setSelectedScenarioId}
             />
           </Box>
           <Box sx={{ flex: 1, p: 3, overflow: 'auto', height: '100vh', maxHeight: '100vh' }}>
