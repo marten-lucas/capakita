@@ -148,7 +148,48 @@ const useSimulationDataStore = create((set, get) => ({
         const item = state.simulationData.find((i) => i.id === itemId);
         if (item) {
           const previousValue = JSON.stringify(item.parseddata.booking);
-          const newValue = JSON.stringify(bookings);
+          
+          // Ensure all segments have unique IDs and create deep copies to avoid mutation
+          const bookingsWithIds = bookings.map((booking, bookingIdx) => ({
+            ...booking,
+            times: booking.times?.map((timeEntry) => ({
+              ...timeEntry,
+              segments: timeEntry.segments?.map((segment) => ({
+                ...segment,
+                id: segment.id || `${itemId}-${bookingIdx}-${timeEntry.day_name}-${Date.now()}-${Math.random()}`
+              }))
+            }))
+          }));
+          
+          // Get all current segment IDs
+          const currentSegmentIds = new Set();
+          bookingsWithIds.forEach(booking => {
+            booking.times?.forEach(timeEntry => {
+              timeEntry.segments?.forEach(segment => {
+                if (segment.id) {
+                  currentSegmentIds.add(segment.id);
+                }
+              });
+            });
+          });
+          
+          // Clean up segment overrides in groups for deleted segments
+          if (item.parseddata.group) {
+            item.parseddata.group = item.parseddata.group.map(group => {
+              if (group.segmentOverrides) {
+                const cleanedOverrides = {};
+                Object.keys(group.segmentOverrides).forEach(segmentId => {
+                  if (currentSegmentIds.has(segmentId)) {
+                    cleanedOverrides[segmentId] = group.segmentOverrides[segmentId];
+                  }
+                });
+                return { ...group, segmentOverrides: cleanedOverrides };
+              }
+              return group;
+            });
+          }
+          
+          const newValue = JSON.stringify(bookingsWithIds);
           
           if (!item.modifications) {
             item.modifications = [];
@@ -163,7 +204,7 @@ const useSimulationDataStore = create((set, get) => ({
             });
           }
           
-          item.parseddata.booking = bookings;
+          item.parseddata.booking = bookingsWithIds;
           
           // Update selectedItem if it's the same item
           if (state.selectedItem && state.selectedItem.id === itemId) {

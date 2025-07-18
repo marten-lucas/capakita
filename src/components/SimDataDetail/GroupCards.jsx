@@ -20,16 +20,23 @@ function groupsModified(localGroups, origGroups) {
 }
 
 function GroupCards({ itemId, allGroups, lastAddedIndex, importedCount, originalGroups, onRestoreGroup, isManualEntry }) {
-  const { getItemGroups, updateItemGroups } = useSimulationDataStore((state) => ({
+  const { getItemGroups, updateItemGroups, getItemBookings } = useSimulationDataStore((state) => ({
     getItemGroups: state.getItemGroups,
     updateItemGroups: state.updateItemGroups,
+    getItemBookings: state.getItemBookings,
   }));
 
   const groups = getItemGroups(itemId);
+  const bookings = getItemBookings(itemId); // Add this to trigger re-renders when bookings change
 
   const handleUpdateGroup = (index, updatedGroup) => {
     const updatedGroups = groups.map((g, idx) => (idx === index ? updatedGroup : g));
     updateItemGroups(itemId, updatedGroups); // Persist changes to global state
+  };
+
+  const handleDeleteGroup = (index) => {
+    const updatedGroups = groups.filter((_, idx) => idx !== index);
+    updateItemGroups(itemId, updatedGroups);
   };
 
   if (!groups || groups.length === 0) {
@@ -43,19 +50,19 @@ function GroupCards({ itemId, allGroups, lastAddedIndex, importedCount, original
         const isMod = orig ? groupsModified([group], [orig]) : false;
         return (
           <GroupAccordion
-            key={idx}
+            key={`${idx}-${bookings.length}`} // Add bookings.length to force re-render
             group={group}
             index={idx}
             allGroups={allGroups}
             defaultExpanded={lastAddedIndex === idx}
-            onDelete={(index) => updateItemGroups(itemId, groups.filter((_, i) => i !== index))}
+            onDelete={handleDeleteGroup}
             canDelete={typeof importedCount === 'number' ? idx >= importedCount : true}
             isModified={isMod}
             onRestore={onRestoreGroup}
             originalGroup={orig}
             onUpdateGroup={(updatedGroup) => handleUpdateGroup(idx, updatedGroup)}
             isManualEntry={isManualEntry}
-            parentItemId={itemId} // Pass the parent item ID
+            parentItemId={itemId}
           />
         );
       })}

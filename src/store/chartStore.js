@@ -276,8 +276,8 @@ const useChartStore = create(
         const staffRatio = requiredStaffHours > 0 ? totalStaffHours / requiredStaffHours : 0;
         const fachkraftRatio = requiredFachkraftHours > 0 ? fachkraftHours / requiredFachkraftHours : 0;
         
-        // Fachkraftquote als Prozentsatz der tatsächlichen Mitarbeiter
-        const fachkraftQuotePercent = totalStaffCount > 0 ? (fachkraftCount / totalStaffCount) * 100 : 0;
+        // Fachkraftquote als Prozentsatz der tatsächlichen Arbeitsstunden (nicht Mitarbeiteranzahl)
+        const fachkraftQuotePercent = totalStaffHours > 0 ? (fachkraftHours / totalStaffHours) * 100 : 0;
         
         return {
           staffRatio,
@@ -403,32 +403,37 @@ const useChartStore = create(
         const baykibigAnstellungsschluessel = [];
         
         periods.forEach(period => {
-          // Calculate demand for this period
+          // Calculate demand hours for this period
           const demandItems = simulationData.filter(item => {
             if (item.type !== 'demand') return false;
-            if (!get().isItemValidForPeriod(item, period, midtermSelectedGroups, midtermSelectedQualifications)) return false;
-            return get().hasBookingInPeriod(item, period);
+            return get().isItemValidForPeriod(item, period, midtermSelectedGroups, midtermSelectedQualifications);
           });
           
-          // Calculate capacity for this period
+          const demandHours = demandItems.reduce((total, item) => {
+            return total + get().calculateBookingHoursInPeriod(item, period);
+          }, 0);
+          
+          // Calculate capacity hours for this period
           const capacityItems = simulationData.filter(item => {
             if (item.type !== 'capacity') return false;
-            if (!get().isItemValidForPeriod(item, period, midtermSelectedGroups, midtermSelectedQualifications)) return false;
-            return get().hasBookingInPeriod(item, period);
+            return get().isItemValidForPeriod(item, period, midtermSelectedGroups, midtermSelectedQualifications);
           });
           
-          bedarf.push(demandItems.length);
-          kapazitaet.push(capacityItems.length);
+          const capacityHours = capacityItems.reduce((total, item) => {
+            return total + get().calculateBookingHoursInPeriod(item, period);
+          }, 0);
           
-          // Calculate BayKiBig ratio for this period (using average hours per period)
-          const periodHours = get().calculatePeriodHours(period, midtermTimeDimension);
-          const baykibigRatio = get().calculateBayKiBigRatioForPeriod(demandItems, capacityItems, periodHours, period);
+          bedarf.push(demandHours);
+          kapazitaet.push(capacityHours);
+          
+          // Calculate BayKiBig ratio for this period
+          const baykibigRatio = get().calculateBayKiBigRatioForPeriodWithHours(demandItems, capacityItems, period);
           baykibigAnstellungsschluessel.push(baykibigRatio);
         });
         
         // Calculate max values for axes
         const maxBedarf = Math.max(...bedarf, 1);
-        const maxKapazitaet = Math.ceil(maxBedarf / 5);
+        const maxKapazitaet = Math.max(...kapazitaet, 1);
         
         const anstellungsschluesselValues = baykibigAnstellungsschluessel.map(item => {
           if (!item || item.totalBookingHours === 0) return 0;
@@ -570,8 +575,8 @@ const useChartStore = create(
         return 25; // Fallback
       },
       
-      // Calculate BayKiBig ratio for a specific period
-      calculateBayKiBigRatioForPeriod: (demandItems, capacityItems, periodHours, period) => {
+      // Calculate BayKiBig ratio for a specific period using actual booking hours
+      calculateBayKiBigRatioForPeriodWithHours: (demandItems, capacityItems, period) => {
         const stichtagDate = new Date(period.start.getTime() + (period.end.getTime() - period.start.getTime()) / 2); // Middle of period
         
         // Calculate total booking hours for children (with weighting factor)
@@ -579,11 +584,12 @@ const useChartStore = create(
         let totalBookingHoursForFachkraftquote = 0;
         
         demandItems.forEach(child => {
+          const bookingHours = get().calculateBookingHoursInPeriod(child, period);
           const weightingFactor = get().calculateWeightingFactor(child, stichtagDate);
           const fachkraftWeightingFactor = get().calculateFachkraftWeightingFactor(child, stichtagDate);
           
-          totalBookingHours += periodHours * weightingFactor;
-          totalBookingHoursForFachkraftquote += periodHours * fachkraftWeightingFactor;
+          totalBookingHours += bookingHours * weightingFactor;
+          totalBookingHoursForFachkraftquote += bookingHours * fachkraftWeightingFactor;
         });
         
         // Calculate available staff hours
@@ -593,10 +599,12 @@ const useChartStore = create(
         let fachkraftCount = 0;
         
         capacityItems.forEach(staff => {
+          const staffHours = get().calculateBookingHoursInPeriod(staff, period);
           const isFachkraft = get().isFachkraft(staff);
-          totalStaffHours += periodHours;
+          
+          totalStaffHours += staffHours;
           if (isFachkraft) {
-            fachkraftHours += periodHours;
+            fachkraftHours += staffHours;
             fachkraftCount++;
           }
         });
@@ -611,7 +619,8 @@ const useChartStore = create(
         const staffRatio = requiredStaffHours > 0 ? totalStaffHours / requiredStaffHours : 0;
         const fachkraftRatio = requiredFachkraftHours > 0 ? fachkraftHours / requiredFachkraftHours : 0;
         
-        const fachkraftQuotePercent = totalStaffCount > 0 ? (fachkraftCount / totalStaffCount) * 100 : 0;
+        // Fachkraftquote als Prozentsatz der tatsächlichen Arbeitsstunden (nicht Mitarbeiteranzahl)
+        const fachkraftQuotePercent = totalStaffHours > 0 ? (fachkraftHours / totalStaffHours) * 100 : 0;
         
         return {
           staffRatio,
@@ -630,6 +639,55 @@ const useChartStore = create(
         };
       },
 
+      // Calculate booking hours for an item within a specific period
+      calculateBookingHoursInPeriod: (item, period) => {
+        const bookings = item.parseddata?.booking ?? [];
+        let totalHours = 0;
+        
+        bookings.forEach(booking => {
+          const bookingStart = booking.startdate ? new Date(booking.startdate.split('.').reverse().join('-')) : period.start;
+          const bookingEnd = booking.enddate ? new Date(booking.enddate.split('.').reverse().join('-')) : period.end;
+          
+          // Calculate overlap between booking period and time period
+          const overlapStart = new Date(Math.max(period.start.getTime(), bookingStart.getTime()));
+          const overlapEnd = new Date(Math.min(period.end.getTime(), bookingEnd.getTime()));
+          
+          if (overlapStart <= overlapEnd) {
+            // Calculate hours for each day in the overlap period
+            const currentDate = new Date(overlapStart);
+            while (currentDate <= overlapEnd) {
+              const dayOfWeek = currentDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
+              const weekDay = dayOfWeek === 0 ? 7 : dayOfWeek; // Convert to 1-7 (Monday-Sunday)
+              
+              // Only count weekdays (Monday-Friday)
+              if (weekDay >= 1 && weekDay <= 5) {
+                // Find booking times for this day
+                const dayTimes = booking.times?.find(time => time.day === weekDay);
+                if (dayTimes && dayTimes.segments) {
+                  dayTimes.segments.forEach(segment => {
+                    if (segment.booking_start && segment.booking_end) {
+                      const startTime = get().timeToHours(segment.booking_start);
+                      const endTime = get().timeToHours(segment.booking_end);
+                      totalHours += endTime - startTime;
+                    }
+                  });
+                }
+              }
+              
+              currentDate.setDate(currentDate.getDate() + 1);
+            }
+          }
+        });
+        
+        return totalHours;
+      },
+
+      // Convert time string to hours (e.g., "14:30" -> 14.5)
+      timeToHours: (timeString) => {
+        const [hours, minutes] = timeString.split(':').map(Number);
+        return hours + minutes / 60;
+      },
+
       // Get week number
       getWeekNumber: (date) => {
         const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
@@ -638,7 +696,7 @@ const useChartStore = create(
         const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
         return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
       },
-      
+
       // Check if item is valid for period with filters
       isItemValidForPeriod: (item, period, groupFilter, qualificationFilter) => {
         // Check if item's date range overlaps with period
@@ -687,7 +745,7 @@ const useChartStore = create(
         
         return true;
       },
-      
+
       // Check if item has booking in period
       hasBookingInPeriod: (item, period) => {
         const bookings = item.parseddata?.booking ?? [];
@@ -704,6 +762,7 @@ const useChartStore = create(
           return booking.times && booking.times.length > 0;
         });
       },
+
     }),
     {
       name: 'chart-storage',
@@ -722,4 +781,3 @@ const useChartStore = create(
 );
 
 export default useChartStore;
-

@@ -152,7 +152,8 @@ function SimulationDataTab({
       start: '',
       end: ''
     };
-    updateItemGroups(item.id, [...groups, newGroup]);
+    const updatedGroups = [...groups, newGroup];
+    updateItemGroups(item.id, updatedGroups);
   };
 
   const handleDeleteGroup = (index) => {

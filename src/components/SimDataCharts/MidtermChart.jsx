@@ -100,18 +100,18 @@ export default function MidtermChart() {
     },
     yAxis: [
       { // Primary: Bedarf
-        title: { text: 'Bedarf (Kinder)' },
+        title: { text: 'Bedarf (Stunden)' },
         min: 0,
         max: null,
-        tickInterval: 5,
+        tickInterval: null,
         opposite: false,
         gridLineWidth: 1
       },
       { // Secondary: Kapazität
-        title: { text: 'Kapazität (Mitarbeiter)' },
+        title: { text: 'Kapazität (Stunden)' },
         min: 0,
         max: chartData.maxKapazitaet,
-        tickInterval: 1,
+        tickInterval: null,
         opposite: false,
         gridLineWidth: 1
       },
@@ -191,12 +191,12 @@ export default function MidtermChart() {
               }
               if (point.series.name.includes('Fachkraftquote')) {
                 s += `<span style="color:${point.color}">\u25CF</span> <b>${point.series.name}:</b> ${baykibigData.fachkraftQuotePercent.toFixed(1)}%<br/>`;
-                s += `<span style="margin-left:16px;font-size:0.9em;">Fachkräfte: ${baykibigData.fachkraftCount}, Gesamt: ${baykibigData.totalStaffCount}</span><br/>`;
+                s += `<span style="margin-left:16px;font-size:0.9em;">Fachkraftstunden: ${baykibigData.fachkraftHours.toFixed(1)}h, Gesamtstunden: ${baykibigData.totalStaffHours.toFixed(1)}h</span><br/>`;
                 s += `<span style="margin-left:16px;font-size:0.9em;">Erforderlich: 50% oder mehr</span><br/>`;
               }
             }
           } else {
-            s += `<span style="color:${point.color}">\u25CF</span> <b>${point.series.name}:</b> ${point.y}<br/>`;
+            s += `<span style="color:${point.color}">\u25CF</span> <b>${point.series.name}:</b> ${point.y.toFixed(1)}h<br/>`;
           }
         });
         return s;
