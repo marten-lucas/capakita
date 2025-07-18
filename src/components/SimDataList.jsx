@@ -1,9 +1,7 @@
-import { List, ListItem, ListItemButton, ListItemText, Divider, Box, ListItemAvatar, Avatar, Chip, Select, MenuItem, FormControl, InputLabel } from '@mui/material';
+import { List, ListItem, ListItemButton, ListItemText, Divider, Box, ListItemAvatar, Avatar, Chip } from '@mui/material';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import useModMonitorStore from '../store/modMonitorStore';
 import useAppSettingsStore from '../store/appSettingsStore';
-import useSimScenarioStore from '../store/simScenarioStore';
-import React from 'react';
 
 
 
@@ -65,18 +63,6 @@ function SimDataList({ data, onRowClick, selectedItem }) {
   // Get groups from AppSettingsStore for icons
   const getGroupById = useAppSettingsStore(state => state.getGroupById);
 
-  // Scenario selector state from simScenarioStore
-  const scenarios = useSimScenarioStore(state => state.scenarios);
-  const selectedScenarioId = useSimScenarioStore(state => state.selectedScenarioId);
-  const setSelectedScenarioId = useSimScenarioStore(state => state.setSelectedScenarioId);
-
-  // Ensure a scenario is always selected
-  React.useEffect(() => {
-    if ((!selectedScenarioId || !scenarios.some(s => s.id === selectedScenarioId)) && scenarios.length > 0) {
-      setSelectedScenarioId(scenarios[0].id);
-    }
-  }, [scenarios, selectedScenarioId, setSelectedScenarioId]);
-
   // Define colors for demand/capacity
   const DEMAND_COLOR = '#c0d9f3ff';   // blue for children
   const CAPACITY_COLOR = '#a3c7a5ff'; // green for employees
@@ -117,117 +103,96 @@ function SimDataList({ data, onRowClick, selectedItem }) {
     );
   }
   return (
-    <Box sx={{ width: 320, bgcolor: 'background.paper', borderRight: 1, borderColor: 'divider', height: '100vh', maxHeight: '100vh', overflowY: 'auto' }}>
-      {/* Scenario Selector */}
-      <Box sx={{ p: 2, pb: 0 }}>
-        <FormControl fullWidth size="small">
-          <InputLabel id="scenario-select-label">Szenario</InputLabel>
-          <Select
-            labelId="scenario-select-label"
-            value={selectedScenarioId || ''}
-            label="Szenario"
-            onChange={e => setSelectedScenarioId(e.target.value)}
-          >
-            {scenarios.map(scenario => (
-              <MenuItem key={scenario.id} value={scenario.id}>
-                {scenario.name}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-      </Box>
-      {/* List */}
-      <List
-        sx={{
-          width: '100%',
-          bgcolor: 'background.paper',
-          borderTop: 1,
-          borderColor: 'divider',
-          height: 'calc(100vh - 64px)', // Adjust height to fit above elements
-          maxHeight: '100vh',
-          overflowY: 'auto'
-        }}
-      >
-        {data.map((item) => {
-          // Passe consolidateBookingTimes-Aufruf an, übergebe type
-          const { hours } = consolidateBookingTimes(item.parseddata?.booking, item.type);
-          // Für demand: erste Gruppe bestimmen
-          let group = null;
-          let groupIcon = '👥'; // Default icon
-          let groupName = '';
-          if (item.type === 'demand' && item.parseddata?.group && item.parseddata.group.length > 0) {
-            group = item.parseddata.group[0];
-            groupName = group?.name || 'Gruppe unbekannt';
-            // Get icon from settings store
-            const settingsGroup = getGroupById(group?.id);
-            if (settingsGroup && settingsGroup.icon) {
-              groupIcon = settingsGroup.icon;
-            }
-          } else if (item.type === 'demand') {
-            // No group set for child
-            groupIcon = '🙂';
-            groupName = 'keine Gruppe';
+    <List
+      sx={{
+        width: 320,
+        bgcolor: 'background.paper',
+        borderRight: 1,
+        borderColor: 'divider',
+        height: '100vh',
+        maxHeight: '100vh',
+        overflowY: 'auto'
+      }}
+    >
+      {data.map((item) => {
+        // Passe consolidateBookingTimes-Aufruf an, übergebe type
+        const { hours } = consolidateBookingTimes(item.parseddata?.booking, item.type);
+        // Für demand: erste Gruppe bestimmen
+        let group = null;
+        let groupIcon = '👥'; // Default icon
+        let groupName = '';
+        if (item.type === 'demand' && item.parseddata?.group && item.parseddata.group.length > 0) {
+          group = item.parseddata.group[0];
+          groupName = group?.name || 'Gruppe unbekannt';
+          // Get icon from settings store
+          const settingsGroup = getGroupById(group?.id);
+          if (settingsGroup && settingsGroup.icon) {
+            groupIcon = settingsGroup.icon;
           }
-          // Use color by type only
-          const avatarColor = item.type === 'demand' ? DEMAND_COLOR : CAPACITY_COLOR;
-          let secondaryText = '';
-          if (item.type === 'demand') {
-            secondaryText = `${hours} h in ${groupName}`;
-          } else {
-            secondaryText = `${hours} h`;
-          }
-          // Hinweis: segmentsPerDay enthält jetzt für Mitarbeiter mehrere Zeitsegmente pro Tag
-          // Diese Struktur kann an die Slider-Komponente weitergegeben werden!
-          const modificationStatus = getModificationStatus(item);
-          const modChipProps = getModificationChipProps(modificationStatus);
+        } else if (item.type === 'demand') {
+          // No group set for child
+          groupIcon = '🙂';
+          groupName = 'keine Gruppe';
+        }
+        // Use color by type only
+        const avatarColor = item.type === 'demand' ? DEMAND_COLOR : CAPACITY_COLOR;
+        let secondaryText = '';
+        if (item.type === 'demand') {
+          secondaryText = `${hours} h in ${groupName}`;
+        } else {
+          secondaryText = `${hours} h`;
+        }
+        // Hinweis: segmentsPerDay enthält jetzt für Mitarbeiter mehrere Zeitsegmente pro Tag
+        // Diese Struktur kann an die Slider-Komponente weitergegeben werden!
+        const modificationStatus = getModificationStatus(item);
+        const modChipProps = getModificationChipProps(modificationStatus);
 
-          // Check if item is manually added
-          const isManualEntry = item?.rawdata?.source === 'manual entry';
+        // Check if item is manually added
+        const isManualEntry = item?.rawdata?.source === 'manual entry';
 
-          return (
-            <div key={item.id}>
-              <ListItemButton
-                onClick={() => onRowClick(item)}
-                selected={selectedItem && selectedItem.id === item.id}
-                sx={selectedItem && selectedItem.id === item.id ? { bgcolor: 'action.selected' } : undefined}
-              >
-                <ListItemAvatar>
-                  <Avatar sx={{ bgcolor: avatarColor }}>
-                    {item.type === 'demand'
-                      ? groupIcon
-                      : <AccountCircleIcon />}
-                  </Avatar>
-                </ListItemAvatar>
-                <ListItemText
-                  primary={
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <span>{item.name}</span>
-                    </Box>
-                  }
-                  secondary={
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 0.5 }}>
-                      <span style={{ color: '#888' }}>{secondaryText}</span>
-                      <Chip
-                        label={item.rawdata?.source || 'unbekannt'}
-                        size="small"
-                        color={item.rawdata?.source === 'adebis export' ? 'primary' : 'default'}
-                        variant={item.rawdata?.source === 'manual entry' ? 'outlined' : 'filled'}
-                        sx={{ mt: 0.5 }}
-                      />
-                      {!isManualEntry && (
-                        <Chip {...modChipProps} size="small" sx={{ mt: 0.5 }} />
-                      )}
-                    </Box>
-                  }
-                  secondaryTypographyProps={{ component: 'div' }}
-                />
-              </ListItemButton>
-              <Divider />
-            </div>
-          );
-        })}
-      </List>
-    </Box>
+        return (
+          <div key={item.id}>
+            <ListItemButton
+              onClick={() => onRowClick(item)}
+              selected={selectedItem && selectedItem.id === item.id}
+              sx={selectedItem && selectedItem.id === item.id ? { bgcolor: 'action.selected' } : undefined}
+            >
+              <ListItemAvatar>
+                <Avatar sx={{ bgcolor: avatarColor }}>
+                  {item.type === 'demand'
+                    ? groupIcon
+                    : <AccountCircleIcon />}
+                </Avatar>
+              </ListItemAvatar>
+              <ListItemText
+                primary={
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <span>{item.name}</span>
+                  </Box>
+                }
+                secondary={
+                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 0.5 }}>
+                    <span style={{ color: '#888' }}>{secondaryText}</span>
+                    <Chip
+                      label={item.rawdata?.source || 'unbekannt'}
+                      size="small"
+                      color={item.rawdata?.source === 'adebis export' ? 'primary' : 'default'}
+                      variant={item.rawdata?.source === 'manual entry' ? 'outlined' : 'filled'}
+                      sx={{ mt: 0.5 }}
+                    />
+                    {!isManualEntry && (
+                      <Chip {...modChipProps} size="small" sx={{ mt: 0.5 }} />
+                    )}
+                  </Box>
+                }
+                secondaryTypographyProps={{ component: 'div' }}
+              />
+            </ListItemButton>
+            <Divider />
+          </div>
+        );
+      })}
+    </List>
   );
 }
 

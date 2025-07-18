@@ -10,14 +10,15 @@ function generateUID() {
 const useSimScenarioStore = create(
   persist(
     (set, get) => ({
-      // scenarios: [{ id, uid, name, remark, confidence, likelihood, baseScenarioId }]
       scenarios: [],
       selectedScenarioId: null,
-      addScenario: ({ name, remark = '', confidence = 50, likelihood = 50, baseScenarioId = null }) =>
+      setSelectedScenarioId: (id) => set({ selectedScenarioId: id }),
+      addScenario: ({ name, remark = '', confidence = 50, likelihood = 50, baseScenarioId = null, simulationData = [] }) =>
         set(produce((state) => {
           const id = Date.now().toString();
           const uid = generateUID();
-          state.scenarios.push({ id, uid, name, remark, confidence, likelihood, baseScenarioId });
+          state.scenarios.push({ id, uid, name, remark, confidence, likelihood, baseScenarioId, simulationData });
+          state.selectedScenarioId = id;
         })),
       updateScenario: (id, updates) =>
         set(produce((state) => {
@@ -29,29 +30,44 @@ const useSimScenarioStore = create(
       deleteScenario: (id) =>
         set(produce((state) => {
           state.scenarios = state.scenarios.filter(s => s.id !== id);
+          if (state.selectedScenarioId === id) {
+            state.selectedScenarioId = state.scenarios.length > 0 ? state.scenarios[0].id : null;
+          }
         })),
       setScenarios: (scenarios) => set({ scenarios }),
       getScenarioById: (id) => {
         const state = get();
         return state.scenarios.find(s => s.id === id);
       },
-      setSelectedScenarioId: (id) => set({ selectedScenarioId: id }),
-      // --- Simulation Data State and Methods (migrated from simulationDataStore) ---
-      simulationData: [],
-      groupsLookup: {},
-      setSimulationData: (data) => {
-        set({ simulationData: data });
+      // --- Simulation Data State and Methods (now per scenario) ---
+      getSimulationData: () => {
+        const state = get();
+        const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+        return scenario?.simulationData || [];
       },
-      setGroupsLookup: (lookup) => {
-        set({ groupsLookup: lookup });
+      setSimulationData: (data) => {
+        set(produce((state) => {
+          const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+          if (scenario) {
+            scenario.simulationData = data;
+          }
+        }));
       },
       clearAllData: () => {
-        set({ simulationData: [], groupsLookup: {} });
+        set(produce((state) => {
+          const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+          if (scenario) {
+            scenario.simulationData = [];
+          }
+        }));
       },
+      // All item-related methods now operate on the selected scenario's simulationData
       addModification: (itemId, field, previousValue, newValue) => {
         set(
           produce((state) => {
-            const item = state.simulationData.find((i) => i.id === itemId);
+            const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+            if (!scenario) return;
+            const item = scenario.simulationData.find((i) => i.id === itemId);
             if (item) {
               if (!item.modifications) {
                 item.modifications = [];
@@ -72,7 +88,9 @@ const useSimScenarioStore = create(
       updateItemDates: (itemId, startDate, endDate) =>
         set(
           produce((state) => {
-            const item = state.simulationData.find((i) => i.id === itemId);
+            const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+            if (!scenario) return;
+            const item = scenario.simulationData.find((i) => i.id === itemId);
             if (item) {
               if (!item.modifications) {
                 item.modifications = [];
@@ -106,7 +124,9 @@ const useSimScenarioStore = create(
         ),
       getItemDates: (itemId) => {
         const state = get();
-        const item = state.simulationData.find((i) => i.id === itemId);
+        const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+        if (!scenario) return null;
+        const item = scenario.simulationData.find((i) => i.id === itemId);
         if (!item) {
           console.error(`Item with ID ${itemId} not found in simulationData`);
           return null;
@@ -116,7 +136,9 @@ const useSimScenarioStore = create(
       updateItemPausedState: (itemId, enabled, start, end) =>
         set(
           produce((state) => {
-            const item = state.simulationData.find((i) => i.id === itemId);
+            const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+            if (!scenario) return;
+            const item = scenario.simulationData.find((i) => i.id === itemId);
             if (item) {
               const previousValue = JSON.stringify(item.parseddata.paused || { enabled: false, start: '', end: '' });
               const newValue = JSON.stringify({ enabled, start, end });
@@ -138,13 +160,17 @@ const useSimScenarioStore = create(
         ),
       getItemPausedState: (itemId) => {
         const state = get();
-        const item = state.simulationData.find((i) => i.id === itemId);
+        const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+        if (!scenario) return { enabled: false, start: '', end: '' };
+        const item = scenario.simulationData.find((i) => i.id === itemId);
         return item?.parseddata?.paused || { enabled: false, start: '', end: '' };
       },
       updateItemBookings: (itemId, bookings) =>
         set(
           produce((state) => {
-            const item = state.simulationData.find((i) => i.id === itemId);
+            const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+            if (!scenario) return;
+            const item = scenario.simulationData.find((i) => i.id === itemId);
             if (item) {
               const previousValue = JSON.stringify(item.parseddata.booking);
               const bookingsWithIds = bookings.map((booking, bookingIdx) => ({
@@ -200,13 +226,17 @@ const useSimScenarioStore = create(
         ),
       getItemBookings: (itemId) => {
         const state = get();
-        const item = state.simulationData.find((i) => i.id === itemId);
+        const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+        if (!scenario) return [];
+        const item = scenario.simulationData.find((i) => i.id === itemId);
         return item?.parseddata?.booking || [];
       },
       updateItemGroups: (itemId, groups) =>
         set(
           produce((state) => {
-            const item = state.simulationData.find((i) => i.id === itemId);
+            const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+            if (!scenario) return;
+            const item = scenario.simulationData.find((i) => i.id === itemId);
             if (item) {
               const previousValue = JSON.stringify(item.parseddata.group);
               const newValue = JSON.stringify(groups);
@@ -228,14 +258,18 @@ const useSimScenarioStore = create(
         ),
       getItemGroups: (itemId) => {
         const state = get();
-        const item = state.simulationData.find((i) => i.id === itemId);
+        const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+        if (!scenario) return [];
+        const item = scenario.simulationData.find((i) => i.id === itemId);
         return item?.parseddata?.group || [];
       },
       updateItemName: (itemId, newName) => {
         set(
           produce((state) => {
-            if (Array.isArray(state.simulationData)) {
-              const item = state.simulationData.find((i) => i.id === itemId);
+            const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+            if (!scenario) return;
+            if (Array.isArray(scenario.simulationData)) {
+              const item = scenario.simulationData.find((i) => i.id === itemId);
               if (item) {
                 item.name = newName;
               }
@@ -245,15 +279,19 @@ const useSimScenarioStore = create(
       },
       getItemName: (itemId) => {
         const state = get();
-        const items = state.simulationData ?? [];
+        const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+        if (!scenario) return '';
+        const items = scenario.simulationData ?? [];
         const item = items.find((i) => i.id === itemId);
         return item && typeof item.name === 'string' ? item.name : '';
       },
       updateItemNote: (itemId, newNote) => {
         set(
           produce((state) => {
-            if (Array.isArray(state.simulationData)) {
-              const item = state.simulationData.find((i) => i.id === itemId);
+            const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+            if (!scenario) return;
+            if (Array.isArray(scenario.simulationData)) {
+              const item = scenario.simulationData.find((i) => i.id === itemId);
               if (item) {
                 item.note = newNote;
               }
@@ -263,14 +301,18 @@ const useSimScenarioStore = create(
       },
       getItemNote: (itemId) => {
         const state = get();
-        const items = state.simulationData ?? [];
+        const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+        if (!scenario) return '';
+        const items = scenario.simulationData ?? [];
         const item = items.find((i) => i.id === itemId);
         return item && typeof item.note === 'string' ? item.note : '';
       },
       updateItemGeburtsdatum: (itemId, geburtsdatum) => {
         set(
           produce((state) => {
-            const item = state.simulationData.find((i) => i.id === itemId);
+            const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+            if (!scenario) return;
+            const item = scenario.simulationData.find((i) => i.id === itemId);
             if (item) {
               const previousValue = item.parseddata.geburtsdatum;
               item.parseddata.geburtsdatum = geburtsdatum;
@@ -292,13 +334,17 @@ const useSimScenarioStore = create(
       },
       getItemGeburtsdatum: (itemId) => {
         const state = get();
-        const item = state.simulationData.find((i) => i.id === itemId);
+        const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+        if (!scenario) return '';
+        const item = scenario.simulationData.find((i) => i.id === itemId);
         return item?.parseddata?.geburtsdatum || '';
       },
       updateItemQualification: (itemId, qualification) => {
         set(
           produce((state) => {
-            const item = state.simulationData.find((i) => i.id === itemId);
+            const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+            if (!scenario) return;
+            const item = scenario.simulationData.find((i) => i.id === itemId);
             if (item) {
               const previousValue = item.parseddata.qualification;
               item.parseddata.qualification = qualification;
@@ -320,13 +366,17 @@ const useSimScenarioStore = create(
       },
       getItemQualification: (itemId) => {
         const state = get();
-        const item = state.simulationData.find((i) => i.id === itemId);
+        const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+        if (!scenario) return '';
+        const item = scenario.simulationData.find((i) => i.id === itemId);
         return item?.parseddata?.qualification || '';
       },
       deleteItem: (itemId) => {
         set(
           produce((state) => {
-            state.simulationData = state.simulationData.filter(item => item.id !== itemId);
+            const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+            if (!scenario) return;
+            scenario.simulationData = scenario.simulationData.filter(item => item.id !== itemId);
           })
         );
       },
@@ -335,8 +385,6 @@ const useSimScenarioStore = create(
       name: 'sim-scenario-storage',
       partialize: (state) => ({
         scenarios: state.scenarios,
-        simulationData: state.simulationData,
-        groupsLookup: state.groupsLookup,
         selectedScenarioId: state.selectedScenarioId
       })
     }

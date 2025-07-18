@@ -17,7 +17,7 @@ import useSimScenarioDataStore from '../../store/simScenarioStore';
  */
 function ModMonitor({ itemId, field, value, originalValue, onRestore, title, confirmMsg, iconProps }) {
   const { setFieldModification, resetFieldModification, isFieldModified } = useModMonitorStore();
-  const simulationData = useSimScenarioDataStore(state => state.simulationData);
+  const simulationData = useSimScenarioDataStore(state => state.simulationData ?? []);
 
   // Check if item is manually added
   const item = simulationData.find(item => item.id === itemId);

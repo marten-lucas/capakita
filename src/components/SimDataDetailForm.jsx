@@ -4,21 +4,9 @@ import {
 import { useState, useEffect } from 'react';
 import SimulationDataTab from './SimDataDetail/SimulationDataTab';
 import useSimScenarioDataStore from '../store/simScenarioStore';
-import useAppSettingsStore from '../store/appSettingsStore';
-import React from 'react';
 
 function SimDataDetailForm({ item }) {
   const updateItemDates = useSimScenarioDataStore(state => state.updateItemDates);
-
-  // Get all groups from AppSettingsStore
-  const allGroups = useAppSettingsStore(state => {
-    const groups = state.groups;
-    const lookup = {};
-    groups.forEach(g => {
-      lookup[g.id] = g.name;
-    });
-    return lookup;
-  });
 
   const [lastAddedBookingIdx, setLastAddedBookingIdx] = useState(null);
   const [lastAddedGroupIdx, setLastAddedGroupIdx] = useState(null);
@@ -64,7 +52,6 @@ function SimDataDetailForm({ item }) {
     >
       <SimulationDataTab 
         item={item}
-        allGroups={allGroups}
         lastAddedBookingIdx={lastAddedBookingIdx}
         lastAddedGroupIdx={lastAddedGroupIdx}
         importedBookingCount={importedBookingCount}

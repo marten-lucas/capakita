@@ -42,28 +42,22 @@ function SimDatenPage() {
   const [showPw, setShowPw] = useState(false);
   const [pendingSave, setPendingSave] = useState(null);
   const [pendingLoad, setPendingLoad] = useState(null);
+
   const selectedScenarioId = useSimScenarioStore(state => state.selectedScenarioId);
   const setSelectedScenarioId = useSimScenarioStore(state => state.setSelectedScenarioId);
 
-  const simulationData = useSimScenarioStore(state => state.simulationData);
-  const groupsLookup = useSimScenarioStore(state => state.groupsLookup);
-  // Remove selectedItem from simulationDataStore, use from appSettingsStore
+  // Use simulationData from selected scenario
+  const simulationData = useSimScenarioStore(state => state.getSimulationData?.() ?? []);
+  const setSimulationData = useSimScenarioStore(state => state.setSimulationData);
+  const clearAllData = useSimScenarioStore(state => state.clearAllData);
+  const addScenario = useSimScenarioStore(state => state.addScenario);
+
+  // Use AppSettingsStore for group and selected item management
+  const importGroupsFromAdebis = useAppSettingsStore(state => state.importGroupsFromAdebis);
+  const importQualificationsFromEmployees = useAppSettingsStore(state => state.importQualificationsFromEmployees);
   const selectedItem = useAppSettingsStore(state => state.selectedItem);
   const setSelectedItem = useAppSettingsStore(state => state.setSelectedItem);
   const lastImportAnonymized = useAppSettingsStore(state => state.lastImportAnonymized);
-
-  const setSimulationData = useSimScenarioStore(state => state.setSimulationData);
-  const setGroupsLookup = useSimScenarioStore(state => state.setGroupsLookup);
-  const clearAllData = useSimScenarioStore(state => state.clearAllData);
-  const addScenario = useSimScenarioStore(state => state.addScenario);
-  
-  // Add AppSettingsStore
-  const { importGroupsFromAdebis, getGroupsLookup, importQualificationsFromEmployees } = useAppSettingsStore();
-
-  const handleOpenModal = () => setModalOpen(true);
-  const handleCloseModal = () => setModalOpen(false);
-  const handleOpenAddItemModal = () => setAddItemModalOpen(true);
-  const handleCloseAddItemModal = () => setAddItemModalOpen(false);
 
   // --- Hilfsfunktionen wie in simulator_poc.html ---
   // Parse DD.MM.YYYY zu Date
@@ -160,13 +154,10 @@ function SimDatenPage() {
         if (id) newGroupsLookup[id] = name;
       });
     }
-    
     // Import groups into AppSettingsStore
     importGroupsFromAdebis(newGroupsLookup);
-    
+
     // Use the updated groups lookup for simulation data
-    const updatedGroupsLookup = getGroupsLookup();
-    setGroupsLookup(updatedGroupsLookup);
 
     // --- GRUKI (Gruppenzuordnung) filtern wie simulator_poc ---
     let grukiList = [];
@@ -346,25 +337,23 @@ function SimDatenPage() {
     // Import qualifications from employees
     importQualificationsFromEmployees(employeeItems);
 
-    setSimulationData(processedData);
+    // Instead, return processedData for scenario creation
+    return processedData;
   };
 
-  //   setSelectedItem(prev => (prev?.id === item.id ? null : item));
-  // };
-
-
   const handleImport = async ({ file, isAnonymized }) => {
-    await extractZipFile(file, isAnonymized);
+    const processedData = await extractZipFile(file, isAnonymized);
     setModalOpen(false);
 
-    // Create a new scenario as root after import
+    // Create a new scenario as root after import, with simulationData
     const scenarioName = isAnonymized ? 'Importiertes Szenario (anonymisiert)' : 'Importiertes Szenario';
     const newScenario = {
       name: scenarioName,
       remark: '',
       confidence: 50,
       likelihood: 50,
-      baseScenarioId: null
+      baseScenarioId: null,
+      simulationData: processedData
     };
     addScenario(newScenario);
     // Find the new scenario's id (last added)
@@ -373,6 +362,22 @@ function SimDatenPage() {
     if (lastScenario) {
       setSelectedScenarioId(lastScenario.id);
     }
+  };
+
+  const handleOpenModal = () => {
+    setModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setModalOpen(false);
+  };
+
+  const handleOpenAddItemModal = () => {
+    setAddItemModalOpen(true);
+  };
+
+  const handleCloseAddItemModal = () => {
+    setAddItemModalOpen(false);
   };
 
   const handleAddItem = (newItem) => {
@@ -441,14 +446,14 @@ function SimDatenPage() {
   // --- Save/Load functions ---
   const saveStoresToFile = () => {
     openPwDialog('save', (password) => {
-      const simData = useSimScenarioStore.getState();
+      const simState = useSimScenarioStore.getState();
       const chartData = useChartStore.getState();
       const modMonitorData = useModMonitorStore.getState();
 
       // Only save relevant parts
       const data = {
-        simulationData: simData.simulationData,
-        groupsLookup: simData.groupsLookup,
+        scenarios: simState.scenarios,
+        selectedScenarioId: simState.selectedScenarioId,
         chartStore: {
           stichtag: chartData.stichtag,
           selectedGroups: chartData.selectedGroups,
@@ -490,11 +495,13 @@ function SimDatenPage() {
           const decrypted = bytes.toString(CryptoJS.enc.Utf8);
           if (!decrypted) throw new Error('Falsches Passwort oder beschädigte Datei.');
           const data = JSON.parse(decrypted);
-          setSimulationData(data.simulationData || []);
-          setGroupsLookup(data.groupsLookup || {});
+          // Restore scenarios and selectedScenarioId
+          useSimScenarioStore.setState({
+            scenarios: data.scenarios || [],
+            selectedScenarioId: data.selectedScenarioId || null
+          });
           useChartStore.setState(data.chartStore || {});
           useModMonitorStore.setState({ modifications: data.modMonitor || {} });
-          // In loadStoresFromFile, setSelectedItem(null) should use appSettingsStore
           setSelectedItem(null);
         } catch (err) {
           alert('Fehler beim Entschlüsseln/Laden: ' + err.message);
@@ -516,6 +523,46 @@ function SimDatenPage() {
     },
     { icon: <span>📂</span>, name: 'Laden', onClick: loadStoresFromFile },
   ];
+
+  const scenarios = useSimScenarioStore(state => state.scenarios);
+
+  // Show notice if no scenario exists
+  if (!scenarios || scenarios.length === 0) {
+    return (
+      <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#f0f2f5' }}>
+        <Paper 
+          sx={{ 
+            m: 'auto',
+            p: 4, 
+            textAlign: 'center', 
+            bgcolor: '#f5f5f5',
+            border: '2px dashed #ccc',
+            maxWidth: 480
+          }}
+        >
+          <Typography variant="h6" gutterBottom>
+            Kein Szenario vorhanden
+          </Typography>
+          <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+            Um mit der Simulation zu starten, importieren Sie bitte zuerst Daten.
+          </Typography>
+          <Button 
+            variant="contained" 
+            startIcon={<FileUploadIcon />}
+            onClick={() => setModalOpen(true)}
+            size="large"
+          >
+            Daten importieren
+          </Button>
+        </Paper>
+        <DataImportModal
+          open={modalOpen}
+          onClose={() => setModalOpen(false)}
+          onImport={handleImport}
+        />
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#f0f2f5' }}>
@@ -620,7 +667,7 @@ function SimDatenPage() {
           </Box>
           <Box sx={{ flex: 1, p: 3, overflow: 'auto', height: '100vh', maxHeight: '100vh' }}>
             {simulationData.length > 0 && selectedItem && (
-              <SimDataDetailForm item={selectedItem} allGroups={groupsLookup} />
+              <SimDataDetailForm item={selectedItem} />
             )}
           </Box>
         </>
@@ -630,3 +677,4 @@ function SimDatenPage() {
 }
 
 export default SimDatenPage;
+
