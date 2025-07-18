@@ -1,19 +1,14 @@
 import {
-  Typography, Box, Tabs, Tab, Paper
+  Typography, Box
 } from '@mui/material';
-import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
-import CommentIcon from '@mui/icons-material/Comment';
-import DataObjectIcon from '@mui/icons-material/DataObject';
 import { useState, useEffect } from 'react';
 import SimulationDataTab from './SimDataDetail/SimulationDataTab';
-import ModificationsTab from './SimDataDetail/ModificationsTab';
 import useSimulationDataStore from '../store/simulationDataStore';
 import React from 'react';
 
 function SimDataDetailForm({ item, allGroups }) {
   const updateItemDates = useSimulationDataStore(state => state.updateItemDates); // Move hook call to top
 
-  const [tab, setTab] = useState(0);
   const [lastAddedBookingIdx, setLastAddedBookingIdx] = useState(null);
   const [lastAddedGroupIdx, setLastAddedGroupIdx] = useState(null);
   const [importedBookingCount, setImportedBookingCount] = useState(0);
@@ -45,12 +40,6 @@ function SimDataDetailForm({ item, allGroups }) {
     );
   }
 
-  const MemoizedModificationsTab = React.memo(ModificationsTab);
-
-  const handleTabChange = (_, newTab) => {
-    setTab(newTab);
-  };
-
   return (
     <Box
       bgcolor="background.paper"
@@ -62,46 +51,18 @@ function SimDataDetailForm({ item, allGroups }) {
       flexDirection="column"
       overflow="auto"
     >
-      <Tabs
-        value={tab}
-        onChange={handleTabChange}
-        variant="fullWidth"
-        sx={{ mb: 2 }}
-      >
-        <Tab icon={<CalendarTodayIcon />} label="Simulationsdaten" />
-        <Tab icon={<CommentIcon />} label="Modifikationen" />
-        <Tab icon={<DataObjectIcon />} label="Rohdaten" />
-      </Tabs>
-      {tab === 0 && (
-        <SimulationDataTab 
-          item={item}
-          allGroups={allGroups}
-          lastAddedBookingIdx={lastAddedBookingIdx}
-          lastAddedGroupIdx={lastAddedGroupIdx}
-          importedBookingCount={importedBookingCount}
-          importedGroupCount={importedGroupCount}
-          updateItemDates={updateItemDates} // Pass updateItemDates directly
-        />
-      )}
-      {tab === 1 && (
-        <>
-          <MemoizedModificationsTab item={item} />
-        </>
-      )}
-      {tab === 2 && (
-        <Box flex={1} display="flex" flexDirection="column">
-          <Typography variant="body2" color="text.secondary">
-            Rohdaten:
-          </Typography>
-          <pre style={{ fontSize: 12, marginTop: 8, flex: 1 }}>
-            {JSON.stringify(item.rawdata, null, 2)}
-          </pre>
-        </Box>
-      )}
+      <SimulationDataTab 
+        item={item}
+        allGroups={allGroups}
+        lastAddedBookingIdx={lastAddedBookingIdx}
+        lastAddedGroupIdx={lastAddedGroupIdx}
+        importedBookingCount={importedBookingCount}
+        importedGroupCount={importedGroupCount}
+        updateItemDates={updateItemDates}
+      />
     </Box>
   );
 }
 
 export default SimDataDetailForm;
-
-
+ 

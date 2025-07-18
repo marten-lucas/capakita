@@ -9,10 +9,15 @@ import {
   FormControl,
   FormLabel,
   RadioGroup,
-  Radio
+  Radio,
+  Tabs,
+  Tab
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
+import PersonIcon from '@mui/icons-material/Person';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import GroupIcon from '@mui/icons-material/Group';
 import GroupCards from './GroupCards';
 import BookingCards from './BookingCards';
 import ModMonitor from './ModMonitor';
@@ -27,6 +32,8 @@ function SimulationDataTab({
   importedGroupCount, 
   handleRestoreBooking 
 }) {
+  const [activeTab, setActiveTab] = useState(0);
+
   const { 
     updateItemPausedState, 
     getItemPausedState, 
@@ -213,7 +220,8 @@ function SimulationDataTab({
     }
   };
 
-  return (
+  // Allgemein Tab Content
+  const AllgemeinTab = () => (
     <Box flex={1} display="flex" flexDirection="column" gap={2} sx={{ overflowY: 'auto' }}>
       {/* Delete button for manually added items */}
       {isManualEntry && (
@@ -316,7 +324,7 @@ function SimulationDataTab({
         </Box>
       )}
 
-      {/* Wiederhergestellte Datumsfelder für den Datensatz */}
+      {/* Zeitraum */}
       <Box display="flex" alignItems="center" gap={2} sx={{ mb: 2 }}>
         <Typography variant="body2" sx={{ minWidth: 90 }}>Zeitraum von</Typography>
         <TextField
@@ -357,6 +365,8 @@ function SimulationDataTab({
           confirmMsg="Enddatum auf importierten Wert zurücksetzen?"
         />
       </Box>
+
+      {/* Pausieren */}
       <Box sx={{ mb: 2, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
         <FormControlLabel
           control={
@@ -378,7 +388,7 @@ function SimulationDataTab({
               value={pausedState.start}
               onChange={(e) => handlePauseChange(pausedState.enabled, e.target.value, pausedState.end)}
               sx={{ width: 130 }}
-              inputProps={{ min: today }} // Restrict to future dates
+              inputProps={{ min: today }}
             />
             <Typography variant="body2" sx={{ minWidth: 24, textAlign: 'center' }}>bis</Typography>
             <TextField
@@ -389,11 +399,17 @@ function SimulationDataTab({
               value={pausedState.end}
               onChange={(e) => handlePauseChange(pausedState.enabled, pausedState.start, e.target.value)}
               sx={{ width: 130 }}
-              inputProps={{ min: today }} // Restrict to future dates
+              inputProps={{ min: today }}
             />
           </Box>
         )}
       </Box>
+    </Box>
+  );
+
+  // Zeiten Tab Content
+  const ZeitenTab = () => (
+    <Box flex={1} display="flex" flexDirection="column" gap={2} sx={{ overflowY: 'auto' }}>
       <Box display="flex" alignItems="center" gap={2} sx={{ mb: 1 }}>
         <Typography variant="h6" sx={{ mt: 1, mb: 1, flex: 1 }}>
           Buchungszeiten:
@@ -427,8 +443,14 @@ function SimulationDataTab({
         originalBookings={item?.originalParsedData?.booking}
         onRestoreBooking={handleRestoreBooking}
         onDelete={handleDeleteBooking}
-        isManualEntry={isManualEntry} // Pass isManualEntry flag
+        isManualEntry={isManualEntry}
       />
+    </Box>
+  );
+
+  // Gruppen Tab Content
+  const GruppenTab = () => (
+    <Box flex={1} display="flex" flexDirection="column" gap={2} sx={{ overflowY: 'auto' }}>
       <Box display="flex" alignItems="center" gap={2} sx={{ mt: 2, mb: 1 }}>
         <Typography variant="h6" sx={{ flex: 1 }}>
           Gruppen:
@@ -460,8 +482,27 @@ function SimulationDataTab({
         importedCount={importedGroupCount}
         originalGroups={item?.originalParsedData?.group}
         onRestoreGroup={handleRestoreGroup}
-        isManualEntry={isManualEntry} // Pass isManualEntry flag
+        isManualEntry={isManualEntry}
       />
+    </Box>
+  );
+
+  return (
+    <Box flex={1} display="flex" flexDirection="column">
+      <Tabs
+        value={activeTab}
+        onChange={(_, newTab) => setActiveTab(newTab)}
+        variant="fullWidth"
+        sx={{ mb: 2 }}
+      >
+        <Tab icon={<PersonIcon />} label="Allgemein" />
+        <Tab icon={<AccessTimeIcon />} label="Zeiten" />
+        <Tab icon={<GroupIcon />} label="Gruppen" />
+      </Tabs>
+      
+      {activeTab === 0 && <AllgemeinTab />}
+      {activeTab === 1 && <ZeitenTab />}
+      {activeTab === 2 && <GruppenTab />}
     </Box>
   );
 }
