@@ -12,6 +12,7 @@ const useSimScenarioStore = create(
     (set, get) => ({
       // scenarios: [{ id, uid, name, remark, confidence, likelihood, baseScenarioId }]
       scenarios: [],
+      selectedScenarioId: null,
       addScenario: ({ name, remark = '', confidence = 50, likelihood = 50, baseScenarioId = null }) =>
         set(produce((state) => {
           const id = Date.now().toString();
@@ -34,6 +35,7 @@ const useSimScenarioStore = create(
         const state = get();
         return state.scenarios.find(s => s.id === id);
       },
+      setSelectedScenarioId: (id) => set({ selectedScenarioId: id }),
       // --- Simulation Data State and Methods (migrated from simulationDataStore) ---
       simulationData: [],
       groupsLookup: {},
@@ -334,7 +336,8 @@ const useSimScenarioStore = create(
       partialize: (state) => ({
         scenarios: state.scenarios,
         simulationData: state.simulationData,
-        groupsLookup: state.groupsLookup
+        groupsLookup: state.groupsLookup,
+        selectedScenarioId: state.selectedScenarioId
       })
     }
   )
