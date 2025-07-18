@@ -7,6 +7,8 @@ import {
   SpeedDialIcon,
   Typography,
   Button, // hinzugefügt
+  MenuItem,
+  Select,
 } from '@mui/material';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
 import AddIcon from '@mui/icons-material/Add';
@@ -566,6 +568,27 @@ function SimDatenPage() {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#f0f2f5' }}>
+      {/* Scenario Selector */}
+      <Box sx={{ px: 3, pt: 2, pb: 1, bgcolor: 'background.paper', borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Typography variant="subtitle1" sx={{ minWidth: 120 }}>Szenario:</Typography>
+        <Select
+          size="small"
+          value={selectedScenarioId || ''}
+          onChange={e => {
+            setSelectedScenarioId(e.target.value);
+            // Log the entire simScenarioStore state
+            console.log('simScenarioStore:', useSimScenarioStore.getState());
+          }}
+          sx={{ minWidth: 280 }}
+          displayEmpty
+        >
+          {scenarios.map(scenario => (
+            <MenuItem key={scenario.id} value={scenario.id}>
+              {scenario.name || `Szenario ${scenario.id}`}
+            </MenuItem>
+          ))}
+        </Select>
+      </Box>
       <SpeedDial
         ariaLabel="SpeedDial for data actions"
         sx={{ position: 'fixed', bottom: 32, right: 32 }}

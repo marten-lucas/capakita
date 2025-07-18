@@ -3,7 +3,7 @@ import {
   FormControl, FormLabel, RadioGroup, FormControlLabel, Radio, TextField,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper
 } from '@mui/material';
-import React, { useMemo } from 'react';
+import  { useMemo, useEffect } from 'react';
 import { convertYYYYMMDDtoDDMMYYYY, convertDDMMYYYYtoYYYYMMDD } from '../../utils/dateUtils';
 import ModMonitor from './ModMonitor';
 import useSimScenarioDataStore from '../../store/simScenarioStore';
@@ -16,45 +16,37 @@ function GroupDetail({ group, index, allGroups, onDelete, canDelete, onRestore, 
 
   // Get bookings and memoize segments calculation
   const bookings = getItemBookings(parentItemId);
-  
+
+  // --- FIX: Assign missing segment IDs in an effect, not during render ---
+  useEffect(() => {
+    let needsUpdate = false;
+    const updatedBookings = bookings.map((booking, bookingIdx) => ({
+      ...booking,
+      times: booking.times?.map((timeEntry) => ({
+        ...timeEntry,
+        segments: timeEntry.segments?.map((segment) => {
+          if (!segment.id) {
+            needsUpdate = true;
+            return {
+              ...segment,
+              id: `${parentItemId}-${bookingIdx}-${timeEntry.day_name}-${Date.now()}-${Math.random()}`
+            };
+          }
+          return segment;
+        })
+      }))
+    }));
+    if (needsUpdate) {
+      updateItemBookings(parentItemId, updatedBookings);
+    }
+  }, [bookings, parentItemId, updateItemBookings]);
+
+  // Now just collect all segments for display
   const getAllBookingSegments = useMemo(() => {
     const segments = [];
-    
     bookings.forEach((booking, bookingIdx) => {
       booking.times?.forEach((timeEntry) => {
         timeEntry.segments?.forEach((segment) => {
-          // Ensure segment has ID and update bookings if needed
-          if (!segment.id) {
-            const newId = `${parentItemId}-${bookingIdx}-${timeEntry.day_name}-${Date.now()}-${Math.random()}`;
-            
-            // Update the booking with the new segment ID
-            const updatedBookings = bookings.map((b, idx) => {
-              if (idx === bookingIdx) {
-                return {
-                  ...b,
-                  times: b.times?.map((t) => {
-                    if (t.day_name === timeEntry.day_name) {
-                      return {
-                        ...t,
-                        segments: t.segments?.map((s) => 
-                          s === segment ? { ...s, id: newId } : s
-                        )
-                      };
-                    }
-                    return t;
-                  })
-                };
-              }
-              return b;
-            });
-            
-            // Update the bookings in the store
-            updateItemBookings(parentItemId, updatedBookings);
-            
-            // Use the new ID for this segment
-            segment = { ...segment, id: newId };
-          }
-          
           segments.push({
             id: segment.id,
             bookingId: bookingIdx + 1,
@@ -65,9 +57,8 @@ function GroupDetail({ group, index, allGroups, onDelete, canDelete, onRestore, 
         });
       });
     });
-    
     return segments;
-  }, [bookings, parentItemId, updateItemBookings]);
+  }, [bookings]);
 
   const handleDateChange = (field, value) => {
     const updatedGroup = { ...group, [field]: convertYYYYMMDDtoDDMMYYYY(value) };
@@ -316,5 +307,6 @@ function GroupDetail({ group, index, allGroups, onDelete, canDelete, onRestore, 
 }
 
 export default GroupDetail;
+
 
 
