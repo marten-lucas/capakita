@@ -121,23 +121,35 @@ const useSimScenarioStore = create(
         return JSON.stringify(currentValue) !== JSON.stringify(computedOriginalValue);
       },
 
-      addScenario: ({ name, remark = '', confidence = 50, likelihood = 50, desirability = 50, baseScenarioId = null, simulationData = [] }) =>
+      addScenario: ({
+        name,
+        remark = '',
+        confidence = 50,
+        likelihood = 50,
+        desirability = 50,
+        baseScenarioId = null,
+        simulationData = [],
+        imported = false,
+        importedAnonymized = false
+      }) =>
         set(produce((state) => {
           const id = Date.now().toString();
           const uid = generateUID();
           // If this is a based scenario, don't store simulationData, only changes
           const scenarioData = baseScenarioId ? [] : simulationData;
-          state.scenarios.push({ 
-            id, 
-            uid, 
-            name, 
-            remark, 
-            confidence, 
-            likelihood, 
+          state.scenarios.push({
+            id,
+            uid,
+            name,
+            remark,
+            confidence,
+            likelihood,
             desirability,
-            baseScenarioId, 
+            baseScenarioId,
             simulationData: scenarioData,
-            dataChanges: baseScenarioId ? {} : undefined // Track changes for based scenarios
+            dataChanges: baseScenarioId ? {} : undefined, // Track changes for based scenarios
+            imported, // new property: true/false
+            importedAnonymized // new property: true/false
           });
           state.selectedScenarioId = id;
         })),
@@ -751,6 +763,14 @@ const useSimScenarioStore = create(
             item: newItem
           });
         }
+      },
+      // Utility: Check if saving is allowed (all imports anonymized or no imports)
+      isSaveAllowed: () => {
+        const scenarios = get().scenarios;
+        if (!scenarios || scenarios.length === 0) return true;
+        const imported = scenarios.filter(s => s.imported);
+        if (imported.length === 0) return true;
+        return imported.every(s => s.importedAnonymized);
       },
     }),
     {

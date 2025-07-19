@@ -26,8 +26,10 @@ const pages = [
 ];
 
 function TopNav() {
+  const isSaveAllowed = useSimScenarioStore(state => state.isSaveAllowed());
   const scenarios = useSimScenarioStore(state => state.scenarios);
-  const lastImportAnonymized = useAppSettingsStore(state => state.lastImportAnonymized);
+
+  // Prüfe, ob alle importierten Szenarien anonymisiert sind oder keine Imports vorliegen
 
   // State for menu anchor
   const [anchorEl, setAnchorEl] = React.useState(null);
@@ -157,7 +159,7 @@ function TopNav() {
             >
               <MenuItem
                 onClick={handleSaveClick}
-                disabled={!lastImportAnonymized}
+                disabled={!isSaveAllowed}
               >
                 💾 Szenarien speichern
               </MenuItem>

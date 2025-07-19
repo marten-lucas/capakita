@@ -14,12 +14,10 @@ import FileUploadIcon from '@mui/icons-material/FileUpload';
 import AddIcon from '@mui/icons-material/Add';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import DataImportModal from '../components/modals/DataImportModal';
-import AddItemModal from '../components/modals/AddItemModal';
 import SimDataList from '../components/SimDataList';
 import SimDataDetailForm from '../components/SimDataDetailForm';
 import JSZip from 'jszip';
 import useSimScenarioStore from '../store/simScenarioStore';
-import useChartStore from '../store/chartStore';
 import CryptoJS from 'crypto-js';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -33,10 +31,13 @@ import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import useAppSettingsStore from '../store/appSettingsStore';
 import ScenarioSaveDialog from '../components/modals/ScenarioSaveDialog';
 import ScenarioManager from '../components/ScenarioManager';
+import PersonIcon from '@mui/icons-material/Person';
+import ChildCareIcon from '@mui/icons-material/ChildCare';
+import LayersIcon from '@mui/icons-material/Layers';
 
 function DataPage() {
   const [modalOpen, setModalOpen] = useState(false);
-  const [addItemModalOpen, setAddItemModalOpen] = useState(false);
+  // const [addItemModalOpen, setAddItemModalOpen] = useState(false);
   // const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   // const [pendingSave, setPendingSave] = useState(false);
 
@@ -52,7 +53,6 @@ function DataPage() {
 
   // Use effective simulation data (overlay-aware)
   const simulationData = useSimScenarioStore(state => state.getEffectiveSimulationData());
-  const clearAllData = useSimScenarioStore(state => state.clearAllData);
   const addScenario = useSimScenarioStore(state => state.addScenario);
   const addItemToScenario = useSimScenarioStore(state => state.addItemToScenario);
 
@@ -61,7 +61,6 @@ function DataPage() {
   const importQualificationsFromEmployees = useAppSettingsStore(state => state.importQualificationsFromEmployees);
   const selectedItem = useAppSettingsStore(state => state.selectedItem);
   const setSelectedItem = useAppSettingsStore(state => state.setSelectedItem);
-  const lastImportAnonymized = useAppSettingsStore(state => state.lastImportAnonymized);
 
   // --- Hilfsfunktionen wie in simulator_poc.html ---
   // Parse DD.MM.YYYY zu Date
@@ -357,7 +356,9 @@ function DataPage() {
       confidence: 50,
       likelihood: 50,
       baseScenarioId: null,
-      simulationData: processedData
+      simulationData: processedData,
+      imported: true,
+      importedAnonymized: !!isAnonymized
     };
     addScenario(newScenario);
     // Find the new scenario's id (last added)
@@ -376,110 +377,115 @@ function DataPage() {
     setModalOpen(false);
   };
 
-  const handleOpenAddItemModal = () => {
-    setAddItemModalOpen(true);
-  };
-
-  const handleCloseAddItemModal = () => {
-    setAddItemModalOpen(false);
-  };
-
-  const handleAddItem = (newItem) => {
-    // Use the new method that handles both root and based scenarios
+  const handleAddCapacity = () => {
+    const newItem = {
+      id: Date.now(),
+      type: 'capacity',
+      name: 'Neuer Mitarbeiter',
+      rawdata: {
+        source: 'manual entry',
+        data: {}
+      },
+      parseddata: {
+        startdate: '',
+        enddate: '',
+        booking: [],
+        group: [],
+        qualification: '',
+        vacation: '',
+        worktime: ''
+      },
+      originalParsedData: {
+        startdate: '',
+        enddate: '',
+        booking: [],
+        group: [],
+        qualification: '',
+        vacation: '',
+        worktime: ''
+      },
+      modifications: [],
+      modifiers: {},
+      simudata: {}
+    };
     addItemToScenario(newItem);
     setSelectedItem(newItem);
   };
 
-  const handleRowClick = (item) => {
-    if (selectedItem?.id === item.id) {
-      setSelectedItem(null);
+  const handleAddDemand = () => {
+    const newItem = {
+      id: Date.now(),
+      type: 'demand',
+      name: 'Neues Kind',
+      rawdata: {
+        source: 'manual entry',
+        data: {}
+      },
+      parseddata: {
+        startdate: '',
+        enddate: '',
+        booking: [],
+        group: [],
+        geburtsdatum: ''
+      },
+      originalParsedData: {
+        startdate: '',
+        enddate: '',
+        booking: [],
+        group: [],
+        geburtsdatum: ''
+      },
+      modifications: [],
+      modifiers: {},
+      simudata: {}
+    };
+    addItemToScenario(newItem);
+    setSelectedItem(newItem);
+  };
+
+  const scenarioManagerRef = React.useRef();
+
+  // Add scenario via SpeedDial: trigger handleAdd of ScenarioManager for current scenario
+  const handleAddScenario = () => {
+    if (!selectedScenarioId) return;
+    // Find the current scenario object
+    const currentScenario = scenarios.find(s => s.id === selectedScenarioId);
+    if (scenarioManagerRef.current && scenarioManagerRef.current.handleAdd) {
+      scenarioManagerRef.current.handleAdd(currentScenario);
     } else {
-      setSelectedItem(item);
+      // fallback: add as root if ref not available
+      const newScenario = {
+        name: 'Neues Szenario',
+        remark: '',
+        confidence: 50,
+        likelihood: 50,
+        baseScenarioId: currentScenario?.id || null
+      };
+      addScenario(newScenario);
+      const scenariosList = useSimScenarioStore.getState().scenarios;
+      const lastScenario = scenariosList[scenariosList.length - 1];
+      if (lastScenario) {
+        setSelectedScenarioId(lastScenario.id);
+      }
     }
   };
 
-  const handleResetData = () => {
-    clearAllData(); // Reset all imported data
-  };
-
-  // --- Save/Load functions ---
-  const saveStoresToFile = () => {
-    setScenarioSaveDialogOpen(true);
-    setScenarioSaveDialogPending(() => (password) => {
-      const simState = useSimScenarioStore.getState();
-      const chartData = useChartStore.getState();
-
-      // Only save relevant parts
-      const data = {
-        scenarios: simState.scenarios,
-        selectedScenarioId: simState.selectedScenarioId,
-        chartStore: {
-          stichtag: chartData.stichtag,
-          selectedGroups: chartData.selectedGroups,
-          selectedQualifications: chartData.selectedQualifications,
-          availableGroups: chartData.availableGroups,
-          availableQualifications: chartData.availableQualifications,
-          midtermTimeDimension: chartData.midtermTimeDimension,
-          midtermSelectedGroups: chartData.midtermSelectedGroups,
-          midtermSelectedQualifications: chartData.midtermSelectedQualifications
-        }
-      };
-
-      // Encrypt
-      const json = JSON.stringify(data, null, 2);
-      const ciphertext = CryptoJS.AES.encrypt(json, password).toString();
-
-      const blob = new Blob([ciphertext], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'kiga-simulator-data.enc';
-      a.click();
-      URL.revokeObjectURL(url);
-    });
-  };
-
-  const loadStoresFromFile = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.enc,.txt';
-    input.onchange = async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const ciphertext = await file.text();
-      setScenarioSaveDialogOpen(true);
-      setScenarioSaveDialogPending(() => (password) => {
-        try {
-          const bytes = CryptoJS.AES.decrypt(ciphertext, password);
-          const decrypted = bytes.toString(CryptoJS.enc.Utf8);
-          if (!decrypted) throw new Error('Falsches Passwort oder beschädigte Datei.');
-          const data = JSON.parse(decrypted);
-          // Restore scenarios and selectedScenarioId
-          useSimScenarioStore.setState({
-            scenarios: data.scenarios || [],
-            selectedScenarioId: data.selectedScenarioId || null
-          });
-          useChartStore.setState(data.chartStore || {});
-          setSelectedItem(null);
-        } catch (err) {
-          alert('Fehler beim Entschlüsseln/Laden: ' + err.message);
-        }
-      });
-    };
-    input.click();
-  };
-
   const actions = [
-    { icon: <FileUploadIcon />, name: 'Import', onClick: handleOpenModal },
-    { icon: <AddIcon />, name: 'Add', onClick: handleOpenAddItemModal },
-    { icon: <RestartAltIcon />, name: 'Reset', onClick: handleResetData },
     {
-      icon: <span>💾</span>,
-      name: 'Speichern',
-      onClick: saveStoresToFile,
-      disabled: !lastImportAnonymized // Disable if not anonymized
+      icon: <PersonIcon />,
+      name: 'Kapazität',
+      onClick: handleAddCapacity
     },
-    { icon: <span>📂</span>, name: 'Laden', onClick: loadStoresFromFile },
+    {
+      icon: <ChildCareIcon />,
+      name: 'Bedarf',
+      onClick: handleAddDemand
+    },
+    {
+      icon: <LayersIcon />,
+      name: 'Szenario',
+      onClick: handleAddScenario
+    }
   ];
 
   // Check if selected scenario still exists, if not select the first available one
@@ -538,6 +544,7 @@ function DataPage() {
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#f0f2f5' }}>
       {/* Scenario Selector */}
       <ScenarioManager
+        ref={scenarioManagerRef}
         selectedScenarioId={selectedScenarioId}
         setSelectedScenarioId={setSelectedScenarioId}
         scenarios={scenarios}
@@ -562,11 +569,6 @@ function DataPage() {
         open={modalOpen}
         onClose={handleCloseModal}
         onImport={handleImport}
-      />
-      <AddItemModal
-        open={addItemModalOpen}
-        onClose={handleCloseAddItemModal}
-        onAdd={handleAddItem}
       />
       <ScenarioSaveDialog
         open={scenarioSaveDialogOpen}
@@ -596,7 +598,7 @@ function DataPage() {
             )}
             <SimDataList
               data={simulationData}
-              onRowClick={handleRowClick}
+              onRowClick={(item) => setSelectedItem(item)}
               selectedItem={selectedItem}
               selectedScenarioId={selectedScenarioId}
               onScenarioChange={setSelectedScenarioId}

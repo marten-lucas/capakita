@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, forwardRef, useImperativeHandle } from 'react';
 import { Box, Typography, Accordion, AccordionSummary, AccordionDetails, List, ListItemButton, ListItemText, Paper, IconButton, Collapse, Button, TextField, Slider, Stack, MenuItem, Select, InputLabel, FormControl, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
@@ -393,7 +393,7 @@ function ScenarioDetailForm({ scenarioId, scenarios, onClose, isNew }) {
     );
 }
 
-function ScenarioManager({ selectedScenarioId, setSelectedScenarioId, scenarios, setSelectedItem }) {
+const ScenarioManager = forwardRef(function ScenarioManager({ selectedScenarioId, setSelectedScenarioId, scenarios, setSelectedItem }, ref) {
     const [expanded, setExpanded] = useState(false);
     const [treeExpandedMap, setTreeExpandedMap] = useState({});
     const [editScenarioId, setEditScenarioId] = useState(null);
@@ -446,6 +446,11 @@ function ScenarioManager({ selectedScenarioId, setSelectedScenarioId, scenarios,
         setSelectedItem?.(null);
         setExpanded(false);
     };
+
+    // Expose handleAdd for parent via ref
+    useImperativeHandle(ref, () => ({
+        handleAdd
+    }));
 
     return (
         <Paper
@@ -582,7 +587,7 @@ function ScenarioManager({ selectedScenarioId, setSelectedScenarioId, scenarios,
             )}
         </Paper>
     );
-}
+});
 
 // Delete confirmation dialog component
 function DeleteScenarioDialog({ scenarioId, scenarios, onClose, onDeleted }) {
