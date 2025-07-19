@@ -49,7 +49,8 @@ function ScenarioTreeList({
                         fontWeight: isSelected ? 700 : undefined
                     }}
                 >
-                    {hasChildren && (
+                    {/* Icons nur anzeigen, wenn Handler gesetzt */}
+                    {hasChildren && onEdit && (
                         <IconButton
                             size="small"
                             onClick={e => {
@@ -61,7 +62,7 @@ function ScenarioTreeList({
                             {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
                         </IconButton>
                     )}
-                    {!hasChildren && <Box sx={{ width: 32, display: 'inline-block' }} />}
+                    {(!hasChildren || !onEdit) && <Box sx={{ width: 32, display: 'inline-block' }} />}
                     <ListItemText
                         primary={
                             <Box sx={{ display: 'flex', alignItems: 'center' }}>
@@ -80,43 +81,47 @@ function ScenarioTreeList({
                         secondary={scenario.remark}
                         sx={{ flex: 1 }}
                     />
-                    {/* Action Icons */}
-                    <IconButton
-                        size="small"
-                        edge="end"
-                        aria-label="edit"
-                        onClick={e => {
-                            e.stopPropagation();
-                            onEdit?.(scenario);
-                        }}
-                        sx={{ ml: 0.5 }}
-                    >
-                        <EditIcon fontSize="small" />
-                    </IconButton>
-                    <IconButton
-                        size="small"
-                        edge="end"
-                        aria-label="add"
-                        onClick={e => {
-                            e.stopPropagation();
-                            onAdd?.(scenario);
-                        }}
-                        sx={{ ml: 0.5 }}
-                    >
-                        <AddIcon fontSize="small" />
-                    </IconButton>
-                    <IconButton
-                        size="small"
-                        edge="end"
-                        aria-label="delete"
-                        onClick={e => {
-                            e.stopPropagation();
-                            onDelete?.(scenario);
-                        }}
-                        sx={{ ml: 0.5 }}
-                    >
-                        <DeleteIcon fontSize="small" />
-                    </IconButton>
+                    {/* Action Icons nur wenn Handler gesetzt */}
+                    {onEdit && (
+                        <>
+                            <IconButton
+                                size="small"
+                                edge="end"
+                                aria-label="edit"
+                                onClick={e => {
+                                    e.stopPropagation();
+                                    onEdit?.(scenario);
+                                }}
+                                sx={{ ml: 0.5 }}
+                            >
+                                <EditIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton
+                                size="small"
+                                edge="end"
+                                aria-label="add"
+                                onClick={e => {
+                                    e.stopPropagation();
+                                    onAdd?.(scenario);
+                                }}
+                                sx={{ ml: 0.5 }}
+                            >
+                                <AddIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton
+                                size="small"
+                                edge="end"
+                                aria-label="delete"
+                                onClick={e => {
+                                    e.stopPropagation();
+                                    onDelete?.(scenario);
+                                }}
+                                sx={{ ml: 0.5 }}
+                            >
+                                <DeleteIcon fontSize="small" />
+                            </IconButton>
+                        </>
+                    )}
                 </ListItemButton>
                 {hasChildren && (
                     <Collapse in={expanded} timeout="auto" unmountOnExit>
@@ -177,7 +182,7 @@ function ScenarioDetailForm({ scenarioId, scenarios, onClose, isNew }) {
         return buildScenarioTree(filtered);
     }, [scenarios, scenario]);
     const [treeExpandedMap, setTreeExpandedMap] = useState({});
-    const [baseScenarioSelectOpen, setBaseScenarioSelectOpen] = useState(false);
+    const [baseScenarioAccordionOpen, setBaseScenarioAccordionOpen] = useState(false);
 
     const handleChange = (field, value) => {
         setForm(f => ({ ...f, [field]: value }));
@@ -223,7 +228,7 @@ function ScenarioDetailForm({ scenarioId, scenarios, onClose, isNew }) {
     // Nested scenario selection for base scenario
     const handleBaseScenarioSelect = (selected) => {
         handleChange('baseScenarioId', selected ? selected.id : '');
-        setBaseScenarioSelectOpen(false);
+        setBaseScenarioAccordionOpen(false);
     };
 
     return (
@@ -240,52 +245,56 @@ function ScenarioDetailForm({ scenarioId, scenarios, onClose, isNew }) {
                             autoFocus
                             size="small"
                         />
-                        {/* Nested ListView for base scenario selection */}
+                        {/* Basis-Szenario Auswahl als Accordion */}
                         <Box>
                             <Typography variant="subtitle2" sx={{ mb: 1 }}>
                                 Basis-Szenario
                             </Typography>
-                            <Button
-                                variant="outlined"
-                                fullWidth
-                                onClick={() => setBaseScenarioSelectOpen(true)}
-                                sx={{ justifyContent: 'flex-start', textAlign: 'left' }}
+                            <Accordion
+                                expanded={baseScenarioAccordionOpen}
+                                onChange={() => setBaseScenarioAccordionOpen(open => !open)}
+                                sx={{ mb: 1, boxShadow: 'none', border: '1px solid #eee' }}
                             >
-                                {form.baseScenarioId
-                                    ? (scenarios.find(s => s.id === form.baseScenarioId)?.name || 'Unbekannt')
-                                    : 'Keines'}
-                            </Button>
-                            <Dialog
-                                open={baseScenarioSelectOpen}
-                                onClose={() => setBaseScenarioSelectOpen(false)}
-                                maxWidth="xs"
-                                fullWidth
-                            >
-                                <DialogTitle>Basis-Szenario auswählen</DialogTitle>
-                                <DialogContent dividers>
+                                <AccordionSummary
+                                    expandIcon={<ExpandMoreIcon />}
+                                    aria-controls="base-scenario-content"
+                                    id="base-scenario-header"
+                                    sx={{ minHeight: 40, '& .MuiAccordionSummary-content': { my: 0, alignItems: 'center' } }}
+                                >
+                                    <Typography sx={{ flex: 1 }}>
+                                        {form.baseScenarioId
+                                            ? (scenarios.find(s => s.id === form.baseScenarioId)?.name || 'Unbekannt')
+                                            : 'Keines'}
+                                    </Typography>
+                                </AccordionSummary>
+                                <AccordionDetails sx={{ p: 0 }}>
                                     <List dense disablePadding>
+                                        {/* "Keines" eingerückt und ohne Icons */}
                                         <ListItemButton
                                             selected={!form.baseScenarioId}
                                             onClick={() => handleBaseScenarioSelect(null)}
+                                            sx={{ pl: 4 }}
                                         >
                                             <ListItemText primary="Keines" />
                                         </ListItemButton>
-                                        <ScenarioTreeList
-                                            scenarioTree={scenarioTree}
-                                            selectedId={form.baseScenarioId}
-                                            onSelect={handleBaseScenarioSelect}
-                                            expandedMap={treeExpandedMap}
-                                            setExpandedMap={setTreeExpandedMap}
-                                            onEdit={undefined}
-                                            onAdd={undefined}
-                                            onDelete={undefined}
-                                        />
+                                        {/* Szenarien ohne Action-Icons */}
+                                        {scenarioTree.map(scenario => (
+                                            <ScenarioTreeList
+                                                key={scenario.id}
+                                                scenarioTree={[scenario]}
+                                                selectedId={form.baseScenarioId}
+                                                onSelect={handleBaseScenarioSelect}
+                                                expandedMap={treeExpandedMap}
+                                                setExpandedMap={setTreeExpandedMap}
+                                                // Icons ausblenden
+                                                onEdit={undefined}
+                                                onAdd={undefined}
+                                                onDelete={undefined}
+                                            />
+                                        ))}
                                     </List>
-                                </DialogContent>
-                                <DialogActions>
-                                    <Button onClick={() => setBaseScenarioSelectOpen(false)}>Abbrechen</Button>
-                                </DialogActions>
-                            </Dialog>
+                                </AccordionDetails>
+                            </Accordion>
                         </Box>
                         <TextField
                             label="Bemerkung"
