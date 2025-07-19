@@ -11,8 +11,8 @@ import { consolidateBookingSummary } from '../../utils/bookingUtils';
 // DayControl component
 function DayControl({ dayLabel, dayAbbr, dayData, onToggle, onTimeChange, onAddSegment, onRemoveSegment, type }) {
   const isActive = !!dayData;
-  const segments = React.useMemo(() => 
-    isActive ? dayData.segments : [], 
+  const segments = React.useMemo(() =>
+    isActive ? dayData.segments : [],
     [isActive, dayData?.segments]
   );
 
@@ -114,14 +114,14 @@ function BookingDetail({
 
         if (isEnabled && dayIndex === -1) {
           const dayNr = ['Mo', 'Di', 'Mi', 'Do', 'Fr'].indexOf(dayAbbr) + 1;
-          newTimes.push({ 
-            day: dayNr, 
-            day_name: dayAbbr, 
-            segments: [{ 
+          newTimes.push({
+            day: dayNr,
+            day_name: dayAbbr,
+            segments: [{
               id: `${parentItemId}-${index}-${dayAbbr}-${Date.now()}`,
-              booking_start: '08:00', 
-              booking_end: '16:00' 
-            }] 
+              booking_start: '08:00',
+              booking_end: '16:00'
+            }]
           });
         } else if (!isEnabled && dayIndex !== -1) {
           newTimes.splice(dayIndex, 1);
@@ -137,17 +137,17 @@ function BookingDetail({
       ...booking,
       times: booking.times.map((t) =>
         t.day_name === dayAbbr
-          ? { 
-              ...t, 
-              segments: [
-                ...t.segments, 
-                { 
-                  id: `${parentItemId}-${index}-${dayAbbr}-${Date.now()}`,
-                  booking_start: '13:00', 
-                  booking_end: '16:00' 
-                }
-              ] 
-            }
+          ? {
+            ...t,
+            segments: [
+              ...t.segments,
+              {
+                id: `${parentItemId}-${index}-${dayAbbr}-${Date.now()}`,
+                booking_start: '13:00',
+                booking_end: '16:00'
+              }
+            ]
+          }
           : t
       ),
     };
@@ -161,11 +161,11 @@ function BookingDetail({
         if (t.day_name === dayAbbr) {
           const newSegments = t.segments.map((seg, i) =>
             i === segIdx
-              ? { 
-                  ...seg, 
-                  booking_start: valueToTime(newValues[0]), 
-                  booking_end: valueToTime(newValues[1]) 
-                }
+              ? {
+                ...seg,
+                booking_start: valueToTime(newValues[0]),
+                booking_end: valueToTime(newValues[1])
+              }
               : seg
           );
           return { ...t, segments: newSegments };
@@ -351,22 +351,7 @@ function BookingDetail({
             : false;
           return (
             <Box key={day.abbr} display="flex" alignItems="center">
-              {dayMod && (
-                <ModMonitor
-                  itemId={parentItemId}
-                  field={`booking-${index}-${day.abbr}`}
-                  value={JSON.stringify(booking.times?.find(t => t.day_name === day.abbr))}
-                  originalValue={
-                    originalBooking
-                      ? JSON.stringify(originalBooking.times?.find(t => t.day_name === day.abbr))
-                      : undefined
-                  }
-                  onRestore={() => handleRestoreDay(day.abbr)}
-                  title="Tag auf importierte Werte zurücksetzen"
-                  confirmMsg={`${day.label} auf importierte Werte zurücksetzen?`}
-                  iconProps={{ sx: { mr: 1 } }}
-                />
-              )}
+
               <DayControl
                 dayLabel={day.label}
                 dayAbbr={day.abbr}
@@ -377,6 +362,24 @@ function BookingDetail({
                 onRemoveSegment={handleRemoveSegment}
                 type={type}
               />
+              <>
+                {dayMod && (
+                  <ModMonitor
+                    itemId={parentItemId}
+                    field={`booking-${index}-${day.abbr}`}
+                    value={JSON.stringify(booking.times?.find(t => t.day_name === day.abbr))}
+                    originalValue={
+                      originalBooking
+                        ? JSON.stringify(originalBooking.times?.find(t => t.day_name === day.abbr))
+                        : undefined
+                    }
+                    onRestore={() => handleRestoreDay(day.abbr)}
+                    title="Tag auf importierte Werte zurücksetzen"
+                    confirmMsg={`${day.label} auf importierte Werte zurücksetzen?`}
+                    iconProps={{ sx: { mr: 1 } }}
+                  />
+                )}
+              </>
             </Box>
           );
         })}
