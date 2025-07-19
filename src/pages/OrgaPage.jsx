@@ -314,7 +314,7 @@ function QualificationsTab() {
   );
 }
 
-function SettingsPage() {
+function OrgaPage() {
   const [activeTab, setActiveTab] = useState(0);
 
   return (
@@ -342,4 +342,4 @@ function SettingsPage() {
   );
 }
 
-export default SettingsPage;
+export default OrgaPage;

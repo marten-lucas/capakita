@@ -1,12 +1,11 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Box, Container } from '@mui/material'
 import TopNav from './components/TopNav'
-import SimDatenPage from './pages/SimDatenPage'
-import SimulationPage from './pages/SimulationPage'
-import SettingsPage from './pages/SettingsPage'
-import ScenarioPage from './pages/ScenarioPage';
-import WelcomePage from './pages/WelcomePage'; // <-- NEU
-import useSimScenarioStore from './store/simScenarioStore'; // <-- NEU
+import DataPage from './pages/DataPage'
+import VisuPage from './pages/VisuPage'
+import OrgaPage from './pages/OrgaPage'
+import WelcomePage from './pages/WelcomePage';
+import useSimScenarioStore from './store/simScenarioStore'; 
 import './App.css'
 
 function App() {
@@ -38,11 +37,10 @@ function App() {
       <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
         <Container maxWidth='l'> {/* Der Container ist jetzt nur für den Inhalt */}
           <Routes>
-            <Route path="/" element={<Navigate to="/simulation" replace />} />
-            <Route path="/simulation" element={<SimulationPage />} />
-            <Route path="/data" element={<SimDatenPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/scenarios" element={<ScenarioPage />} />
+            <Route path="/" element={<Navigate to="/data" replace />} />
+            <Route path="/visu" element={<VisuPage />} />
+            <Route path="/data" element={<DataPage />} />
+            <Route path="/orga" element={<OrgaPage />} />
           </Routes>
         </Container>
       </Box>

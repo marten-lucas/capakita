@@ -7,7 +7,7 @@ import useSimScenarioStore from '../../store/simScenarioStore';
 import useChartStore from '../../store/chartStore';
 import useAppSettingsStore from '../../store/appSettingsStore';
 
-function LoadDataDialog({ open, onClose, onLoaded }) {
+function ScenarioLoadDialog({ open, onClose, onLoaded }) {
   const [pwValue, setPwValue] = useState('');
   const [pwError, setPwError] = useState('');
   const [showPw, setShowPw] = useState(false);
@@ -99,4 +99,4 @@ function LoadDataDialog({ open, onClose, onLoaded }) {
   );
 }
 
-export default LoadDataDialog;
+export default ScenarioLoadDialog;

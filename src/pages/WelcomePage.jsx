@@ -5,8 +5,7 @@ import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import { useNavigate } from 'react-router-dom';
 import DataImportModal from '../components/modals/DataImportModal';
-import LoadDataDialog from '../components/modals/LoadDataDialog';
-import AddScenarioDialog from '../components/modals/AddScenarioDialog';
+import ScenarioLoadDialog from '../components/modals/ScenarioLoadDialog.jsx';
 import { extractAdebisZipAndData } from '../utils/adebis-import.js';
 import useSimScenarioStore from '../store/simScenarioStore';
 import useAppSettingsStore from '../store/appSettingsStore';
@@ -14,7 +13,6 @@ import useAppSettingsStore from '../store/appSettingsStore';
 function WelcomePage() {
   const [importOpen, setImportOpen] = useState(false);
   const [loadOpen, setLoadOpen] = useState(false);
-  const [addScenarioOpen, setAddScenarioOpen] = useState(false);
   const navigate = useNavigate();
 
   const addScenario = useSimScenarioStore(state => state.addScenario);
@@ -57,8 +55,24 @@ function WelcomePage() {
     setLoadOpen(false);
     navigate('/data');
   };
-  const handleAddScenarioDone = () => {
-    setAddScenarioOpen(false);
+
+  // Neues leeres Szenario direkt anlegen und auswählen
+  const handleAddEmptyScenario = () => {
+    const newScenario = {
+      name: 'Neues Szenario',
+      remark: '',
+      confidence: 50,
+      likelihood: 50,
+      baseScenarioId: null,
+      simulationData: undefined
+    };
+    addScenario(newScenario);
+    // Setze das neue Szenario als ausgewählt
+    const scenarios = useSimScenarioStore.getState().scenarios;
+    const lastScenario = scenarios[scenarios.length - 1];
+    if (lastScenario) {
+      setSelectedScenarioId(lastScenario.id);
+    }
     navigate('/data');
   };
 
@@ -142,7 +156,7 @@ function WelcomePage() {
             textAlign: 'center'
           }}
         >
-          <CardActionArea onClick={() => setAddScenarioOpen(true)}>
+          <CardActionArea onClick={handleAddEmptyScenario}>
             <CardContent>
               <AddCircleOutlineIcon sx={{ fontSize: 56, color: 'success.main', mb: 1 }} />
               <Typography variant="h6" sx={{ fontWeight: 600 }}>
@@ -154,11 +168,9 @@ function WelcomePage() {
       </Stack>
       {/* Dialoge */}
       <DataImportModal open={importOpen} onClose={() => setImportOpen(false)} onImport={handleImport} />
-      <LoadDataDialog open={loadOpen} onClose={() => setLoadOpen(false)} onLoaded={handleLoadDone} />
-      <AddScenarioDialog open={addScenarioOpen} onClose={() => setAddScenarioOpen(false)} onAdded={handleAddScenarioDone} />
+      <ScenarioLoadDialog open={loadOpen} onClose={() => setLoadOpen(false)} onLoaded={handleLoadDone} />
     </Box>
   );
 }
 
 export default WelcomePage;
- 

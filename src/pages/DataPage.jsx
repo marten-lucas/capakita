@@ -31,20 +31,22 @@ import InputAdornment from '@mui/material/InputAdornment';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import useAppSettingsStore from '../store/appSettingsStore';
+import ScenarioSaveDialog from '../components/modals/ScenarioSaveDialog';
+import ScenarioManager from '../components/ScenarioManager';
 
-function SimDatenPage() {
+function DataPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [addItemModalOpen, setAddItemModalOpen] = useState(false);
-  const [pwDialogOpen, setPwDialogOpen] = useState(false);
-  const [pwDialogMode, setPwDialogMode] = useState(''); // 'save' | 'load'
-  const [pwValue, setPwValue] = useState('');
-  const [pwValue2, setPwValue2] = useState('');
-  const [pwError, setPwError] = useState('');
-  const [showPw, setShowPw] = useState(false);
-  const [pendingSave, setPendingSave] = useState(null);
-  const [pendingLoad, setPendingLoad] = useState(null);
+  // const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  // const [pendingSave, setPendingSave] = useState(false);
 
-  const selectedScenarioId = useSimScenarioStore(state => state.selectedScenarioId);
+  // Use store for dialog state
+  const scenarioSaveDialogOpen = useAppSettingsStore(state => state.scenarioSaveDialogOpen);
+  const setScenarioSaveDialogOpen = useAppSettingsStore(state => state.setScenarioSaveDialogOpen);
+  const scenarioSaveDialogPending = useAppSettingsStore(state => state.scenarioSaveDialogPending);
+  const setScenarioSaveDialogPending = useAppSettingsStore(state => state.setScenarioSaveDialogPending);
+
+    const selectedScenarioId = useSimScenarioStore(state => state.selectedScenarioId);
   const setSelectedScenarioId = useSimScenarioStore(state => state.setSelectedScenarioId);
   const scenarios = useSimScenarioStore(state => state.scenarios);
 
@@ -400,55 +402,10 @@ function SimDatenPage() {
     clearAllData(); // Reset all imported data
   };
 
-  // Open password dialog for save/load
-  const openPwDialog = (mode, cb) => {
-    setPwDialogMode(mode);
-    setPwValue('');
-    setPwValue2('');
-    setPwError('');
-    setShowPw(false);
-    if (mode === 'save') setPendingSave(() => cb);
-    if (mode === 'load') setPendingLoad(() => cb);
-    setPwDialogOpen(true);
-  };
-
-  // Handle dialog close
-  const handlePwDialogClose = () => {
-    setPwDialogOpen(false);
-    setPendingSave(null);
-    setPendingLoad(null);
-    setPwError('');
-  };
-
-  // Handle dialog submit
-  const handlePwDialogSubmit = () => {
-    if (pwDialogMode === 'save') {
-      if (!pwValue) {
-        setPwError('Bitte Passwort eingeben.');
-        return;
-      }
-      if (pwValue !== pwValue2) {
-        setPwError('Passwörter stimmen nicht überein.');
-        return;
-      }
-      setPwDialogOpen(false);
-      if (pendingSave) pendingSave(pwValue);
-      setPendingSave(null);
-    } else if (pwDialogMode === 'load') {
-      if (!pwValue) {
-        setPwError('Bitte Passwort eingeben.');
-        return;
-      }
-      setPwDialogOpen(false);
-      if (pendingLoad) pendingLoad(pwValue);
-      setPendingLoad(null);
-    }
-    setPwError('');
-  };
-
   // --- Save/Load functions ---
   const saveStoresToFile = () => {
-    openPwDialog('save', (password) => {
+    setScenarioSaveDialogOpen(true);
+    setScenarioSaveDialogPending(() => (password) => {
       const simState = useSimScenarioStore.getState();
       const chartData = useChartStore.getState();
 
@@ -490,7 +447,8 @@ function SimDatenPage() {
       const file = e.target.files[0];
       if (!file) return;
       const ciphertext = await file.text();
-      openPwDialog('load', (password) => {
+      setScenarioSaveDialogOpen(true);
+      setScenarioSaveDialogPending(() => (password) => {
         try {
           const bytes = CryptoJS.AES.decrypt(ciphertext, password);
           const decrypted = bytes.toString(CryptoJS.enc.Utf8);
@@ -579,27 +537,12 @@ function SimDatenPage() {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#f0f2f5' }}>
       {/* Scenario Selector */}
-      <Box sx={{ px: 3, pt: 2, pb: 1, bgcolor: 'background.paper', borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 2 }}>
-        <Typography variant="subtitle1" sx={{ minWidth: 120 }}>Szenario:</Typography>
-        <Select
-          size="small"
-          value={selectedScenarioId || ''}
-          onChange={e => {
-            setSelectedScenarioId(e.target.value);
-            // Clear selected item when switching scenarios
-            setSelectedItem(null);
-          }}
-          sx={{ minWidth: 280 }}
-          displayEmpty
-        >
-          {scenarios.map(scenario => (
-            <MenuItem key={scenario.id} value={scenario.id}>
-              {scenario.name || `Szenario ${scenario.id}`}
-              {scenario.baseScenarioId && ' (basiert auf)'}
-            </MenuItem>
-          ))}
-        </Select>
-      </Box>
+      <ScenarioManager
+        selectedScenarioId={selectedScenarioId}
+        setSelectedScenarioId={setSelectedScenarioId}
+        scenarios={scenarios}
+        setSelectedItem={setSelectedItem}
+      />
       <SpeedDial
         ariaLabel="SpeedDial for data actions"
         sx={{ position: 'fixed', bottom: 32, right: 32 }}
@@ -611,7 +554,7 @@ function SimDatenPage() {
             icon={action.icon}
             tooltipTitle={action.name}
             onClick={action.onClick}
-            disabled={action.disabled} // <-- Add this line!
+            disabled={action.disabled}
           />
         ))}
       </SpeedDial>
@@ -625,57 +568,17 @@ function SimDatenPage() {
         onClose={handleCloseAddItemModal}
         onAdd={handleAddItem}
       />
-      <Dialog open={pwDialogOpen} onClose={handlePwDialogClose}>
-        <DialogTitle>
-          {pwDialogMode === 'save' ? 'Passwort zum Speichern' : 'Passwort zum Laden'}
-        </DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            margin="dense"
-            label="Passwort"
-            type={showPw ? 'text' : 'password'}
-            fullWidth
-            value={pwValue}
-            onChange={e => setPwValue(e.target.value)}
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton
-                    aria-label="Passwort anzeigen"
-                    onClick={() => setShowPw(s => !s)}
-                    edge="end"
-                  >
-                    {showPw ? <VisibilityOff /> : <Visibility />}
-                  </IconButton>
-                </InputAdornment>
-              )
-            }}
-          />
-          {pwDialogMode === 'save' && (
-            <TextField
-              margin="dense"
-              label="Passwort bestätigen"
-              type={showPw ? 'text' : 'password'}
-              fullWidth
-              value={pwValue2}
-              onChange={e => setPwValue2(e.target.value)}
-              sx={{ mt: 2 }}
-            />
-          )}
-          {pwError && (
-            <Typography color="error" variant="body2" sx={{ mt: 1 }}>
-              {pwError}
-            </Typography>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handlePwDialogClose}>Abbrechen</Button>
-          <Button onClick={handlePwDialogSubmit} variant="contained">
-            OK
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ScenarioSaveDialog
+        open={scenarioSaveDialogOpen}
+        onClose={() => { setScenarioSaveDialogOpen(false); setScenarioSaveDialogPending(null); }}
+        onSave={(password) => {
+          if (scenarioSaveDialogPending) {
+            scenarioSaveDialogPending(password);
+            setScenarioSaveDialogOpen(false);
+            setScenarioSaveDialogPending(null);
+          }
+        }}
+      />
       <Box sx={{ flex: 1, display: 'flex', flexDirection: 'row', pt: 0 }}>
         <>
           <Box sx={{ width: 320, flexShrink: 0, borderRight: 1, borderColor: 'divider', bgcolor: 'background.paper', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -710,7 +613,5 @@ function SimDatenPage() {
   );
 }
 
-export default SimDatenPage;
-
-
+export default DataPage;
 

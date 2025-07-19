@@ -8,7 +8,7 @@ import WeeklyChart from '../components/SimDataCharts/WeeklyChart'
 import MidtermChart from '../components/SimDataCharts/MidtermChart'
 import useSimScenarioStore from '../store/simScenarioStore'
 
-function SimulationPage() {
+function VisuPage() {
   const [tab, setTab] = useState(0)
   const navigate = useNavigate()
 
@@ -70,4 +70,4 @@ function SimulationPage() {
   )
 }
 
-export default SimulationPage
+export default VisuPage

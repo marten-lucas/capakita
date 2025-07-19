@@ -121,7 +121,7 @@ const useSimScenarioStore = create(
         return JSON.stringify(currentValue) !== JSON.stringify(computedOriginalValue);
       },
 
-      addScenario: ({ name, remark = '', confidence = 50, likelihood = 50, baseScenarioId = null, simulationData = [] }) =>
+      addScenario: ({ name, remark = '', confidence = 50, likelihood = 50, desirability = 50, baseScenarioId = null, simulationData = [] }) =>
         set(produce((state) => {
           const id = Date.now().toString();
           const uid = generateUID();
@@ -134,6 +134,7 @@ const useSimScenarioStore = create(
             remark, 
             confidence, 
             likelihood, 
+            desirability,
             baseScenarioId, 
             simulationData: scenarioData,
             dataChanges: baseScenarioId ? {} : undefined // Track changes for based scenarios
