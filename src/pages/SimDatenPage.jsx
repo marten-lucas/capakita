@@ -13,8 +13,8 @@ import {
 import FileUploadIcon from '@mui/icons-material/FileUpload';
 import AddIcon from '@mui/icons-material/Add';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
-import DataImportModal from '../components/DataImportModal';
-import AddItemModal from '../components/AddItemModal';
+import DataImportModal from '../components/modals/DataImportModal';
+import AddItemModal from '../components/modals/AddItemModal';
 import SimDataList from '../components/SimDataList';
 import SimDataDetailForm from '../components/SimDataDetailForm';
 import JSZip from 'jszip';

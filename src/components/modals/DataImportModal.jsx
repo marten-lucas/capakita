@@ -9,7 +9,7 @@ import {
   Stack,
 } from '@mui/material';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
-import useAppSettingsStore from '../store/appSettingsStore';
+import useAppSettingsStore from '../../store/appSettingsStore';
 
 const modalStyle = {
   position: 'absolute',
