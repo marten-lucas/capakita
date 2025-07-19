@@ -37,7 +37,7 @@ function TopNav() {
               textDecoration: 'none',
             }}
           >
-            Kiga Simulator
+            CapaKita
           </Typography>
           <Box sx={{ flexGrow: 1, display: 'flex' }}>
             {pages.map((page) => (
