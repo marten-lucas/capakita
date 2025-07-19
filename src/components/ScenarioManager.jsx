@@ -5,7 +5,6 @@ import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import EditIcon from '@mui/icons-material/Edit';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
-import CheckIcon from '@mui/icons-material/Check';
 import useSimScenarioStore from '../store/simScenarioStore';
 
 // Helper to build a tree from flat scenario list
@@ -173,7 +172,7 @@ function ScenarioDetailForm({ scenarioId, scenarios, onClose, isNew }) {
         });
     }, [scenarioId, scenario]);
 
-   
+
     // Build scenario tree for nested list, excluding the current scenario itself
     const scenarioTree = useMemo(() => {
         if (!scenario) return [];
@@ -217,7 +216,7 @@ function ScenarioDetailForm({ scenarioId, scenarios, onClose, isNew }) {
         return ids;
     };
 
-    
+
     const handleDeleteConfirmed = () => {
         if (!scenario) return;
         deleteScenario(scenario.id);
@@ -469,19 +468,62 @@ const ScenarioManager = forwardRef(function ScenarioManager({ selectedScenarioId
                 minWidth: 320
             }}
         >
-            <Typography
-                variant="subtitle2"
-                sx={{
-                    px: 2,
-                    pt: 2,
-                    pb: 1,
-                    fontWeight: 600,
-                    textAlign: 'left',
-                    color: 'text.secondary',
-                }}
-            >
-                Szenario auswählen
-            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', px: 2, pt: 2, pb: 1 }}>
+                <Typography
+                    variant="subtitle2"
+                    sx={{
+                        fontWeight: 600,
+                        textAlign: 'left',
+                        color: 'text.secondary',
+                        flex: 1,
+                        minWidth: 0,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                    }}
+                >
+                    Szenario auswählen
+                </Typography>
+                <IconButton
+                    size="small"
+                    edge="end"
+                    aria-label="edit"
+                    onClick={e => {
+                        e.stopPropagation();
+                        if (selectedScenario) handleEdit(selectedScenario);
+                    }}
+                    sx={{ ml: 0.5 }}
+                    disabled={!selectedScenario}
+                >
+                    <EditIcon fontSize="small" />
+                </IconButton>
+                <IconButton
+                    size="small"
+                    edge="end"
+                    aria-label="add"
+                    onClick={e => {
+                        e.stopPropagation();
+                        if (selectedScenario) handleAdd(selectedScenario);
+                    }}
+                    sx={{ ml: 0.5 }}
+                    disabled={!selectedScenario}
+                >
+                    <AddIcon fontSize="small" />
+                </IconButton>
+                <IconButton
+                    size="small"
+                    edge="end"
+                    aria-label="delete"
+                    onClick={e => {
+                        e.stopPropagation();
+                        if (selectedScenario) handleDelete(selectedScenario);
+                    }}
+                    sx={{ ml: 0.5 }}
+                    disabled={!selectedScenario}
+                >
+                    <DeleteIcon fontSize="small" />
+                </IconButton>
+            </Box>
             <Box sx={{ px: 0, pt: 1 }}>
                 <Accordion
                     expanded={expanded}
@@ -499,48 +541,6 @@ const ScenarioManager = forwardRef(function ScenarioManager({ selectedScenarioId
                                 ? `${selectedScenario.name || `Szenario ${selectedScenario.id}`}${selectedScenario.baseScenarioId ? ' (basiert auf)' : ''}`
                                 : 'Szenario auswählen'}
                         </Typography>
-                        {/* Action Icons in Summary */}
-                        <Box sx={{ display: 'flex', alignItems: 'center', ml: 1 }}>
-                            <IconButton
-                                size="small"
-                                edge="end"
-                                aria-label="edit"
-                                onClick={e => {
-                                    e.stopPropagation();
-                                    if (selectedScenario) handleEdit(selectedScenario);
-                                }}
-                                sx={{ ml: 0.5 }}
-                                disabled={!selectedScenario}
-                            >
-                                <EditIcon fontSize="small" />
-                            </IconButton>
-                            <IconButton
-                                size="small"
-                                edge="end"
-                                aria-label="add"
-                                onClick={e => {
-                                    e.stopPropagation();
-                                    if (selectedScenario) handleAdd(selectedScenario);
-                                }}
-                                sx={{ ml: 0.5 }}
-                                disabled={!selectedScenario}
-                            >
-                                <AddIcon fontSize="small" />
-                            </IconButton>
-                            <IconButton
-                                size="small"
-                                edge="end"
-                                aria-label="delete"
-                                onClick={e => {
-                                    e.stopPropagation();
-                                    if (selectedScenario) handleDelete(selectedScenario);
-                                }}
-                                sx={{ ml: 0.5 }}
-                                disabled={!selectedScenario}
-                            >
-                                <DeleteIcon fontSize="small" />
-                            </IconButton>
-                        </Box>
                     </AccordionSummary>
                     <AccordionDetails sx={{ p: 0 }}>
                         <List dense disablePadding>
@@ -642,3 +642,4 @@ function DeleteScenarioDialog({ scenarioId, scenarios, onClose, onDeleted }) {
 }
 
 export default ScenarioManager;
+
