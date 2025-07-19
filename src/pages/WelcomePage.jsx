@@ -7,6 +7,9 @@ import { useNavigate } from 'react-router-dom';
 import DataImportModal from '../components/modals/DataImportModal';
 import LoadDataDialog from '../components/modals/LoadDataDialog';
 import AddScenarioDialog from '../components/modals/AddScenarioDialog';
+import { extractAdebisZipAndData } from '../utils/adebis-import.js';
+import useSimScenarioStore from '../store/simScenarioStore';
+import useAppSettingsStore from '../store/appSettingsStore';
 
 function WelcomePage() {
   const [importOpen, setImportOpen] = useState(false);
@@ -14,11 +17,42 @@ function WelcomePage() {
   const [addScenarioOpen, setAddScenarioOpen] = useState(false);
   const navigate = useNavigate();
 
-  // Nach Abschluss immer zu /data navigieren
-  const handleImportDone = () => {
+  const addScenario = useSimScenarioStore(state => state.addScenario);
+  const setSelectedScenarioId = useSimScenarioStore(state => state.setSelectedScenarioId);
+  const importGroupsFromAdebis = useAppSettingsStore(state => state.importGroupsFromAdebis);
+  const importQualificationsFromEmployees = useAppSettingsStore(state => state.importQualificationsFromEmployees);
+
+  // Handler für DataImportModal
+  const handleImport = async ({ file, isAnonymized }) => {
+    const { processedData  } = await extractAdebisZipAndData(
+      file,
+      isAnonymized,
+      importGroupsFromAdebis,
+      importQualificationsFromEmployees
+    );
+
+    // Szenario anlegen wie in SimDatenPage
+    const scenarioName = isAnonymized ? 'Importiertes Szenario (anonymisiert)' : 'Importiertes Szenario';
+    const newScenario = {
+      name: scenarioName,
+      remark: '',
+      confidence: 50,
+      likelihood: 50,
+      baseScenarioId: null,
+      simulationData: processedData
+    };
+    addScenario(newScenario);
+    // Setze das neue Szenario als ausgewählt
+    const scenarios = useSimScenarioStore.getState().scenarios;
+    const lastScenario = scenarios[scenarios.length - 1];
+    if (lastScenario) {
+      setSelectedScenarioId(lastScenario.id);
+    }
     setImportOpen(false);
     navigate('/data');
   };
+
+  // Nach Abschluss immer zu /data navigieren
   const handleLoadDone = () => {
     setLoadOpen(false);
     navigate('/data');
@@ -119,7 +153,7 @@ function WelcomePage() {
         </Card>
       </Stack>
       {/* Dialoge */}
-      <DataImportModal open={importOpen} onClose={() => setImportOpen(false)} onImport={handleImportDone} />
+      <DataImportModal open={importOpen} onClose={() => setImportOpen(false)} onImport={handleImport} />
       <LoadDataDialog open={loadOpen} onClose={() => setLoadOpen(false)} onLoaded={handleLoadDone} />
       <AddScenarioDialog open={addScenarioOpen} onClose={() => setAddScenarioOpen(false)} onAdded={handleAddScenarioDone} />
     </Box>
@@ -127,3 +161,4 @@ function WelcomePage() {
 }
 
 export default WelcomePage;
+ 
