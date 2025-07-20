@@ -103,7 +103,7 @@ function ScenarioTreeList({
                                     e.stopPropagation();
                                     onAdd?.(scenario);
                                 }}
-                                sx={{ ml: 0.5 }}
+                                sx={{ ml: 0.5}}
                             >
                                 <AddIcon fontSize="small" />
                             </IconButton>
@@ -455,9 +455,7 @@ const ScenarioManager = forwardRef(function ScenarioManager({ selectedScenarioId
         <Paper
             variant="outlined"
             sx={{
-                px: 0,
-                pt: 0,
-                pb: 2,
+                p: 2,
                 ml: 0,
                 mr: 3,
                 mt: 2,
@@ -468,95 +466,111 @@ const ScenarioManager = forwardRef(function ScenarioManager({ selectedScenarioId
                 minWidth: 320
             }}
         >
-            <Box sx={{ display: 'flex', alignItems: 'center', px: 2, pt: 2, pb: 1 }}>
-                <Typography
-                    variant="subtitle2"
-                    sx={{
-                        fontWeight: 600,
-                        textAlign: 'left',
-                        color: 'text.secondary',
-                        flex: 1,
-                        minWidth: 0,
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                    }}
-                >
-                    Szenario auswählen
-                </Typography>
-                <IconButton
-                    size="small"
-                    edge="end"
-                    aria-label="edit"
-                    onClick={e => {
-                        e.stopPropagation();
-                        if (selectedScenario) handleEdit(selectedScenario);
-                    }}
-                    sx={{ ml: 0.5 }}
-                    disabled={!selectedScenario}
-                >
-                    <EditIcon fontSize="small" />
-                </IconButton>
-                <IconButton
-                    size="small"
-                    edge="end"
-                    aria-label="add"
-                    onClick={e => {
-                        e.stopPropagation();
-                        if (selectedScenario) handleAdd(selectedScenario);
-                    }}
-                    sx={{ ml: 0.5 }}
-                    disabled={!selectedScenario}
-                >
-                    <AddIcon fontSize="small" />
-                </IconButton>
-                <IconButton
-                    size="small"
-                    edge="end"
-                    aria-label="delete"
-                    onClick={e => {
-                        e.stopPropagation();
-                        if (selectedScenario) handleDelete(selectedScenario);
-                    }}
-                    sx={{ ml: 0.5 }}
-                    disabled={!selectedScenario}
-                >
-                    <DeleteIcon fontSize="small" />
-                </IconButton>
-            </Box>
-            <Box sx={{ px: 0, pt: 1 }}>
-                <Accordion
-                    expanded={expanded}
-                    onChange={() => setExpanded(!expanded)}
-                    sx={{ minWidth: 280, flex: 1, boxShadow: 'none', '&:before': { display: 'none' } }}
-                >
-                    <AccordionSummary
-                        expandIcon={<ExpandMoreIcon />}
-                        aria-controls="scenario-list-content"
-                        id="scenario-list-header"
-                        sx={{ minHeight: 40, '& .MuiAccordionSummary-content': { my: 0, alignItems: 'center' } }}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <InputLabel sx={{ mb: 0.5, fontSize: '0.75rem', color: 'text.secondary' }}>
+                        Szenario
+                    </InputLabel>
+                    <Accordion
+                        expanded={expanded}
+                        onChange={() => setExpanded(!expanded)}
+                        sx={{ 
+                            minWidth: 0, 
+                            flex: 1, 
+                            boxShadow: 'none', 
+                            '&:before': { display: 'none' },
+                            border: '1px solid',
+                            borderColor: 'divider',
+                            borderRadius: 1
+                        }}
                     >
-                        <Typography component="span" sx={{ color: 'text.secondary', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>
-                            {selectedScenario
-                                ? `${selectedScenario.name || `Szenario ${selectedScenario.id}`}${selectedScenario.baseScenarioId ? ' (basiert auf)' : ''}`
-                                : 'Szenario auswählen'}
-                        </Typography>
-                    </AccordionSummary>
-                    <AccordionDetails sx={{ p: 0 }}>
-                        <List dense disablePadding>
-                            <ScenarioTreeList
-                                scenarioTree={scenarioTree}
-                                selectedId={selectedScenarioId}
-                                onSelect={handleSelect}
-                                expandedMap={treeExpandedMap}
-                                setExpandedMap={setTreeExpandedMap}
-                                onEdit={handleEdit}
-                                onAdd={handleAdd}
-                                onDelete={handleDelete}
-                            />
-                        </List>
-                    </AccordionDetails>
-                </Accordion>
+                        <AccordionSummary
+                            expandIcon={<ExpandMoreIcon />}
+                            aria-controls="scenario-list-content"
+                            id="scenario-list-header"
+                            sx={{ 
+                                minHeight: 40, 
+                                height: 40,
+                                '& .MuiAccordionSummary-content': { 
+                                    my: 0, 
+                                    alignItems: 'center',
+                                    margin: 0
+                                },
+                                '& .MuiAccordionSummary-expandIconWrapper': {
+                                    color: 'action.active'
+                                }
+                            }}
+                        >
+                            <Typography 
+                                component="span" 
+                                sx={{ 
+                                    color: 'text.primary', 
+                                    whiteSpace: 'nowrap', 
+                                    overflow: 'hidden', 
+                                    textOverflow: 'ellipsis', 
+                                    flex: 1,
+                                    fontSize: '0.875rem'
+                                }}
+                            >
+                                {selectedScenario
+                                    ? `${selectedScenario.name || `Szenario ${selectedScenario.id}`}${selectedScenario.baseScenarioId ? ' (basiert auf)' : ''}`
+                                    : 'Szenario auswählen'}
+                            </Typography>
+                        </AccordionSummary>
+                        <AccordionDetails sx={{ p: 0 }}>
+                            <List dense disablePadding>
+                                <ScenarioTreeList
+                                    scenarioTree={scenarioTree}
+                                    selectedId={selectedScenarioId}
+                                    onSelect={handleSelect}
+                                    expandedMap={treeExpandedMap}
+                                    setExpandedMap={setTreeExpandedMap}
+                                    onEdit={handleEdit}
+                                    onAdd={handleAdd}
+                                    onDelete={handleDelete}
+                                />
+                            </List>
+                        </AccordionDetails>
+                    </Accordion>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, height: 40 }}>
+                    <IconButton
+                        size="small"
+                        aria-label="edit"
+                        onClick={e => {
+                            e.stopPropagation();
+                            if (selectedScenario) handleEdit(selectedScenario);
+                        }}
+                        disabled={!selectedScenario}
+                        sx={{ width: 32, height: 32,  mt: 3  }}
+                    >
+                        <EditIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton
+                        size="small"
+                        aria-label="add"
+                        onClick={e => {
+                            e.stopPropagation();
+                            if (selectedScenario) handleAdd(selectedScenario);
+                        }}
+                        disabled={!selectedScenario}
+                        sx={{ width: 32, height: 32 ,  mt: 3 }}
+                    >
+                        <AddIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton
+                        size="small"
+                        aria-label="delete"
+                        onClick={e => {
+                            e.stopPropagation();
+                            if (selectedScenario) handleDelete(selectedScenario);
+                        }}
+                        disabled={!selectedScenario}
+                        sx={{ width: 32, height: 32 ,  mt: 3 }}
+                    >
+                        <DeleteIcon fontSize="small" />
+                    </IconButton>
+                </Box>
             </Box>
             {/* Scenario Detail Dialog */}
             {editScenarioId && (
