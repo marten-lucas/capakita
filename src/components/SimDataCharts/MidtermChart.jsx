@@ -14,9 +14,7 @@ import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 
 export default function MidtermChart({ hideFilters = false, scenario }) {
 
-  // Log scenario input and start of chart data processing
-  // Move this log to the function body so it always runs first
-  console.log('[MidtermChart] Step 1: Received scenario prop:', scenario);
+  
 
   // Always use the scenario prop's simulation data for charting
   const simulationData = useMemo(() => {
@@ -28,7 +26,6 @@ export default function MidtermChart({ hideFilters = false, scenario }) {
       } else {
         data = scenario.simulationData ?? [];
       }
-      console.log('[MidtermChart] Step 2: Loaded simulationData for scenario:', data);
       return data;
     }
     return [];
@@ -99,19 +96,11 @@ export default function MidtermChart({ hideFilters = false, scenario }) {
 
   // Calculate chart data with proper dependencies
   const chartData = useMemo(() => {
-    console.log('[MidtermChart] Step 3: Preparing chart data with filters:', {
-      midtermTimeDimension,
-      midtermSelectedGroups,
-      midtermSelectedQualifications
-    });
-    const result = getChartData(midtermTimeDimension, midtermSelectedGroups, midtermSelectedQualifications);
-    console.log('[MidtermChart] Step 4: Resulting chartData:', result);
-    return result;
+    return getChartData(midtermTimeDimension, midtermSelectedGroups, midtermSelectedQualifications);
   }, [getChartData, midtermTimeDimension, midtermSelectedGroups, midtermSelectedQualifications]);
 
   // Add console log to verify group and qualification filters
   React.useEffect(() => {
-    console.log('MidtermChart chartData:', chartData);
     if (
       chartData &&
       Array.isArray(chartData.categories) &&
@@ -141,8 +130,6 @@ export default function MidtermChart({ hideFilters = false, scenario }) {
           if (q) qualificationSet.add(q);
         }
       });
-      console.log('MidtermChart: unique group names in simulationData:', Array.from(groupNamesSet));
-      console.log('MidtermChart: unique qualifications in simulationData:', Array.from(qualificationSet));
     }
   }, [chartData, simulationData, midtermTimeDimension, midtermSelectedGroups, midtermSelectedQualifications]);
 
@@ -341,11 +328,7 @@ export default function MidtermChart({ hideFilters = false, scenario }) {
         <HighchartsReact highcharts={Highcharts} options={midtermOptions} />
       </Box>
 
-      {/* Debug Logs */}
-      <Box sx={{ display: 'none' }}>
-        {console.log('midtermSelectedGroups:', midtermSelectedGroups)}
-        {console.log('midtermSelectedQualifications:', midtermSelectedQualifications)}
-      </Box>
+     
     </Box>
   );
 }

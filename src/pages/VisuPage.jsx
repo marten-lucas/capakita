@@ -14,7 +14,7 @@ import ChartFilterForm from '../components/SimDataCharts/ChartFilterForm'
 import React from 'react'
 
 function VisuPage() {
-  const [visibleCharts, setVisibleCharts] = useState(['weekly', 'midterm'])
+  const [visibleCharts] = useState(['weekly', 'midterm'])
   const navigate = useNavigate()
 
   // Scenario management
@@ -31,8 +31,6 @@ function VisuPage() {
   // Find the selected scenario object
   const selectedScenario = scenarios.find(s => s.id === selectedScenarioId);
 
-  // Get simulationData for Dates of Interest selector
-  const simulationData = selectedScenario?.simulationData ?? [];
 
   // Check if selected scenario still exists, if not select the first available one
   React.useEffect(() => {
@@ -81,13 +79,8 @@ function VisuPage() {
     )
   }
 
-  const handleChartToggle = (event, newVisibleCharts) => {
-    setVisibleCharts(newVisibleCharts)
-  }
 
-  // Determine which filters to show based on visible charts
-  const showStichtag = visibleCharts.includes('weekly')
-  const showZeitdimension = visibleCharts.includes('midterm')
+
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#f0f2f5' }}>
@@ -111,35 +104,7 @@ function VisuPage() {
         }}
       />
       
-      <Box sx={{ px: 3, pt: 4, pb: 2 }}>
-        {/* Always show the filter form, even if no chart is selected */}
-        <Box sx={{ mb: 3 }}>
-          <ChartFilterForm 
-            showStichtag={showStichtag}
-            showZeitdimension={showZeitdimension}
-            simulationData={simulationData}
-            chartToggle={
-              <Box sx={{ display: 'flex', justifyContent: 'flex-start', mb: 2 }}>
-                <ToggleButtonGroup
-                  value={visibleCharts}
-                  onChange={handleChartToggle}
-                  aria-label="chart visibility"
-                  size="medium"
-                >
-                  <ToggleButton value="weekly" aria-label="weekly chart">
-                    <BarChartIcon sx={{ mr: 1 }} />
-                    Weekly
-                  </ToggleButton>
-                  <ToggleButton value="midterm" aria-label="midterm chart">
-                    <TimelineIcon sx={{ mr: 1 }} />
-                    Midterm
-                  </ToggleButton>
-                </ToggleButtonGroup>
-              </Box>
-            }
-          />
-        </Box>
-      </Box>
+
       
       <Box sx={{ flex: 1, p: 3, display: 'flex', flexDirection: 'column', gap: 3, overflow: 'auto' }}>
         {visibleCharts.includes('weekly') && (

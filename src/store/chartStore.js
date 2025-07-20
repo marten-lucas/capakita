@@ -400,14 +400,9 @@ const useChartStore = create(
         
         // Get last date of interest to determine end date
         const lastDateOfInterest = get().getLastDateOfInterest(simulationData);
-        console.log('[MidtermChart][chartStore] lastDateOfInterest:', lastDateOfInterest);
 
         // Generate time periods based on dimension
         const periods = get().generateMidtermPeriods(midtermTimeDimension, lastDateOfInterest);
-        console.log('[MidtermChart][chartStore] generated periods:', periods);
-        console.log('[MidtermChart][chartStore] midtermTimeDimension:', midtermTimeDimension);
-        console.log('[MidtermChart][chartStore] today:', new Date());
-        console.log('[MidtermChart][chartStore] endDate:', lastDateOfInterest);
 
         // Debug: show period generation logic step-by-step
         if (periods.length === 0) {
