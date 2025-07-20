@@ -119,7 +119,7 @@ function ChartFilterForm({ showStichtag = false, showZeitdimension = false, simu
     setSelectedQualifications,
     availableGroups,
     availableQualifications,
-    
+
     // Midterm filters
     midtermTimeDimension,
     setMidtermTimeDimension,
@@ -133,33 +133,39 @@ function ChartFilterForm({ showStichtag = false, showZeitdimension = false, simu
     setChartToggles
   } = useChartStore();
 
-  // Use appropriate filters based on what charts are visible
-  const currentGroups = showZeitdimension && !showStichtag ? midtermSelectedGroups : selectedGroups;
-  const currentQualifications = showZeitdimension && !showStichtag ? midtermSelectedQualifications : selectedQualifications;
-  
+  // Use correct filters based on chartToggles
+  const showWeekly = chartToggles.includes('weekly');
+  const showMidterm = chartToggles.includes('midterm');
+
+  // Use store state for filters depending on which chart is visible
+  const currentGroups = showMidterm && !showWeekly ? midtermSelectedGroups : selectedGroups;
+  const currentQualifications = showMidterm && !showWeekly ? midtermSelectedQualifications : selectedQualifications;
+
   const handleGroupChange = (event) => {
     const value = typeof event.target.value === 'string' ? event.target.value.split(',') : event.target.value;
-    if (showZeitdimension && !showStichtag) {
+    if (showMidterm && !showWeekly) {
       setMidtermSelectedGroups(value);
     } else {
       setSelectedGroups(value);
     }
     // Sync both if both charts are visible
-    if (showStichtag && showZeitdimension) {
+    if (showWeekly && showMidterm) {
       setMidtermSelectedGroups(value);
+      setSelectedGroups(value);
     }
   };
 
   const handleQualificationChange = (event) => {
     const value = typeof event.target.value === 'string' ? event.target.value.split(',') : event.target.value;
-    if (showZeitdimension && !showStichtag) {
+    if (showMidterm && !showWeekly) {
       setMidtermSelectedQualifications(value);
     } else {
       setSelectedQualifications(value);
     }
     // Sync both if both charts are visible
-    if (showStichtag && showZeitdimension) {
+    if (showWeekly && showMidterm) {
       setMidtermSelectedQualifications(value);
+      setSelectedQualifications(value);
     }
   };
 
@@ -167,11 +173,6 @@ function ChartFilterForm({ showStichtag = false, showZeitdimension = false, simu
   const handleToggle = (event, newToggles) => {
     setChartToggles(newToggles);
   };
-
-  // Only show stichtag/datesOfInterest if "weekly" is selected
-  const showWeekly = chartToggles.includes('weekly');
-  // Only show zeitdimension if "midterm" is selected
-  const showMidterm = chartToggles.includes('midterm');
 
   // Dates of Interest for weekly chart
   const datesOfInterest = useMemo(() => {
@@ -358,3 +359,4 @@ function ChartFilterForm({ showStichtag = false, showZeitdimension = false, simu
 }
 
 export default ChartFilterForm;
+
