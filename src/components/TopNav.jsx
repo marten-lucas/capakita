@@ -85,14 +85,14 @@ function TopNav() {
   // Wenn keine Szenarien vorhanden sind, nur leerer Balken anzeigen
   if (!scenarios || scenarios.length === 0) {
     return (
-      <AppBar position="static" sx={{ bgcolor: '#f5f5f5', boxShadow: 'none' }}>
+      <AppBar position="static" sx={{ bgcolor: '#fbf5ed', boxShadow: 'none' }}>
         <Toolbar disableGutters />
       </AppBar>
     );
   }
 
   return (
-    <AppBar position="static" sx={{ bgcolor: '#f2e7a5ff', boxShadow: 'none' }}>
+    <AppBar position="static" sx={{ bgcolor: '#fbf5ed', boxShadow: 'none' }}>
       <Container maxWidth="xl" disableGutters>
         <Toolbar >
           <Box sx={{ display: 'flex', alignItems: 'center', mr: 6, ml: 2 }}>
@@ -111,7 +111,7 @@ function TopNav() {
                 fontFamily: 'sans-serif',
                 fontWeight: 700,
                 letterSpacing: '.1em',
-                color: '#111',
+                color: '#083743',
                 textDecoration: 'none',
                 fontSize: '1.5rem',
               }}
@@ -127,13 +127,13 @@ function TopNav() {
                 to={page.path}
                 sx={{
                   my: 2,
-                  color: '#222',
+                  color: '#083743',
                   display: 'flex',
                   alignItems: 'center',
                   fontFamily: 'sans-serif',
                   fontWeight: 500,
                   '&.active': {
-                    bgcolor: '#e0e0e0',
+                    bgcolor: 'rgba(8, 55, 67, 0.1)',
                   },
                 }}
               >
@@ -148,7 +148,7 @@ function TopNav() {
               aria-label="Mehr"
               onClick={handleMenuOpen}
               size="large"
-              sx={{ ml: 1 }}
+              sx={{ ml: 1, color: '#083743' }}
             >
               <MoreVertIcon />
             </IconButton>

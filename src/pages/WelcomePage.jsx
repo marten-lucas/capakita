@@ -22,7 +22,7 @@ function WelcomePage() {
 
   // Handler für DataImportModal
   const handleImport = async ({ file, isAnonymized }) => {
-    const { processedData  } = await extractAdebisZipAndData(
+    const { processedData } = await extractAdebisZipAndData(
       file,
       isAnonymized,
       importGroupsFromAdebis,
@@ -91,7 +91,7 @@ function WelcomePage() {
       {/* App Logo */}
       <Box sx={{ width: '100%', maxWidth: 480, mb: 2 }}>
         <img
-          src="/CapaKita_Visual.svg"
+          src="CapaKita_Visual.svg"
           alt="CapaKita Logo"
           style={{
             width: '100%',
@@ -106,7 +106,7 @@ function WelcomePage() {
         ...was wäre wenn
       </Typography>
       {/* Wertversprechen */}
-      <Typography variant="h6" sx={{ maxWidth: 540, textAlign: 'center', color: 'text.secondary', mb: 3 }}>
+      <Typography variant="h6" sx={{ maxWidth: "80%", textAlign: 'center', color: 'text.secondary', mb: 0 }}>
         CapaKita hilft Ihnen, Personalkapazitäten und Betreuungsbedarf in Ihrer Kita einfach und flexibel zu simulieren. Importieren Sie Ihre Daten, spielen Sie verschiedene Szenarien durch und treffen Sie fundierte Entscheidungen für die Zukunft.
       </Typography>
       {/* Cards statt Buttons */}
