@@ -11,33 +11,33 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 import Checkbox from '@mui/material/Checkbox';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
-import MenuItem from '@mui/material/MenuItem';
-import Select from '@mui/material/Select';
 
-export default function MidtermChart() {
-  // Scenario selection state in chartStore
-  const scenarios = useSimScenarioStore(state => state.scenarios);
-  const chartSelectedScenarioId = useChartStore(state => state.midtermSelectedScenarioId);
-  const setMidtermSelectedScenarioId = useChartStore(state => state.setMidtermSelectedScenarioId);
+export default function MidtermChart({ hideFilters = false, scenario }) {
 
-  // Get simulationData for selected scenario
-  const simulationData = useSimScenarioStore(state => {
-    // Use overlay-aware data for the selected scenario
-    const scenario = state.scenarios.find(s => s.id === chartSelectedScenarioId);
-    if (!scenario) return [];
-    if (!scenario.baseScenarioId) {
-      return scenario.simulationData ?? [];
+  // Log scenario input and start of chart data processing
+  // Move this log to the function body so it always runs first
+  console.log('[MidtermChart] Step 1: Received scenario prop:', scenario);
+
+  // Always use the scenario prop's simulation data for charting
+  const simulationData = useMemo(() => {
+    if (scenario) {
+      const state = useSimScenarioStore.getState();
+      let data = [];
+      if (typeof state.getEffectiveSimulationData === 'function') {
+        data = state.getEffectiveSimulationData(scenario.id);
+      } else {
+        data = scenario.simulationData ?? [];
+      }
+      console.log('[MidtermChart] Step 2: Loaded simulationData for scenario:', data);
+      return data;
     }
-    const baseScenario = state.scenarios.find(s => s.id === scenario.baseScenarioId);
-    if (!baseScenario) return [];
-    return state.getEffectiveSimulationData
-      ? state.getEffectiveSimulationData.call({ ...state, selectedScenarioId: chartSelectedScenarioId })
-      : [];
-  });
+    return [];
+  }, [scenario]);
 
-  const groupsLookup = useAppSettingsStore(state => state.getGroupsLookup());
+  // Use groups and qualifications from appSettingsStore
+  const groups = useAppSettingsStore(state => state.groups);
   const qualifications = useAppSettingsStore(state => state.qualifications);
-  
+
   // Chart store
   const {
     midtermTimeDimension,
@@ -51,11 +51,10 @@ export default function MidtermChart() {
     updateAvailableQualifications
   } = useChartStore();
 
-  // Use only AppSettingsStore groups
+  // Use group names from appSettingsStore groups
   const groupNames = useMemo(() => {
-    const groupKeys = Object.keys(groupsLookup);
-    return groupKeys.map(key => groupsLookup[key]);
-  }, [groupsLookup]);
+    return groups.map(g => g.name);
+  }, [groups]);
 
   const hasNoGroup = useMemo(() => (
     simulationData.some(item =>
@@ -65,32 +64,20 @@ export default function MidtermChart() {
   ), [simulationData]);
 
   const allGroupNames = useMemo(() => {
-    const groups = hasNoGroup ? [...groupNames, 'keine Gruppe'] : groupNames;
-    updateAvailableGroups(groups);
-    return groups;
+    const groupsList = hasNoGroup ? [...groupNames, 'keine Gruppe'] : groupNames;
+    updateAvailableGroups(groupsList);
+    return groupsList;
   }, [groupNames, hasNoGroup, updateAvailableGroups]);
 
-  // Use qualification keys from app settings for filter
-  const qualificationNames = useMemo(() => {
-    if (qualifications && qualifications.length > 0) {
-      return qualifications.map(q => q.key);
-    }
-    // fallback: extract from simulationData if not set
-    const qualificationSet = new Set();
-    simulationData.forEach(item => {
-      if (item.type === 'capacity') {
-        const qualification = item.parseddata?.qualification || 'keine Qualifikation';
-        qualificationSet.add(qualification);
-      }
-    });
-    return Array.from(qualificationSet).sort();
-  }, [qualifications, simulationData]);
+  // Use qualification keys from appSettingsStore for filter
+  const qualificationKeys = useMemo(() => {
+    return qualifications.map(q => q.key);
+  }, [qualifications]);
 
-  // Update available qualifications
   const allQualificationNames = useMemo(() => {
-    updateAvailableQualifications(qualificationNames);
-    return qualificationNames;
-  }, [qualificationNames, updateAvailableQualifications]);
+    updateAvailableQualifications(qualificationKeys);
+    return qualificationKeys;
+  }, [qualificationKeys, updateAvailableQualifications]);
 
   // Initialize selections if empty
   useEffect(() => {
@@ -111,10 +98,53 @@ export default function MidtermChart() {
   }, [simulationData, calculateMidtermChartData]);
 
   // Calculate chart data with proper dependencies
-  const chartData = useMemo(() => 
-    getChartData(midtermTimeDimension, midtermSelectedGroups, midtermSelectedQualifications), 
-    [getChartData, midtermTimeDimension, midtermSelectedGroups, midtermSelectedQualifications]
-  );
+  const chartData = useMemo(() => {
+    console.log('[MidtermChart] Step 3: Preparing chart data with filters:', {
+      midtermTimeDimension,
+      midtermSelectedGroups,
+      midtermSelectedQualifications
+    });
+    const result = getChartData(midtermTimeDimension, midtermSelectedGroups, midtermSelectedQualifications);
+    console.log('[MidtermChart] Step 4: Resulting chartData:', result);
+    return result;
+  }, [getChartData, midtermTimeDimension, midtermSelectedGroups, midtermSelectedQualifications]);
+
+  // Add console log to verify group and qualification filters
+  React.useEffect(() => {
+    console.log('MidtermChart chartData:', chartData);
+    if (
+      chartData &&
+      Array.isArray(chartData.categories) &&
+      chartData.categories.length === 0
+    ) {
+      console.warn('MidtermChart: chartData is empty. Inputs:', {
+        simulationData,
+        midtermTimeDimension,
+        midtermSelectedGroups,
+        midtermSelectedQualifications
+      });
+      // Log unique values for group and qualification in simulationData for debugging
+      const groupNamesSet = new Set();
+      const qualificationSet = new Set();
+      simulationData.forEach(item => {
+        // Groups
+        if (item.parseddata?.group && Array.isArray(item.parseddata.group)) {
+          item.parseddata.group.forEach(g => {
+            if (g.name) groupNamesSet.add(g.name);
+          });
+        } else if (!item.parseddata?.group || item.parseddata.group.length === 0) {
+          groupNamesSet.add('keine Gruppe');
+        }
+        // Qualifications
+        if (item.type === 'capacity') {
+          const q = item.parseddata?.qualification;
+          if (q) qualificationSet.add(q);
+        }
+      });
+      console.log('MidtermChart: unique group names in simulationData:', Array.from(groupNamesSet));
+      console.log('MidtermChart: unique qualifications in simulationData:', Array.from(qualificationSet));
+    }
+  }, [chartData, simulationData, midtermTimeDimension, midtermSelectedGroups, midtermSelectedQualifications]);
 
   // Chart options
   const midtermOptions = useMemo(() => ({
@@ -230,101 +260,94 @@ export default function MidtermChart() {
     }
   }), [chartData, midtermTimeDimension]);
 
+  // Filter Form
   return (
     <Box sx={{ flex: 1, p: 2, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-      {/* Scenario Selector */}
-      <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
-        <Typography variant="subtitle1" sx={{ minWidth: 120 }}>Szenario:</Typography>
-        <Select
-          size="small"
-          value={chartSelectedScenarioId || ''}
-          onChange={e => setMidtermSelectedScenarioId(e.target.value)}
-          sx={{ minWidth: 280 }}
-          displayEmpty
-        >
-          {scenarios.map(scenario => (
-            <MenuItem key={scenario.id} value={scenario.id}>
-              {scenario.name || `Szenario ${scenario.id}`}
-            </MenuItem>
-          ))}
-        </Select>
-      </Box>
-      
       {/* Filter Form */}
-      <Box sx={{ mb: 2, display: 'flex', gap: 4, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-        <Box>
-          <Typography variant="body1" sx={{ mb: 1 }}>Zeitdimension:</Typography>
-          <ToggleButtonGroup
-            value={midtermTimeDimension}
-            exclusive
-            onChange={(e, newDimension) => {
-              if (newDimension !== null) {
-                setMidtermTimeDimension(newDimension);
-              }
-            }}
-            size="small"
-          >
-            <ToggleButton value="Wochen">Wochen</ToggleButton>
-            <ToggleButton value="Monate">Monate</ToggleButton>
-            <ToggleButton value="Jahre">Jahre</ToggleButton>
-          </ToggleButtonGroup>
-        </Box>
-        
-        <Box>
-          <Typography variant="body1" sx={{ mb: 1 }}>Gruppen:</Typography>
-          <FormGroup row>
-            {allGroupNames.map(groupName => (
-              <FormControlLabel
-                key={groupName}
-                control={
-                  <Checkbox
-                    checked={midtermSelectedGroups.includes(groupName)}
-                    onChange={() => {
-                      const newGroups = midtermSelectedGroups.includes(groupName)
-                        ? midtermSelectedGroups.filter(g => g !== groupName)
-                        : [...midtermSelectedGroups, groupName];
-                      setMidtermSelectedGroups(newGroups);
-                    }}
-                  />
+      {!hideFilters && (
+        <Box sx={{ mb: 2, display: 'flex', gap: 4, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <Box>
+            <Typography variant="body1" sx={{ mb: 1 }}>Zeitdimension:</Typography>
+            <ToggleButtonGroup
+              value={midtermTimeDimension}
+              exclusive
+              onChange={(e, newDimension) => {
+                if (newDimension !== null) {
+                  setMidtermTimeDimension(newDimension);
                 }
-                label={groupName}
-              />
-            ))}
-          </FormGroup>
-        </Box>
-        
-        <Box>
-          <Typography variant="body1" sx={{ mb: 1 }}>Qualifikationen:</Typography>
-          <FormGroup row>
-            {allQualificationNames.map(qualification => {
-              const displayName =
-                qualifications.find(q => q.key === qualification)?.name || qualification;
-              return (
+              }}
+              size="small"
+            >
+              <ToggleButton value="Wochen">Wochen</ToggleButton>
+              <ToggleButton value="Monate">Monate</ToggleButton>
+              <ToggleButton value="Jahre">Jahre</ToggleButton>
+            </ToggleButtonGroup>
+          </Box>
+          
+          <Box>
+            <Typography variant="body1" sx={{ mb: 1 }}>Gruppen:</Typography>
+            <FormGroup row>
+              {allGroupNames.map(groupName => (
                 <FormControlLabel
-                  key={qualification}
+                  key={groupName}
                   control={
                     <Checkbox
-                      checked={midtermSelectedQualifications.includes(qualification)}
+                      checked={midtermSelectedGroups.includes(groupName)}
                       onChange={() => {
-                        const newQualifications = midtermSelectedQualifications.includes(qualification)
-                          ? midtermSelectedQualifications.filter(q => q !== qualification)
-                          : [...midtermSelectedQualifications, qualification];
-                        setMidtermSelectedQualifications(newQualifications);
+                        const newGroups = midtermSelectedGroups.includes(groupName)
+                          ? midtermSelectedGroups.filter(g => g !== groupName)
+                          : [...midtermSelectedGroups, groupName];
+                        setMidtermSelectedGroups(newGroups);
                       }}
                     />
                   }
-                  label={displayName}
+                  label={groupName}
                 />
-              );
-            })}
-          </FormGroup>
+              ))}
+            </FormGroup>
+          </Box>
+          
+          <Box>
+            <Typography variant="body1" sx={{ mb: 1 }}>Qualifikationen:</Typography>
+            <FormGroup row>
+              {allQualificationNames.map(qualification => {
+                const displayName =
+                  qualifications.find(q => q.key === qualification)?.name || qualification;
+                return (
+                  <FormControlLabel
+                    key={qualification}
+                    control={
+                      <Checkbox
+                        checked={midtermSelectedQualifications.includes(qualification)}
+                        onChange={() => {
+                          const newQualifications = midtermSelectedQualifications.includes(qualification)
+                            ? midtermSelectedQualifications.filter(q => q !== qualification)
+                            : [...midtermSelectedQualifications, qualification];
+                          setMidtermSelectedQualifications(newQualifications);
+                        }}
+                      />
+                    }
+                    label={displayName}
+                  />
+                );
+              })}
+            </FormGroup>
+          </Box>
         </Box>
-      </Box>
+      )}
 
       {/* Chart */}
       <Box sx={{ flex: 1, minHeight: 0 }}>
         <HighchartsReact highcharts={Highcharts} options={midtermOptions} />
       </Box>
+
+      {/* Debug Logs */}
+      <Box sx={{ display: 'none' }}>
+        {console.log('midtermSelectedGroups:', midtermSelectedGroups)}
+        {console.log('midtermSelectedQualifications:', midtermSelectedQualifications)}
+      </Box>
     </Box>
   );
 }
+
+ 

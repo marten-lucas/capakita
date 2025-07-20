@@ -7,17 +7,15 @@ const useAppSettingsStore = create(
     (set, get) => ({
       // Groups management
       groups: [], // Array of { id, name, icon }
+      groupsLookup: {}, // Lookup object for group names
       
       // Actions for groups
-      addGroup: (group) => set(produce((state) => {
-        // Generate ID if not provided
-        const newGroup = {
-          ...group,
-          id: group.id || Date.now().toString(),
-          icon: group.icon || '👥'
-        };
-        state.groups.push(newGroup);
-      })),
+      addGroup: (groupName) =>
+        set(produce((state) => {
+          if (!state.groupsLookup[groupName]) {
+            state.groupsLookup[groupName] = groupName;
+          }
+        })),
       
       updateGroup: (id, updates) => set(produce((state) => {
         const index = state.groups.findIndex(g => g.id === id);

@@ -16,21 +16,22 @@ import Select from '@mui/material/Select';
 import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
 
-export default function WeeklyChart() {
+export default function WeeklyChart({ hideFilters = false, scenario }) {
   // Scenario selection state in chartStore
-  const scenarios = useSimScenarioStore(state => state.scenarios);
   const chartSelectedScenarioId = useChartStore(state => state.weeklySelectedScenarioId);
-  const setWeeklySelectedScenarioId = useChartStore(state => state.setWeeklySelectedScenarioId);
 
   // Get effective simulationData for selected scenario (overlay-aware)
   const simulationData = useSimScenarioStore(state => {
-    // Use overlay-aware data for the selected scenario
-    const scenario = state.scenarios.find(s => s.id === chartSelectedScenarioId);
-    if (!scenario) return [];
-    if (!scenario.baseScenarioId) {
-      return scenario.simulationData ?? [];
+    // Use overlay-aware data for the scenario prop if provided, else use chartSelectedScenarioId
+    let scenarioToUse = scenario;
+    if (!scenarioToUse) {
+      scenarioToUse = state.scenarios.find(s => s.id === chartSelectedScenarioId);
     }
-    return state.computeOverlayData(scenario);
+    if (!scenarioToUse) return [];
+    if (!scenarioToUse.baseScenarioId) {
+      return scenarioToUse.simulationData ?? [];
+    }
+    return state.computeOverlayData(scenarioToUse);
   });
 
   const groupsLookup = useAppSettingsStore(state => state.getGroupsLookup());
@@ -348,133 +349,10 @@ export default function WeeklyChart() {
     }
   }), [chartData, categories, simulationData, getNamesForSegment]);
 
-  // Scenario selector for chart
+  // Material UI Filterformular
   return (
     <Box sx={{ flex: 1, p: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-      {/* Scenario Selector */}
-      <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
-        <Typography variant="subtitle1" sx={{ minWidth: 120 }}>Szenario:</Typography>
-        <Select
-          size="small"
-          value={chartSelectedScenarioId || ''}
-          onChange={e => setWeeklySelectedScenarioId(e.target.value)}
-          sx={{ minWidth: 280 }}
-          displayEmpty
-        >
-          {scenarios.map(scenario => (
-            <MenuItem key={scenario.id} value={scenario.id}>
-              {scenario.name || `Szenario ${scenario.id}`}
-            </MenuItem>
-          ))}
-        </Select>
-      </Box>
-      {/* Material UI Filterformular */}
-      <Box sx={{ mb: 2, display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
-        <Box>
-          <Typography variant="body1" sx={{ mb: 1 }}>Stichtag:</Typography>
-          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-            <TextField
-              type="date"
-              value={stichtag}
-              onChange={(e) => setStichtag(e.target.value)}
-              size="small"
-              InputLabelProps={{ shrink: true }}
-            />
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={() => setStichtag(new Date().toISOString().slice(0, 10))}
-            >
-              Heute
-            </Button>
-          </Box>
-          {datesOfInterest.length > 0 && (
-            <Box sx={{ mt: 1 }}>
-              <FormControl size="small" sx={{ minWidth: 300 }}>
-                <InputLabel>Dates of Interest</InputLabel>
-                <Select
-                  value={datesOfInterest.find(item => item.date === stichtag)?.date || ""}
-                  onChange={(e) => setStichtag(e.target.value)}
-                  label="Dates of Interest"
-                >
-                  {datesOfInterest.map(item => {
-                    const changesSummary = item.changes.reduce((acc, change) => {
-                      const key = change.type.split(':')[0];
-                      acc[key] = (acc[key] || 0) + 1;
-                      return acc;
-                    }, {});
-                    
-                    const summaryText = Object.entries(changesSummary)
-                      .map(([type, count]) => `${count} ${type}${count > 1 ? (type === 'Neu' ? 'e' : type === 'Verabschiedung' ? 'en' : '') : ''}`)
-                      .join(', ');
-                    
-                    return (
-                      <MenuItem key={item.date} value={item.date}>
-                        <Box>
-                          <Box sx={{ fontWeight: 'bold' }}>
-                            {new Date(item.date).toLocaleDateString('de-DE')}
-                          </Box>
-                          <Box sx={{ fontSize: '0.8em', color: 'text.secondary' }}>
-                            {summaryText}
-                          </Box>
-                        </Box>
-                      </MenuItem>
-                    );
-                  })}
-                </Select>
-              </FormControl>
-            </Box>
-          )}
-        </Box>
-        <Box>
-          <Typography variant="body1" sx={{ mb: 1 }}>Gruppen:</Typography>
-          <FormGroup row>
-            {allGroupNames.map(groupName => (
-              <FormControlLabel
-                key={groupName}
-                control={
-                  <Checkbox
-                    checked={selectedGroups.includes(groupName)}
-                    onChange={() => {
-                      const newGroups = selectedGroups.includes(groupName)
-                        ? selectedGroups.filter(g => g !== groupName)
-                        : [...selectedGroups, groupName];
-                      setSelectedGroups(newGroups);
-                    }}
-                  />
-                }
-                label={groupName}
-              />
-            ))}
-          </FormGroup>
-        </Box>
-        <Box>
-          <Typography variant="body1" sx={{ mb: 1 }}>Qualifikationen:</Typography>
-          <FormGroup row>
-            {allQualificationNames.map(qualification => {
-              const displayName =
-                qualifications.find(q => q.key === qualification)?.name || qualification;
-              return (
-                <FormControlLabel
-                  key={qualification}
-                  control={
-                    <Checkbox
-                      checked={selectedQualifications.includes(qualification)}
-                      onChange={() => {
-                        const newQualifications = selectedQualifications.includes(qualification)
-                          ? selectedQualifications.filter(q => q !== qualification)
-                          : [...selectedQualifications, qualification];
-                        setSelectedQualifications(newQualifications);
-                      }}
-                    />
-                  }
-                  label={displayName}
-                />
-              );
-            })}
-          </FormGroup>
-        </Box>
-      </Box>
+      {/* ChartFilterForm removed; now rendered in DataPage */}
       {/* Chart */}
       <Box sx={{ flex: 1, minHeight: 0 }}>
         <HighchartsReact highcharts={Highcharts} options={weeklyOptions} />

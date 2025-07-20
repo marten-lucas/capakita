@@ -400,10 +400,20 @@ const useChartStore = create(
         
         // Get last date of interest to determine end date
         const lastDateOfInterest = get().getLastDateOfInterest(simulationData);
-        
+        console.log('[MidtermChart][chartStore] lastDateOfInterest:', lastDateOfInterest);
+
         // Generate time periods based on dimension
         const periods = get().generateMidtermPeriods(midtermTimeDimension, lastDateOfInterest);
-        
+        console.log('[MidtermChart][chartStore] generated periods:', periods);
+        console.log('[MidtermChart][chartStore] midtermTimeDimension:', midtermTimeDimension);
+        console.log('[MidtermChart][chartStore] today:', new Date());
+        console.log('[MidtermChart][chartStore] endDate:', lastDateOfInterest);
+
+        // Debug: show period generation logic step-by-step
+        if (periods.length === 0) {
+          console.warn('[MidtermChart][chartStore] No periods generated! Check dimension and date logic.');
+        }
+
         const bedarf = [];
         const kapazitaet = [];
         const baykibigAnstellungsschluessel = [];
@@ -511,57 +521,50 @@ const useChartStore = create(
       generateMidtermPeriods: (dimension, endDate) => {
         const today = new Date();
         const periods = [];
-        
-        if (dimension === 'Wochen') {
-          // Generate weeks until endDate
+        // Normalize dimension to German label for backward compatibility
+        let dim = dimension;
+        if (dim === 'month') dim = 'Monate';
+        if (dim === 'week') dim = 'Wochen';
+        if (dim === 'year') dim = 'Jahre';
+        if (dim === 'quarter') dim = 'Quartale'; // Not implemented, but for completeness
+
+        if (dim === 'Wochen') {
           let currentDate = new Date(today);
-          // Start from beginning of current week (Monday)
           currentDate.setDate(currentDate.getDate() - currentDate.getDay() + 1);
-          
           while (currentDate <= endDate) {
             const startDate = new Date(currentDate);
             const weekEnd = new Date(currentDate);
             weekEnd.setDate(currentDate.getDate() + 6);
-            
             periods.push({
               label: `KW ${get().getWeekNumber(startDate)} ${startDate.getFullYear()}`,
               start: startDate,
               end: weekEnd
             });
-            
             currentDate.setDate(currentDate.getDate() + 7);
           }
-        } else if (dimension === 'Monate') {
-          // Generate months until endDate
+        } else if (dim === 'Monate') {
           let currentDate = new Date(today.getFullYear(), today.getMonth(), 1);
-          
           while (currentDate <= endDate) {
             const startDate = new Date(currentDate);
             const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-            
             periods.push({
               label: startDate.toLocaleDateString('de-DE', { month: 'short', year: 'numeric' }),
               start: startDate,
               end: monthEnd
             });
-            
             currentDate.setMonth(currentDate.getMonth() + 1);
           }
-        } else if (dimension === 'Jahre') {
-          // Generate years until endDate
+        } else if (dim === 'Jahre') {
           let currentYear = today.getFullYear();
           const endYear = endDate.getFullYear();
-          
           while (currentYear <= endYear) {
             const startDate = new Date(currentYear, 0, 1);
             const yearEnd = new Date(currentYear, 11, 31);
-            
             periods.push({
               label: currentYear.toString(),
               start: startDate,
               end: yearEnd
             });
-            
             currentYear++;
           }
         }
@@ -789,3 +792,4 @@ const useChartStore = create(
 );
 
 export default useChartStore;
+

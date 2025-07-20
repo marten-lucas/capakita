@@ -258,7 +258,14 @@ export async function extractAdebisZipAndData(
     employeeItems.push(employeeItem);
   }
 
+  // NOTE: All group and qualification import logic is centralized here.
+  // Groups are imported via importGroupsFromAdebis(newGroupsLookup)
+  // Qualifications are imported via importQualificationsFromEmployees(employeeItems)
+
   if (importQualificationsFromEmployees) importQualificationsFromEmployees(employeeItems);
 
-  return { processedData, employeeItems, newGroupsLookup };
+  const uniqueGroupNames = Object.values(newGroupsLookup);
+  const uniqueQualifications = Array.from(new Set(employeeItems.map(e => e.parseddata.qualification).filter(Boolean)));
+
+  return { processedData, employeeItems, newGroupsLookup, uniqueGroupNames, uniqueQualifications };
 }

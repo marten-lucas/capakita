@@ -772,6 +772,17 @@ const useSimScenarioStore = create(
         if (imported.length === 0) return true;
         return imported.every(s => s.importedAnonymized);
       },
+      importScenario: () => {
+        // ...existing import logic...
+
+        // REMOVE: Extract unique group names from simulationData and update AppSettingsStore
+        // REMOVE: const groupNamesSet = new Set();
+        // REMOVE: scenario.simulationData.forEach(item => { ... });
+        // REMOVE: const addGroup = useAppSettingsStore.getState().addGroup;
+        // REMOVE: groupNamesSet.forEach(groupName => { addGroup(groupName); });
+
+        // ...rest of import logic (add scenario to store)...
+      },
     }),
     {
       name: 'sim-scenario-storage',
@@ -784,3 +795,4 @@ const useSimScenarioStore = create(
 );
 
 export default useSimScenarioStore;
+
