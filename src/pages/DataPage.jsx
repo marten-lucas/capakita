@@ -485,6 +485,11 @@ function DataPage() {
       icon: <LayersIcon />,
       name: 'Szenario',
       onClick: handleAddScenario
+    },
+    {
+      icon: <FileUploadIcon />,
+      name: 'Import',
+      onClick: handleOpenModal
     }
   ];
 
