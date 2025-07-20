@@ -3,20 +3,10 @@ import HighchartsReact from 'highcharts-react-official';
 import Highcharts from 'highcharts';
 import useSimScenarioStore from '../../store/simScenarioStore';
 import useChartStore from '../../store/chartStore';
-import useAppSettingsStore from '../../store/appSettingsStore';
 import Box from '@mui/material/Box';
-import Typography from '@mui/material/Typography';
-import TextField from '@mui/material/TextField';
-import FormGroup from '@mui/material/FormGroup';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import Checkbox from '@mui/material/Checkbox';
-import Button from '@mui/material/Button';
-import MenuItem from '@mui/material/MenuItem';
-import Select from '@mui/material/Select';
-import FormControl from '@mui/material/FormControl';
-import InputLabel from '@mui/material/InputLabel';
 
-export default function WeeklyChart({ hideFilters = false, scenario }) {
+
+export default function WeeklyChart({ scenario }) {
   // Scenario selection state in chartStore
   const chartSelectedScenarioId = useChartStore(state => state.weeklySelectedScenarioId);
 
@@ -34,8 +24,6 @@ export default function WeeklyChart({ hideFilters = false, scenario }) {
     return state.computeOverlayData(scenarioToUse);
   });
 
-  const groupsLookup = useAppSettingsStore(state => state.getGroupsLookup());
-  const qualifications = useAppSettingsStore(state => state.qualifications);
   
   // Chart store - explizit extrahieren für useMemo
   const {
@@ -43,137 +31,20 @@ export default function WeeklyChart({ hideFilters = false, scenario }) {
     selectedGroups,
     selectedQualifications,
     categories,
-    setStichtag,
-    setSelectedGroups,
-    setSelectedQualifications,
     calculateChartData,
-    getNamesForSegment,
-    updateAvailableGroups,
-    updateAvailableQualifications
-  } = useChartStore();
+    getNamesForSegment  } = useChartStore();
 
   // Extract dates of interest from simulation data with change information
-  const datesOfInterest = useMemo(() => {
-    const dateChanges = new Map();
-    const today = new Date().toISOString().split('T')[0];
-    
-    const addChange = (date, type, name) => {
-      if (!dateChanges.has(date)) {
-        dateChanges.set(date, { date, changes: [] });
-      }
-      dateChanges.get(date).changes.push({ type, name });
-    };
-    
-    const addDayToDate = (dateStr) => {
-      const date = new Date(dateStr);
-      date.setDate(date.getDate() + 1);
-      return date.toISOString().split('T')[0];
-    };
-    
-    simulationData.forEach(item => {
-      const itemType = item.type === 'demand' ? 'Kind' : 'Mitarbeiter';
-      
-      // Item start/end dates
-      if (item.parseddata?.startdate) {
-        const startDate = item.parseddata.startdate.split('.').reverse().join('-');
-        addChange(startDate, `Neu: ${itemType}`, item.name);
-      }
-      if (item.parseddata?.enddate) {
-        const endDate = item.parseddata.enddate.split('.').reverse().join('-');
-        const effectiveEndDate = addDayToDate(endDate);
-        addChange(effectiveEndDate, `Verabschiedung: ${itemType}`, item.name);
-      }
-      
-      // Group start/end dates
-      if (item.parseddata?.group) {
-        item.parseddata.group.forEach(group => {
-          if (group.start) {
-            const groupStart = group.start.split('.').reverse().join('-');
-            addChange(groupStart, `Gruppenwechsel: ${itemType}`, `${item.name} → ${group.name}`);
-          }
-          if (group.end) {
-            const groupEnd = group.end.split('.').reverse().join('-');
-            const effectiveGroupEnd = addDayToDate(groupEnd);
-            addChange(effectiveGroupEnd, `Gruppenwechsel: ${itemType}`, `${item.name} verlässt ${group.name}`);
-          }
-        });
-      }
-      
-      // Booking start/end dates
-      if (item.parseddata?.booking) {
-        item.parseddata.booking.forEach(booking => {
-          if (booking.startdate) {
-            const bookingStart = booking.startdate.split('.').reverse().join('-');
-            addChange(bookingStart, `Buchungsänderung: ${itemType}`, `${item.name} neue Zeiten`);
-          }
-          if (booking.enddate) {
-            const bookingEnd = booking.enddate.split('.').reverse().join('-');
-            const effectiveBookingEnd = addDayToDate(bookingEnd);
-            addChange(effectiveBookingEnd, `Buchungsänderung: ${itemType}`, `${item.name} Zeiten enden`);
-          }
-        });
-      }
-      
-      // Pause start/end dates
-      if (item.parseddata?.paused?.enabled) {
-        if (item.parseddata.paused.start) {
-          addChange(item.parseddata.paused.start, `Pause: ${itemType}`, `${item.name} beginnt Pause`);
-        }
-        if (item.parseddata.paused.end) {
-          const effectivePauseEnd = addDayToDate(item.parseddata.paused.end);
-          addChange(effectivePauseEnd, `Pause: ${itemType}`, `${item.name} beendet Pause`);
-        }
-      }
-    });
-    
-    // Filter future dates and sort
-    return Array.from(dateChanges.values())
-      .filter(item => item.date > today)
-      .sort((a, b) => a.date.localeCompare(b.date));
-  }, [simulationData]);
 
   // Optimized: Only recalculate when groupsLookup changes
-  const groupNames = useMemo(() => {
-    const groupKeys = Object.keys(groupsLookup);
-    return groupKeys.map(key => groupsLookup[key]);
-  }, [groupsLookup]);
 
   // Optimized: Only check when simulationData changes
-  const hasNoGroup = useMemo(() => (
-    simulationData.some(item =>
-      (item.type === 'demand' || item.type === 'capacity') &&
-      (!item.parseddata?.group || item.parseddata.group.length === 0)
-    )
-  ), [simulationData]);
 
   // Optimized: Only recalculate when dependencies actually change
-  const allGroupNames = useMemo(() => {
-    const groups = hasNoGroup ? [...groupNames, 'keine Gruppe'] : groupNames;
-    updateAvailableGroups(groups);
-    return groups;
-  }, [groupNames, hasNoGroup, updateAvailableGroups]);
 
   // Use qualification keys from app settings for filter
-  const qualificationNames = useMemo(() => {
-    if (qualifications && qualifications.length > 0) {
-      return qualifications.map(q => q.key);
-    }
-    // fallback: extract from simulationData if not set
-    const qualificationSet = new Set();
-    simulationData.forEach(item => {
-      if (item.type === 'capacity') {
-        const qualification = item.parseddata?.qualification || 'keine Qualifikation';
-        qualificationSet.add(qualification);
-      }
-    });
-    return Array.from(qualificationSet).sort();
-  }, [qualifications, simulationData]);
 
   // Update available qualifications
-  const allQualificationNames = useMemo(() => {
-    updateAvailableQualifications(qualificationNames);
-    return qualificationNames;
-  }, [qualificationNames, updateAvailableQualifications]);
 
   // Stable reference for chart data calculation
   const getChartData = useCallback((stichtag, selectedGroups, selectedQualifications) => {

@@ -63,14 +63,6 @@ function DataPage() {
 
   // --- Hilfsfunktionen wie in simulator_poc.html ---
   // Parse DD.MM.YYYY zu Date
-  const parseDate = (dateString) => {
-    if (!dateString) return null;
-    const parts = dateString.split('.');
-    if (parts.length === 3) {
-      return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
-    }
-    return null;
-  };
 
   const handleImport = async ({ file, isAnonymized }) => {
     // Use the centralized import utility
