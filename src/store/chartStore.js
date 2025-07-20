@@ -767,6 +767,10 @@ const useChartStore = create(
         });
       },
 
+      // Chart visibility toggles
+      chartToggles: ['weekly', 'midterm'],
+      setChartToggles: (toggles) => set({ chartToggles: toggles }),
+
     }),
     {
       name: 'chart-storage',
@@ -781,6 +785,7 @@ const useChartStore = create(
         midtermSelectedQualifications: state.midtermSelectedQualifications,
         weeklySelectedScenarioId: state.weeklySelectedScenarioId,
         midtermSelectedScenarioId: state.midtermSelectedScenarioId,
+        chartToggles: state.chartToggles,
       })
     }
   )

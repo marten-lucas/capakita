@@ -1,7 +1,4 @@
-import { useState } from 'react'
-import { Box, Typography, Paper, Button, ToggleButton, ToggleButtonGroup } from '@mui/material'
-import BarChartIcon from '@mui/icons-material/BarChart'
-import TimelineIcon from '@mui/icons-material/Timeline'
+import { Box, Typography, Paper, Button } from '@mui/material'
 import FileUploadIcon from '@mui/icons-material/FileUpload'
 import { useNavigate } from 'react-router-dom'
 import WeeklyChart from '../components/SimDataCharts/WeeklyChart'
@@ -12,9 +9,9 @@ import useAppSettingsStore from '../store/appSettingsStore'
 import ScenarioSaveDialog from '../components/modals/ScenarioSaveDialog'
 import ChartFilterForm from '../components/SimDataCharts/ChartFilterForm'
 import React from 'react'
+import useChartStore from '../store/chartStore'
 
 function VisuPage() {
-  const [visibleCharts] = useState(['weekly', 'midterm'])
   const navigate = useNavigate()
 
   // Scenario management
@@ -31,6 +28,11 @@ function VisuPage() {
   // Find the selected scenario object
   const selectedScenario = scenarios.find(s => s.id === selectedScenarioId);
 
+  // Get simulationData for ChartFilterForm
+  const simulationData = selectedScenario?.simulationData || [];
+
+  // Use chartToggles from store
+  const chartToggles = useChartStore(state => state.chartToggles);
 
   // Check if selected scenario still exists, if not select the first available one
   React.useEffect(() => {
@@ -79,9 +81,6 @@ function VisuPage() {
     )
   }
 
-
-
-
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#f0f2f5' }}>
       {/* Scenario Selector */}
@@ -103,11 +102,14 @@ function VisuPage() {
           }
         }}
       />
-      
 
+      {/* Chart Filter Form added here */}
+      <Box sx={{ px: 3, pt: 2 }}>
+        <ChartFilterForm showStichtag simulationData={simulationData} />
+      </Box>
       
       <Box sx={{ flex: 1, p: 3, display: 'flex', flexDirection: 'column', gap: 3, overflow: 'auto' }}>
-        {visibleCharts.includes('weekly') && (
+        {chartToggles.includes('weekly') && (
           <Box sx={{ minHeight: '400px' }}>
             <Typography variant="h6" sx={{ mb: 2, color: 'text.secondary' }}>
               Weekly Chart
@@ -115,7 +117,7 @@ function VisuPage() {
             <WeeklyChart hideFilters scenario={selectedScenario} />
           </Box>
         )}
-        {visibleCharts.includes('midterm') && (
+        {chartToggles.includes('midterm') && (
           <Box sx={{ minHeight: '400px' }}>
             <Typography variant="h6" sx={{ mb: 2, color: 'text.secondary' }}>
               Midterm Chart
@@ -123,7 +125,7 @@ function VisuPage() {
             <MidtermChart hideFilters scenario={selectedScenario} />
           </Box>
         )}
-        {visibleCharts.length === 0 && (
+        {chartToggles.length === 0 && (
           <Paper sx={{ p: 4, textAlign: 'center', bgcolor: '#f5f5f5' }}>
             <Typography variant="h6" color="text.secondary">
               Keine Charts ausgewählt

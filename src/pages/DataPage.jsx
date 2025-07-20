@@ -34,7 +34,6 @@ import PersonIcon from '@mui/icons-material/Person';
 import ChildCareIcon from '@mui/icons-material/ChildCare';
 import LayersIcon from '@mui/icons-material/Layers';
 import { extractAdebisZipAndData } from '../utils/adebis-import';
-import ChartFilterForm from '../components/SimDataCharts/ChartFilterForm';
 
 function DataPage() {
   const [modalOpen, setModalOpen] = useState(false);
@@ -281,10 +280,6 @@ function DataPage() {
         scenarios={scenarios}
         setSelectedItem={setSelectedItem}
       />
-      {/* Chart Filter Form always visible above data details */}
-      <Box sx={{ px: 3, pt: 2 }}>
-        <ChartFilterForm showStichtag simulationData={simulationData} />
-      </Box>
       <SpeedDial
         ariaLabel="SpeedDial for data actions"
         sx={{ position: 'fixed', bottom: 32, right: 32 }}

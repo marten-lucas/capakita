@@ -10,8 +10,11 @@ import {
   Chip,
   OutlinedInput,
   Typography,
-  Divider
+  ToggleButton,
+  ToggleButtonGroup
 } from '@mui/material';
+import BarChartIcon from '@mui/icons-material/BarChart';
+import TimelineIcon from '@mui/icons-material/Timeline';
 import useChartStore from '../../store/chartStore';
 
 const ITEM_HEIGHT = 48;
@@ -25,6 +28,7 @@ const MenuProps = {
   },
 };
 
+// --- Use the extractDatesOfInterest function from the example ---
 function extractDatesOfInterest(simulationData) {
   const dateChanges = new Map();
   const today = new Date().toISOString().split('T')[0];
@@ -104,7 +108,7 @@ function extractDatesOfInterest(simulationData) {
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
-function ChartFilterForm({ showStichtag = false, showZeitdimension = false, chartToggle, simulationData }) {
+function ChartFilterForm({ showStichtag = false, showZeitdimension = false, simulationData }) {
   const {
     // Weekly filters
     stichtag,
@@ -122,7 +126,11 @@ function ChartFilterForm({ showStichtag = false, showZeitdimension = false, char
     midtermSelectedGroups,
     setMidtermSelectedGroups,
     midtermSelectedQualifications,
-    setMidtermSelectedQualifications
+    setMidtermSelectedQualifications,
+
+    // Chart toggles
+    chartToggles,
+    setChartToggles
   } = useChartStore();
 
   // Use appropriate filters based on what charts are visible
@@ -155,14 +163,26 @@ function ChartFilterForm({ showStichtag = false, showZeitdimension = false, char
     }
   };
 
+  // Chart toggle logic (allow toggling both on/off independently)
+  const handleToggle = (event, newToggles) => {
+    setChartToggles(newToggles);
+  };
+
+  // Only show stichtag/datesOfInterest if "weekly" is selected
+  const showWeekly = chartToggles.includes('weekly');
+  // Only show zeitdimension if "midterm" is selected
+  const showMidterm = chartToggles.includes('midterm');
+
   // Dates of Interest for weekly chart
   const datesOfInterest = useMemo(() => {
-    if (!showStichtag || !simulationData) return [];
+    if (!showWeekly || !simulationData) return [];
     return extractDatesOfInterest(simulationData);
-  }, [showStichtag, simulationData]);
+  }, [showWeekly, simulationData]);
 
   // Determine if second row is needed
-  const showSecondRow = showStichtag || (showStichtag && datesOfInterest.length > 0) || showZeitdimension;
+  const showSecondRow =
+    (showWeekly && (showStichtag || datesOfInterest.length > 0)) ||
+    showMidterm;
 
   return (
     <Paper sx={{ p: 3, mb: 2 }}>
@@ -171,10 +191,22 @@ function ChartFilterForm({ showStichtag = false, showZeitdimension = false, char
       </Typography>
       {/* First row: Toggles, Groups, Qualifications (always visible) */}
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center', mb: showSecondRow ? 2 : 0 }}>
-        {/* Chart toggles (if provided) */}
-        {chartToggle && (
-          <Box sx={{ minWidth: 220 }}>{chartToggle}</Box>
-        )}
+        {/* Chart toggles (always visible) */}
+        <Box sx={{ minWidth: 220 }}>
+          <ToggleButtonGroup
+            value={chartToggles}
+            onChange={handleToggle}
+            aria-label="Chart selection"
+            size="small"
+          >
+            <ToggleButton value="weekly" aria-label="Weekly Chart">
+              <BarChartIcon sx={{ mr: 1 }} /> Woche
+            </ToggleButton>
+            <ToggleButton value="midterm" aria-label="Midterm Chart">
+              <TimelineIcon sx={{ mr: 1 }} /> Zeitverlauf
+            </ToggleButton>
+          </ToggleButtonGroup>
+        </Box>
         {/* Groups */}
         <FormControl sx={{ minWidth: 200 }} size="small">
           <InputLabel>Gruppen</InputLabel>
@@ -231,8 +263,8 @@ function ChartFilterForm({ showStichtag = false, showZeitdimension = false, char
       {/* Second row: Stichtag, Dates of Interest, Zeitdimension */}
       {showSecondRow && (
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center' }}>
-          {/* Stichtag - only for Weekly */}
-          {showStichtag && (
+          {/* Stichtag - only for Weekly and if selected */}
+          {showWeekly && showStichtag && (
             <FormControl sx={{ minWidth: 200 }}>
               <TextField
                 label="Stichtag"
@@ -247,7 +279,7 @@ function ChartFilterForm({ showStichtag = false, showZeitdimension = false, char
             </FormControl>
           )}
           {/* Dates of Interest selector (with InputLabel, single row) */}
-          {showStichtag && datesOfInterest.length > 0 && (
+          {showWeekly && showStichtag && datesOfInterest.length > 0 && (
             <FormControl size="small" sx={{ minWidth: 240 }}>
               <InputLabel id="dates-of-interest-label">Dates of Interest</InputLabel>
               <Select
@@ -304,7 +336,7 @@ function ChartFilterForm({ showStichtag = false, showZeitdimension = false, char
             </FormControl>
           )}
           {/* Zeitdimension - only for Midterm */}
-          {showZeitdimension && (
+          {showMidterm && (
             <FormControl sx={{ minWidth: 150 }} size="small">
               <InputLabel>Zeitdimension</InputLabel>
               <Select
