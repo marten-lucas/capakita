@@ -6,9 +6,8 @@ import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import { useNavigate } from 'react-router-dom';
 import DataImportModal from '../components/modals/DataImportModal';
 import ScenarioLoadDialog from '../components/modals/ScenarioLoadDialog.jsx';
-import { extractAdebisZipAndData } from '../utils/adebis-import.js';
+import { useScenarioImport } from '../hooks/useScenarioImport';
 import useSimScenarioStore from '../store/simScenarioStore';
-import useAppSettingsStore from '../store/appSettingsStore';
 
 function WelcomePage() {
   const [importOpen, setImportOpen] = useState(false);
@@ -17,35 +16,11 @@ function WelcomePage() {
 
   const addScenario = useSimScenarioStore(state => state.addScenario);
   const setSelectedScenarioId = useSimScenarioStore(state => state.setSelectedScenarioId);
-  const importGroupsFromAdebis = useAppSettingsStore(state => state.importGroupsFromAdebis);
-  const importQualificationsFromEmployees = useAppSettingsStore(state => state.importQualificationsFromEmployees);
+  const { importScenario } = useScenarioImport();
 
   // Handler für DataImportModal
   const handleImport = async ({ file, isAnonymized }) => {
-    const { processedData } = await extractAdebisZipAndData(
-      file,
-      isAnonymized,
-      importGroupsFromAdebis,
-      importQualificationsFromEmployees
-    );
-
-    // Szenario anlegen wie in SimDatenPage
-    const scenarioName = isAnonymized ? 'Importiertes Szenario (anonymisiert)' : 'Importiertes Szenario';
-    const newScenario = {
-      name: scenarioName,
-      remark: '',
-      confidence: 50,
-      likelihood: 50,
-      baseScenarioId: null,
-      simulationData: processedData
-    };
-    addScenario(newScenario);
-    // Setze das neue Szenario als ausgewählt
-    const scenarios = useSimScenarioStore.getState().scenarios;
-    const lastScenario = scenarios[scenarios.length - 1];
-    if (lastScenario) {
-      setSelectedScenarioId(lastScenario.id);
-    }
+    await importScenario({ file, isAnonymized });
     setImportOpen(false);
     navigate('/data');
   };

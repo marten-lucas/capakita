@@ -21,6 +21,7 @@ export function useScenarioImport() {
       name,
       icon: (() => {
         const lowerName = name.toLowerCase();
+        if (lowerName.includes('schul')) return '🏫';
         if (lowerName.includes('fuchs')) return '🦊';
         if (lowerName.includes('bär') || lowerName.includes('baer')) return '🐻';
         if (lowerName.includes('hase') || lowerName.includes('kaninchen')) return '🐰';
