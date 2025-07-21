@@ -1,7 +1,6 @@
 import React from 'react';
 import {
   Typography, Box, Button, Divider, TextField, Switch, Slider,
-  Card, CardContent, CardHeader, CardActions
 } from '@mui/material';
 import { convertYYYYMMDDtoDDMMYYYY, convertDDMMYYYYtoYYYYMMDD } from '../../utils/dateUtils';
 import { timeToValue, valueToTime } from '../../utils/timeUtils';
@@ -82,16 +81,17 @@ function DayControl({ dayLabel, dayAbbr, dayData, onToggle, onTimeChange, onAddS
                     title="Segment entfernen"
                   >−</Button>
                 )}
+                {type === 'capacity' && (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    sx={{ minWidth: 32, px: 1, ml: 0.5 }}
+                    onClick={() => onAddSegment(dayAbbr)}
+                    title="Zeitbereich hinzufügen"
+                  >+</Button>
+                )}
               </Box>
             ))}
-            {type === 'capacity' && (
-              <Button
-                size="small"
-                variant="outlined"
-                sx={{ mt: 0.5 }}
-                onClick={() => onAddSegment(dayAbbr)}
-              >+ Zeitbereich</Button>
-            )}
           </Box>
         )}
       </Box>
@@ -283,31 +283,11 @@ function BookingDetail({
   };
 
   return (
-    <Card sx={{ mb: 3 }}>
-      <CardHeader
-        title={
-          <Box display="flex" alignItems="center">
-            <Typography sx={{ flex: 1 }}>
-              Buchung {index + 1}: {dateRangeText}
-              {dateRangeText ? ': ' : ''}
-              {consolidateBookingSummary(times)}
-            </Typography>
-            <ModMonitor
-              itemId={parentItemId}
-              field={`booking-${index}`}
-              value={JSON.stringify(booking)}
-              originalValue={JSON.stringify(originalBooking || {})}
-              onRestore={handleRestoreAll}
-              title="Komplette Buchung auf importierte Werte zurücksetzen"
-              confirmMsg="Buchung auf importierte Adebis-Daten zurücksetzen?"
-              iconProps={{ sx: { ml: 1 } }}
-            />
-          </Box>
-        }
-        sx={{ pb: 0 }}
-      />
-      <CardContent>
+    <Box sx={{ mb: 3 }}>
+
+      <Box>
         <Box display="flex" gap={2} sx={{ mb: 2, alignItems: 'center' }}>
+          <Typography>gültig von</Typography>
           <TextField
             label="Startdatum"
             type="date"
@@ -344,14 +324,12 @@ function BookingDetail({
             confirmMsg="Enddatum auf importierten Wert zurücksetzen?"
           />
         </Box>
-        <Divider sx={{ my: 2 }} />
         {daysOfWeek.map(day => {
           const dayMod = originalBooking && !isManualEntry
             ? isDayModified(booking.times, originalBooking.times, day.abbr)
             : false;
           return (
             <Box key={day.abbr} display="flex" alignItems="center">
-
               <DayControl
                 dayLabel={day.label}
                 dayAbbr={day.abbr}
@@ -383,9 +361,9 @@ function BookingDetail({
             </Box>
           );
         })}
-      </CardContent>
+      </Box>
       {(onDelete && canDelete) && (
-        <CardActions sx={{ justifyContent: 'flex-end' }}>
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
           <Button
             size="small"
             color="error"
@@ -393,9 +371,9 @@ function BookingDetail({
           >
             Löschen
           </Button>
-        </CardActions>
+        </Box>
       )}
-    </Card>
+    </Box>
   );
 }
 
