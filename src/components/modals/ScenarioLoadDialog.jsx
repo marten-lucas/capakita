@@ -5,7 +5,6 @@ import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import CryptoJS from 'crypto-js';
 import useSimScenarioStore from '../../store/simScenarioStore';
 import useChartStore from '../../store/chartStore';
-import useAppSettingsStore from '../../store/appSettingsStore';
 
 function ScenarioLoadDialog({ open, onClose, onLoaded }) {
   const [pwValue, setPwValue] = useState('');
@@ -13,7 +12,7 @@ function ScenarioLoadDialog({ open, onClose, onLoaded }) {
   const [showPw, setShowPw] = useState(false);
   const [file, setFile] = useState(null);
 
-  const setSelectedItem = useAppSettingsStore(state => state.setSelectedItem);
+  const setSelectedItem = useSimScenarioStore(state => state.setSelectedItem);
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
