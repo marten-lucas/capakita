@@ -20,10 +20,19 @@ function ScenarioLoadDialog({ open, onClose, onLoaded }) {
     }
   };
 
+  const isStrongPassword = (pw) => {
+    // At least 8 chars, one uppercase, one lowercase, one number, one special char
+    return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/.test(pw);
+  };
+
   const handleLoad = async () => {
     if (!file) return;
     if (!pwValue) {
       setPwError('Bitte Passwort eingeben.');
+      return;
+    }
+    if (!isStrongPassword(pwValue)) {
+      setPwError('Passwort muss mindestens 8 Zeichen lang sein und Großbuchstaben, Kleinbuchstaben, Zahl und Sonderzeichen enthalten.');
       return;
     }
     try {
