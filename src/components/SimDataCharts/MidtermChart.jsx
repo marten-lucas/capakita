@@ -3,7 +3,6 @@ import HighchartsReact from 'highcharts-react-official';
 import Highcharts from 'highcharts';
 import useSimScenarioStore from '../../store/simScenarioStore';
 import useChartStore from '../../store/chartStore';
-import useAppSettingsStore from '../../store/appSettingsStore';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import FormGroup from '@mui/material/FormGroup';
@@ -31,8 +30,8 @@ export default function MidtermChart({ hideFilters = false, scenario }) {
     return [];
   }, [scenario]);
 
-  // Use groups and qualifications from appSettingsStore
-  const qualifications = useAppSettingsStore(state => state.qualifications);
+  // Use qualifications from simScenarioStore
+  const qualifications = useSimScenarioStore(state => state.getQualiDefs());
 
   // Chart store
   const midtermTimeDimension = useChartStore(state => state.midtermTimeDimension);

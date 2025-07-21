@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom'
 import WeeklyChart from '../components/SimDataCharts/WeeklyChart'
 import MidtermChart from '../components/SimDataCharts/MidtermChart'
 import useSimScenarioStore from '../store/simScenarioStore'
-import useAppSettingsStore from '../store/appSettingsStore'
 import ScenarioSaveDialog from '../components/modals/ScenarioSaveDialog'
 import ChartFilterForm from '../components/SimDataCharts/ChartFilterForm'
 import React from 'react'
@@ -19,10 +18,10 @@ function VisuPage() {
   const scenarios = useSimScenarioStore(state => state.scenarios);
 
   // Use store for dialog state
-  const scenarioSaveDialogOpen = useAppSettingsStore(state => state.scenarioSaveDialogOpen);
-  const setScenarioSaveDialogOpen = useAppSettingsStore(state => state.setScenarioSaveDialogOpen);
-  const scenarioSaveDialogPending = useAppSettingsStore(state => state.scenarioSaveDialogPending);
-  const setScenarioSaveDialogPending = useAppSettingsStore(state => state.setScenarioSaveDialogPending);
+  const scenarioSaveDialogOpen = useSimScenarioStore(state => state.scenarioSaveDialogOpen);
+  const setScenarioSaveDialogOpen = useSimScenarioStore(state => state.setScenarioSaveDialogOpen);
+  const scenarioSaveDialogPending = useSimScenarioStore(state => state.scenarioSaveDialogPending);
+  const setScenarioSaveDialogPending = useSimScenarioStore(state => state.setScenarioSaveDialogPending);
 
   // Find the selected scenario object
   const selectedScenario = scenarios.find(s => s.id === selectedScenarioId);

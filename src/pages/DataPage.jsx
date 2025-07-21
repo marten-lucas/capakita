@@ -27,7 +27,6 @@ import IconButton from '@mui/material/IconButton';
 import InputAdornment from '@mui/material/InputAdornment';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
-import useAppSettingsStore from '../store/appSettingsStore';
 import ScenarioSaveDialog from '../components/modals/ScenarioSaveDialog';
 import PersonIcon from '@mui/icons-material/Person';
 import ChildCareIcon from '@mui/icons-material/ChildCare';
@@ -41,12 +40,12 @@ function DataPage() {
   // const [pendingSave, setPendingSave] = useState(false);
 
   // Use store for dialog state
-  const scenarioSaveDialogOpen = useAppSettingsStore(state => state.scenarioSaveDialogOpen);
-  const setScenarioSaveDialogOpen = useAppSettingsStore(state => state.setScenarioSaveDialogOpen);
-  const scenarioSaveDialogPending = useAppSettingsStore(state => state.scenarioSaveDialogPending);
-  const setScenarioSaveDialogPending = useAppSettingsStore(state => state.setScenarioSaveDialogPending);
+  const scenarioSaveDialogOpen = useSimScenarioStore(state => state.scenarioSaveDialogOpen);
+  const setScenarioSaveDialogOpen = useSimScenarioStore(state => state.setScenarioSaveDialogOpen);
+  const scenarioSaveDialogPending = useSimScenarioStore(state => state.scenarioSaveDialogPending);
+  const setScenarioSaveDialogPending = useSimScenarioStore(state => state.setScenarioSaveDialogPending);
 
-    const selectedScenarioId = useSimScenarioStore(state => state.selectedScenarioId);
+  const selectedScenarioId = useSimScenarioStore(state => state.selectedScenarioId);
   const setSelectedScenarioId = useSimScenarioStore(state => state.setSelectedScenarioId);
   const scenarios = useSimScenarioStore(state => state.scenarios);
 
@@ -55,16 +54,16 @@ function DataPage() {
   const addScenario = useSimScenarioStore(state => state.addScenario);
   const addItemToScenario = useSimScenarioStore(state => state.addItemToScenario);
 
-  // Use AppSettingsStore for group and selected item management
-  const selectedItem = useAppSettingsStore(state => state.selectedItem);
-  const setSelectedItem = useAppSettingsStore(state => state.setSelectedItem);
+  // Use simScenarioStore for group and selected item management
+  const selectedItem = useSimScenarioStore(state => state.selectedItem);
+  const setSelectedItem = useSimScenarioStore(state => state.setSelectedItem);
 
   // --- Hilfsfunktionen wie in simulator_poc.html ---
   // Parse DD.MM.YYYY zu Date
 
   const handleImport = async ({ file, isAnonymized }) => {
     // Use the centralized import utility
-    const { processedData, uniqueGroupNames, newGroupsLookup, uniqueQualifications } = await extractAdebisZipAndData(
+    const { processedData, newGroupsLookup, uniqueQualifications } = await extractAdebisZipAndData(
       file,
       isAnonymized,
       // Remove useAppSettingsStore import hooks, just pass null

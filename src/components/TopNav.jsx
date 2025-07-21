@@ -17,7 +17,6 @@ import IconButton from '@mui/material/IconButton';
 import ScenarioSaveDialog from './modals/ScenarioSaveDialog';
 import useChartStore from '../store/chartStore';
 import CryptoJS from 'crypto-js';
-import useAppSettingsStore from '../store/appSettingsStore';
 
 const pages = [
   { label: 'Szenarien & Daten', path: '/data', icon: <StorageIcon sx={{ mr: 1 }} /> },
@@ -35,10 +34,10 @@ function TopNav() {
   const [anchorEl, setAnchorEl] = React.useState(null);
 
   // Use store for dialog state
-  const scenarioSaveDialogOpen = useAppSettingsStore(state => state.scenarioSaveDialogOpen);
-  const setScenarioSaveDialogOpen = useAppSettingsStore(state => state.setScenarioSaveDialogOpen);
-  const scenarioSaveDialogPending = useAppSettingsStore(state => state.scenarioSaveDialogPending);
-  const setScenarioSaveDialogPending = useAppSettingsStore(state => state.setScenarioSaveDialogPending);
+  const scenarioSaveDialogOpen = useSimScenarioStore(state => state.scenarioSaveDialogOpen);
+  const setScenarioSaveDialogOpen = useSimScenarioStore(state => state.setScenarioSaveDialogOpen);
+  const scenarioSaveDialogPending = useSimScenarioStore(state => state.scenarioSaveDialogPending);
+  const setScenarioSaveDialogPending = useSimScenarioStore(state => state.setScenarioSaveDialogPending);
 
   const handleMenuOpen = (event) => {
     setAnchorEl(event.currentTarget);

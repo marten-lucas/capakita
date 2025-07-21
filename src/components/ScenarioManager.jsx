@@ -392,7 +392,7 @@ function ScenarioDetailForm({ scenarioId, scenarios, onClose, isNew }) {
     );
 }
 
-const ScenarioManager = forwardRef(function ScenarioManager({ selectedScenarioId, setSelectedScenarioId, scenarios, setSelectedItem }, ref) {
+const ScenarioManager = forwardRef(function ScenarioManager({ selectedScenarioId, setSelectedScenarioId, scenarios }, ref) {
     const [expanded, setExpanded] = useState(false);
     const [treeExpandedMap, setTreeExpandedMap] = useState({});
     const [editScenarioId, setEditScenarioId] = useState(null);
@@ -401,6 +401,7 @@ const ScenarioManager = forwardRef(function ScenarioManager({ selectedScenarioId
 
     const scenarioTree = useMemo(() => buildScenarioTree(scenarios), [scenarios]);
     const selectedScenario = scenarios.find(s => s.id === selectedScenarioId);
+    const setSelectedItem = useSimScenarioStore(state => state.setSelectedItem);
 
     // Store actions
     const addScenario = useSimScenarioStore(state => state.addScenario);

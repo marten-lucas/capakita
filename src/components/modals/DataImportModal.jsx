@@ -9,7 +9,7 @@ import {
   Stack,
 } from '@mui/material';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
-import useAppSettingsStore from '../../store/appSettingsStore';
+import useSimScenarioStore from '../../store/simScenarioStore';
 
 const modalStyle = {
   position: 'absolute',
@@ -26,7 +26,7 @@ const modalStyle = {
 function DatenImportModal({ open, onClose, onImport }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [isAnonymized, setIsAnonymized] = useState(true);
-  const setLastImportAnonymized = useAppSettingsStore(state => state.setLastImportAnonymized);
+  const setLastImportAnonymized = useSimScenarioStore(state => state.setLastImportAnonymized);
 
   useEffect(() => {
     if (open) {

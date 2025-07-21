@@ -12,9 +12,13 @@ const useSimScenarioStore = create(
     (set, get) => ({
       scenarios: [],
       selectedScenarioId: null,
+      selectedItem: null,
+      lastImportAnonymized: true,
       
       setSelectedScenarioId: (id) => set({ selectedScenarioId: id }),
-      
+      setSelectedItem: (item) => set({ selectedItem: item }),
+      setLastImportAnonymized: (value) => set({ lastImportAnonymized: value }),
+
       // Get original value for a field (handles both root and based scenarios)
       getOriginalValue: (itemId, field) => {
         const state = get();
@@ -870,7 +874,9 @@ const useSimScenarioStore = create(
       name: 'sim-scenario-storage',
       partialize: (state) => ({
         scenarios: state.scenarios,
-        selectedScenarioId: state.selectedScenarioId
+        selectedScenarioId: state.selectedScenarioId,
+        selectedItem: state.selectedItem,
+        lastImportAnonymized: state.lastImportAnonymized
       })
     }
   )
