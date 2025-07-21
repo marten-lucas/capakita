@@ -50,7 +50,8 @@ function SimulationDataTab({
     updateItemQualification,
     getItemQualification,
     deleteItem,
-    setSelectedItem
+    setSelectedItem,
+    getQualiDefs
   } = useSimScenarioDataStore((state) => ({
     updateItemPausedState: state.updateItemPausedState,
     getItemPausedState: state.getItemPausedState,
@@ -72,6 +73,7 @@ function SimulationDataTab({
     getEffectiveSimulationData: state.getEffectiveSimulationData,
     selectedItem: state.selectedItem,
     setSelectedItem: state.setSelectedItem,
+    getQualiDefs: state.getQualiDefs,
   }));
 
   const pausedState = getItemPausedState(item.id);
@@ -209,6 +211,9 @@ function SimulationDataTab({
     }
   };
 
+  // Get scenario-based qualidefs for radio options
+  const qualiDefs = getQualiDefs ? getQualiDefs() : [];
+
   // Allgemein Tab Content
   const AllgemeinTab = () => (
     <Box flex={1} display="flex" flexDirection="column" gap={2} sx={{ overflowY: 'auto' }}>
@@ -299,11 +304,24 @@ function SimulationDataTab({
               onChange={(e) => setLocalQualification(e.target.value)}
               onBlur={() => updateItemQualification(item.id, localQualification)}
             >
-              <FormControlLabel value="E" control={<Radio />} label="Erzieher (E)" />
-              <FormControlLabel value="K" control={<Radio />} label="Kinderpfleger (K)" />
-              <FormControlLabel value="H" control={<Radio />} label="Hilfskraft (H)" />
-              <FormControlLabel value="P" control={<Radio />} label="Praktikant (P)" />
-              <FormControlLabel value="" control={<Radio />} label="Keine Qualifikation" />
+              {qualiDefs && qualiDefs.length > 0 ? (
+                qualiDefs.map(q => (
+                  <FormControlLabel
+                    key={q.key}
+                    value={q.key}
+                    control={<Radio />}
+                    label={`${q.name} (${q.key})`}
+                  />
+                ))
+              ) : (
+                <>
+                  <FormControlLabel value="E" control={<Radio />} label="Erzieher (E)" />
+                  <FormControlLabel value="K" control={<Radio />} label="Kinderpfleger (K)" />
+                  <FormControlLabel value="H" control={<Radio />} label="Hilfskraft (H)" />
+                  <FormControlLabel value="P" control={<Radio />} label="Praktikant (P)" />
+                  <FormControlLabel value="" control={<Radio />} label="Keine Qualifikation" />
+                </>
+              )}
             </RadioGroup>
           </FormControl>
         </Box>
@@ -572,11 +590,24 @@ function SimulationDataTab({
                   onChange={(e) => setLocalQualification(e.target.value)}
                   onBlur={() => updateItemQualification(item.id, localQualification)}
                 >
-                  <FormControlLabel value="E" control={<Radio />} label="Erzieher (E)" />
-                  <FormControlLabel value="K" control={<Radio />} label="Kinderpfleger (K)" />
-                  <FormControlLabel value="H" control={<Radio />} label="Hilfskraft (H)" />
-                  <FormControlLabel value="P" control={<Radio />} label="Praktikant (P)" />
-                  <FormControlLabel value="" control={<Radio />} label="Keine Qualifikation" />
+                  {qualiDefs && qualiDefs.length > 0 ? (
+                    qualiDefs.map(q => (
+                      <FormControlLabel
+                        key={q.key}
+                        value={q.key}
+                        control={<Radio />}
+                        label={`${q.name} (${q.key})`}
+                      />
+                    ))
+                  ) : (
+                    <>
+                      <FormControlLabel value="E" control={<Radio />} label="Erzieher (E)" />
+                      <FormControlLabel value="K" control={<Radio />} label="Kinderpfleger (K)" />
+                      <FormControlLabel value="H" control={<Radio />} label="Hilfskraft (H)" />
+                      <FormControlLabel value="P" control={<Radio />} label="Praktikant (P)" />
+                      <FormControlLabel value="" control={<Radio />} label="Keine Qualifikation" />
+                    </>
+                  )}
                 </RadioGroup>
               </FormControl>
             </Box>

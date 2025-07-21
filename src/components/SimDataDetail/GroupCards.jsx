@@ -4,7 +4,6 @@ import {
 import React from 'react';
 import GroupDetail from './GroupDetail';
 import useSimScenarioDataStore from '../../store/simScenarioStore';
-import useAppSettingsStore from '../../store/appSettingsStore';
 
 // Helper: compare groups for modification
 function groupsModified(localGroups, origGroups) {
@@ -21,21 +20,22 @@ function groupsModified(localGroups, origGroups) {
 }
 
 function GroupCards({ itemId, lastAddedIndex, importedCount, originalGroups, onRestoreGroup, isManualEntry }) {
-  const { getItemGroups, updateItemGroups, getItemBookings } = useSimScenarioDataStore((state) => ({
+  const { getItemGroups, updateItemGroups, getItemBookings, getGroupDefs } = useSimScenarioDataStore((state) => ({
     getItemGroups: state.getItemGroups,
     updateItemGroups: state.updateItemGroups,
     getItemBookings: state.getItemBookings,
+    getGroupDefs: state.getGroupDefs,
   }));
 
-  // Get all groups from AppSettingsStore
-  const allGroups = useAppSettingsStore(state => {
-    const groups = state.groups;
+  // Use scenario-based groupdefs for lookup
+  const allGroups = React.useMemo(() => {
+    const defs = getGroupDefs();
     const lookup = {};
-    groups.forEach(g => {
+    defs.forEach(g => {
       lookup[g.id] = g.name;
     });
     return lookup;
-  });
+  }, [getGroupDefs]);
 
   const groups = getItemGroups(itemId);
   const bookings = getItemBookings(itemId); // Add this to trigger re-renders when bookings change

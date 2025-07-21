@@ -34,6 +34,9 @@ export default function WeeklyChart({ scenario }) {
     calculateChartData,
     getNamesForSegment  } = useChartStore();
 
+  // Use scenario-based groupdefs and qualidefs for filter options
+  
+
   // Extract dates of interest from simulation data with change information
 
   // Optimized: Only recalculate when groupsLookup changes
@@ -42,7 +45,7 @@ export default function WeeklyChart({ scenario }) {
 
   // Optimized: Only recalculate when dependencies actually change
 
-  // Use qualification keys from app settings for filter
+  // Use qualification keys from scenario for filter
 
   // Update available qualifications
 

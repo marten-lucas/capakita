@@ -32,7 +32,6 @@ export default function MidtermChart({ hideFilters = false, scenario }) {
   }, [scenario]);
 
   // Use groups and qualifications from appSettingsStore
-  const groups = useAppSettingsStore(state => state.groups);
   const qualifications = useAppSettingsStore(state => state.qualifications);
 
   // Chart store
@@ -48,10 +47,14 @@ export default function MidtermChart({ hideFilters = false, scenario }) {
     updateAvailableQualifications
   } = useChartStore();
 
-  // Use group names from appSettingsStore groups
+  // Use scenario-based groupdefs and qualidefs
+  const groupDefs = useSimScenarioStore(state => state.getGroupDefs());
+  const qualiDefs = useSimScenarioStore(state => state.getQualiDefs());
+
+  // Use group names from scenario groupdefs
   const groupNames = useMemo(() => {
-    return groups.map(g => g.name);
-  }, [groups]);
+    return groupDefs.map(g => g.name);
+  }, [groupDefs]);
 
   const hasNoGroup = useMemo(() => (
     simulationData.some(item =>
@@ -66,10 +69,10 @@ export default function MidtermChart({ hideFilters = false, scenario }) {
     return groupsList;
   }, [groupNames, hasNoGroup, updateAvailableGroups]);
 
-  // Use qualification keys from appSettingsStore for filter
+  // Use qualification keys from scenario qualidefs for filter
   const qualificationKeys = useMemo(() => {
-    return qualifications.map(q => q.key);
-  }, [qualifications]);
+    return qualiDefs.map(q => q.key);
+  }, [qualiDefs]);
 
   const allQualificationNames = useMemo(() => {
     updateAvailableQualifications(qualificationKeys);
@@ -333,4 +336,4 @@ export default function MidtermChart({ hideFilters = false, scenario }) {
   );
 }
 
- 
+
