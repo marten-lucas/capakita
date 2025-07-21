@@ -99,7 +99,7 @@ function DayControl({ dayLabel, dayAbbr, dayData, onToggle, onTimeChange, onAddS
 }
 
 function BookingDetail({
-  booking, index, type, canDelete,
+  booking, index, type, 
   originalBooking, onUpdateBooking, onDelete, isManualEntry, parentItemId
 }) {
   // Remove expanded state and Accordion logic

@@ -1,5 +1,5 @@
 import {
-  Typography, Box, Card, CardContent, CardHeader, Button,
+  Typography, Box, Button,
   FormControl, FormLabel, RadioGroup, FormControlLabel, Radio, TextField,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper
 } from '@mui/material';
@@ -8,7 +8,7 @@ import { convertYYYYMMDDtoDDMMYYYY, convertDDMMYYYYtoYYYYMMDD } from '../../util
 import ModMonitor from './ModMonitor';
 import useSimScenarioDataStore from '../../store/simScenarioStore';
 
-function GroupDetail({ group, index, onDelete, canDelete, onRestore, originalGroup, onUpdateGroup, parentItemId }) {
+function GroupDetail({ group, index, onDelete, onRestore, originalGroup, onUpdateGroup, parentItemId }) {
   const { getItemBookings, updateItemBookings } = useSimScenarioDataStore((state) => ({
     getItemBookings: state.getItemBookings,
     updateItemBookings: state.updateItemBookings,
@@ -124,16 +124,6 @@ function GroupDetail({ group, index, onDelete, canDelete, onRestore, originalGro
     onUpdateGroup(updatedGroup);
   };
 
-  const { start, end } = group;
-  let dateRangeText = '';
-  if (start && end) {
-    dateRangeText = `von ${start} bis ${end}`;
-  } else if (start) {
-    dateRangeText = `ab ${start}`;
-  } else if (end) {
-    dateRangeText = `bis ${end}`;
-  }
-
   // Get allGroups from scenario groupdefs
   const groupDefs = useSimScenarioDataStore(state => state.getGroupDefs());
   // Build allGroups lookup { id: name }
@@ -146,178 +136,160 @@ function GroupDetail({ group, index, onDelete, canDelete, onRestore, originalGro
   }, [groupDefs]);
 
   return (
-    <Card variant="outlined" sx={{ mb: 2 }}>
-      <CardHeader
-        title={
-          <Box display="flex" alignItems="center" justifyContent="space-between">
-            <Typography variant="h6">
-              {group.name || 'Gruppenzuordnung'}{dateRangeText ? `: ${dateRangeText}` : ''}
-            </Typography>
-            <Box display="flex" alignItems="center" gap={1}>
-              <ModMonitor
-                itemId={parentItemId}
-                field={`group-${index}`}
-                value={JSON.stringify(group)}
-                originalValue={originalGroup ? JSON.stringify(originalGroup) : undefined}
-                onRestore={handleRestoreAll}
-                title="Komplette Gruppenzuordnung auf importierte Werte zurücksetzen"
-                confirmMsg="Gruppenzuordnung auf importierte Adebis-Daten zurücksetzen?"
-              />
-              {onDelete && canDelete && (
-                <Button
-                  size="small"
-                  color="error"
-                  onClick={() => onDelete(index)}
-                >
-                  Löschen
-                </Button>
-              )}
-            </Box>
-          </Box>
-        }
-      />
-      
-      <CardContent>
-        {/* Group Selection Section */}
-        <Box sx={{ mb: 3 }}>
-          <Box display="flex" alignItems="center" sx={{ mb: 2 }}>
-            <FormLabel component="legend" sx={{ mr: 2 }}>Gruppe auswählen:</FormLabel>
-            <ModMonitor
-              itemId={parentItemId}
-              field={`group-${index}-id`}
-              value={group.id}
-              originalValue={originalGroup ? originalGroup.id : undefined}
-              onRestore={handleRestoreGroupId}
-              title="Gruppenzuordnung auf importierten Wert zurücksetzen"
-              confirmMsg="Gruppenzuordnung auf importierten Wert zurücksetzen?"
-            />
-          </Box>
-          <RadioGroup
-            row
-            value={group.id === 'mehrere' ? 'mehrere' : (group.id ? String(group.id) : '')}
-            onChange={handleGroupModeChange}
-          >
-            {Object.entries(allGroupsLookup).map(([groupId, groupName]) => (
-              <FormControlLabel 
-                key={groupId} 
-                value={groupId} 
-                control={<Radio />} 
-                label={groupName}
-              />
-            ))}
-            <FormControlLabel 
-              value="mehrere" 
-              control={<Radio />} 
-              label="Mehrere Gruppen"
-            />
-          </RadioGroup>
+    <Box sx={{ mb: 2 }}>
+      <Box alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
+        
+        <Box alignItems="center" gap={1}>
+          <ModMonitor
+            itemId={parentItemId}
+            field={`group-${index}`}
+            value={JSON.stringify(group)}
+            originalValue={originalGroup ? JSON.stringify(originalGroup) : undefined}
+            onRestore={handleRestoreAll}
+            title="Komplette Gruppenzuordnung auf importierte Werte zurücksetzen"
+            confirmMsg="Gruppenzuordnung auf importierte Adebis-Daten zurücksetzen?"
+          />
+          {onDelete && (
+            <Button
+              size="small"
+              color="error"
+              onClick={() => onDelete(index)}
+            >
+              Löschen
+            </Button>
+          )}
         </Box>
+      </Box>
+      {/* Start/Enddatum section at the top */}
+      <Box display="flex" gap={2} sx={{ mb: 2, alignItems: 'center' }}>
+        <Typography>gültig von</Typography>
+        <TextField
+          label="Startdatum"
+          type="date"
+          size="small"
+          InputLabelProps={{ shrink: true }}
+          value={convertDDMMYYYYtoYYYYMMDD(group.start)}
+          onChange={(e) => handleDateChange('start', e.target.value)}
+        />
+        <ModMonitor
+          itemId={parentItemId}
+          field={`group-${index}-start`}
+          value={group.start}
+          originalValue={originalGroup ? originalGroup.start : undefined}
+          onRestore={() => handleRestoreGroupDate('start')}
+          title="Startdatum auf importierten Wert zurücksetzen"
+          confirmMsg="Startdatum auf importierten Wert zurücksetzen?"
+        />
+        <Typography>bis</Typography>
+        <TextField
+          label="Enddatum"
+          type="date"
+          size="small"
+          InputLabelProps={{ shrink: true }}
+          value={convertDDMMYYYYtoYYYYMMDD(group.end)}
+          onChange={(e) => handleDateChange('end', e.target.value)}
+        />
+        <ModMonitor
+          itemId={parentItemId}
+          field={`group-${index}-end`}
+          value={group.end}
+          originalValue={originalGroup ? originalGroup.end : undefined}
+          onRestore={() => handleRestoreGroupDate('end')}
+          title="Enddatum auf importierten Wert zurücksetzen"
+          confirmMsg="Enddatum auf importierten Wert zurücksetzen?"
+        />
+      </Box>
+      {/* Group Selection Section */}
+      <Box sx={{ mb: 3 }}>
+        <Box display="flex" alignItems="center" sx={{ mb: 2 }}>
+          <FormLabel component="legend" sx={{ mr: 2 }}>Gruppe auswählen:</FormLabel>
+          <ModMonitor
+            itemId={parentItemId}
+            field={`group-${index}-id`}
+            value={group.id}
+            originalValue={originalGroup ? originalGroup.id : undefined}
+            onRestore={handleRestoreGroupId}
+            title="Gruppenzuordnung auf importierten Wert zurücksetzen"
+            confirmMsg="Gruppenzuordnung auf importierten Wert zurücksetzen?"
+          />
+        </Box>
+        <RadioGroup
+          row
+          value={group.id === 'mehrere' ? 'mehrere' : (group.id ? String(group.id) : '')}
+          onChange={handleGroupModeChange}
+        >
+          {Object.entries(allGroupsLookup).map(([groupId, groupName]) => (
+            <FormControlLabel 
+              key={groupId} 
+              value={groupId} 
+              control={<Radio />} 
+              label={groupName}
+            />
+          ))}
+          <FormControlLabel 
+            value="mehrere" 
+            control={<Radio />} 
+            label="Mehrere Gruppen"
+          />
+        </RadioGroup>
+      </Box>
+      {/* Segment Override Section - Only shown when "mehrere" is selected */}
+      {group.id === 'mehrere' && (
+        <Box sx={{ mb: 3 }}>
 
-        {/* Segment Override Section - Only shown when "mehrere" is selected */}
-        {group.id === 'mehrere' && (
-          <Box sx={{ mb: 3 }}>
-            <Typography variant="h6" sx={{ mb: 2 }}>
-              Spezifische Gruppenzuordnung pro Buchungssegment:
-            </Typography>
-            <TableContainer component={Paper} variant="outlined">
-              <Table size="small">
-                <TableHead>
+          <TableContainer component={Paper} variant="outlined">
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell><strong>Buchung</strong></TableCell>
+                  <TableCell><strong>Zeitraum</strong></TableCell>
+                  <TableCell><strong>Zugeordnete Gruppe</strong></TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {getAllBookingSegments.length === 0 ? (
                   <TableRow>
-                    <TableCell><strong>Buchung</strong></TableCell>
-                    <TableCell><strong>Zeitraum</strong></TableCell>
-                    <TableCell><strong>Zugeordnete Gruppe</strong></TableCell>
+                    <TableCell colSpan={3} align="center">
+                      <Typography variant="body2" color="text.secondary">
+                        Keine Buchungssegmente vorhanden
+                      </Typography>
+                    </TableCell>
                   </TableRow>
-                </TableHead>
-                <TableBody>
-                  {getAllBookingSegments.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={3} align="center">
-                        <Typography variant="body2" color="text.secondary">
-                          Keine Buchungssegmente vorhanden
-                        </Typography>
+                ) : (
+                  getAllBookingSegments.map((segment) => (
+                    <TableRow key={segment.id}>
+                      <TableCell>{segment.summary}</TableCell>
+                      <TableCell>{segment.timeRange}</TableCell>
+                      <TableCell>
+                        <RadioGroup
+                          row
+                          name={`segment-override-${segment.id}`}
+                          value={group.segmentOverrides?.[segment.id] ? String(group.segmentOverrides[segment.id]) : ''}
+                          onChange={(e) => handleSegmentOverride(segment.id, e.target.value)}
+                        >
+                          {Object.entries(allGroupsLookup).map(([groupId, groupName]) => (
+                            <FormControlLabel 
+                              key={groupId}
+                              value={groupId}
+                              control={<Radio size="small" />}
+                              label={groupName}
+                              sx={{ mr: 1 }}
+                            />
+                          ))}
+                        </RadioGroup>
                       </TableCell>
                     </TableRow>
-                  ) : (
-                    getAllBookingSegments.map((segment) => (
-                      <TableRow key={segment.id}>
-                        <TableCell>{segment.summary}</TableCell>
-                        <TableCell>{segment.timeRange}</TableCell>
-                        <TableCell>
-                          <RadioGroup
-                            row
-                            name={`segment-override-${segment.id}`}
-                            value={group.segmentOverrides?.[segment.id] ? String(group.segmentOverrides[segment.id]) : ''}
-                            onChange={(e) => handleSegmentOverride(segment.id, e.target.value)}
-                          >
-                            {Object.entries(allGroupsLookup).map(([groupId, groupName]) => (
-                              <FormControlLabel 
-                                key={groupId}
-                                value={groupId}
-                                control={<Radio size="small" />}
-                                label={groupName}
-                                sx={{ mr: 1 }}
-                              />
-                            ))}
-                          </RadioGroup>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Box>
-        )}
-
-        {/* Date Range Section */}
-        <Box>
-          <Typography variant="h6" sx={{ mb: 2, textAlign: 'left' }}>Zeitraum der Gruppenzuordnung:</Typography>
-          <Box display="flex" gap={2} alignItems="center">
-            <TextField
-              label="Startdatum"
-              type="date"
-              size="small"
-              InputLabelProps={{ shrink: true }}
-              value={convertDDMMYYYYtoYYYYMMDD(group.start)}
-              onChange={(e) => handleDateChange('start', e.target.value)}
-              sx={{ width: 150 }}
-            />
-            <ModMonitor
-              itemId={parentItemId}
-              field={`group-${index}-start`}
-              value={group.start}
-              originalValue={originalGroup ? originalGroup.start : undefined}
-              onRestore={() => handleRestoreGroupDate('start')}
-              title="Startdatum auf importierten Wert zurücksetzen"
-              confirmMsg="Startdatum auf importierten Wert zurücksetzen?"
-            />
-            <Typography>bis</Typography>
-            <TextField
-              label="Enddatum"
-              type="date"
-              size="small"
-              InputLabelProps={{ shrink: true }}
-              value={convertDDMMYYYYtoYYYYMMDD(group.end)}
-              onChange={(e) => handleDateChange('end', e.target.value)}
-              sx={{ width: 150 }}
-            />
-            <ModMonitor
-              itemId={parentItemId}
-              field={`group-${index}-end`}
-              value={group.end}
-              originalValue={originalGroup ? originalGroup.end : undefined}
-              onRestore={() => handleRestoreGroupDate('end')}
-              title="Enddatum auf importierten Wert zurücksetzen"
-              confirmMsg="Enddatum auf importierten Wert zurücksetzen?"
-            />
-          </Box>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
         </Box>
-      </CardContent>
-    </Card>
+      )}
+    </Box>
   );
 }
 
 export default GroupDetail;
-
 
 

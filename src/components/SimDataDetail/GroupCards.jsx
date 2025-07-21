@@ -1,6 +1,7 @@
 import {
-  Typography, Box,
+  Typography, Box, Accordion, AccordionSummary, AccordionDetails
 } from '@mui/material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import React from 'react';
 import GroupDetail from './GroupDetail';
 import useSimScenarioDataStore from '../../store/simScenarioStore';
@@ -19,7 +20,7 @@ function groupsModified(localGroups, origGroups) {
   return false;
 }
 
-function GroupCards({ itemId, lastAddedIndex, importedCount, originalGroups, onRestoreGroup, isManualEntry }) {
+function GroupCards({ itemId, importedCount, originalGroups, onRestoreGroup, isManualEntry }) {
   const { getItemGroups, updateItemGroups, getItemBookings, getGroupDefs } = useSimScenarioDataStore((state) => ({
     getItemGroups: state.getItemGroups,
     updateItemGroups: state.updateItemGroups,
@@ -38,11 +39,27 @@ function GroupCards({ itemId, lastAddedIndex, importedCount, originalGroups, onR
   }, [getGroupDefs]);
 
   const groups = getItemGroups(itemId);
-  const bookings = getItemBookings(itemId); // Add this to trigger re-renders when bookings change
+  const bookings = getItemBookings(itemId);
+
+  // Track expanded accordion index
+  const [expandedIdx, setExpandedIdx] = React.useState(groups && groups.length > 0 ? 0 : null);
+
+  // Expand last group when groups length increases
+  const prevLengthRef = React.useRef(groups ? groups.length : 0);
+  React.useEffect(() => {
+    if (groups && groups.length > prevLengthRef.current) {
+      setExpandedIdx(groups.length - 1);
+    }
+    prevLengthRef.current = groups ? groups.length : 0;
+  }, [groups]);
+
+  const handleAccordionChange = (idx) => (event, expanded) => {
+    setExpandedIdx(expanded ? idx : null);
+  };
 
   const handleUpdateGroup = (index, updatedGroup) => {
     const updatedGroups = groups.map((g, idx) => (idx === index ? updatedGroup : g));
-    updateItemGroups(itemId, updatedGroups); // Persist changes to global state
+    updateItemGroups(itemId, updatedGroups);
   };
 
   const handleDeleteGroup = (index) => {
@@ -54,27 +71,53 @@ function GroupCards({ itemId, lastAddedIndex, importedCount, originalGroups, onR
     return <Typography variant="body2" color="text.secondary">Keine Gruppenzuordnungen vorhanden.</Typography>;
   }
 
+  
+
+
   return (
     <Box>
       {groups.map((group, idx) => {
         const orig = Array.isArray(originalGroups) ? originalGroups[idx] : undefined;
         const isMod = orig ? groupsModified([group], [orig]) : false;
+
+        // Use dateRangeText logic for header
+        const { start, end } = group;
+        let dateRangeText = '';
+        if (start && end) {
+          dateRangeText = `von ${start} bis ${end}`;
+        } else if (start) {
+          dateRangeText = `ab ${start}`;
+        } else if (end) {
+          dateRangeText = `bis ${end}`;
+        }
+
         return (
-          <GroupDetail
-            key={`${idx}-${bookings.length}`} 
-            group={group}
-            index={idx}
-            allGroups={allGroups}
-            defaultExpanded={lastAddedIndex === idx}
-            onDelete={handleDeleteGroup}
-            canDelete={typeof importedCount === 'number' ? idx >= importedCount : true}
-            isModified={isMod}
-            onRestore={onRestoreGroup}
-            originalGroup={orig}
-            onUpdateGroup={(updatedGroup) => handleUpdateGroup(idx, updatedGroup)}
-            isManualEntry={isManualEntry}
-            parentItemId={itemId}
-          />
+          <Accordion
+            key={`${idx}-${bookings.length}`}
+            expanded={expandedIdx === idx}
+            onChange={handleAccordionChange(idx)}
+          >
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography variant="subtitle1">
+                {(group.name || 'Gruppenzuordnung')}{dateRangeText ? `: ${dateRangeText}` : ''}
+              </Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <GroupDetail
+                group={group}
+                index={idx}
+                allGroups={allGroups}
+                onDelete={handleDeleteGroup}
+                canDelete={typeof importedCount === 'number' ? idx >= importedCount : true}
+                isModified={isMod}
+                onRestore={onRestoreGroup}
+                originalGroup={orig}
+                onUpdateGroup={(updatedGroup) => handleUpdateGroup(idx, updatedGroup)}
+                isManualEntry={isManualEntry}
+                parentItemId={itemId}
+              />
+            </AccordionDetails>
+          </Accordion>
         );
       })}
     </Box>
