@@ -33,7 +33,7 @@ function SimulationDataTab({
 
   const { 
     updateItemAbsenceState, 
-    getItemAbsenceState, 
+    getItemAbsenceStateList,
     getItemBookings, 
     updateItemBookings, 
     getItemGroups, 
@@ -53,7 +53,7 @@ function SimulationDataTab({
     getQualiDefs
   } = useSimScenarioDataStore((state) => ({
     updateItemAbsenceState: state.updateItemAbsenceState,
-    getItemAbsenceState: state.getItemAbsenceState,
+    getItemAbsenceStateList: state.getItemAbsenceStateList,
     getItemBookings: state.getItemBookings,
     updateItemBookings: state.updateItemBookings,
     getItemGroups: state.getItemGroups,
@@ -75,7 +75,7 @@ function SimulationDataTab({
     getQualiDefs: state.getQualiDefs,
   }));
 
-  const absenceState = getItemAbsenceState(item.id);
+  const absenceStateList = getItemAbsenceStateList(item.id) || [];
   const bookings = getItemBookings(item.id);
   const groups = getItemGroups(item.id);
   const currentDates = getItemDates(item.id);
@@ -212,6 +212,20 @@ function SimulationDataTab({
   // Get scenario-based qualidefs for radio options
   const qualiDefs = getQualiDefs ? getQualiDefs() : [];
 
+  const handleAddAbsence = () => {
+    updateItemAbsenceState(item.id, [...absenceStateList, { start: '', end: '' }]);
+  };
+
+  const handleUpdateAbsence = (idx, updatedAbsence) => {
+    const newList = absenceStateList.map((a, i) => (i === idx ? updatedAbsence : a));
+    updateItemAbsenceState(item.id, newList);
+  };
+
+  const handleDeleteAbsence = (idx) => {
+    const newList = absenceStateList.filter((_, i) => i !== idx);
+    updateItemAbsenceState(item.id, newList);
+  };
+
   return (
     <Box flex={1} display="flex" flexDirection="column">
       <Tabs
@@ -227,7 +241,7 @@ function SimulationDataTab({
       {activeTab === 0 && (
         <SimDataGeneralTab
           item={item}
-          absenceState={absenceState}
+          absenceStateList={absenceStateList}
           startDate={startDate}
           endDate={endDate}
           initialStartDate={initialStartDate}
@@ -249,6 +263,9 @@ function SimulationDataTab({
           handleRestoreStartDate={handleRestoreStartDate}
           handleRestoreEndDate={handleRestoreEndDate}
           handleAbsenceChange={handleAbsenceChange}
+          handleAddAbsence={handleAddAbsence}
+          handleUpdateAbsence={handleUpdateAbsence}
+          handleDeleteAbsence={handleDeleteAbsence}
           updateItemName={updateItemName}
           updateItemNote={updateItemNote}
           updateItemQualification={updateItemQualification}

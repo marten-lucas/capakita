@@ -95,17 +95,13 @@ const useChartStore = create(
       },
       
       // Helper to check if item is booked in segment
-      isBookedInSegment: (item, dayIdx, segmentStart, segmentEnd, groupNamesFilter, isDemand, stichtag, qualificationFilter, getItemAbsenceState) => {
+      isBookedInSegment: (item, dayIdx, segmentStart, segmentEnd, groupNamesFilter, isDemand, stichtag, qualificationFilter, getItemAbsenceStateList) => {
         const stichtagDate = new Date(stichtag);
 
-        // Check if item is absent on the stichtag via simScenarioStore
-        const absenceState = getItemAbsenceState ? getItemAbsenceState(item.id) : { enabled: false };
-        if (absenceState.enabled && absenceState.start && absenceState.end) {
-          const absenceStart = new Date(absenceState.start);
-          const absenceEnd = new Date(absenceState.end);
-          if (stichtagDate >= absenceStart && stichtagDate <= absenceEnd) {
-            return false;
-          }
+        // Check if item is absent on the stichtag via simScenarioStore (multiple absences)
+        const absences = getItemAbsenceStateList ? getItemAbsenceStateList(item.id) : [];
+        if (absences.some(a => a.start && a.end && stichtagDate >= new Date(a.start) && stichtagDate <= new Date(a.end))) {
+          return false;
         }
 
         // Filter by qualification (only for capacity items) - moved to correct position
@@ -479,7 +475,7 @@ const useChartStore = create(
       },
       
       // Get last date of interest from simulation data
-      getLastDateOfInterest: (simulationData, getItemAbsenceState) => {
+      getLastDateOfInterest: (simulationData, getItemAbsenceStateList) => {
         const today = new Date();
         let lastDate = today;
         simulationData.forEach(item => {
@@ -510,11 +506,13 @@ const useChartStore = create(
           }
           
           // Check pause dates
-          const absenceState = getItemAbsenceState ? getItemAbsenceState(item.id) : { enabled: false };
-          if (absenceState.enabled && absenceState.end) {
-            const absenceEnd = new Date(absenceState.end);
-            if (absenceEnd > lastDate) lastDate = absenceEnd;
-          }
+          const absences = getItemAbsenceStateList ? getItemAbsenceStateList(item.id) : [];
+          absences.forEach(a => {
+            if (a.end) {
+              const absenceEnd = new Date(a.end);
+              if (absenceEnd > lastDate) lastDate = absenceEnd;
+            }
+          });
         });
         return lastDate;
       },
@@ -730,7 +728,7 @@ const useChartStore = create(
       },
 
       // Check if item is valid for period with filters
-      isItemValidForPeriod: (item, period, groupFilter, qualificationFilter, getItemAbsenceState) => {
+      isItemValidForPeriod: (item, period, groupFilter, qualificationFilter, getItemAbsenceStateList) => {
         // Check if item's date range overlaps with period
         const itemStart = item.parseddata?.startdate ? new Date(item.parseddata.startdate.split('.').reverse().join('-')) : null;
         const itemEnd = item.parseddata?.enddate ? new Date(item.parseddata.enddate.split('.').reverse().join('-')) : null;
@@ -739,14 +737,10 @@ const useChartStore = create(
         if (itemStart && itemStart > period.end) return false;
         if (itemEnd && itemEnd < period.start) return false;
         
-        // Check absence state via simScenarioStore
-        const absenceState = getItemAbsenceState ? getItemAbsenceState(item.id) : { enabled: false };
-        if (absenceState.enabled && absenceState.start && absenceState.end) {
-          const absenceStart = new Date(absenceState.start);
-          const absenceEnd = new Date(absenceState.end);
-          if (absenceStart <= period.start && absenceEnd >= period.end) {
-            return false;
-          }
+        // Check absence state via simScenarioStore (multiple absences)
+        const absences = getItemAbsenceStateList ? getItemAbsenceStateList(item.id) : [];
+        if (absences.some(a => a.start && a.end && new Date(a.start) <= period.start && new Date(a.end) >= period.end)) {
+          return false;
         }
         
         // Filter by groups
@@ -818,3 +812,4 @@ const useChartStore = create(
 );
 
 export default useChartStore;
+

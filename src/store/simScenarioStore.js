@@ -441,46 +441,38 @@ const useSimScenarioStore = create(
         }
         return item.parseddata ? { startdate: item.parseddata.startdate, enddate: item.parseddata.enddate } : null;
       },
-      updateItemAbsenceState: (itemId, enabled, start, end) => {
+      updateItemAbsenceState: (itemId, absences) => {
         const state = get();
         const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
         if (!scenario) return;
 
         if (!scenario.baseScenarioId) {
-          // Root scenario - existing implementation
           set(produce((draft) => {
             const draftScenario = draft.scenarios.find(s => s.id === state.selectedScenarioId);
             if (!draftScenario) return;
             const item = draftScenario.simulationData.find((i) => i.id === itemId);
             if (item) {
-              const previousValue = JSON.stringify(item.parseddata.absence || { enabled: false, start: '', end: '' });
-              const newValue = JSON.stringify({ enabled, start, end });
-              item.parseddata.absence = { enabled, start, end };
-              if (!item.modifications) {
-                item.modifications = [];
-              }
-              item.modifications = item.modifications.filter(m => m.field !== 'absence');
-              if (previousValue !== newValue) {
-                item.modifications.push({
-                  field: 'absence',
-                  previousValue,
-                  newValue,
-                  timestamp: new Date().toISOString()
-                });
-              }
+              item.parseddata.absences = absences;
+              // Optional: Modifikationslogik für absences
+              if (!item.modifications) item.modifications = [];
+              item.modifications = item.modifications.filter(m => m.field !== 'absences');
+              item.modifications.push({
+                field: 'absences',
+                newValue: JSON.stringify(absences),
+                timestamp: new Date().toISOString()
+              });
             }
           }));
         } else {
-          // Based scenario - track change
-          get().trackItemChange(itemId, 'absence', {
-            parseddata: { absence: { enabled, start, end } }
+          get().trackItemChange(itemId, 'absences', {
+            parseddata: { absences }
           });
         }
       },
-      getItemAbsenceState: (itemId) => {
+      getItemAbsenceStateList: (itemId) => {
         const effectiveData = get().getEffectiveSimulationData();
         const item = effectiveData.find((i) => i.id === itemId);
-        return item?.parseddata?.absence || { enabled: false, start: '', end: '' };
+        return item?.parseddata?.absences || [];
       },
       updateItemBookings: (itemId, bookings) => {
         const state = get();

@@ -8,7 +8,7 @@ import ModMonitor from './ModMonitor';
 
 function SimDataGeneralTab({
   item,
-  absenceState,
+  absenceStateList, // jetzt Array von Abwesenheiten
   startDate,
   endDate,
   initialStartDate,
@@ -32,7 +32,9 @@ function SimDataGeneralTab({
   updateItemName,
   updateItemNote,
   updateItemQualification,
-  handleAbsenceChange,
+  handleAddAbsence,
+  handleUpdateAbsence,
+  handleDeleteAbsence,
 }) {
   // Local state for controlled fields
   const [localName, setLocalName] = useState(itemName);
@@ -139,13 +141,9 @@ function SimDataGeneralTab({
                   />
                 ))
               ) : (
-                <>
-                  <FormControlLabel value="E" control={<Radio />} label="Erzieher (E)" />
-                  <FormControlLabel value="K" control={<Radio />} label="Kinderpfleger (K)" />
-                  <FormControlLabel value="H" control={<Radio />} label="Hilfskraft (H)" />
-                  <FormControlLabel value="P" control={<Radio />} label="Praktikant (P)" />
-                  <FormControlLabel value="" control={<Radio />} label="Keine Qualifikation" />
-                </>
+                <Typography variant="body2" color="text.secondary" sx={{ ml: 2, mt: 1 }}>
+                  Keine Qualifikationsdefinitionen geladen. Bitte Organisation prüfen.
+                </Typography>
               )}
             </RadioGroup>
           </FormControl>
@@ -192,39 +190,65 @@ function SimDataGeneralTab({
         />
       </Box>
       <Box sx={{ mb: 2, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-        <FormControlLabel
-          control={
-            <Switch
-              checked={absenceState.enabled}
-              onChange={(e) => handleAbsenceChange(e.target.checked, absenceState.start, absenceState.end)}
-            />
-          }
-          label="Abwesenheit"
-          sx={{ ml: 0 }}
-        />
-        {absenceState.enabled && (
-          <Box display="flex" alignItems="center" gap={1} sx={{ mt: 1 }}>
-            <TextField
-              label="von"
-              type="date"
-              size="small"
-              InputLabelProps={{ shrink: true }}
-              value={absenceState.start}
-              onChange={(e) => handleAbsenceChange(absenceState.enabled, e.target.value, absenceState.end)}
-              sx={{ width: 130 }}
-              inputProps={{ min: today }}
-            />
-            <Typography variant="body2" sx={{ minWidth: 24, textAlign: 'center' }}>bis</Typography>
-            <TextField
-              label="bis"
-              type="date"
-              size="small"
-              InputLabelProps={{ shrink: true }}
-              value={absenceState.end}
-              onChange={(e) => handleAbsenceChange(absenceState.enabled, absenceState.start, e.target.value)}
-              sx={{ width: 130 }}
-              inputProps={{ min: today }}
-            />
+        <Button
+          variant="outlined"
+          size="small"
+          onClick={handleAddAbsence}
+          sx={{ mb: 1 }}
+        >
+          Abwesenheit hinzufügen
+        </Button>
+        {absenceStateList && absenceStateList.length > 0 && (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            {absenceStateList.map((absence, idx) => {
+              // Berechne die Anzahl der Arbeitstage (Mo-Fr) für diese Abwesenheit
+              let workdays = 0;
+              if (absence.start && absence.end) {
+                const start = new Date(absence.start);
+                const end = new Date(absence.end);
+                for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+                  const day = d.getDay();
+                  if (day >= 1 && day <= 5) workdays++;
+                }
+              }
+              return (
+                <Box key={idx} display="flex" alignItems="center" gap={1}>
+                  <TextField
+                    label="von"
+                    type="date"
+                    size="small"
+                    InputLabelProps={{ shrink: true }}
+                    value={absence.start}
+                    onChange={(e) => handleUpdateAbsence(idx, { ...absence, start: e.target.value })}
+                    sx={{ width: 130 }}
+                    inputProps={{ min: today }}
+                  />
+                  <Typography variant="body2" sx={{ minWidth: 24, textAlign: 'center' }}>bis</Typography>
+                  <TextField
+                    label="bis"
+                    type="date"
+                    size="small"
+                    InputLabelProps={{ shrink: true }}
+                    value={absence.end}
+                    onChange={(e) => handleUpdateAbsence(idx, { ...absence, end: e.target.value })}
+                    sx={{ width: 130 }}
+                    inputProps={{ min: today }}
+                  />
+                  <Typography variant="body2" sx={{ minWidth: 80 }}>
+                    {workdays > 0 ? `${workdays} Arbeitstage` : ''}
+                  </Typography>
+                  <Button
+                    variant="outlined"
+                    color="error"
+                    size="small"
+                    onClick={() => handleDeleteAbsence(idx)}
+                    sx={{ ml: 1 }}
+                  >
+                    Entfernen
+                  </Button>
+                </Box>
+              );
+            })}
           </Box>
         )}
       </Box>
