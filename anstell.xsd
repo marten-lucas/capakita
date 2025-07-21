@@ -1,0 +1,42 @@
+<xs:schema attributeFormDefault="unqualified" elementFormDefault="qualified" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="ANSTELLUNGEN">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="ANSTELLUNG" maxOccurs="unbounded" minOccurs="0">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element type="xs:short" name="IDNR"/>
+              <xs:element type="xs:short" name="ADRNR"/>
+              <xs:element type="xs:string" name="BEGINNDAT"/>
+              <xs:element type="xs:string" name="ENDDAT" minOccurs="0"/>
+              <xs:element type="xs:string" name="ARBZEIT"/>
+              <xs:element type="xs:byte" name="URLAUB" minOccurs="0"/>
+              <xs:element type="xs:string" name="QUALIFIK"/>
+              <xs:element type="xs:string" name="BEMERK" minOccurs="0"/>
+              <xs:element type="xs:string" name="VERTRAGART" minOccurs="0"/>
+              <xs:element type="xs:string" name="ANLDAT"/>
+              <xs:element type="xs:string" name="AENDAT"/>
+              <xs:element type="xs:byte" name="ANLUSER"/>
+              <xs:element type="xs:byte" name="AENUSER"/>
+              <xs:element type="xs:byte" name="MNR"/>
+              <xs:element type="xs:string" name="ZEITEN"/>
+              <xs:element type="xs:string" name="ERSATZKR" minOccurs="0"/>
+              <xs:element type="xs:string" name="NEBENBERUF" minOccurs="0"/>
+              <xs:element type="xs:byte" name="ARBBEREICH" minOccurs="0"/>
+              <xs:element type="xs:byte" name="ARBBEREIC2" minOccurs="0"/>
+              <xs:element type="xs:string" name="ARBZEITAB2" minOccurs="0"/>
+              <xs:element type="xs:byte" name="MBNR1" minOccurs="0"/>
+              <xs:element type="xs:byte" name="MBNR2" minOccurs="0"/>
+              <xs:element type="xs:byte" name="MBNR3" minOccurs="0"/>
+              <xs:element type="xs:string" name="MBSTD2" minOccurs="0"/>
+              <xs:element type="xs:string" name="BEGINNMODE" minOccurs="0"/>
+              <xs:element type="xs:string" name="ENDMODE" minOccurs="0"/>
+              <xs:element type="xs:string" name="ARBZEITB" minOccurs="0"/>
+              <xs:element type="xs:string" name="PERSBONUS" minOccurs="0"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>
