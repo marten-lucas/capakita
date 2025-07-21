@@ -724,6 +724,51 @@ const useSimScenarioStore = create(
         const item = effectiveData.find((i) => i.id === itemId);
         return item?.parseddata?.qualification || '';
       },
+      
+      // Financial data methods
+      getItemFinancials: (itemId) => {
+        const effectiveData = get().getEffectiveSimulationData();
+        const item = effectiveData.find((i) => i.id === itemId);
+        return item?.parseddata?.financials || [];
+      },
+      
+      updateItemFinancials: (itemId, financials) => {
+        const state = get();
+        const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+        if (!scenario) return;
+
+        if (!scenario.baseScenarioId) {
+          // Root scenario - existing implementation
+          set(produce((draft) => {
+            const draftScenario = draft.scenarios.find(s => s.id === state.selectedScenarioId);
+            if (!draftScenario) return;
+            const item = draftScenario.simulationData.find((i) => i.id === itemId);
+            if (item) {
+              const previousValue = JSON.stringify(item.parseddata.financials);
+              const newValue = JSON.stringify(financials);
+              if (!item.modifications) {
+                item.modifications = [];
+              }
+              item.modifications = item.modifications.filter(m => m.field !== 'financials');
+              if (previousValue !== newValue) {
+                item.modifications.push({
+                  field: 'financials',
+                  previousValue,
+                  newValue,
+                  timestamp: new Date().toISOString()
+                });
+              }
+              item.parseddata.financials = financials;
+            }
+          }));
+        } else {
+          // Based scenario - track change
+          get().trackItemChange(itemId, 'financials', {
+            parseddata: { financials }
+          });
+        }
+      },
+      
       deleteItem: (itemId) => {
         const state = get();
         const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
@@ -772,14 +817,7 @@ const useSimScenarioStore = create(
         return imported.every(s => s.importedAnonymized);
       },
       importScenario: () => {
-        // ...existing import logic...
-
-        // REMOVE: Extract unique group names from simulationData and update AppSettingsStore
-        // REMOVE: const groupNamesSet = new Set();
-        // REMOVE: scenario.simulationData.forEach(item => { ... });
-        // REMOVE: const addGroup = useAppSettingsStore.getState().addGroup;
-        // REMOVE: groupNamesSet.forEach(groupName => { addGroup(groupName); });
-
+        
         // ...rest of import logic (add scenario to store)...
       },
       // --- Organisation State per Scenario ---

@@ -18,9 +18,11 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import PersonIcon from '@mui/icons-material/Person';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import GroupIcon from '@mui/icons-material/Group';
+import EuroIcon from '@mui/icons-material/Euro';
 import SimDataGeneralTab from './SimDataGeneralTab';
 import SimDataBookingTab from './SimDataBookingTab';
 import SimDataGroupsTab from './SimDataGroupsTab';
+import SimDataFinanceTab from './SimDataFinanceTab';
 import useSimScenarioDataStore from '../../store/simScenarioStore';
 
 function SimulationDataTab({ 
@@ -237,6 +239,7 @@ function SimulationDataTab({
         <Tab icon={<PersonIcon />} label="Allgemein" />
         <Tab icon={<AccessTimeIcon />} label="Zeiten" />
         <Tab icon={<GroupIcon />} label="Gruppen" />
+        <Tab icon={<EuroIcon />} label="Finanzen" />
       </Tabs>
       {activeTab === 0 && (
         <SimDataGeneralTab
@@ -291,6 +294,11 @@ function SimulationDataTab({
           handleAddGroup={handleAddGroup}
           handleDeleteGroup={handleDeleteGroup}
           handleRestoreGroup={handleRestoreGroup}
+        />
+      )}
+      {activeTab === 3 && (
+        <SimDataFinanceTab
+          item={item}
         />
       )}
     </Box>
