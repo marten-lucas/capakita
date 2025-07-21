@@ -1,7 +1,6 @@
 import { List, ListItem, ListItemButton, ListItemText, Divider, Box, ListItemAvatar, Avatar, Chip } from '@mui/material';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import useSimScenarioStore from '../store/simScenarioStore';
-import useAppSettingsStore from '../store/appSettingsStore';
 
 
 
@@ -60,8 +59,12 @@ function SimDataList({ data, onRowClick, selectedItem }) {
   // Use the simScenarioStore for modification checking
   const isFieldModified = useSimScenarioStore(state => state.isFieldModified);
   
-  // Get groups from AppSettingsStore for icons
-  const getGroupById = useAppSettingsStore(state => state.getGroupById);
+  // Get groups from simScenarioStore for icons
+  const groupDefs = useSimScenarioStore(state => state.getGroupDefs());
+  // Helper to get group by id from scenario groupDefs
+  function getGroupById(id) {
+    return groupDefs.find(g => String(g.id) === String(id));
+  }
 
   // Define colors for demand/capacity
   const DEMAND_COLOR = '#c0d9f3ff';   // blue for children
@@ -125,10 +128,10 @@ function SimDataList({ data, onRowClick, selectedItem }) {
         if (item.type === 'demand' && item.parseddata?.group && item.parseddata.group.length > 0) {
           group = item.parseddata.group[0];
           groupName = group?.name || 'Gruppe unbekannt';
-          // Get icon from settings store
-          const settingsGroup = getGroupById(group?.id);
-          if (settingsGroup && settingsGroup.icon) {
-            groupIcon = settingsGroup.icon;
+          // Get icon from scenario groupDefs
+          const scenarioGroup = getGroupById(group?.id);
+          if (scenarioGroup && scenarioGroup.icon) {
+            groupIcon = scenarioGroup.icon;
           }
         } else if (item.type === 'demand') {
           // No group set for child

@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom'
 import WeeklyChart from '../components/SimDataCharts/WeeklyChart'
 import MidtermChart from '../components/SimDataCharts/MidtermChart'
 import useSimScenarioStore from '../store/simScenarioStore'
-import ScenarioManager from '../components/ScenarioManager'
 import useAppSettingsStore from '../store/appSettingsStore'
 import ScenarioSaveDialog from '../components/modals/ScenarioSaveDialog'
 import ChartFilterForm from '../components/SimDataCharts/ChartFilterForm'
@@ -83,14 +82,7 @@ function VisuPage() {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#f0f2f5' }}>
-      {/* Scenario Selector */}
-      <ScenarioManager
-        selectedScenarioId={selectedScenarioId}
-        setSelectedScenarioId={setSelectedScenarioId}
-        scenarios={scenarios}
-        setSelectedItem={() => {}} // Not used in VisuPage
-      />
-      
+      {/* Scenario Save Dialog */}
       <ScenarioSaveDialog
         open={scenarioSaveDialogOpen}
         onClose={() => { setScenarioSaveDialogOpen(false); setScenarioSaveDialogPending(null); }}

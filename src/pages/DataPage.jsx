@@ -29,7 +29,6 @@ import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import useAppSettingsStore from '../store/appSettingsStore';
 import ScenarioSaveDialog from '../components/modals/ScenarioSaveDialog';
-import ScenarioManager from '../components/ScenarioManager';
 import PersonIcon from '@mui/icons-material/Person';
 import ChildCareIcon from '@mui/icons-material/ChildCare';
 import LayersIcon from '@mui/icons-material/Layers';
@@ -65,15 +64,50 @@ function DataPage() {
 
   const handleImport = async ({ file, isAnonymized }) => {
     // Use the centralized import utility
-    const { processedData } = await extractAdebisZipAndData(
+    const { processedData, uniqueGroupNames, newGroupsLookup, uniqueQualifications } = await extractAdebisZipAndData(
       file,
       isAnonymized,
-      useAppSettingsStore.getState().importGroupsFromAdebis,
-      useAppSettingsStore.getState().importQualificationsFromEmployees
+      // Remove useAppSettingsStore import hooks, just pass null
+      null,
+      null
     );
     setModalOpen(false);
 
-    // Create a new scenario as root after import, with simulationData
+    // Defensive: always create groupdefs and qualidefs arrays
+    const groupdefs = Object.entries(newGroupsLookup).map(([id, name]) => ({
+      id,
+      name,
+      icon: (() => {
+        const lowerName = name.toLowerCase();
+        if (lowerName.includes('fuchs')) return '🦊';
+        if (lowerName.includes('bär') || lowerName.includes('baer')) return '🐻';
+        if (lowerName.includes('hase') || lowerName.includes('kaninchen')) return '🐰';
+        if (lowerName.includes('frosch')) return '🐸';
+        if (lowerName.includes('schmetterling')) return '🦋';
+        if (lowerName.includes('marienkäfer') || lowerName.includes('käfer')) return '🐞';
+        if (lowerName.includes('biene')) return '🐝';
+        if (lowerName.includes('schule') || lowerName.includes('schulkind')) return '🎒';
+        if (lowerName.includes('stern')) return '⭐';
+        if (lowerName.includes('sonne')) return '☀️';
+        if (lowerName.includes('mond')) return '🌙';
+        if (lowerName.includes('regenbogen')) return '🌈';
+        if (lowerName.includes('blume')) return '🌸';
+        if (lowerName.includes('baum')) return '🌳';
+        return '👥';
+      })()
+    })) || [];
+
+    const qualidefs = uniqueQualifications.map(key => ({
+      key,
+      name: key
+    })) || [];
+
+    // Always provide organisation property, even if empty
+    const organisation = {
+      groupdefs,
+      qualidefs
+    };
+
     const scenarioName = isAnonymized ? 'Importiertes Szenario (anonymisiert)' : 'Importiertes Szenario';
     const newScenario = {
       name: scenarioName,
@@ -83,14 +117,19 @@ function DataPage() {
       baseScenarioId: null,
       simulationData: processedData,
       imported: true,
-      importedAnonymized: !!isAnonymized
+      importedAnonymized: !!isAnonymized,
+      organisation // always present
     };
     addScenario(newScenario);
+
     // Find the new scenario's id (last added)
     const scenarios = useSimScenarioStore.getState().scenarios;
     const lastScenario = scenarios[scenarios.length - 1];
     if (lastScenario) {
       setSelectedScenarioId(lastScenario.id);
+      // Defensive: ensure groupdefs/qualidefs are set (for overlays etc.)
+      useSimScenarioStore.getState().setGroupDefs(groupdefs);
+      useSimScenarioStore.getState().setQualiDefs(qualidefs);
     }
   };
 
@@ -168,7 +207,8 @@ function DataPage() {
     setSelectedItem(newItem);
   };
 
-  const scenarioManagerRef = React.useRef();
+  // Reference for scenario manager (if needed for handleAdd)
+  const scenarioManagerRef = React.useRef(null);
 
   // Add scenario via SpeedDial: trigger handleAdd of ScenarioManager for current scenario
   const handleAddScenario = () => {
@@ -272,14 +312,6 @@ function DataPage() {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#f0f2f5' }}>
-      {/* Scenario Selector */}
-      <ScenarioManager
-        ref={scenarioManagerRef}
-        selectedScenarioId={selectedScenarioId}
-        setSelectedScenarioId={setSelectedScenarioId}
-        scenarios={scenarios}
-        setSelectedItem={setSelectedItem}
-      />
       <SpeedDial
         ariaLabel="SpeedDial for data actions"
         sx={{ position: 'fixed', bottom: 32, right: 32 }}

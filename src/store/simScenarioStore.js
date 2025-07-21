@@ -130,13 +130,15 @@ const useSimScenarioStore = create(
         baseScenarioId = null,
         simulationData = [],
         imported = false,
-        importedAnonymized = false
+        importedAnonymized = false,
+        organisation = undefined // allow explicit organisation
       }) =>
         set(produce((state) => {
           const id = Date.now().toString();
           const uid = generateUID();
-          // If this is a based scenario, don't store simulationData, only changes
           const scenarioData = baseScenarioId ? [] : simulationData;
+          // Ensure organisation property is always present
+          const org = organisation || { groupdefs: [], qualidefs: [] };
           state.scenarios.push({
             id,
             uid,
@@ -147,9 +149,10 @@ const useSimScenarioStore = create(
             desirability,
             baseScenarioId,
             simulationData: scenarioData,
-            dataChanges: baseScenarioId ? {} : undefined, // Track changes for based scenarios
-            imported, // new property: true/false
-            importedAnonymized // new property: true/false
+            dataChanges: baseScenarioId ? {} : undefined,
+            imported,
+            importedAnonymized,
+            organisation: org
           });
           state.selectedScenarioId = id;
         })),
@@ -783,6 +786,85 @@ const useSimScenarioStore = create(
 
         // ...rest of import logic (add scenario to store)...
       },
+      // --- Organisation State per Scenario ---
+      // Get groupdefs for selected scenario
+      getGroupDefs: () => {
+        const state = get();
+        const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+        return scenario?.organisation?.groupdefs || [];
+      },
+      // Get qualidefs for selected scenario
+      getQualiDefs: () => {
+        const state = get();
+        const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+        return scenario?.organisation?.qualidefs || [];
+      },
+      // Add group to selected scenario
+      addGroupDef: (group) => set(produce((state) => {
+        const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+        if (!scenario) return;
+        if (!scenario.organisation) scenario.organisation = {};
+        if (!scenario.organisation.groupdefs) scenario.organisation.groupdefs = [];
+        // Prevent duplicate by id
+        if (!scenario.organisation.groupdefs.some(g => g.id === group.id)) {
+          scenario.organisation.groupdefs.push(group);
+        }
+      })),
+      // Update group in selected scenario
+      updateGroupDef: (id, updates) => set(produce((state) => {
+        const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+        if (!scenario?.organisation?.groupdefs) return;
+        const idx = scenario.organisation.groupdefs.findIndex(g => g.id === id);
+        if (idx !== -1) {
+          scenario.organisation.groupdefs[idx] = { ...scenario.organisation.groupdefs[idx], ...updates };
+        }
+      })),
+      // Delete group from selected scenario
+      deleteGroupDef: (id) => set(produce((state) => {
+        const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+        if (!scenario?.organisation?.groupdefs) return;
+        scenario.organisation.groupdefs = scenario.organisation.groupdefs.filter(g => g.id !== id);
+      })),
+      // Set all groups for selected scenario
+      setGroupDefs: (groups) => set(produce((state) => {
+        const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+        if (!scenario) return;
+        if (!scenario.organisation) scenario.organisation = {};
+        scenario.organisation.groupdefs = groups;
+      })),
+      // Add qualification to selected scenario
+      addQualiDef: (quali) => set(produce((state) => {
+        const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+        if (!scenario) return;
+        if (!scenario.organisation) scenario.organisation = {};
+        if (!scenario.organisation.qualidefs) scenario.organisation.qualidefs = [];
+        // Prevent duplicate by key
+        if (!scenario.organisation.qualidefs.some(q => q.key === quali.key)) {
+          scenario.organisation.qualidefs.push(quali);
+        }
+      })),
+      // Update qualification in selected scenario
+      updateQualiDef: (key, updates) => set(produce((state) => {
+        const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+        if (!scenario?.organisation?.qualidefs) return;
+        const idx = scenario.organisation.qualidefs.findIndex(q => q.key === key);
+        if (idx !== -1) {
+          scenario.organisation.qualidefs[idx] = { ...scenario.organisation.qualidefs[idx], ...updates };
+        }
+      })),
+      // Delete qualification from selected scenario
+      deleteQualiDef: (key) => set(produce((state) => {
+        const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+        if (!scenario?.organisation?.qualidefs) return;
+        scenario.organisation.qualidefs = scenario.organisation.qualidefs.filter(q => q.key !== key);
+      })),
+      // Set all qualifications for selected scenario
+      setQualiDefs: (qualis) => set(produce((state) => {
+        const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
+        if (!scenario) return;
+        if (!scenario.organisation) scenario.organisation = {};
+        scenario.organisation.qualidefs = qualis;
+      })),
     }),
     {
       name: 'sim-scenario-storage',

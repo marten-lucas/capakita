@@ -60,8 +60,6 @@ function TopNav() {
           stichtag: chartData.stichtag,
           selectedGroups: chartData.selectedGroups,
           selectedQualifications: chartData.selectedQualifications,
-          availableGroups: chartData.availableGroups,
-          availableQualifications: chartData.availableQualifications,
           midtermTimeDimension: chartData.midtermTimeDimension,
           midtermSelectedGroups: chartData.midtermSelectedGroups,
           midtermSelectedQualifications: chartData.midtermSelectedQualifications

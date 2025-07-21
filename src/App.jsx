@@ -8,9 +8,14 @@ import WelcomePage from './pages/WelcomePage';
 import useSimScenarioStore from './store/simScenarioStore'; 
 import theme from './theme';
 import './App.css'
+import ScenarioManager from './components/ScenarioManager'
+import useAppSettingsStore from './store/appSettingsStore'
 
 function App() {
   const scenarios = useSimScenarioStore(state => state.scenarios);
+  const selectedScenarioId = useSimScenarioStore(state => state.selectedScenarioId);
+  const setSelectedScenarioId = useSimScenarioStore(state => state.setSelectedScenarioId);
+  const setSelectedItem = useAppSettingsStore(state => state.setSelectedItem);
 
   // Wenn keine Szenarien vorhanden sind, immer WelcomePage anzeigen
   if (!scenarios || scenarios.length === 0) {
@@ -39,9 +44,16 @@ function App() {
         display: 'flex', flexDirection: 'column', minHeight: '100vh',
         width: "100vw"
       }}>
-        <TopNav /> {/* TopNav ist jetzt außerhalb des Containers für volle Breite */}
+        <TopNav />
+        {/* ScenarioManager is now shown below TopNav and above page content */}
+        <ScenarioManager
+          selectedScenarioId={selectedScenarioId}
+          setSelectedScenarioId={setSelectedScenarioId}
+          scenarios={scenarios}
+          setSelectedItem={setSelectedItem}
+        />
         <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
-          <Container maxWidth='l'> {/* Der Container ist jetzt nur für den Inhalt */}
+          <Container maxWidth='l'>
             <Routes>
               <Route path="/" element={<Navigate to="/data" replace />} />
               <Route path="/visu" element={<VisuPage />} />

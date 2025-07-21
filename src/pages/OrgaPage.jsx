@@ -25,11 +25,16 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import PersonIcon from '@mui/icons-material/Person';
-import useAppSettingsStore from '../store/appSettingsStore';
+import useSimScenarioStore from '../store/simScenarioStore';
 import IconPicker from '../components/IconPicker';
 
 function GroupsTab() {
-  const { groups, addGroup, updateGroup, deleteGroup } = useAppSettingsStore();
+  // Use scenario-based groupdefs/actions
+  const groupDefs = useSimScenarioStore(state => state.getGroupDefs());
+  const addGroupDef = useSimScenarioStore(state => state.addGroupDef);
+  const updateGroupDef = useSimScenarioStore(state => state.updateGroupDef);
+  const deleteGroupDef = useSimScenarioStore(state => state.deleteGroupDef);
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState(null);
   const [groupForm, setGroupForm] = useState({ name: '', icon: '👥' });
@@ -54,19 +59,19 @@ function GroupsTab() {
       setError('Gruppenname ist erforderlich');
       return;
     }
-
     if (editingGroup) {
-      updateGroup(editingGroup.id, groupForm);
+      updateGroupDef(editingGroup.id, groupForm);
     } else {
-      addGroup(groupForm);
+      // Generate a new id (string) for manual group
+      const newId = Date.now().toString();
+      addGroupDef({ ...groupForm, id: newId });
     }
-    
     handleCloseDialog();
   };
 
   const handleDeleteGroup = (group) => {
     if (window.confirm(`Möchten Sie die Gruppe "${group.name}" wirklich löschen?`)) {
-      deleteGroup(group.id);
+      deleteGroupDef(group.id);
     }
   };
 
@@ -88,7 +93,7 @@ function GroupsTab() {
         </Button>
       </Box>
 
-      {groups.length === 0 ? (
+      {groupDefs.length === 0 ? (
         <Alert severity="info">
           Keine Gruppen definiert. Fügen Sie Gruppen hinzu oder importieren Sie Adebis-Daten.
         </Alert>
@@ -105,7 +110,7 @@ function GroupsTab() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {groups.map((group) => (
+              {groupDefs.map((group) => (
                 <TableRow key={group.id}>
                   <TableCell sx={{ fontSize: '1.5em' }}>{group.icon}</TableCell>
                   <TableCell>{group.name}</TableCell>
@@ -174,12 +179,11 @@ function GroupsTab() {
 }
 
 function QualificationsTab() {
-  const {
-    qualifications,
-    addQualification,
-    updateQualification,
-    deleteQualification
-  } = useAppSettingsStore();
+  // Use scenario-based qualidefs/actions
+  const qualiDefs = useSimScenarioStore(state => state.getQualiDefs());
+  const addQualiDef = useSimScenarioStore(state => state.addQualiDef);
+  const updateQualiDef = useSimScenarioStore(state => state.updateQualiDef);
+  const deleteQualiDef = useSimScenarioStore(state => state.deleteQualiDef);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingQualification, setEditingQualification] = useState(null);
@@ -206,16 +210,16 @@ function QualificationsTab() {
       return;
     }
     if (editingQualification) {
-      updateQualification(editingQualification.key, form);
+      updateQualiDef(editingQualification.key, form);
     } else {
-      addQualification(form);
+      addQualiDef(form);
     }
     handleCloseDialog();
   };
 
   const handleDelete = (qualification) => {
     if (window.confirm(`Möchten Sie die Qualifikation "${qualification.name}" wirklich löschen?`)) {
-      deleteQualification(qualification.key);
+      deleteQualiDef(qualification.key);
     }
   };
 
@@ -234,7 +238,7 @@ function QualificationsTab() {
         </Button>
       </Box>
       
-      {qualifications.length === 0 ? (
+      {qualiDefs.length === 0 ? (
         <Alert severity="info">
           Keine Qualifikationen definiert. Fügen Sie Qualifikationen hinzu oder importieren Sie Mitarbeiterdaten.
         </Alert>
@@ -249,7 +253,7 @@ function QualificationsTab() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {qualifications.map((q) => (
+              {qualiDefs.map((q) => (
                 <TableRow key={q.key}>
                   <TableCell sx={{ fontWeight: 'bold', fontSize: '1.2em' }}>{q.key}</TableCell>
                   <TableCell>{q.name}</TableCell>
@@ -316,6 +320,11 @@ function QualificationsTab() {
 
 function OrgaPage() {
   const [activeTab, setActiveTab] = useState(0);
+
+  // Log the current scenario object when OrgaPage is rendered
+  const selectedScenarioId = useSimScenarioStore(state => state.selectedScenarioId);
+  const scenario = useSimScenarioStore(state => state.getScenarioById(selectedScenarioId));
+  console.log('OrgaPage scenario:', scenario);
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#f0f2f5' }}>

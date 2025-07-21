@@ -16,6 +16,7 @@ import {
 import BarChartIcon from '@mui/icons-material/BarChart';
 import TimelineIcon from '@mui/icons-material/Timeline';
 import useChartStore from '../../store/chartStore';
+import useSimScenarioStore from '../../store/simScenarioStore';
 
 const ITEM_HEIGHT = 48;
 const ITEM_PADDING_TOP = 8;
@@ -108,7 +109,7 @@ function extractDatesOfInterest(simulationData) {
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
-function ChartFilterForm({ showStichtag = false, showZeitdimension = false, simulationData }) {
+function ChartFilterForm({ showStichtag = false, simulationData }) {
   const {
     // Weekly filters
     stichtag,
@@ -117,8 +118,6 @@ function ChartFilterForm({ showStichtag = false, showZeitdimension = false, simu
     setSelectedGroups,
     selectedQualifications,
     setSelectedQualifications,
-    availableGroups,
-    availableQualifications,
 
     // Midterm filters
     midtermTimeDimension,
@@ -132,6 +131,26 @@ function ChartFilterForm({ showStichtag = false, showZeitdimension = false, simu
     chartToggles,
     setChartToggles
   } = useChartStore();
+
+  // Get available groups/qualifications from scenario
+  const groupDefs = useSimScenarioStore(state => state.getGroupDefs());
+  const qualiDefs = useSimScenarioStore(state => state.getQualiDefs());
+  // Build availableGroups lookup { id: name }
+  const availableGroups = React.useMemo(() => {
+    const lookup = {};
+    groupDefs.forEach(g => {
+      lookup[g.id] = g.name;
+    });
+    return lookup;
+  }, [groupDefs]);
+  // Build availableQualifications lookup { key: name }
+  const availableQualifications = React.useMemo(() => {
+    const lookup = {};
+    qualiDefs.forEach(q => {
+      lookup[q.key] = q.name;
+    });
+    return lookup;
+  }, [qualiDefs]);
 
   // Use correct filters based on chartToggles
   const showWeekly = chartToggles.includes('weekly');

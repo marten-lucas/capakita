@@ -3,12 +3,12 @@ import {
   FormControl, FormLabel, RadioGroup, FormControlLabel, Radio, TextField,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper
 } from '@mui/material';
-import  { useMemo, useEffect } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { convertYYYYMMDDtoDDMMYYYY, convertDDMMYYYYtoYYYYMMDD } from '../../utils/dateUtils';
 import ModMonitor from './ModMonitor';
 import useSimScenarioDataStore from '../../store/simScenarioStore';
 
-function GroupDetail({ group, index, allGroups, onDelete, canDelete, onRestore, originalGroup, onUpdateGroup, parentItemId }) {
+function GroupDetail({ group, index, onDelete, canDelete, onRestore, originalGroup, onUpdateGroup, parentItemId }) {
   const { getItemBookings, updateItemBookings } = useSimScenarioDataStore((state) => ({
     getItemBookings: state.getItemBookings,
     updateItemBookings: state.updateItemBookings,
@@ -78,7 +78,7 @@ function GroupDetail({ group, index, allGroups, onDelete, canDelete, onRestore, 
     const updatedGroup = {
       ...group,
       id: originalGroup.id,
-      name: allGroups[originalGroup.id] || `Gruppe ${originalGroup.id}`,
+      name: allGroupsLookup[originalGroup.id] || `Gruppe ${originalGroup.id}`,
     };
     onUpdateGroup(updatedGroup);
   };
@@ -102,7 +102,7 @@ function GroupDetail({ group, index, allGroups, onDelete, canDelete, onRestore, 
       onUpdateGroup(updatedGroup);
     } else {
       const newGroupId = parseInt(mode, 10);
-      const newGroupName = allGroups[newGroupId] || `Gruppe ${newGroupId}`;
+      const newGroupName = allGroupsLookup[newGroupId] || `Gruppe ${newGroupId}`;
       const updatedGroup = { 
         ...group, 
         id: newGroupId, 
@@ -133,6 +133,17 @@ function GroupDetail({ group, index, allGroups, onDelete, canDelete, onRestore, 
   } else if (end) {
     dateRangeText = `bis ${end}`;
   }
+
+  // Get allGroups from scenario groupdefs
+  const groupDefs = useSimScenarioDataStore(state => state.getGroupDefs());
+  // Build allGroups lookup { id: name }
+  const allGroupsLookup = React.useMemo(() => {
+    const lookup = {};
+    groupDefs.forEach(g => {
+      lookup[g.id] = g.name;
+    });
+    return lookup;
+  }, [groupDefs]);
 
   return (
     <Card variant="outlined" sx={{ mb: 2 }}>
@@ -186,7 +197,7 @@ function GroupDetail({ group, index, allGroups, onDelete, canDelete, onRestore, 
             value={group.id === 'mehrere' ? 'mehrere' : (group.id ? String(group.id) : '')}
             onChange={handleGroupModeChange}
           >
-            {Object.entries(allGroups).map(([groupId, groupName]) => (
+            {Object.entries(allGroupsLookup).map(([groupId, groupName]) => (
               <FormControlLabel 
                 key={groupId} 
                 value={groupId} 
@@ -238,7 +249,7 @@ function GroupDetail({ group, index, allGroups, onDelete, canDelete, onRestore, 
                             value={group.segmentOverrides?.[segment.id] ? String(group.segmentOverrides[segment.id]) : ''}
                             onChange={(e) => handleSegmentOverride(segment.id, e.target.value)}
                           >
-                            {Object.entries(allGroups).map(([groupId, groupName]) => (
+                            {Object.entries(allGroupsLookup).map(([groupId, groupName]) => (
                               <FormControlLabel 
                                 key={groupId}
                                 value={groupId}
