@@ -10,7 +10,7 @@ export async function extractAdebisZipAndData(
   const JSZipLib = JSZip;
   const zip = await JSZipLib.loadAsync(file);
 
-  let kindXml, gruppeXml, grukiXml, belegungXml, anstellXml;
+  let kindXml, gruppeXml, grukiXml, belegungXml, anstellXml, beitrartXml, bartbetrXml;
   for (const fname in zip.files) {
     if (zip.files[fname].dir) continue;
     const l = fname.toLowerCase();
@@ -19,6 +19,8 @@ export async function extractAdebisZipAndData(
     else if (l.endsWith('gruki.xml')) grukiXml = fname;
     else if (l.endsWith('belegung.xml')) belegungXml = fname;
     else if (l.endsWith('anstell.xml')) anstellXml = fname;
+    else if (l.endsWith('beitrart.xml')) beitrartXml = fname;
+    else if (l.endsWith('bartbetr.xml')) bartbetrXml = fname;
   }
   const decodeXml = async (fname) => {
     if (!fname) return null;
@@ -148,6 +150,54 @@ export async function extractAdebisZipAndData(
       .filter(a => isFutureOrEmptyDate(a.ENDDAT));
   }
 
+  // --- Beitragarten (rates) ---
+  let rates = [];
+  if (beitrartXml) {
+    const beitrartXmlContent = await decodeXml(beitrartXml);
+    console.log('adebis-import: beitrart.xml read:', !!beitrartXmlContent);
+    const xml = parseXml(beitrartXmlContent);
+    rates = Array.from(xml.getElementsByTagName('BEITRAGSART')).map(el => ({
+      id: getXmlValue(el, 'BARTNR'),
+      name: getXmlValue(el, 'BEZ'),
+      text: getXmlValue(el, 'TEXT'),
+      kostenst: getXmlValue(el, 'KOSTENST'),
+      multiple: getXmlValue(el, 'MULTIPLE'),
+      status: getXmlValue(el, 'STATUS'),
+      variabel: getXmlValue(el, 'VARIABEL')
+    }));
+  } else {
+    console.log('adebis-import: beitrart.xml not found');
+  }
+
+  // --- Bartbetr (rate amounts) ---
+  let rateAmounts = [];
+  if (bartbetrXml) {
+    const bartbetrXmlContent = await decodeXml(bartbetrXml);
+    console.log('adebis-import: bartbetr.xml read:', !!bartbetrXmlContent);
+    const xml = parseXml(bartbetrXmlContent);
+    // Try BEITRAGSSATZ instead of BARTBETR
+    const allAmounts = Array.from(xml.getElementsByTagName('BEITRAGSSATZ')).map(el => ({
+      id: getXmlValue(el, 'BARTNR'),
+      amount: getXmlValue(el, 'BETRAG'),
+      validFrom: getXmlValue(el, 'GUELTIGVON'),
+      validTo: getXmlValue(el, 'GUELTIGBIS'),
+      text: getXmlValue(el, 'TEXT')
+    }));
+    // Only keep amounts valid today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    rateAmounts = allAmounts.filter(a => {
+      const from = a.validFrom ? parseDate(a.validFrom) : null;
+      const to = a.validTo ? parseDate(a.validTo) : null;
+      return (!from || from <= today) && (!to || to >= today);
+    });
+    if (rateAmounts.length === 0) {
+      console.log('adebis-import: bartbetr.xml structure:', xml.documentElement.outerHTML);
+    }
+  } else {
+    console.log('adebis-import: bartbetr.xml not found');
+  }
+
   // --- Build simulationData ---
   let idCounter = 1;
   const processedData = [];
@@ -267,5 +317,13 @@ export async function extractAdebisZipAndData(
   const uniqueGroupNames = Object.values(newGroupsLookup);
   const uniqueQualifications = Array.from(new Set(employeeItems.map(e => e.parseddata.qualification).filter(Boolean)));
 
-  return { processedData, employeeItems, newGroupsLookup, uniqueGroupNames, uniqueQualifications };
+  return {
+    processedData,
+    employeeItems,
+    newGroupsLookup,
+    uniqueGroupNames,
+    uniqueQualifications,
+    rates,
+    rateAmounts
+  };
 }

@@ -9,12 +9,25 @@ export function useScenarioImport() {
   const setQualiDefs = useSimScenarioStore(state => state.setQualiDefs);
 
   const importScenario = useCallback(async ({ file, isAnonymized }) => {
-    const { processedData, newGroupsLookup, uniqueQualifications } = await extractAdebisZipAndData(
+    // Remove manual zip loading and file listing here
+    // Instead, add logging inside extractAdebisZipAndData
+
+    const {
+      processedData,
+      newGroupsLookup,
+      uniqueQualifications,
+      rates,
+      rateAmounts
+    } = await extractAdebisZipAndData(
       file,
       isAnonymized,
       null,
       null
     );
+
+    // Debug logs for file presence and parsed data
+    console.log('ImportScenario: rates:', rates);
+    console.log('ImportScenario: rateAmounts:', rateAmounts);
 
     // Ensure groupdefs IDs are strings
     const groupdefs = Object.entries(newGroupsLookup).map(([id, name]) => ({
@@ -57,7 +70,14 @@ export function useScenarioImport() {
       name: key
     }));
 
-    const organisation = { groupdefs, qualidefs };
+    // Compose rates with amounts (flatten: merge first valid amount into rate)
+    const ratesWithAmounts = rates.map(rate => {
+      const amountObj = rateAmounts.find(a => a.id === rate.id);
+      if (!amountObj) return null;
+      return { ...rate, ...amountObj };
+    }).filter(rate => !!rate);
+
+    const organisation = { groupdefs, qualidefs, rates: ratesWithAmounts };
 
     const scenarioName = isAnonymized ? 'Importiertes Szenario (anonymisiert)' : 'Importiertes Szenario';
     const newScenario = {
