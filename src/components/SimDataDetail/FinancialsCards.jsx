@@ -2,7 +2,7 @@ import { Accordion, AccordionSummary, AccordionDetails, Typography, Box, Button 
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import FinancialsDetail from './FinancialsDetail';
 
-function FinancialsCards({ financials, expandedItems, onToggleExpanded, onUpdate, onDelete }) {
+function FinancialsCards({ financials, expandedItems, onToggleExpanded, onUpdate, onDelete, item }) {
   const handleAccordionChange = (financial) => () => {
     onToggleExpanded(financial.id);
   };
@@ -25,6 +25,7 @@ function FinancialsCards({ financials, expandedItems, onToggleExpanded, onUpdate
               financial={fin}
               onChange={updated => onUpdate(idx, updated)}
               onDelete={() => onDelete(idx)}
+              item={item} // <-- pass item here
             />
           </AccordionDetails>
         </Accordion>

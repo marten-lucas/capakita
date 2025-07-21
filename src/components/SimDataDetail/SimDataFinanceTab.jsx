@@ -107,6 +107,7 @@ function SimDataFinanceTab({ item }) {
         onToggleExpanded={handleToggleExpanded}
         onUpdate={handleUpdateFinancial}
         onDelete={handleDeleteFinancial}
+        item={item} // <-- pass item here
       />
       {(!financials || financials.length === 0) && (
         <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
