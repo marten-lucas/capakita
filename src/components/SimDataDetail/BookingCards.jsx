@@ -1,3 +1,4 @@
+import React from 'react';
 import { Typography, Box, Accordion, AccordionSummary, AccordionDetails } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import BookingDetail from './BookingDetail';
@@ -34,6 +35,22 @@ function BookingCards({
 
   const bookings = getItemBookings(itemId);
 
+  // Track expanded accordion index
+  const [expandedIdx, setExpandedIdx] = React.useState(bookings && bookings.length > 0 ? 0 : null);
+
+  // Expand last booking when bookings length increases
+  const prevLengthRef = React.useRef(bookings ? bookings.length : 0);
+  React.useEffect(() => {
+    if (bookings && bookings.length > prevLengthRef.current) {
+      setExpandedIdx(bookings.length - 1);
+    }
+    prevLengthRef.current = bookings ? bookings.length : 0;
+  }, [bookings]);
+
+  const handleAccordionChange = (idx) => (event, expanded) => {
+    setExpandedIdx(expanded ? idx : null);
+  };
+
   const handleUpdateBooking = (index, updatedBooking) => {
     const updatedBookings = bookings.map((b, idx) => (idx === index ? updatedBooking : b));
     updateItemBookings(itemId, updatedBookings);
@@ -60,7 +77,11 @@ function BookingCards({
         const hoursText = getBookingHours(booking.times);
 
         return (
-          <Accordion key={idx} defaultExpanded={idx === 0}>
+          <Accordion
+            key={idx}
+            expanded={expandedIdx === idx}
+            onChange={handleAccordionChange(idx)}
+          >
             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
               <Box>
                 <Typography variant="subtitle1">{`Buchung ${idx + 1}:`}  <Box component="span" fontWeight='fontWeightMedium'>{hoursText} {dateRangeText}</Box></Typography>

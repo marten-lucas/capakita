@@ -5,7 +5,6 @@ import {
 import { convertYYYYMMDDtoDDMMYYYY, convertDDMMYYYYtoYYYYMMDD } from '../../utils/dateUtils';
 import { timeToValue, valueToTime } from '../../utils/timeUtils';
 import ModMonitor from './ModMonitor';
-import { consolidateBookingSummary } from '../../utils/bookingUtils';
 
 // DayControl component
 function DayControl({ dayLabel, dayAbbr, dayData, onToggle, onTimeChange, onAddSegment, onRemoveSegment, type }) {
@@ -225,15 +224,6 @@ function BookingDetail({
     { label: 'Freitag', abbr: 'Fr' }
   ];
 
-  const { startdate, enddate, times } = booking;
-  let dateRangeText = '';
-  if (startdate && enddate) {
-    dateRangeText = `von ${startdate} bis ${enddate}`;
-  } else if (startdate) {
-    dateRangeText = `ab ${startdate}`;
-  } else if (enddate) {
-    dateRangeText = `bis ${enddate}`;
-  }
 
   // Restore-Funktion für einen Tag
   const handleRestoreDay = (dayAbbr) => {
@@ -266,11 +256,6 @@ function BookingDetail({
   };
 
   // Restore-Funktion für das gesamte Booking
-  const handleRestoreAll = () => {
-    if (!originalBooking) return;
-    const restoredBooking = JSON.parse(JSON.stringify(originalBooking));
-    onUpdateBooking(restoredBooking);
-  };
 
   // Restore für Start-/Enddatum
   const handleRestoreBookingDate = (field) => {
@@ -362,7 +347,7 @@ function BookingDetail({
           );
         })}
       </Box>
-      {(onDelete && canDelete) && (
+      {onDelete && (
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
           <Button
             size="small"
