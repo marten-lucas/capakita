@@ -45,7 +45,12 @@ const useChartStore = create(
         state.stichtag = date;
       })),
       setSelectedGroups: (groups) => set(produce((state) => {
-        state.selectedGroups = groups;
+        // If user tries to deselect all, auto-select all available groups
+        if (Array.isArray(groups) && groups.length === 0 && state.availableGroups.length > 0) {
+          state.selectedGroups = [...state.availableGroups];
+        } else {
+          state.selectedGroups = groups;
+        }
       })),
       setSelectedQualifications: (qualifications) => set(produce((state) => {
         state.selectedQualifications = qualifications;
@@ -56,7 +61,12 @@ const useChartStore = create(
         state.midtermTimeDimension = dimension;
       })),
       setMidtermSelectedGroups: (groups) => set(produce((state) => {
-        state.midtermSelectedGroups = groups;
+        // If user tries to deselect all, auto-select all available groups
+        if (Array.isArray(groups) && groups.length === 0 && state.availableGroups.length > 0) {
+          state.midtermSelectedGroups = [...state.availableGroups];
+        } else {
+          state.midtermSelectedGroups = groups;
+        }
       })),
       setMidtermSelectedQualifications: (qualifications) => set(produce((state) => {
         state.midtermSelectedQualifications = qualifications;
@@ -123,7 +133,7 @@ const useChartStore = create(
         const groups = item.parseddata?.group ?? [];
         if (groups.length === 0) {
           // Keine Gruppe - nur anzeigen wenn "keine Gruppe" ausgewählt ist
-          if (!groupNamesFilter.includes('keine Gruppe')) return false;
+          if (!groupNamesFilter.includes('0')) return false;
         } else {
           // Hat Gruppen - prüfen ob mindestens eine ausgewählte Gruppe zum Stichtag gültig ist
           const hasValidGroup = groups.some(g => {
@@ -185,15 +195,21 @@ const useChartStore = create(
           }
           const segmentEnd = `${String(endHour).padStart(2, '0')}:${String(endMin).padStart(2, '0')}`;
 
-          // Bedarf: Kinder mit Buchung im Segment und Gruppe ausgewählt und zum Stichtag gültig
+          // Debug log for demand filtering
           const demandItems = simulationData.filter(
             item =>
               item.type === 'demand' &&
               isBookedInSegment(item, dayIdx, segmentStart, segmentEnd, selectedGroups, true, stichtag, selectedQualifications)
           );
+          if (i === 0) {
+            console.log('[ChartStore][calculateChartData] Filters:', {
+              selectedGroups,
+              selectedQualifications,
+              stichtag
+            });
+          }
           bedarf.push(demandItems.length);
 
-          // Kapazität: Mitarbeiter mit Buchung im Segment und Gruppe ausgewählt und zum Stichtag gültig
           const capacityItems = simulationData.filter(
             item =>
               item.type === 'capacity' &&
@@ -201,7 +217,6 @@ const useChartStore = create(
           );
           kapazitaet.push(capacityItems.length);
 
-          // BayKiBig Anstellungsschlüssel berechnen
           const baykibigRatio = get().calculateBayKiBigRatio(demandItems, capacityItems, 0.5);
           baykibigAnstellungsschluessel.push(baykibigRatio);
         }
@@ -375,6 +390,7 @@ const useChartStore = create(
         }
         const segmentEnd = `${String(endHour).padStart(2, '0')}:${String(endMin).padStart(2, '0')}`;
 
+        // Apply both filters to all series
         if (seriesType === 'Bedarf') {
           return simulationData
             .filter(item =>
@@ -413,31 +429,34 @@ const useChartStore = create(
         const kapazitaet = [];
         const baykibigAnstellungsschluessel = [];
         
-        periods.forEach(period => {
-          // Calculate demand hours for this period
+        periods.forEach((period, idx) => {
+          // Debug log for demand filtering
           const demandItems = simulationData.filter(item => {
             if (item.type !== 'demand') return false;
             return get().isItemValidForPeriod(item, period, midtermSelectedGroups, midtermSelectedQualifications);
           });
-          
+          if (idx === 0) {
+            console.log('[ChartStore][calculateMidtermChartData] Filters:', {
+              midtermSelectedGroups,
+              midtermSelectedQualifications,
+              midtermTimeDimension
+            });
+          }
           const demandHours = demandItems.reduce((total, item) => {
             return total + get().calculateBookingHoursInPeriod(item, period);
           }, 0);
-          
-          // Calculate capacity hours for this period
+
           const capacityItems = simulationData.filter(item => {
             if (item.type !== 'capacity') return false;
             return get().isItemValidForPeriod(item, period, midtermSelectedGroups, midtermSelectedQualifications);
           });
-          
           const capacityHours = capacityItems.reduce((total, item) => {
             return total + get().calculateBookingHoursInPeriod(item, period);
           }, 0);
-          
+
           bedarf.push(demandHours);
           kapazitaet.push(capacityHours);
-          
-          // Calculate BayKiBig ratio for this period
+
           const baykibigRatio = get().calculateBayKiBigRatioForPeriodWithHours(demandItems, capacityItems, period);
           baykibigAnstellungsschluessel.push(baykibigRatio);
         });
@@ -562,8 +581,29 @@ const useChartStore = create(
             });
             currentYear++;
           }
+        } else if (dim === 'Quartale') {
+          // Implement quarters
+          let currentYear = today.getFullYear();
+          let currentQuarter = Math.floor(today.getMonth() / 3) + 1;
+          const endYear = endDate.getFullYear();
+          const endQuarter = Math.floor(endDate.getMonth() / 3) + 1;
+          while (currentYear < endYear || (currentYear === endYear && currentQuarter <= endQuarter)) {
+            const startMonth = (currentQuarter - 1) * 3;
+            const startDate = new Date(currentYear, startMonth, 1);
+            const endMonth = startMonth + 2;
+            const endDateQ = new Date(currentYear, endMonth + 1, 0); // last day of endMonth
+            periods.push({
+              label: `Q${currentQuarter} ${currentYear}`,
+              start: startDate,
+              end: endDateQ
+            });
+            currentQuarter++;
+            if (currentQuarter > 4) {
+              currentQuarter = 1;
+              currentYear++;
+            }
+          }
         }
-        
         return periods;
       },
       
@@ -726,7 +766,7 @@ const useChartStore = create(
         // Filter by groups
         const groups = item.parseddata?.group ?? [];
         if (groups.length === 0) {
-          if (!groupFilter.includes('keine Gruppe')) return false;
+          if (!groupFilter.includes('0')) return false;
         } else {
           const hasValidGroup = groups.some(g => {
             if (!groupFilter.includes(g.name)) return false;
@@ -792,4 +832,3 @@ const useChartStore = create(
 );
 
 export default useChartStore;
-

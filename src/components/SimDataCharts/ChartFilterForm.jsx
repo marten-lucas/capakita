@@ -141,8 +141,18 @@ function ChartFilterForm({ showStichtag = false, simulationData }) {
     groupDefs.forEach(g => {
       lookup[g.id] = g.name;
     });
+    // Add "keine Gruppe" with ID "0" if needed
+    if (
+      simulationData &&
+      simulationData.some(item =>
+        (item.type === 'demand' || item.type === 'capacity') &&
+        (!item.parseddata?.group || item.parseddata.group.length === 0)
+      )
+    ) {
+      lookup['0'] = 'keine Gruppe';
+    }
     return lookup;
-  }, [groupDefs]);
+  }, [groupDefs, simulationData]);
   // Build availableQualifications lookup { key: name }
   const availableQualifications = React.useMemo(() => {
     const lookup = {};
@@ -156,12 +166,15 @@ function ChartFilterForm({ showStichtag = false, simulationData }) {
   const showWeekly = chartToggles.includes('weekly');
   const showMidterm = chartToggles.includes('midterm');
 
-  // Use store state for filters depending on which chart is visible
+  // Always use chartStore state for filter values (IDs only)
   const currentGroups = showMidterm && !showWeekly ? midtermSelectedGroups : selectedGroups;
   const currentQualifications = showMidterm && !showWeekly ? midtermSelectedQualifications : selectedQualifications;
 
   const handleGroupChange = (event) => {
-    const value = typeof event.target.value === 'string' ? event.target.value.split(',') : event.target.value;
+    // Ensure only IDs are used
+    const value = typeof event.target.value === 'string'
+      ? event.target.value.split(',')
+      : event.target.value;
     if (showMidterm && !showWeekly) {
       setMidtermSelectedGroups(value);
     } else {

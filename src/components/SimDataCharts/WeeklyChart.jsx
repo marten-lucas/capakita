@@ -24,39 +24,22 @@ export default function WeeklyChart({ scenario }) {
     return state.computeOverlayData(scenarioToUse);
   });
 
-  
-  // Chart store - explizit extrahieren für useMemo
-  const {
-    stichtag,
-    selectedGroups,
-    selectedQualifications,
-    categories,
-    calculateChartData,
-    getNamesForSegment  } = useChartStore();
-
-  // Use scenario-based groupdefs and qualidefs for filter options
-  
-
-  // Extract dates of interest from simulation data with change information
-
-  // Optimized: Only recalculate when groupsLookup changes
-
-  // Optimized: Only check when simulationData changes
-
-  // Optimized: Only recalculate when dependencies actually change
-
-  // Use qualification keys from scenario for filter
-
-  // Update available qualifications
+  // Get current filters from chartStore
+  const stichtag = useChartStore(state => state.stichtag);
+  const selectedGroups = useChartStore(state => state.selectedGroups);
+  const selectedQualifications = useChartStore(state => state.selectedQualifications);
+  const categories = useChartStore(state => state.categories);
+  const calculateChartData = useChartStore(state => state.calculateChartData);
+  const getNamesForSegment = useChartStore(state => state.getNamesForSegment);
 
   // Stable reference for chart data calculation
   const getChartData = useCallback((stichtag, selectedGroups, selectedQualifications) => {
     return calculateChartData(simulationData, stichtag, selectedGroups, selectedQualifications);
   }, [simulationData, calculateChartData]);
 
-  // Optimized: Use stable callback with explicit filter dependency
-  const chartData = useMemo(() => 
-    getChartData(stichtag, selectedGroups, selectedQualifications), 
+  // Chart data recalculates when filters change
+  const chartData = useMemo(() =>
+    getChartData(stichtag, selectedGroups, selectedQualifications),
     [getChartData, stichtag, selectedGroups, selectedQualifications]
   );
 

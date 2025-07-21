@@ -35,17 +35,15 @@ export default function MidtermChart({ hideFilters = false, scenario }) {
   const qualifications = useAppSettingsStore(state => state.qualifications);
 
   // Chart store
-  const {
-    midtermTimeDimension,
-    midtermSelectedGroups,
-    midtermSelectedQualifications,
-    setMidtermTimeDimension,
-    setMidtermSelectedGroups,
-    setMidtermSelectedQualifications,
-    calculateMidtermChartData,
-    updateAvailableGroups,
-    updateAvailableQualifications
-  } = useChartStore();
+  const midtermTimeDimension = useChartStore(state => state.midtermTimeDimension);
+  const midtermSelectedGroups = useChartStore(state => state.midtermSelectedGroups);
+  const midtermSelectedQualifications = useChartStore(state => state.midtermSelectedQualifications);
+  const setMidtermTimeDimension = useChartStore(state => state.setMidtermTimeDimension);
+  const setMidtermSelectedGroups = useChartStore(state => state.setMidtermSelectedGroups);
+  const setMidtermSelectedQualifications = useChartStore(state => state.setMidtermSelectedQualifications);
+  const calculateMidtermChartData = useChartStore(state => state.calculateMidtermChartData);
+  const updateAvailableGroups = useChartStore(state => state.updateAvailableGroups);
+  const updateAvailableQualifications = useChartStore(state => state.updateAvailableQualifications);
 
   // Use scenario-based groupdefs and qualidefs
   const groupDefs = useSimScenarioStore(state => state.getGroupDefs());
@@ -64,10 +62,11 @@ export default function MidtermChart({ hideFilters = false, scenario }) {
   ), [simulationData]);
 
   const allGroupNames = useMemo(() => {
-    const groupsList = hasNoGroup ? [...groupNames, 'keine Gruppe'] : groupNames;
+    // Use ID "0" for "keine Gruppe"
+    const groupsList = hasNoGroup ? [...groupDefs.map(g => g.id), '0'] : groupDefs.map(g => g.id);
     updateAvailableGroups(groupsList);
     return groupsList;
-  }, [groupNames, hasNoGroup, updateAvailableGroups]);
+  }, [groupDefs, hasNoGroup, updateAvailableGroups]);
 
   // Use qualification keys from scenario qualidefs for filter
   const qualificationKeys = useMemo(() => {
@@ -277,23 +276,28 @@ export default function MidtermChart({ hideFilters = false, scenario }) {
           <Box>
             <Typography variant="body1" sx={{ mb: 1 }}>Gruppen:</Typography>
             <FormGroup row>
-              {allGroupNames.map(groupName => (
-                <FormControlLabel
-                  key={groupName}
-                  control={
-                    <Checkbox
-                      checked={midtermSelectedGroups.includes(groupName)}
-                      onChange={() => {
-                        const newGroups = midtermSelectedGroups.includes(groupName)
-                          ? midtermSelectedGroups.filter(g => g !== groupName)
-                          : [...midtermSelectedGroups, groupName];
-                        setMidtermSelectedGroups(newGroups);
-                      }}
-                    />
-                  }
-                  label={groupName}
-                />
-              ))}
+              {allGroupNames.map(groupId => {
+                const label = groupId === '0'
+                  ? 'keine Gruppe'
+                  : (groupDefs.find(g => g.id === groupId)?.name || groupId);
+                return (
+                  <FormControlLabel
+                    key={groupId}
+                    control={
+                      <Checkbox
+                        checked={midtermSelectedGroups.includes(groupId)}
+                        onChange={() => {
+                          const newGroups = midtermSelectedGroups.includes(groupId)
+                            ? midtermSelectedGroups.filter(g => g !== groupId)
+                            : [...midtermSelectedGroups, groupId];
+                          setMidtermSelectedGroups(newGroups);
+                        }}
+                      />
+                    }
+                    label={label}
+                  />
+                );
+              })}
             </FormGroup>
           </Box>
           
