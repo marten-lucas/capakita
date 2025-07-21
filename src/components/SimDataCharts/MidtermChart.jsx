@@ -50,9 +50,6 @@ export default function MidtermChart({ hideFilters = false, scenario }) {
   const qualiDefs = useSimScenarioStore(state => state.getQualiDefs());
 
   // Use group names from scenario groupdefs
-  const groupNames = useMemo(() => {
-    return groupDefs.map(g => g.name);
-  }, [groupDefs]);
 
   const hasNoGroup = useMemo(() => (
     simulationData.some(item =>

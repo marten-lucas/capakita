@@ -16,8 +16,9 @@ export function useScenarioImport() {
       null
     );
 
+    // Ensure groupdefs IDs are strings
     const groupdefs = Object.entries(newGroupsLookup).map(([id, name]) => ({
-      id,
+      id: String(id),
       name,
       icon: (() => {
         const lowerName = name.toLowerCase();
@@ -40,6 +41,17 @@ export function useScenarioImport() {
       })()
     }));
 
+    // Ensure group IDs in simulationData are strings
+    const processedDataWithStringGroupIds = processedData.map(item => {
+      if (item.parseddata?.group && Array.isArray(item.parseddata.group)) {
+        item.parseddata.group = item.parseddata.group.map(g => ({
+          ...g,
+          id: g.id !== undefined ? String(g.id) : g.id
+        }));
+      }
+      return item;
+    });
+
     const qualidefs = uniqueQualifications.map(key => ({
       key,
       name: key
@@ -54,7 +66,7 @@ export function useScenarioImport() {
       confidence: 50,
       likelihood: 50,
       baseScenarioId: null,
-      simulationData: processedData,
+      simulationData: processedDataWithStringGroupIds,
       imported: true,
       importedAnonymized: !!isAnonymized,
       organisation

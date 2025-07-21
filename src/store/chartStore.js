@@ -45,12 +45,7 @@ const useChartStore = create(
         state.stichtag = date;
       })),
       setSelectedGroups: (groups) => set(produce((state) => {
-        // If user tries to deselect all, auto-select all available groups
-        if (Array.isArray(groups) && groups.length === 0 && state.availableGroups.length > 0) {
-          state.selectedGroups = [...state.availableGroups];
-        } else {
-          state.selectedGroups = groups;
-        }
+        state.selectedGroups = groups;
       })),
       setSelectedQualifications: (qualifications) => set(produce((state) => {
         state.selectedQualifications = qualifications;
@@ -61,12 +56,7 @@ const useChartStore = create(
         state.midtermTimeDimension = dimension;
       })),
       setMidtermSelectedGroups: (groups) => set(produce((state) => {
-        // If user tries to deselect all, auto-select all available groups
-        if (Array.isArray(groups) && groups.length === 0 && state.availableGroups.length > 0) {
-          state.midtermSelectedGroups = [...state.availableGroups];
-        } else {
-          state.midtermSelectedGroups = groups;
-        }
+        state.midtermSelectedGroups = groups;
       })),
       setMidtermSelectedQualifications: (qualifications) => set(produce((state) => {
         state.midtermSelectedQualifications = qualifications;
@@ -137,7 +127,9 @@ const useChartStore = create(
         } else {
           // Hat Gruppen - prüfen ob mindestens eine ausgewählte Gruppe zum Stichtag gültig ist
           const hasValidGroup = groups.some(g => {
-            if (!groupNamesFilter.includes(g.name)) return false;
+            // Always compare as string
+            const groupIdStr = String(g.id);
+            if (!groupNamesFilter.includes(groupIdStr)) return false;
             const start = g.start ? new Date(g.start.split('.').reverse().join('-')) : null;
             const end = g.end ? new Date(g.end.split('.').reverse().join('-')) : null;
             if (start && stichtagDate < start) return false;
@@ -769,11 +761,11 @@ const useChartStore = create(
           if (!groupFilter.includes('0')) return false;
         } else {
           const hasValidGroup = groups.some(g => {
-            if (!groupFilter.includes(g.name)) return false;
+            // Always compare as string
+            const groupIdStr = String(g.id);
+            if (!groupFilter.includes(groupIdStr)) return false;
             const groupStart = g.start ? new Date(g.start.split('.').reverse().join('-')) : null;
             const groupEnd = g.end ? new Date(g.end.split('.').reverse().join('-')) : null;
-            
-            // Group must be active during the period
             if (groupStart && groupStart > period.end) return false;
             if (groupEnd && groupEnd < period.start) return false;
             return true;
