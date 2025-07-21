@@ -1,0 +1,33 @@
+<xs:schema attributeFormDefault="unqualified" elementFormDefault="qualified" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="BARTBETRAEGE">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="BEITRAGSSATZ" maxOccurs="unbounded" minOccurs="0">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element type="xs:byte" name="IDNR"/>
+              <xs:element type="xs:byte" name="BARTNR"/>
+              <xs:element type="xs:string" name="GUELTIGVON"/>
+              <xs:element type="xs:string" name="GUELTIGBIS" minOccurs="0"/>
+              <xs:element type="xs:string" name="BETRAG" minOccurs="0"/>
+              <xs:element type="xs:string" name="BETRAGZ1" minOccurs="0"/>
+              <xs:element type="xs:string" name="BETRAGZ2" minOccurs="0"/>
+              <xs:element type="xs:string" name="BETRAGZ4" minOccurs="0"/>
+              <xs:element type="xs:string" name="BETRAGZ5" minOccurs="0"/>
+              <xs:element type="xs:string" name="BETRAGZ6" minOccurs="0"/>
+              <xs:element type="xs:string" name="BETRAGZ7" minOccurs="0"/>
+              <xs:element type="xs:string" name="BETRAGZ8" minOccurs="0"/>
+              <xs:element type="xs:string" name="BETRAGZ9" minOccurs="0"/>
+              <xs:element type="xs:string" name="BETRAGZ10" minOccurs="0"/>
+              <xs:element type="xs:byte" name="MNR"/>
+              <xs:element type="xs:string" name="ANLDAT"/>
+              <xs:element type="xs:string" name="AENDAT"/>
+              <xs:element type="xs:byte" name="ANLUSER" minOccurs="0"/>
+              <xs:element type="xs:byte" name="AENUSER"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

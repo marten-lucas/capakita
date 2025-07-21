@@ -1,0 +1,26 @@
+<xs:schema attributeFormDefault="unqualified" elementFormDefault="qualified" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="BEITRAGSARTEN">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="BEITRAGSART" maxOccurs="unbounded" minOccurs="0">
+          <xs:complexType>
+            <xs:choice maxOccurs="unbounded" minOccurs="0">
+              <xs:element type="xs:byte" name="BARTNR"/>
+              <xs:element type="xs:string" name="BEZ"/>
+              <xs:element type="xs:string" name="TEXT"/>
+              <xs:element type="xs:byte" name="KOSTENST"/>
+              <xs:element type="xs:string" name="MULTIPLE"/>
+              <xs:element type="xs:string" name="STATUS"/>
+              <xs:element type="xs:string" name="VARIABEL"/>
+              <xs:element type="xs:byte" name="MNR"/>
+              <xs:element type="xs:string" name="ANLDAT"/>
+              <xs:element type="xs:string" name="AENDAT"/>
+              <xs:element type="xs:byte" name="ANLUSER"/>
+              <xs:element type="xs:byte" name="AENUSER"/>
+            </xs:choice>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>
