@@ -2,9 +2,11 @@ import React from 'react';
 import { Box, TextField, Button, Typography, MenuItem, IconButton } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import avgData from '../../assets/avg-data/avg-data-2024.json'; // Adjust as needed
+import { getSalaryForGroupAndStage, normalizeDateString, getFutureSalaryForGroupAndStage } from '../../utils/avr-calculator';
 
 function FinancialsDetail({ financial, onChange, onDelete, item }) {
-  console.log('FinancialsDetail item:', item); // Debug: verify item prop
+  // Debug: Show the item as stored in simScenarioStore
+  console.log('simScenarioStore item:', item);
 
   const handleField = (field, value) => {
     onChange({ ...financial, [field]: value });
@@ -14,6 +16,12 @@ function FinancialsDetail({ financial, onChange, onDelete, item }) {
   const eintrittsdatum = item?.parseddata?.startdate
     ? item.parseddata.startdate.split('.').reverse().join('-')
     : '';
+
+  // Helper to get group/stage names for AVR calculator
+  const getGroupName = () => {
+    const group = avgData.salery_groups.find(g => g.group_id === financial.group);
+    return group ? group.group_name : '';
+  };
 
   if (financial.type === 'expense-avr') {
     // Gruppe options
@@ -34,6 +42,19 @@ function FinancialsDetail({ financial, onChange, onDelete, item }) {
           label: `Stufe ${a.stage}`
         }))
       : [];
+
+    // Use today's date as reference for AVR calculator, normalized
+    const todayStr = normalizeDateString(new Date().toISOString().slice(0, 10));
+
+    // Determine salary using AVR calculator
+    let avrSalary = null;
+    if (financial.group && financial.stage) {
+      avrSalary = getSalaryForGroupAndStage(
+        todayStr,
+        getGroupName(),
+        financial.stage // pass stage id directly
+      );
+    }
 
     return (
       <Box display="flex" flexDirection="column" gap={2} position="relative">
@@ -72,6 +93,11 @@ function FinancialsDetail({ financial, onChange, onDelete, item }) {
           InputProps={{ readOnly: true }}
           disabled
         />
+        {avrSalary !== null && (
+          <Typography variant="body2" color="primary">
+            AVR-Gehalt: {avrSalary.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+          </Typography>
+        )}
         <Box>
           <IconButton
             aria-label="Entfernen"
@@ -142,3 +168,4 @@ function FinancialsDetail({ financial, onChange, onDelete, item }) {
 }
 
 export default FinancialsDetail;
+
