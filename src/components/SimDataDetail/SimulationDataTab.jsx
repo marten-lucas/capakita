@@ -18,9 +18,9 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import PersonIcon from '@mui/icons-material/Person';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import GroupIcon from '@mui/icons-material/Group';
-import GroupCards from './GroupCards';
-import BookingCards from './BookingCards';
-import ModMonitor from './ModMonitor';
+import SimDataGeneralTab from './SimDataGeneralTab';
+import SimDataBookingTab from './SimDataBookingTab';
+import SimDataGroupsTab from './SimDataGroupsTab';
 import useSimScenarioDataStore from '../../store/simScenarioStore';
 
 function SimulationDataTab({ 
@@ -28,8 +28,7 @@ function SimulationDataTab({
   lastAddedBookingIdx, 
   lastAddedGroupIdx, 
   importedBookingCount, 
-  importedGroupCount, 
-  handleRestoreBooking}) {
+  importedGroupCount}) {
   const [activeTab, setActiveTab] = useState(0);
 
   const { 
@@ -175,13 +174,12 @@ function SimulationDataTab({
     updateItemDates(item.id, currentDates?.startdate || '', formattedDate);
   };
 
-  const today = new Date().toISOString().split('T')[0]; // Get today's date in YYYY-MM-DD format
 
   // Lokaler State für Name und Bemerkungen
-  const [localName, setLocalName] = useState(itemName);
-  const [localNote, setLocalNote] = useState(itemNote);
-  const [localGeburtsdatum, setLocalGeburtsdatum] = useState(geburtsdatum);
-  const [localQualification, setLocalQualification] = useState(itemQualification);
+  const [, setLocalName] = useState(itemName);
+  const [, setLocalNote] = useState(itemNote);
+  const [, setLocalGeburtsdatum] = useState(geburtsdatum);
+  const [, setLocalQualification] = useState(itemQualification);
 
   // Synchronisiere lokalen State, wenn Item wechselt
   useEffect(() => { setLocalName(itemName); }, [itemName]);
@@ -214,280 +212,6 @@ function SimulationDataTab({
   // Get scenario-based qualidefs for radio options
   const qualiDefs = getQualiDefs ? getQualiDefs() : [];
 
-  // Allgemein Tab Content
-  const AllgemeinTab = () => (
-    <Box flex={1} display="flex" flexDirection="column" gap={2} sx={{ overflowY: 'auto' }}>
-      {/* Delete button for manually added items */}
-      {isManualEntry && (
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
-          <Button
-            variant="outlined"
-            color="error"
-            startIcon={<DeleteIcon />}
-            onClick={handleDeleteItem}
-            size="small"
-          >
-            Eintrag löschen
-          </Button>
-        </Box>
-      )}
-
-      {/* Editable Name and Note Fields */}
-      <Box display="flex" alignItems="center" gap={2} sx={{ mb: 2 }}>
-        <Typography variant="body2" sx={{ minWidth: 90 }}>Name</Typography>
-        <TextField
-          value={localName}
-          onChange={(e) => setLocalName(e.target.value)}
-          onBlur={() => updateItemName(item.id, localName)}
-          size="small"
-          sx={{ width: 300 }}
-          InputLabelProps={{ shrink: true }}
-        />
-        <Typography variant="body2" sx={{ minWidth: 90 }}>Bemerkungen</Typography>
-        <TextField
-          value={localNote}
-          onChange={(e) => setLocalNote(e.target.value)}
-          onBlur={() => updateItemNote(item.id, localNote)}
-          size="small"
-          sx={{ width: 300 }}
-          multiline
-          minRows={2}
-          maxRows={4}
-          InputLabelProps={{ shrink: true }}
-        />
-      </Box>
-
-      {/* Geburtsdatum nur für Kinder (demand) */}
-      {item.type === 'demand' && (
-        <Box display="flex" alignItems="center" gap={2} sx={{ mb: 2 }}>
-          <Typography variant="body2" sx={{ minWidth: 90 }}>Geburtsdatum</Typography>
-          <TextField
-            type="date"
-            value={localGeburtsdatum}
-            onChange={(e) => setLocalGeburtsdatum(e.target.value)}
-            onBlur={() => handleGeburtsdatumChange(localGeburtsdatum)}
-            size="small"
-            sx={{ width: 150 }}
-            InputLabelProps={{ shrink: true }}
-          />
-          <ModMonitor
-            itemId={item.id}
-            field="geburtsdatum"
-            value={localGeburtsdatum}
-            originalValue={initialGeburtsdatum}
-            onRestore={handleRestoreGeburtsdatum}
-            title="Geburtsdatum auf importierten Wert zurücksetzen"
-            confirmMsg="Geburtsdatum auf importierten Wert zurücksetzen?"
-          />
-        </Box>
-      )}
-
-      {/* Qualifikation nur für Mitarbeiter (capacity) */}
-      {item.type === 'capacity' && (
-        <Box sx={{ mb: 2 }}>
-          <FormControl component="fieldset">
-            <Box display="flex" alignItems="center" gap={1}>
-              <FormLabel component="legend">Qualifikation</FormLabel>
-              <ModMonitor
-                itemId={item.id}
-                field="qualification"
-                value={localQualification}
-                originalValue={initialQualification}
-                onRestore={handleRestoreQualification}
-                title="Qualifikation auf importierten Wert zurücksetzen"
-                confirmMsg="Qualifikation auf importierten Wert zurücksetzen?"
-              />
-            </Box>
-            <RadioGroup
-              row
-              value={localQualification}
-              onChange={(e) => setLocalQualification(e.target.value)}
-              onBlur={() => updateItemQualification(item.id, localQualification)}
-            >
-              {qualiDefs && qualiDefs.length > 0 ? (
-                qualiDefs.map(q => (
-                  <FormControlLabel
-                    key={q.key}
-                    value={q.key}
-                    control={<Radio />}
-                    label={`${q.name} (${q.key})`}
-                  />
-                ))
-              ) : (
-                <>
-                  <FormControlLabel value="E" control={<Radio />} label="Erzieher (E)" />
-                  <FormControlLabel value="K" control={<Radio />} label="Kinderpfleger (K)" />
-                  <FormControlLabel value="H" control={<Radio />} label="Hilfskraft (H)" />
-                  <FormControlLabel value="P" control={<Radio />} label="Praktikant (P)" />
-                  <FormControlLabel value="" control={<Radio />} label="Keine Qualifikation" />
-                </>
-              )}
-            </RadioGroup>
-          </FormControl>
-        </Box>
-      )}
-
-      {/* Zeitraum */}
-      <Box display="flex" alignItems="center" gap={2} sx={{ mb: 2 }}>
-        <Typography variant="body2" sx={{ minWidth: 90 }}>Zeitraum von</Typography>
-        <TextField
-          label=""
-          type="date"
-          size="small"
-          InputLabelProps={{ shrink: true }}
-          value={startDate}
-          onChange={(e) => handleStartDateChange(e.target.value)}
-          sx={{ width: 150 }}
-        />
-        <ModMonitor
-          itemId={item.id}
-          field="startdate"
-          value={startDate}
-          originalValue={initialStartDate}
-          onRestore={handleRestoreStartDate}
-          title="Startdatum auf importierten Wert zurücksetzen"
-          confirmMsg="Startdatum auf importierten Wert zurücksetzen?"
-        />
-        <Typography variant="body2" sx={{ minWidth: 24, textAlign: 'center' }}>bis</Typography>
-        <TextField
-          label=""
-          type="date"
-          size="small"
-          InputLabelProps={{ shrink: true }}
-          value={endDate}
-          onChange={(e) => handleEndDateChange(e.target.value)}
-          sx={{ width: 150 }}
-        />
-        <ModMonitor
-          itemId={item.id}
-          field="enddate"
-          value={endDate}
-          originalValue={initialEndDate}
-          onRestore={handleRestoreEndDate}
-          title="Enddatum auf importierten Wert zurücksetzen"
-          confirmMsg="Enddatum auf importierten Wert zurücksetzen?"
-        />
-      </Box>
-
-      {/* Pausieren */}
-      <Box sx={{ mb: 2, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-        <FormControlLabel
-          control={
-            <Switch
-              checked={pausedState.enabled}
-              onChange={(e) => handlePauseChange(e.target.checked, pausedState.start, pausedState.end)}
-            />
-          }
-          label="Pausieren"
-          sx={{ ml: 0 }}
-        />
-        {pausedState.enabled && (
-          <Box display="flex" alignItems="center" gap={1} sx={{ mt: 1 }}>
-            <TextField
-              label="von"
-              type="date"
-              size="small"
-              InputLabelProps={{ shrink: true }}
-              value={pausedState.start}
-              onChange={(e) => handlePauseChange(pausedState.enabled, e.target.value, pausedState.end)}
-              sx={{ width: 130 }}
-              inputProps={{ min: today }}
-            />
-            <Typography variant="body2" sx={{ minWidth: 24, textAlign: 'center' }}>bis</Typography>
-            <TextField
-              label="bis"
-              type="date"
-              size="small"
-              InputLabelProps={{ shrink: true }}
-              value={pausedState.end}
-              onChange={(e) => handlePauseChange(pausedState.enabled, pausedState.start, e.target.value)}
-              sx={{ width: 130 }}
-              inputProps={{ min: today }}
-            />
-          </Box>
-        )}
-      </Box>
-    </Box>
-  );
-
-  // Zeiten Tab Content
-  const ZeitenTab = () => (
-    <Box flex={1} display="flex" flexDirection="column" gap={2} sx={{ overflowY: 'auto' }}>
-      <Box display="flex" alignItems="center" gap={2} sx={{ mb: 1 }}>
-        <Typography variant="h6" sx={{ mt: 1, mb: 1, flex: 1 }}>
-          Buchungszeiten:
-          <ModMonitor
-            itemId={item.id}
-            field="bookings"
-            value={JSON.stringify(bookings)}
-            originalValue={JSON.stringify(item.originalParsedData?.booking || [])}
-            onRestore={() => {
-              updateItemBookings(item.id, JSON.parse(JSON.stringify(item.originalParsedData?.booking || [])));
-            }}
-            title="Alle Buchungen auf importierte Werte zurücksetzen"
-            confirmMsg="Alle Buchungen auf importierten Wert zurücksetzen?"
-          />
-        </Typography>
-        <Button
-          variant="outlined"
-          size="small"
-          startIcon={<AddIcon />}
-          onClick={handleAddBooking}
-        >
-          Buchungszeitraum hinzufügen
-        </Button>
-      </Box>
-      <BookingCards
-        itemId={item.id}
-        type={item.type}
-        lastAddedIndex={lastAddedBookingIdx}
-        importedCount={importedBookingCount}
-        originalBookings={item?.originalParsedData?.booking}
-        onRestoreBooking={handleRestoreBooking}
-        onDelete={handleDeleteBooking}
-        isManualEntry={isManualEntry}
-      />
-    </Box>
-  );
-
-  // Gruppen Tab Content
-  const GruppenTab = () => (
-    <Box flex={1} display="flex" flexDirection="column" gap={2} sx={{ overflowY: 'auto' }}>
-      <Box display="flex" alignItems="center" gap={2} sx={{ mt: 2, mb: 1 }}>
-        <Typography variant="h6" sx={{ flex: 1 }}>
-          Gruppen:
-          <ModMonitor
-            itemId={item.id}
-            field="groups"
-            value={JSON.stringify(groups)}
-            originalValue={JSON.stringify(item.originalParsedData?.group || [])}
-            onRestore={() => updateItemGroups(item.id, JSON.parse(JSON.stringify(item.originalParsedData?.group || [])))}
-            title="Alle Gruppen auf importierte Werte zurücksetzen"
-            confirmMsg="Alle Gruppen auf importierten Wert zurücksetzen?"
-          />
-        </Typography>
-        <Button
-          variant="outlined"
-          size="small"
-          startIcon={<AddIcon />}
-          onClick={handleAddGroup}
-        >
-          Gruppe hinzufügen
-        </Button>
-      </Box>
-      <GroupCards
-        itemId={item.id}
-        groups={groups}
-        lastAddedIndex={lastAddedGroupIdx}
-        onDelete={handleDeleteGroup}
-        importedCount={importedGroupCount}
-        originalGroups={item?.originalParsedData?.group}
-        onRestoreGroup={handleRestoreGroup}
-        isManualEntry={isManualEntry}
-      />
-    </Box>
-  );
-
   return (
     <Box flex={1} display="flex" flexDirection="column">
       <Tabs
@@ -500,208 +224,61 @@ function SimulationDataTab({
         <Tab icon={<AccessTimeIcon />} label="Zeiten" />
         <Tab icon={<GroupIcon />} label="Gruppen" />
       </Tabs>
-      
       {activeTab === 0 && (
-        <Box flex={1} display="flex" flexDirection="column" gap={2} sx={{ overflowY: 'auto' }}>
-          {/* Delete button for manually added items */}
-          {isManualEntry && (
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
-              <Button
-                variant="outlined"
-                color="error"
-                startIcon={<DeleteIcon />}
-                onClick={handleDeleteItem}
-                size="small"
-              >
-                Eintrag löschen
-              </Button>
-            </Box>
-          )}
-
-          {/* Editable Name and Note Fields */}
-          <Box display="flex" alignItems="center" gap={2} sx={{ mb: 2 }}>
-            <Typography variant="body2" sx={{ minWidth: 90 }}>Name</Typography>
-            <TextField
-              value={localName}
-              onChange={(e) => setLocalName(e.target.value)}
-              onBlur={() => updateItemName(item.id, localName)}
-              size="small"
-              sx={{ width: 300 }}
-              InputLabelProps={{ shrink: true }}
-            />
-            <Typography variant="body2" sx={{ minWidth: 90 }}>Bemerkungen</Typography>
-            <TextField
-              value={localNote}
-              onChange={(e) => setLocalNote(e.target.value)}
-              onBlur={() => updateItemNote(item.id, localNote)}
-              size="small"
-              sx={{ width: 300 }}
-              multiline
-              minRows={2}
-              maxRows={4}
-              InputLabelProps={{ shrink: true }}
-            />
-          </Box>
-
-          {/* Geburtsdatum nur für Kinder (demand) */}
-          {item.type === 'demand' && (
-            <Box display="flex" alignItems="center" gap={2} sx={{ mb: 2 }}>
-              <Typography variant="body2" sx={{ minWidth: 90 }}>Geburtsdatum</Typography>
-              <TextField
-                type="date"
-                value={localGeburtsdatum}
-                onChange={(e) => setLocalGeburtsdatum(e.target.value)}
-                onBlur={() => handleGeburtsdatumChange(localGeburtsdatum)}
-                size="small"
-                sx={{ width: 150 }}
-                InputLabelProps={{ shrink: true }}
-              />
-              <ModMonitor
-                itemId={item.id}
-                field="geburtsdatum"
-                value={localGeburtsdatum}
-                originalValue={initialGeburtsdatum}
-                onRestore={handleRestoreGeburtsdatum}
-                title="Geburtsdatum auf importierten Wert zurücksetzen"
-                confirmMsg="Geburtsdatum auf importierten Wert zurücksetzen?"
-              />
-            </Box>
-          )}
-
-          {/* Qualifikation nur für Mitarbeiter (capacity) */}
-          {item.type === 'capacity' && (
-            <Box sx={{ mb: 2 }}>
-              <FormControl component="fieldset">
-                <Box display="flex" alignItems="center" gap={1}>
-                  <FormLabel component="legend">Qualifikation</FormLabel>
-                  <ModMonitor
-                    itemId={item.id}
-                    field="qualification"
-                    value={localQualification}
-                    originalValue={initialQualification}
-                    onRestore={handleRestoreQualification}
-                    title="Qualifikation auf importierten Wert zurücksetzen"
-                    confirmMsg="Qualifikation auf importierten Wert zurücksetzen?"
-                  />
-                </Box>
-                <RadioGroup
-                  row
-                  value={localQualification}
-                  onChange={(e) => setLocalQualification(e.target.value)}
-                  onBlur={() => updateItemQualification(item.id, localQualification)}
-                >
-                  {qualiDefs && qualiDefs.length > 0 ? (
-                    qualiDefs.map(q => (
-                      <FormControlLabel
-                        key={q.key}
-                        value={q.key}
-                        control={<Radio />}
-                        label={`${q.name} (${q.key})`}
-                      />
-                    ))
-                  ) : (
-                    <>
-                      <FormControlLabel value="E" control={<Radio />} label="Erzieher (E)" />
-                      <FormControlLabel value="K" control={<Radio />} label="Kinderpfleger (K)" />
-                      <FormControlLabel value="H" control={<Radio />} label="Hilfskraft (H)" />
-                      <FormControlLabel value="P" control={<Radio />} label="Praktikant (P)" />
-                      <FormControlLabel value="" control={<Radio />} label="Keine Qualifikation" />
-                    </>
-                  )}
-                </RadioGroup>
-              </FormControl>
-            </Box>
-          )}
-
-          {/* Zeitraum */}
-          <Box display="flex" alignItems="center" gap={2} sx={{ mb: 2 }}>
-            <Typography variant="body2" sx={{ minWidth: 90 }}>Zeitraum von</Typography>
-            <TextField
-              label=""
-              type="date"
-              size="small"
-              InputLabelProps={{ shrink: true }}
-              value={startDate}
-              onChange={(e) => handleStartDateChange(e.target.value)}
-              sx={{ width: 150 }}
-            />
-            <ModMonitor
-              itemId={item.id}
-              field="startdate"
-              value={startDate}
-              originalValue={initialStartDate}
-              onRestore={handleRestoreStartDate}
-              title="Startdatum auf importierten Wert zurücksetzen"
-              confirmMsg="Startdatum auf importierten Wert zurücksetzen?"
-            />
-            <Typography variant="body2" sx={{ minWidth: 24, textAlign: 'center' }}>bis</Typography>
-            <TextField
-              label=""
-              type="date"
-              size="small"
-              InputLabelProps={{ shrink: true }}
-              value={endDate}
-              onChange={(e) => handleEndDateChange(e.target.value)}
-              sx={{ width: 150 }}
-            />
-            <ModMonitor
-              itemId={item.id}
-              field="enddate"
-              value={endDate}
-              originalValue={initialEndDate}
-              onRestore={handleRestoreEndDate}
-              title="Enddatum auf importierten Wert zurücksetzen"
-              confirmMsg="Enddatum auf importierten Wert zurücksetzen?"
-            />
-          </Box>
-
-          {/* Pausieren */}
-          <Box sx={{ mb: 2, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={pausedState.enabled}
-                  onChange={(e) => handlePauseChange(e.target.checked, pausedState.start, pausedState.end)}
-                />
-              }
-              label="Pausieren"
-              sx={{ ml: 0 }}
-            />
-            {pausedState.enabled && (
-              <Box display="flex" alignItems="center" gap={1} sx={{ mt: 1 }}>
-                <TextField
-                  label="von"
-                  type="date"
-                  size="small"
-                  InputLabelProps={{ shrink: true }}
-                  value={pausedState.start}
-                  onChange={(e) => handlePauseChange(pausedState.enabled, e.target.value, pausedState.end)}
-                  sx={{ width: 130 }}
-                  inputProps={{ min: today }}
-                />
-                <Typography variant="body2" sx={{ minWidth: 24, textAlign: 'center' }}>bis</Typography>
-                <TextField
-                  label="bis"
-                  type="date"
-                  size="small"
-                  InputLabelProps={{ shrink: true }}
-                  value={pausedState.end}
-                  onChange={(e) => handlePauseChange(pausedState.enabled, pausedState.start, e.target.value)}
-                  sx={{ width: 130 }}
-                  inputProps={{ min: today }}
-                />
-              </Box>
-            )}
-          </Box>
-        </Box>
+        <SimDataGeneralTab
+          item={item}
+          pausedState={pausedState}
+          startDate={startDate}
+          endDate={endDate}
+          initialStartDate={initialStartDate}
+          initialEndDate={initialEndDate}
+          geburtsdatum={geburtsdatum}
+          initialGeburtsdatum={initialGeburtsdatum}
+          itemName={itemName}
+          itemNote={itemNote}
+          itemQualification={itemQualification}
+          initialQualification={initialQualification}
+          qualiDefs={qualiDefs}
+          isManualEntry={isManualEntry}
+          handleDeleteItem={handleDeleteItem}
+          handleGeburtsdatumChange={handleGeburtsdatumChange}
+          handleRestoreGeburtsdatum={handleRestoreGeburtsdatum}
+          handleRestoreQualification={handleRestoreQualification}
+          handleStartDateChange={handleStartDateChange}
+          handleEndDateChange={handleEndDateChange}
+          handleRestoreStartDate={handleRestoreStartDate}
+          handleRestoreEndDate={handleRestoreEndDate}
+          handlePauseChange={handlePauseChange}
+          updateItemName={updateItemName}
+          updateItemNote={updateItemNote}
+          updateItemQualification={updateItemQualification}
+        />
       )}
-      {activeTab === 1 && <ZeitenTab />}
-      {activeTab === 2 && <GruppenTab />}
+      {activeTab === 1 && (
+        <SimDataBookingTab
+          item={item}
+          bookings={bookings}
+          lastAddedBookingIdx={lastAddedBookingIdx}
+          importedBookingCount={importedBookingCount}
+          handleAddBooking={handleAddBooking}
+          handleDeleteBooking={handleDeleteBooking}
+          handleRestoreBooking={updateItemBookings}
+        />
+      )}
+      {activeTab === 2 && (
+        <SimDataGroupsTab
+          item={item}
+          groups={groups}
+          lastAddedGroupIdx={lastAddedGroupIdx}
+          importedGroupCount={importedGroupCount}
+          handleAddGroup={handleAddGroup}
+          handleDeleteGroup={handleDeleteGroup}
+          handleRestoreGroup={handleRestoreGroup}
+        />
+      )}
     </Box>
   );
 }
 
 export default SimulationDataTab;
-
-
-
+   
