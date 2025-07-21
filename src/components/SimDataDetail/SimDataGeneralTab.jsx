@@ -50,7 +50,7 @@ function SimDataGeneralTab({
   const today = new Date().toISOString().split('T')[0];
 
   return (
-    <Box flex={1} display="flex" flexDirection="column" gap={2} sx={{ overflowY: 'auto' }}>
+    <Box flex={1} display="flex" flexDirection="column" sx={{ overflowY: 'auto', gap: 0 }}>
       {isManualEntry && (
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
           <Button
@@ -64,57 +64,69 @@ function SimDataGeneralTab({
           </Button>
         </Box>
       )}
-      <Box display="flex" alignItems="center" gap={2} sx={{ mb: 2 }}>
-        <Typography variant="body2" sx={{ minWidth: 90 }}>Name</Typography>
+
+      {/* Name */}
+      <Box sx={{ mb: 2 }}>
+        <Typography variant="body2" sx={{ mb: 0.5 }}>Name</Typography>
         <TextField
           value={localName}
           onChange={(e) => setLocalName(e.target.value)}
           onBlur={() => updateItemName(item.id, localName)}
           size="small"
-          sx={{ width: 300 }}
+          sx={{ width: 355 }}
           InputLabelProps={{ shrink: true }}
         />
-        <Typography variant="body2" sx={{ minWidth: 90 }}>Bemerkungen</Typography>
+      </Box>
+
+      {/* Bemerkungen */}
+      <Box sx={{ mb: 2 }}>
+        <Typography variant="body2" sx={{ mb: 0.5 }}>Bemerkungen</Typography>
         <TextField
           value={localNote}
           onChange={(e) => setLocalNote(e.target.value)}
           onBlur={() => updateItemNote(item.id, localNote)}
           size="small"
-          sx={{ width: 300 }}
+          sx={{ width: 355 }}
           multiline
           minRows={2}
           maxRows={4}
           InputLabelProps={{ shrink: true }}
         />
       </Box>
+
+      {/* Geburtsdatum */}
       {item.type === 'demand' && (
-        <Box display="flex" alignItems="center" gap={2} sx={{ mb: 2 }}>
-          <Typography variant="body2" sx={{ minWidth: 90 }}>Geburtsdatum</Typography>
-          <TextField
-            type="date"
-            value={localGeburtsdatum}
-            onChange={(e) => setLocalGeburtsdatum(e.target.value)}
-            onBlur={() => handleGeburtsdatumChange(localGeburtsdatum)}
-            size="small"
-            sx={{ width: 150 }}
-            InputLabelProps={{ shrink: true }}
-          />
-          <ModMonitor
-            itemId={item.id}
-            field="geburtsdatum"
-            value={localGeburtsdatum}
-            originalValue={initialGeburtsdatum}
-            onRestore={handleRestoreGeburtsdatum}
-            title="Geburtsdatum auf importierten Wert zurücksetzen"
-            confirmMsg="Geburtsdatum auf importierten Wert zurücksetzen?"
-          />
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="body2" sx={{ mb: 0.5 }}>Geburtsdatum</Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <TextField
+              type="date"
+              value={localGeburtsdatum}
+              onChange={(e) => setLocalGeburtsdatum(e.target.value)}
+              onBlur={() => handleGeburtsdatumChange(localGeburtsdatum)}
+              size="small"
+              sx={{ width: 355 }}
+              InputLabelProps={{ shrink: true }}
+            />
+            <ModMonitor
+              itemId={item.id}
+              field="geburtsdatum"
+              value={localGeburtsdatum}
+              originalValue={initialGeburtsdatum}
+              onRestore={handleRestoreGeburtsdatum}
+              title="Geburtsdatum auf importierten Wert zurücksetzen"
+              confirmMsg="Geburtsdatum auf importierten Wert zurücksetzen?"
+            />
+          </Box>
         </Box>
       )}
+
+      {/* Qualifikation */}
       {item.type === 'capacity' && (
         <Box sx={{ mb: 2 }}>
           <FormControl component="fieldset">
-            <Box display="flex" alignItems="center" gap={1}>
-              <FormLabel component="legend">Qualifikation</FormLabel>
+          <Typography variant="body2" sx={{ mb: 0.5 }}>Qualifikation</Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <ModMonitor
                 itemId={item.id}
                 field="qualification"
@@ -137,7 +149,7 @@ function SimDataGeneralTab({
                     key={q.key}
                     value={q.key}
                     control={<Radio />}
-                    label={`${q.name} (${q.key})`}
+                    label={`${q.name}`}
                   />
                 ))
               ) : (
@@ -149,47 +161,53 @@ function SimDataGeneralTab({
           </FormControl>
         </Box>
       )}
-      <Box display="flex" alignItems="center" gap={2} sx={{ mb: 2 }}>
-        <Typography variant="body2" sx={{ minWidth: 90 }}>Zeitraum von</Typography>
-        <TextField
-          label=""
-          type="date"
-          size="small"
-          InputLabelProps={{ shrink: true }}
-          value={startDate}
-          onChange={(e) => handleStartDateChange(e.target.value)}
-          sx={{ width: 150 }}
-        />
-        <ModMonitor
-          itemId={item.id}
-          field="startdate"
-          value={startDate}
-          originalValue={initialStartDate}
-          onRestore={handleRestoreStartDate}
-          title="Startdatum auf importierten Wert zurücksetzen"
-          confirmMsg="Startdatum auf importierten Wert zurücksetzen?"
-        />
-        <Typography variant="body2" sx={{ minWidth: 24, textAlign: 'center' }}>bis</Typography>
-        <TextField
-          label=""
-          type="date"
-          size="small"
-          InputLabelProps={{ shrink: true }}
-          value={endDate}
-          onChange={(e) => handleEndDateChange(e.target.value)}
-          sx={{ width: 150 }}
-        />
-        <ModMonitor
-          itemId={item.id}
-          field="enddate"
-          value={endDate}
-          originalValue={initialEndDate}
-          onRestore={handleRestoreEndDate}
-          title="Enddatum auf importierten Wert zurücksetzen"
-          confirmMsg="Enddatum auf importierten Wert zurücksetzen?"
-        />
+
+      {/* Zeitraum */}
+      <Box sx={{ mb: 2 }}>
+        <Typography variant="body2" sx={{ mt: 1, mb: 1.5}}>Anwesenheit</Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <TextField
+            label="von"
+            type="date"
+            size="small"
+            InputLabelProps={{ shrink: true }}
+            value={startDate}
+            onChange={(e) => handleStartDateChange(e.target.value)}
+            sx={{ width: 150 }}
+          />
+          <ModMonitor
+            itemId={item.id}
+            field="startdate"
+            value={startDate}
+            originalValue={initialStartDate}
+            onRestore={handleRestoreStartDate}
+            title="Startdatum auf importierten Wert zurücksetzen"
+            confirmMsg="Startdatum auf importierten Wert zurücksetzen?"
+          />
+          <Typography variant="body2" sx={{ minWidth: 24, textAlign: 'center' }}>bis</Typography>
+          <TextField
+            label="bis"
+            type="date"
+            size="small"
+            InputLabelProps={{ shrink: true }}
+            value={endDate}
+            onChange={(e) => handleEndDateChange(e.target.value)}
+            sx={{ width: 150 }}
+          />
+          <ModMonitor
+            itemId={item.id}
+            field="enddate"
+            value={endDate}
+            originalValue={initialEndDate}
+            onRestore={handleRestoreEndDate}
+            title="Enddatum auf importierten Wert zurücksetzen"
+            confirmMsg="Enddatum auf importierten Wert zurücksetzen?"
+          />
+        </Box>
       </Box>
-      <Box sx={{ mb: 2, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+
+      {/* Abwesenheiten */}
+      <Box sx={{ mt: 4, mb: 2 }}>
         <Button
           variant="outlined"
           size="small"
@@ -212,7 +230,7 @@ function SimDataGeneralTab({
                 }
               }
               return (
-                <Box key={idx} display="flex" alignItems="center" gap={1}>
+                <Box key={idx} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <TextField
                     label="von"
                     type="date"
