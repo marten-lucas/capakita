@@ -1,0 +1,46 @@
+<xs:schema attributeFormDefault="unqualified" elementFormDefault="qualified" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="BELEGUNGEN">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="BELEGUNGSBUCHUNG" maxOccurs="unbounded" minOccurs="0">
+          <xs:complexType>
+            <xs:choice maxOccurs="unbounded" minOccurs="0">
+              <xs:element type="xs:short" name="IDNR"/>
+              <xs:element type="xs:short" name="KINDNR"/>
+              <xs:element type="xs:string" name="BELVON"/>
+              <xs:element type="xs:string" name="BELBIS"/>
+              <xs:element type="xs:byte" name="ZEITKAT"/>
+              <xs:element type="xs:string" name="ZEITEN"/>
+              <xs:element type="xs:string" name="ANLDAT"/>
+              <xs:element type="xs:string" name="AENDAT"/>
+              <xs:element type="xs:byte" name="ANLUSER"/>
+              <xs:element type="xs:byte" name="AENUSER"/>
+              <xs:element type="xs:byte" name="MNR"/>
+              <xs:element type="xs:string" name="KRIPPENK"/>
+              <xs:element type="xs:string" name="SCHULKIND"/>
+              <xs:element type="xs:string" name="ART"/>
+              <xs:element type="xs:byte" name="GEMNR"/>
+              <xs:element type="xs:byte" name="BUZEITKAT"/>
+              <xs:element type="xs:string" name="VORSCHULE"/>
+              <xs:element type="xs:byte" name="KLASSE"/>
+              <xs:element type="xs:short" name="BUTAGE"/>
+              <xs:element type="xs:string" name="BTMODE"/>
+              <xs:element type="xs:byte" name="SCHULE"/>
+              <xs:element type="xs:byte" name="MBNR"/>
+              <xs:element type="xs:string" name="VORSCHULK"/>
+              <xs:element type="xs:byte" name="KLASSEBEZ"/>
+              <xs:element type="xs:string" name="EINSCHUL"/>
+              <xs:element type="xs:string" name="BEHINDERT"/>
+              <xs:element type="xs:string" name="FBEZIRK"/>
+              <xs:element type="xs:string" name="MIGRATION"/>
+              <xs:element type="xs:string" name="MITTAGVPFL"/>
+              <xs:element type="xs:string" name="PLSPLITT"/>
+              <xs:element type="xs:string" name="VORKURS"/>
+              <xs:element type="xs:string" name="BEMERK"/>
+            </xs:choice>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

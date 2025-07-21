@@ -1,0 +1,23 @@
+<xs:schema attributeFormDefault="unqualified" elementFormDefault="qualified" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="GRUPPEN">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="GRUPPE" maxOccurs="unbounded" minOccurs="0">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element type="xs:byte" name="GRUNR"/>
+              <xs:element type="xs:string" name="BEZ"/>
+              <xs:element type="xs:string" name="ZEITEN"/>
+              <xs:element type="xs:string" name="ANLDAT"/>
+              <xs:element type="xs:string" name="AENDAT"/>
+              <xs:element type="xs:byte" name="ANLUSER"/>
+              <xs:element type="xs:byte" name="AENUSER"/>
+              <xs:element type="xs:byte" name="MNR"/>
+              <xs:element type="xs:byte" name="TYP"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

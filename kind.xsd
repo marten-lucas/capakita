@@ -1,0 +1,77 @@
+<xs:schema attributeFormDefault="unqualified" elementFormDefault="qualified" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="KINDER">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="KIND" maxOccurs="unbounded" minOccurs="0">
+          <xs:complexType>
+            <xs:choice maxOccurs="unbounded" minOccurs="0">
+              <xs:element type="xs:short" name="KINDNR"/>
+              <xs:element type="xs:string" name="AUFNDAT"/>
+              <xs:element type="xs:string" name="AUSTRDAT"/>
+              <xs:element type="xs:byte" name="GRUNR"/>
+              <xs:element type="xs:string" name="GESCHW1VN"/>
+              <xs:element type="xs:string" name="GESCHW2VN"/>
+              <xs:element type="xs:string" name="GESCHW1GD"/>
+              <xs:element type="xs:string" name="GESCHW2GD"/>
+              <xs:element type="xs:string" name="ABHOLER"/>
+              <xs:element type="xs:short" name="HAUSARZT"/>
+              <xs:element type="xs:string" name="KRANKKASSE"/>
+              <xs:element type="xs:string" name="GESBESOND"/>
+              <xs:element type="xs:byte" name="ANZGESCHW"/>
+              <xs:element type="xs:string" name="AUSTRGRUND"/>
+              <xs:element type="xs:string" name="NAME"/>
+              <xs:element type="xs:string" name="VORNAME"/>
+              <xs:element type="xs:string" name="GEBDATUM"/>
+              <xs:element type="xs:string" name="GEBORT"/>
+              <xs:element type="xs:string" name="STRASSE"/>
+              <xs:element type="xs:string" name="LKZ"/>
+              <xs:element type="xs:int" name="PLZ"/>
+              <xs:element type="xs:string" name="WOHNORT"/>
+              <xs:element type="xs:string" name="ORTSTEIL"/>
+              <xs:element type="xs:string" name="TELEFON"/>
+              <xs:element type="xs:string" name="KONFESS"/>
+              <xs:element type="xs:short" name="STAATSANG"/>
+              <xs:element type="xs:string" name="GESCHLECHT"/>
+              <xs:element type="xs:string" name="FNAME"/>
+              <xs:element type="xs:string" name="ANMDAT"/>
+              <xs:element type="xs:string" name="TETANUS"/>
+              <xs:element type="xs:string" name="SPRACHE"/>
+              <xs:element type="xs:string" name="ANLDAT"/>
+              <xs:element type="xs:string" name="AENDAT"/>
+              <xs:element type="xs:byte" name="ANLUSER"/>
+              <xs:element type="xs:byte" name="AENUSER"/>
+              <xs:element type="xs:byte" name="MNR"/>
+              <xs:element type="xs:string" name="AUFNVDAT"/>
+              <xs:element type="xs:byte" name="GEMNR"/>
+              <xs:element type="xs:short" name="NAMENSTAG"/>
+              <xs:element type="xs:string" name="STATUS"/>
+              <xs:element type="xs:string" name="SUBSTATUS"/>
+              <xs:element type="xs:short" name="KINDID"/>
+              <xs:element type="xs:byte" name="MBNR"/>
+              <xs:element type="xs:string" name="NACHWEISU"/>
+              <xs:element type="xs:string" name="NACHWIMPF"/>
+              <xs:element type="xs:string" name="NACHWMIMPF"/>
+              <xs:element type="xs:string" name="ISMSTATDAT"/>
+              <xs:element type="xs:string" name="ISMSTATUS"/>
+              <xs:element type="xs:string" name="EBE2020"/>
+              <xs:element type="xs:byte" name="GEKINR"/>
+              <xs:element type="xs:string" name="AKTIV"/>
+              <xs:element type="xs:string" name="BEHBESCH"/>
+              <xs:element type="xs:string" name="BEHBDAT"/>
+              <xs:element type="xs:string" name="SYMBOL"/>
+              <xs:element type="xs:string" name="EIHKOERPB"/>
+              <xs:element type="xs:short" name="DOPPSTAAT"/>
+              <xs:element type="xs:string" name="FAMSPRND"/>
+              <xs:element type="xs:string" name="WLNOTIZ"/>
+              <xs:element type="xs:string" name="EIHSGB8"/>
+              <xs:element type="xs:string" name="BESUEINR"/>
+              <xs:element type="xs:string" name="GESCHW3VN"/>
+              <xs:element type="xs:string" name="GESCHW3GD"/>
+              <xs:element type="xs:string" name="BEMERKUNG"/>
+            </xs:choice>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>
