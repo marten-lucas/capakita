@@ -32,8 +32,8 @@ function SimulationDataTab({
   const [activeTab, setActiveTab] = useState(0);
 
   const { 
-    updateItemPausedState, 
-    getItemPausedState, 
+    updateItemAbsenceState, 
+    getItemAbsenceState, 
     getItemBookings, 
     updateItemBookings, 
     getItemGroups, 
@@ -52,8 +52,8 @@ function SimulationDataTab({
     setSelectedItem,
     getQualiDefs
   } = useSimScenarioDataStore((state) => ({
-    updateItemPausedState: state.updateItemPausedState,
-    getItemPausedState: state.getItemPausedState,
+    updateItemAbsenceState: state.updateItemAbsenceState,
+    getItemAbsenceState: state.getItemAbsenceState,
     getItemBookings: state.getItemBookings,
     updateItemBookings: state.updateItemBookings,
     getItemGroups: state.getItemGroups,
@@ -75,7 +75,7 @@ function SimulationDataTab({
     getQualiDefs: state.getQualiDefs,
   }));
 
-  const pausedState = getItemPausedState(item.id);
+  const absenceState = getItemAbsenceState(item.id);
   const bookings = getItemBookings(item.id);
   const groups = getItemGroups(item.id);
   const currentDates = getItemDates(item.id);
@@ -125,8 +125,8 @@ function SimulationDataTab({
     updateItemDates(item.id, currentStartDate, originalEndDate);
   };
 
-  const handlePauseChange = (enabled, start, end) => {
-    updateItemPausedState(item.id, enabled, start, end);
+  const handleAbsenceChange = (enabled, start, end) => {
+    updateItemAbsenceState(item.id, enabled, start, end);
   };
 
   const handleAddBooking = () => {
@@ -227,7 +227,7 @@ function SimulationDataTab({
       {activeTab === 0 && (
         <SimDataGeneralTab
           item={item}
-          pausedState={pausedState}
+          absenceState={absenceState}
           startDate={startDate}
           endDate={endDate}
           initialStartDate={initialStartDate}
@@ -248,7 +248,7 @@ function SimulationDataTab({
           handleEndDateChange={handleEndDateChange}
           handleRestoreStartDate={handleRestoreStartDate}
           handleRestoreEndDate={handleRestoreEndDate}
-          handlePauseChange={handlePauseChange}
+          handleAbsenceChange={handleAbsenceChange}
           updateItemName={updateItemName}
           updateItemNote={updateItemNote}
           updateItemQualification={updateItemQualification}
@@ -281,4 +281,3 @@ function SimulationDataTab({
 }
 
 export default SimulationDataTab;
-   

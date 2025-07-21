@@ -441,7 +441,7 @@ const useSimScenarioStore = create(
         }
         return item.parseddata ? { startdate: item.parseddata.startdate, enddate: item.parseddata.enddate } : null;
       },
-      updateItemPausedState: (itemId, enabled, start, end) => {
+      updateItemAbsenceState: (itemId, enabled, start, end) => {
         const state = get();
         const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
         if (!scenario) return;
@@ -453,16 +453,16 @@ const useSimScenarioStore = create(
             if (!draftScenario) return;
             const item = draftScenario.simulationData.find((i) => i.id === itemId);
             if (item) {
-              const previousValue = JSON.stringify(item.parseddata.paused || { enabled: false, start: '', end: '' });
+              const previousValue = JSON.stringify(item.parseddata.absence || { enabled: false, start: '', end: '' });
               const newValue = JSON.stringify({ enabled, start, end });
-              item.parseddata.paused = { enabled, start, end };
+              item.parseddata.absence = { enabled, start, end };
               if (!item.modifications) {
                 item.modifications = [];
               }
-              item.modifications = item.modifications.filter(m => m.field !== 'paused');
+              item.modifications = item.modifications.filter(m => m.field !== 'absence');
               if (previousValue !== newValue) {
                 item.modifications.push({
-                  field: 'paused',
+                  field: 'absence',
                   previousValue,
                   newValue,
                   timestamp: new Date().toISOString()
@@ -472,15 +472,15 @@ const useSimScenarioStore = create(
           }));
         } else {
           // Based scenario - track change
-          get().trackItemChange(itemId, 'paused', {
-            parseddata: { paused: { enabled, start, end } }
+          get().trackItemChange(itemId, 'absence', {
+            parseddata: { absence: { enabled, start, end } }
           });
         }
       },
-      getItemPausedState: (itemId) => {
+      getItemAbsenceState: (itemId) => {
         const effectiveData = get().getEffectiveSimulationData();
         const item = effectiveData.find((i) => i.id === itemId);
-        return item?.parseddata?.paused || { enabled: false, start: '', end: '' };
+        return item?.parseddata?.absence || { enabled: false, start: '', end: '' };
       },
       updateItemBookings: (itemId, bookings) => {
         const state = get();

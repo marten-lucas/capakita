@@ -8,7 +8,7 @@ import ModMonitor from './ModMonitor';
 
 function SimDataGeneralTab({
   item,
-  pausedState,
+  absenceState,
   startDate,
   endDate,
   initialStartDate,
@@ -29,10 +29,10 @@ function SimDataGeneralTab({
   handleEndDateChange,
   handleRestoreStartDate,
   handleRestoreEndDate,
-  handlePauseChange,
   updateItemName,
   updateItemNote,
   updateItemQualification,
+  handleAbsenceChange,
 }) {
   // Local state for controlled fields
   const [localName, setLocalName] = useState(itemName);
@@ -195,22 +195,22 @@ function SimDataGeneralTab({
         <FormControlLabel
           control={
             <Switch
-              checked={pausedState.enabled}
-              onChange={(e) => handlePauseChange(e.target.checked, pausedState.start, pausedState.end)}
+              checked={absenceState.enabled}
+              onChange={(e) => handleAbsenceChange(e.target.checked, absenceState.start, absenceState.end)}
             />
           }
-          label="Pausieren"
+          label="Abwesenheit"
           sx={{ ml: 0 }}
         />
-        {pausedState.enabled && (
+        {absenceState.enabled && (
           <Box display="flex" alignItems="center" gap={1} sx={{ mt: 1 }}>
             <TextField
               label="von"
               type="date"
               size="small"
               InputLabelProps={{ shrink: true }}
-              value={pausedState.start}
-              onChange={(e) => handlePauseChange(pausedState.enabled, e.target.value, pausedState.end)}
+              value={absenceState.start}
+              onChange={(e) => handleAbsenceChange(absenceState.enabled, e.target.value, absenceState.end)}
               sx={{ width: 130 }}
               inputProps={{ min: today }}
             />
@@ -220,8 +220,8 @@ function SimDataGeneralTab({
               type="date"
               size="small"
               InputLabelProps={{ shrink: true }}
-              value={pausedState.end}
-              onChange={(e) => handlePauseChange(pausedState.enabled, pausedState.start, e.target.value)}
+              value={absenceState.end}
+              onChange={(e) => handleAbsenceChange(absenceState.enabled, absenceState.start, e.target.value)}
               sx={{ width: 130 }}
               inputProps={{ min: today }}
             />

@@ -95,18 +95,15 @@ const useChartStore = create(
       },
       
       // Helper to check if item is booked in segment
-      isBookedInSegment: (item, dayIdx, segmentStart, segmentEnd, groupNamesFilter, isDemand, stichtag, qualificationFilter) => {
-        // Stichtag als Date
+      isBookedInSegment: (item, dayIdx, segmentStart, segmentEnd, groupNamesFilter, isDemand, stichtag, qualificationFilter, getItemAbsenceState) => {
         const stichtagDate = new Date(stichtag);
 
-        // Check if item is paused on the stichtag
-        const pausedState = item.parseddata?.paused;
-        if (pausedState?.enabled && pausedState.start && pausedState.end) {
-          const pauseStart = new Date(pausedState.start);
-          const pauseEnd = new Date(pausedState.end);
-          
-          // If stichtag falls within pause period, item is not booked
-          if (stichtagDate >= pauseStart && stichtagDate <= pauseEnd) {
+        // Check if item is absent on the stichtag via simScenarioStore
+        const absenceState = getItemAbsenceState ? getItemAbsenceState(item.id) : { enabled: false };
+        if (absenceState.enabled && absenceState.start && absenceState.end) {
+          const absenceStart = new Date(absenceState.start);
+          const absenceEnd = new Date(absenceState.end);
+          if (stichtagDate >= absenceStart && stichtagDate <= absenceEnd) {
             return false;
           }
         }
@@ -482,10 +479,9 @@ const useChartStore = create(
       },
       
       // Get last date of interest from simulation data
-      getLastDateOfInterest: (simulationData) => {
+      getLastDateOfInterest: (simulationData, getItemAbsenceState) => {
         const today = new Date();
         let lastDate = today;
-        
         simulationData.forEach(item => {
           // Check item dates
           if (item.parseddata?.enddate) {
@@ -514,12 +510,12 @@ const useChartStore = create(
           }
           
           // Check pause dates
-          if (item.parseddata?.paused?.enabled && item.parseddata.paused.end) {
-            const pauseEnd = new Date(item.parseddata.paused.end);
-            if (pauseEnd > lastDate) lastDate = pauseEnd;
+          const absenceState = getItemAbsenceState ? getItemAbsenceState(item.id) : { enabled: false };
+          if (absenceState.enabled && absenceState.end) {
+            const absenceEnd = new Date(absenceState.end);
+            if (absenceEnd > lastDate) lastDate = absenceEnd;
           }
         });
-        
         return lastDate;
       },
       
@@ -532,7 +528,7 @@ const useChartStore = create(
         if (dim === 'month') dim = 'Monate';
         if (dim === 'week') dim = 'Wochen';
         if (dim === 'year') dim = 'Jahre';
-        if (dim === 'quarter') dim = 'Quartale'; // Not implemented, but for completeness
+        if (dim === 'quarter') dim = 'Quartale'; 
 
         if (dim === 'Wochen') {
           let currentDate = new Date(today);
@@ -734,7 +730,7 @@ const useChartStore = create(
       },
 
       // Check if item is valid for period with filters
-      isItemValidForPeriod: (item, period, groupFilter, qualificationFilter) => {
+      isItemValidForPeriod: (item, period, groupFilter, qualificationFilter, getItemAbsenceState) => {
         // Check if item's date range overlaps with period
         const itemStart = item.parseddata?.startdate ? new Date(item.parseddata.startdate.split('.').reverse().join('-')) : null;
         const itemEnd = item.parseddata?.enddate ? new Date(item.parseddata.enddate.split('.').reverse().join('-')) : null;
@@ -743,14 +739,12 @@ const useChartStore = create(
         if (itemStart && itemStart > period.end) return false;
         if (itemEnd && itemEnd < period.start) return false;
         
-        // Check pause state - if paused during entire period, item is not valid
-        const pausedState = item.parseddata?.paused;
-        if (pausedState?.enabled && pausedState.start && pausedState.end) {
-          const pauseStart = new Date(pausedState.start);
-          const pauseEnd = new Date(pausedState.end);
-          
-          // If the pause period completely covers the time period, item is not valid
-          if (pauseStart <= period.start && pauseEnd >= period.end) {
+        // Check absence state via simScenarioStore
+        const absenceState = getItemAbsenceState ? getItemAbsenceState(item.id) : { enabled: false };
+        if (absenceState.enabled && absenceState.start && absenceState.end) {
+          const absenceStart = new Date(absenceState.start);
+          const absenceEnd = new Date(absenceState.end);
+          if (absenceStart <= period.start && absenceEnd >= period.end) {
             return false;
           }
         }
