@@ -55,13 +55,14 @@ function consolidateBookingTimes(booking) {
   };
 }
 
-function SimDataList({ data, onRowClick, selectedItem }) {
-  // Use the simScenarioStore for modification checking
-  const isFieldModified = useSimScenarioStore(state => state.isFieldModified);
-  
-  // Get groups from simScenarioStore for icons
-  const groupDefs = useSimScenarioStore(state => state.getGroupDefs());
-  // Helper to get group by id from scenario groupDefs
+function SimDataList({ data, scenarioId, simGroupStore }) {
+  // Use groupDefs from simGroupStore for the current scenario
+  const groupDefs = simGroupStore.getGroups(scenarioId);
+
+  // Use per-scenario selectedItemId from store
+  const selectedItemId = useSimScenarioStore(state => state.selectedItems?.[scenarioId]);
+  const setSelectedItem = useSimScenarioStore(state => state.setSelectedItem);
+
   function getGroupById(id) {
     return groupDefs.find(g => String(g.id) === String(id));
   }
@@ -157,9 +158,9 @@ function SimDataList({ data, onRowClick, selectedItem }) {
         return (
           <div key={item.id}>
             <ListItemButton
-              onClick={() => onRowClick(item)}
-              selected={selectedItem && selectedItem.id === item.id}
-              sx={selectedItem && selectedItem.id === item.id ? { bgcolor: 'action.selected' } : undefined}
+              onClick={() => setSelectedItem(scenarioId, item.id)}
+              selected={selectedItemId === item.id}
+              sx={selectedItemId === item.id ? { bgcolor: 'action.selected' } : undefined}
             >
               <ListItemAvatar>
                 <Avatar sx={{ bgcolor: avatarColor }}>

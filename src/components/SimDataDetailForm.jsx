@@ -3,11 +3,17 @@ import {
 } from '@mui/material';
 import { useState, useEffect } from 'react';
 import SimulationDataTab from './SimDataDetail/SimulationDataTab';
-import useSimScenarioDataStore from '../store/simScenarioStore';
+import useSimScenarioStore from '../store/simScenarioStore';
+import useSimDataStore from '../store/simDataStore'; // <-- import your data store
 
-function SimDataDetailForm({ item }) {
-  const updateItemDates = useSimScenarioDataStore(state => state.updateItemDates);
-  const addItemToScenario = useSimScenarioDataStore(state => state.addItemToScenario);
+function SimDataDetailForm({ scenarioId, simDataStore, simGroupStore, simBookingStore, simFinancialsStore, simQualificationStore }) {
+  // Get selected item id for this scenario
+  const selectedItemId = useSimScenarioStore(state => state.selectedItems?.[scenarioId]);
+  // Get the item from the data store
+  const item = useSimDataStore(state => state.getDataItem(scenarioId, selectedItemId));
+
+  const updateItemDates = useSimScenarioStore(state => state.updateItemDates);
+  const addItemToScenario = useSimScenarioStore(state => state.addItemToScenario);
 
   const [lastAddedBookingIdx, setLastAddedBookingIdx] = useState(null);
   const [lastAddedGroupIdx, setLastAddedGroupIdx] = useState(null);
@@ -53,6 +59,12 @@ function SimDataDetailForm({ item }) {
     >
       <SimulationDataTab 
         item={item}
+        scenarioId={scenarioId}
+        simDataStore={simDataStore}
+        simGroupStore={simGroupStore}
+        simBookingStore={simBookingStore}
+        simFinancialsStore={simFinancialsStore}
+        simQualificationStore={simQualificationStore}
         lastAddedBookingIdx={lastAddedBookingIdx}
         lastAddedGroupIdx={lastAddedGroupIdx}
         importedBookingCount={importedBookingCount}

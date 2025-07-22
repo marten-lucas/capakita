@@ -5,7 +5,6 @@ import {
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ModMonitor from './ModMonitor';
-import useSimDataStore from '../../store/simDataStore'; // <-- import the store
 
 function SimDataGeneralTab({
   item,
@@ -33,14 +32,14 @@ function SimDataGeneralTab({
   handleAddAbsence,
   handleUpdateAbsence,
   handleDeleteAbsence,
-  scenarioId,   // <-- keep scenarioId as prop
+  simDataStore, // <-- add this prop
+  scenarioId,   // <-- add this prop
 }) {
   // Local state for controlled fields
   const [localName, setLocalName] = useState(itemName);
   const [localNote, setLocalNote] = useState(itemNote);
   const [localGeburtsdatum, setLocalGeburtsdatum] = useState(geburtsdatum);
   const [localQualification, setLocalQualification] = useState(itemQualification);
-  const simDataStore = useSimDataStore(); // <-- load the store here
 
   useEffect(() => { setLocalName(itemName); }, [itemName]);
   useEffect(() => { setLocalNote(itemNote); }, [itemNote]);

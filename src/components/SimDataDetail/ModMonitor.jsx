@@ -1,5 +1,5 @@
 import RestoreIcon from '@mui/icons-material/Restore';
-import useSimScenarioDataStore from '../../store/simScenarioStore';
+import useSimScenarioStore from '../../store/simScenarioStore';
 
 /**
  * ModMonitor: Monitors a specific field of an item for modifications.
@@ -14,27 +14,25 @@ import useSimScenarioDataStore from '../../store/simScenarioStore';
  *   iconProps: object (optional, extra props for icon)
  */
 function ModMonitor({ itemId, field, value, originalValue, onRestore, title, confirmMsg, iconProps }) {
-  const { 
-    isFieldModified, 
-    getOriginalValue,
-    getEffectiveSimulationData 
-  } = useSimScenarioDataStore();
+  // Only use scenario store for manual entry check
+  const { scenarios, selectedScenarioId } = useSimScenarioStore();
 
-  // Check if item is manually added
-  const effectiveData = getEffectiveSimulationData();
-  const item = effectiveData.find(item => item.id === itemId);
+  // Find the item in the current scenario for manual entry check
+  const scenario = scenarios.find(s => s.id === selectedScenarioId);
+  let item = null;
+  if (scenario && Array.isArray(scenario.simulationData)) {
+    item = scenario.simulationData.find(i => i.id === itemId);
+  }
   const isManualEntry = item?.rawdata?.source === 'manual entry';
 
   // Don't show ModMonitor for manually added items
   if (isManualEntry) return null;
 
-  // Get original value if not provided
-  const computedOriginalValue = originalValue !== undefined 
-    ? originalValue 
-    : getOriginalValue(itemId, field);
-
-  // Check if field is modified (pure function call, no state updates)
-  const modified = isFieldModified(itemId, field, value, computedOriginalValue);
+  // Fallback: always show the restore icon (no modification logic)
+  // You may want to hide this if you want to only show when value !== originalValue
+  // For now, show only if value !== originalValue
+  const computedOriginalValue = originalValue;
+  const modified = computedOriginalValue !== undefined && JSON.stringify(value) !== JSON.stringify(computedOriginalValue);
 
   if (!modified) return null;
 

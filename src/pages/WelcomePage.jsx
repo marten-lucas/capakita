@@ -38,8 +38,8 @@ function WelcomePage() {
       remark: '',
       confidence: 50,
       likelihood: 50,
-      baseScenarioId: null,
-      simulationData: undefined
+      baseScenarioId: null
+      // simulationData removed, handled by simDataStore
     };
     addScenario(newScenario);
     // Setze das neue Szenario als ausgewählt

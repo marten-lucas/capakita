@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   SpeedDial,
@@ -17,6 +17,11 @@ import DataImportModal from '../components/modals/DataImportModal';
 import SimDataList from '../components/SimDataList';
 import SimDataDetailForm from '../components/SimDataDetailForm';
 import useSimScenarioStore from '../store/simScenarioStore';
+import useSimDataStore from '../store/simDataStore';
+import useSimGroupStore from '../store/simGroupStore';
+import useSimBookingStore from '../store/simBookingStore';
+import useSimFinancialsStore from '../store/simFinancialsStore';
+import useSimQualificationStore from '../store/simQualificationStore';
 import CryptoJS from 'crypto-js';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -49,14 +54,20 @@ function DataPage() {
   const setSelectedScenarioId = useSimScenarioStore(state => state.setSelectedScenarioId);
   const scenarios = useSimScenarioStore(state => state.scenarios);
 
-  // Use effective simulation data (overlay-aware)
-  const simulationData = useSimScenarioStore(state => state.getEffectiveSimulationData());
-  const addScenario = useSimScenarioStore(state => state.addScenario);
-  const addItemToScenario = useSimScenarioStore(state => state.addItemToScenario);
+  // Use per-scenario selectedItemId from store
+  const selectedItemId = useSimScenarioStore(state => state.selectedItems?.[selectedScenarioId]);
+  // Get the selected item from the data store
+  const selectedItem = useSimDataStore(state => state.getDataItem(selectedScenarioId, selectedItemId));
 
-  // Use simScenarioStore for group and selected item management
-  const selectedItem = useSimScenarioStore(state => state.selectedItem);
-  const setSelectedItem = useSimScenarioStore(state => state.setSelectedItem);
+  // Use new stores for simulation data and overlays
+  const simDataStore = useSimDataStore();
+  const simGroupStore = useSimGroupStore();
+  const simBookingStore = useSimBookingStore();
+  const simFinancialsStore = useSimFinancialsStore();
+  const simQualificationStore = useSimQualificationStore();
+
+  // Get simulation data for the selected scenario
+  const simulationData = simDataStore.getDataItems(selectedScenarioId);
 
   // --- Hilfsfunktionen wie in simulator_poc.html ---
   // Parse DD.MM.YYYY zu Date
@@ -140,69 +151,14 @@ function DataPage() {
     setModalOpen(false);
   };
 
+  // Add item using simDataStore
   const handleAddCapacity = () => {
-    const newItem = {
-      id: Date.now(),
-      type: 'capacity',
-      name: 'Neuer Mitarbeiter',
-      rawdata: {
-        source: 'manual entry',
-        data: {}
-      },
-      parseddata: {
-        startdate: '',
-        enddate: '',
-        booking: [],
-        group: [],
-        qualification: '',
-        vacation: '',
-        worktime: ''
-      },
-      originalParsedData: {
-        startdate: '',
-        enddate: '',
-        booking: [],
-        group: [],
-        qualification: '',
-        vacation: '',
-        worktime: ''
-      },
-      modifications: [],
-      modifiers: {},
-      simudata: {}
-    };
-    addItemToScenario(newItem);
+    const newItem = simDataStore.simDataItemAdd(selectedScenarioId, "manual entry", "capacity");
     setSelectedItem(newItem);
   };
 
   const handleAddDemand = () => {
-    const newItem = {
-      id: Date.now(),
-      type: 'demand',
-      name: 'Neues Kind',
-      rawdata: {
-        source: 'manual entry',
-        data: {}
-      },
-      parseddata: {
-        startdate: '',
-        enddate: '',
-        booking: [],
-        group: [],
-        geburtsdatum: ''
-      },
-      originalParsedData: {
-        startdate: '',
-        enddate: '',
-        booking: [],
-        group: [],
-        geburtsdatum: ''
-      },
-      modifications: [],
-      modifiers: {},
-      simudata: {}
-    };
-    addItemToScenario(newItem);
+    const newItem = simDataStore.simDataItemAdd(selectedScenarioId, "manual entry", "demand");
     setSelectedItem(newItem);
   };
 
@@ -359,15 +315,22 @@ function DataPage() {
             )}
             <SimDataList
               data={simulationData}
-              onRowClick={(item) => setSelectedItem(item)}
-              selectedItem={selectedItem}
-              selectedScenarioId={selectedScenarioId}
-              onScenarioChange={setSelectedScenarioId}
+              scenarioId={selectedScenarioId}
+              simGroupStore={simGroupStore}
+              // onRowClick and selectedItem props removed
             />
           </Box>
           <Box sx={{ flex: 1, p: 3, overflow: 'auto', height: '100vh', maxHeight: '100vh' }}>
             {simulationData.length > 0 && selectedItem && (
-              <SimDataDetailForm item={selectedItem} />
+              <SimDataDetailForm
+                scenarioId={selectedScenarioId}
+                simDataStore={simDataStore}
+                simGroupStore={simGroupStore}
+                simBookingStore={simBookingStore}
+                simFinancialsStore={simFinancialsStore}
+                simQualificationStore={simQualificationStore}
+                // item prop removed
+              />
             )}
           </Box>
         </>

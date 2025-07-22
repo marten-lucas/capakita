@@ -19,27 +19,30 @@ import PersonIcon from '@mui/icons-material/Person';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import GroupIcon from '@mui/icons-material/Group';
 import EuroIcon from '@mui/icons-material/Euro';
+import BugReportIcon from '@mui/icons-material/BugReport'; // Add icon for debug tab
 import SimDataGeneralTab from './SimDataGeneralTab';
 import SimDataBookingTab from './SimDataBookingTab';
 import SimDataGroupsTab from './SimDataGroupsTab';
 import SimDataFinanceTab from './SimDataFinanceTab';
-import useSimScenarioDataStore from '../../store/simScenarioStore';
 
 function SimulationDataTab({ 
   item, 
+  scenarioId,
+  simDataStore,
+  simGroupStore,
+  simBookingStore,
+  simFinancialsStore,
+  simQualificationStore,
   lastAddedBookingIdx, 
   lastAddedGroupIdx, 
   importedBookingCount, 
-  importedGroupCount}) {
+  importedGroupCount
+}) {
   const [activeTab, setActiveTab] = useState(0);
 
-  const { 
-    updateItemAbsenceState, 
+  // Only use functions that exist on simDataStore
+  const {
     getItemAbsenceStateList,
-    getItemGroups, 
-    updateItemGroups, 
-    updateItemDates, 
-    getItemDates,
     updateItemName,
     getItemName,
     updateItemNote,
@@ -50,32 +53,25 @@ function SimulationDataTab({
     getItemQualification,
     deleteItem,
     setSelectedItem,
-    getQualiDefs
-  } = useSimScenarioDataStore((state) => ({
-    updateItemAbsenceState: state.updateItemAbsenceState,
-    getItemAbsenceStateList: state.getItemAbsenceStateList,
-    getItemGroups: state.getItemGroups,
-    updateItemGroups: state.updateItemGroups,
-    updateItemDates: state.updateItemDates,
-    getItemDates: state.getItemDates,
-    updateItemName: state.updateItemName,
-    getItemName: state.getItemName,
-    updateItemNote: state.updateItemNote,
-    getItemNote: state.getItemNote,
-    updateItemGeburtsdatum: state.updateItemGeburtsdatum,
-    getItemGeburtsdatum: state.getItemGeburtsdatum,
-    updateItemQualification: state.updateItemQualification,
-    getItemQualification: state.getItemQualification,
-    deleteItem: state.deleteItem,
-    getEffectiveSimulationData: state.getEffectiveSimulationData,
-    selectedItem: state.selectedItem,
-    setSelectedItem: state.setSelectedItem,
-    getQualiDefs: state.getQualiDefs,
-  }));
+    getQualiDefs,
+    updateDataItem // <-- Use this for updating fields
+  } = simDataStore;
 
-  const absenceStateList = getItemAbsenceStateList(item.id) || [];
-  const groups = getItemGroups(item.id);
-  const currentDates = getItemDates(item.id);
+  // Use scenarioId when calling getItemAbsenceStateList
+  const absenceStateList = getItemAbsenceStateList
+    ? getItemAbsenceStateList(scenarioId, item.id) || []
+    : [];
+
+  // Use simGroupStore for groups
+  const allGroups = simGroupStore.getGroups(scenarioId) || [];
+  // Find groups for this item by matching group IDs in item.parseddata.group
+  const groups = item.parseddata?.group || [];
+
+  // --- FIX: getItemDates is not a function on simDataStore, so get dates from item.parseddata ---
+  const currentDates = {
+    startdate: item.parseddata?.startdate || '',
+    enddate: item.parseddata?.enddate || ''
+  };
   const itemNameFromStore = getItemName ? getItemName(item.id) : '';
   const itemName = itemNameFromStore || item.name || '';
   const itemNoteFromStore = getItemNote ? getItemNote(item.id) : '';
@@ -195,6 +191,16 @@ function SimulationDataTab({
   // Get scenario-based qualidefs for radio options
   const qualiDefs = getQualiDefs ? getQualiDefs() : [];
 
+  // Implement updateItemAbsenceState using updateDataItem
+  const updateItemAbsenceState = (itemId, absences) => {
+    simDataStore.updateDataItem(scenarioId, itemId, {
+      parseddata: {
+        ...item.parseddata,
+        absences
+      }
+    });
+  };
+
   const handleAddAbsence = () => {
     updateItemAbsenceState(item.id, [...absenceStateList, { start: '', end: '' }]);
   };
@@ -209,6 +215,17 @@ function SimulationDataTab({
     updateItemAbsenceState(item.id, newList);
   };
 
+  // Implement updateItemDates locally using simDataStore.updateDataItem
+  const updateItemDates = (itemId, startdate, enddate) => {
+    simDataStore.updateDataItem(scenarioId, itemId, {
+      parseddata: {
+        ...item.parseddata,
+        startdate,
+        enddate
+      }
+    });
+  };
+
   return (
     <Box flex={1} display="flex" flexDirection="column">
       <Tabs
@@ -218,9 +235,10 @@ function SimulationDataTab({
         sx={{ mb: 2 }}
       >
         <Tab icon={<PersonIcon />} label="Allgemein" />
-        <Tab icon={<AccessTimeIcon />} label="Zeiten" />
+        {/* <Tab icon={<AccessTimeIcon />} label="Zeiten" />
         <Tab icon={<GroupIcon />} label="Gruppen" />
-        <Tab icon={<EuroIcon />} label="Finanzen" />
+        <Tab icon={<EuroIcon />} label="Finanzen" /> */}
+        <Tab icon={<BugReportIcon />} label="Debug" /> 
       </Tabs>
       {activeTab === 0 && (
         <SimDataGeneralTab
@@ -255,7 +273,7 @@ function SimulationDataTab({
           updateItemQualification={updateItemQualification}
         />
       )}
-      {activeTab === 1 && (
+      {/* {activeTab === 1 && (
         <SimDataBookingTab
           item={item}
           lastAddedBookingIdx={lastAddedBookingIdx}
@@ -271,12 +289,27 @@ function SimulationDataTab({
           handleAddGroup={handleAddGroup}
           handleDeleteGroup={handleDeleteGroup}
           handleRestoreGroup={handleRestoreGroup}
+          allGroups={allGroups}
         />
-      )}
+      )} 
       {activeTab === 3 && (
         <SimDataFinanceTab
           item={item}
         />
+      )} */}
+      {activeTab === 1 && (
+        <Box sx={{ p: 2, overflow: 'auto', maxHeight: 400 }}>
+          <Typography variant="h6" gutterBottom>Simulation Item Debug</Typography>
+          <pre style={{
+            background: '#f5f5f5',
+            padding: 12,
+            borderRadius: 4,
+            fontSize: 13,
+            overflowX: 'auto'
+          }}>
+            {JSON.stringify(item, null, 2)}
+          </pre>
+        </Box>
       )}
     </Box>
   );

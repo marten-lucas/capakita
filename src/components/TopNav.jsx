@@ -52,6 +52,13 @@ function TopNav() {
       const simState = useSimScenarioStore.getState();
       const chartData = useChartStore.getState();
 
+      // If you want to include all new stores, gather their state here:
+      // const dataItems = useSimDataStore.getState();
+      // const groups = useSimGroupStore.getState();
+      // const bookings = useSimBookingStore.getState();
+      // const financials = useSimFinancialsStore.getState();
+      // const qualifications = useSimQualificationStore.getState();
+
       const data = {
         scenarios: simState.scenarios,
         selectedScenarioId: simState.selectedScenarioId,
@@ -63,6 +70,8 @@ function TopNav() {
           midtermSelectedGroups: chartData.midtermSelectedGroups,
           midtermSelectedQualifications: chartData.midtermSelectedQualifications
         }
+        // Add new store states here if you want to export them
+        // , dataItems, groups, bookings, financials, qualifications
       };
 
       const json = JSON.stringify(data, null, 2);
