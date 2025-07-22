@@ -206,5 +206,191 @@ export function getAllSalaryStages(dateStr, groupId) {
   }));
 }
 
+/**
+ * Returns all bonus types for a given date (or latest if not found).
+ * Extracts from AVR JSON data if available, otherwise falls back to empty list.
+ * @param {string} dateStr
+ * @returns {Array<{value:string, label:string}>}
+ */
+export function getAllBonusTypes(dateStr) {
+  const avrData = findApplicableAvrData(dateStr) || avrDataArray[avrDataArray.length - 1];
+  if (avrData && Array.isArray(avrData.bonus)) {
+    // Map bonus objects to { value, label }
+    return avrData.bonus.map(b => ({
+      value: b.type,
+      label: b.name || b.type
+    }));
+  }
+  // Fallback empty list
+  return [
+  ];
+}
+
+/**
+ * Get the bonus definition object for a given type at a reference date.
+ * @param {string} dateStr
+ * @param {string} bonusType
+ * @returns {object|null}
+ */
+export function getBonusDefinition(dateStr, bonusType) {
+  const avrData = findApplicableAvrData(dateStr) || avrDataArray[avrDataArray.length - 1];
+  if (!avrData || !Array.isArray(avrData.bonus)) return null;
+  return avrData.bonus.find(b => b.type === bonusType) || null;
+}
+
+/**
+ * Hole fulltimeHours aus dem AVR-Datensatz für das Referenzdatum.
+ * @param {string} dateStr
+ * @returns {number}
+ */
+export function getFulltimeHours(dateStr) {
+  const avrData = findApplicableAvrData(dateStr) || avrDataArray[avrDataArray.length - 1];
+  return avrData?.fulltimehours || 39;
+}
+
+/**
+ * Calculate the child bonus amount for a given date and number of children.
+ * Takes into account part-time reduction if reduce_parttime is true.
+ * @param {string} dateStr
+ * @param {number} kinderanzahl
+ * @param {number} wochenstunden
+ * @returns {number|null}
+ */
+export function calcAvrChildBonus(dateStr, kinderanzahl, wochenstunden) {
+  const def = getBonusDefinition(dateStr, 'avr-childbonus');
+  if (!def || !def.value) return null;
+  const value = Number(def.value);
+  if (isNaN(value)) return null;
+  let bonus = value * (Number(kinderanzahl) || 0);
+  const fulltimeHours = getFulltimeHours(dateStr);
+  if (def.reduce_parttime && fulltimeHours && wochenstunden) {
+    bonus = bonus * (wochenstunden / fulltimeHours);
+  }
+  return Math.round(bonus * 100) / 100;
+}
+
+/**
+ * Calculate the instructor bonus amount for a given date.
+ * Takes into account part-time reduction if reduce_parttime is true.
+ * @param {string} dateStr
+ * @param {number} wochenstunden
+ * @returns {number|null}
+ */
+export function calcAvrInstructorBonus(dateStr, wochenstunden) {
+  const def = getBonusDefinition(dateStr, 'avr-instructor');
+  if (!def || !def.value) return null;
+  const value = Number(def.value);
+  if (isNaN(value)) return null;
+  let bonus = value;
+  const fulltimeHours = getFulltimeHours(dateStr);
+  if (def.reduce_parttime && fulltimeHours && wochenstunden) {
+    bonus = bonus * (wochenstunden / fulltimeHours);
+  }
+  return Math.round(bonus * 100) / 100;
+}
+
+/**
+ * Calculate the yearly bonus (Jahressonderzahlung) for a given date, group, and stage.
+ * Returns { amount, payoutDate }
+ * Takes into account part-time and part-year reductions.
+ * @param {string} dateStr - reference date (YYYY-MM-DD)
+ * @param {string} groupName - e.g. "S 18"
+ * @param {number} stage - e.g. 3
+ * @param {number} wochenstunden
+ * @param {string} startdate - Eintrittsdatum (YYYY-MM-DD)
+ * @param {string} enddate - Austrittsdatum (YYYY-MM-DD, optional)
+ * @returns {{amount: number|null, payoutDate: string|null}}
+ */
+export function calcAvrYearlyBonus(dateStr, groupName, stage, wochenstunden, startdate, enddate) {
+  const def = getBonusDefinition(dateStr, 'avr-yearly');
+  if (!def) return { amount: null, payoutDate: null };
+
+  const fulltimeHours = getFulltimeHours(dateStr);
+
+  // 1. Berechne das Gehalt für jeden base_month_average im gleichen Jahr wie das Referenzdatum
+  const refDate = new Date(normalizeDateString(dateStr));
+  const year = refDate.getFullYear();
+  const months = Array.isArray(def.base_month_average) ? def.base_month_average : [];
+  const salaries = months.map(month => {
+    // Erzeuge ein Datum im gewünschten Monat und Jahr
+    const monthStr = `${year}-${String(month).padStart(2, '0')}-01`;
+    return getSalaryForGroupAndStage(monthStr, groupName, stage);
+  }).filter(val => typeof val === 'number' && !isNaN(val));
+
+  // 2. Bilde den Durchschnitt dieser Werte
+  if (salaries.length === 0) return { amount: null, payoutDate: null };
+  const avgSalary = salaries.reduce((a, b) => a + b, 0) / salaries.length;
+
+  // 3. Ermittle den passenden percentage
+  let percentage = null;
+  if (Array.isArray(def.percentage)) {
+    for (const p of def.percentage) {
+      if (
+        (p.from_group === undefined || groupNameMatchesGroupId(groupName, p.from_group)) &&
+        (p.to_stage === undefined || stage <= p.to_stage)
+      ) {
+        percentage = p.value;
+        break;
+      }
+    }
+    if (percentage === null && def.percentage.length > 0) {
+      percentage = def.percentage[0].value;
+    }
+  }
+  if (percentage === null) return { amount: null, payoutDate: null };
+
+  // 4. Errechne den Betrag aus Durchschnittsgehalt und percentage
+  let amount = avgSalary * percentage;
+
+  // Teilzeit-Kürzung
+  if (def.reduce_parttime && fulltimeHours && wochenstunden) {
+    amount = amount * (wochenstunden / fulltimeHours);
+  }
+
+  // Teiljahr-Kürzung
+  if (def.reduce_partyear && startdate) {
+    const start = new Date(normalizeDateString(startdate));
+    const end = enddate ? new Date(normalizeDateString(enddate)) : null;
+    // Berechne wie viele Monate im Jahr gearbeitet wurde
+    let monthsWorked = 12;
+    if (start.getFullYear() === year) {
+      monthsWorked -= (start.getMonth());
+    }
+    if (end && end.getFullYear() === year) {
+      monthsWorked -= (11 - end.getMonth());
+    }
+    monthsWorked = Math.max(0, Math.min(12, monthsWorked));
+    amount = amount * (monthsWorked / 12);
+  }
+
+  amount = Math.round(amount * 100) / 100;
+
+  // 5. Errechne das nächste Auszahlungstag (letzter Tag des due_month)
+  let payoutDate = null;
+  if (def.due_month) {
+    let payoutYear = year;
+    if (refDate.getMonth() + 1 > def.due_month) payoutYear += 1;
+    const lastDay = new Date(payoutYear, def.due_month, 0).getDate();
+    payoutDate = `${payoutYear}-${String(def.due_month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+  }
+
+  return { amount, payoutDate };
+}
+
+/**
+ * Helper: Check if groupName matches a group_id (as number or string).
+ * @param {string} groupName
+ * @param {number} groupId
+ * @returns {boolean}
+ */
+function groupNameMatchesGroupId(groupName, groupId) {
+  // Find group name for groupId in current AVR data
+  for (const avrData of avrDataArray) {
+    const group = avrData.salery_groups?.find(g => g.group_id === groupId);
+    if (group && group.group_name === groupName) return true;
+  }
+  return false;
+}
+
 // Export all loaded AVR data if needed elsewhere
 export { avrDataArray };
