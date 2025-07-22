@@ -1,7 +1,8 @@
 import React from 'react';
 import { Box, TextField, Button, Typography, MenuItem, IconButton } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { getSalaryForGroupAndStage, normalizeDateString, getFutureSalaryForGroupAndStage, getAllSalaryGroups, getAllSalaryStages } from '../../utils/avr-calculator';
+import { getSalaryForGroupAndStage, normalizeDateString, getAllSalaryGroups, getAllSalaryStages } from '../../utils/avr-calculator';
+import FinancialBonusDetails from './FinancialBonusDetails';
 
 function FinancialsDetail({ financial, onChange, onDelete, item }) {
   // Debug: Show the item as stored in simScenarioStore
@@ -47,6 +48,11 @@ function FinancialsDetail({ financial, onChange, onDelete, item }) {
       );
     }
 
+    // Zuschläge-Handler
+    const handleBonusChange = (newBonus) => {
+      onChange({ ...financial, bonus: newBonus });
+    };
+
     return (
       <Box display="flex" flexDirection="column" gap={2} position="relative">
         <TextField
@@ -89,6 +95,11 @@ function FinancialsDetail({ financial, onChange, onDelete, item }) {
             AVR-Gehalt: {avrSalary.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
           </Typography>
         )}
+
+        <FinancialBonusDetails
+          bonus={financial.bonus || []}
+          onChange={handleBonusChange}
+        />
         <Box>
           <IconButton
             aria-label="Entfernen"
@@ -159,4 +170,4 @@ function FinancialsDetail({ financial, onChange, onDelete, item }) {
 }
 
 export default FinancialsDetail;
-
+  

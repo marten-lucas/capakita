@@ -6,7 +6,6 @@ import FinancialsCards from './FinancialsCards';
 
 const FINANCIAL_TYPES = [
   { value: 'expense-avr', label: 'Ausgabe: AVR-Entgelt', allowed: ['capacity'] },
-  { value: 'expense-bonus', label: 'Ausgabe: Sonderzahlung' ,allowed: ['capacity'] },
   { value: 'income-fee', label: 'Einnahme: Beitrag', allowed: ['demand'] },
   { value: 'income-baykibig', label: 'Einnahme: BayKiBig-Förderung', allowed: ['demand'] },
   { value: 'income-other', label: 'Einnahme: Förderung', allowed: ['capacity', 'demand'] },
