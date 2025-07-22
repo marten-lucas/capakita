@@ -1,6 +1,7 @@
-import React from 'react';
-import { Box, TextField, Button, Typography, MenuItem, IconButton, Table, TableBody, TableCell, TableHead, TableRow, Checkbox } from '@mui/material';
+import React, { useState } from 'react';
+import { Box, TextField, Button, Typography, MenuItem, IconButton, Table, TableBody, TableCell, TableHead, TableRow, Checkbox, Menu } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
+import AddIcon from '@mui/icons-material/Add';
 import { 
   getSalaryForGroupAndStage, 
   normalizeDateString, 
@@ -149,6 +150,27 @@ function FinancialsDetail({ financial, onChange, onDelete, item }) {
       });
     };
 
+    // Handler to add a bonus type by removing it from disabled list
+    const handleBonusAdd = (bonusType) => {
+      const disabledBonuses = Array.isArray(financial.disabledBonuses)
+        ? financial.disabledBonuses.filter(type => type !== bonusType)
+        : [];
+      onChange({
+        ...financial,
+        disabledBonuses
+      });
+      setBonusMenuAnchor(null);
+    };
+
+    // Get available bonus types that are currently disabled
+    const availableBonusTypes = bonusTypes.filter(bonus => 
+      Array.isArray(financial.disabledBonuses) && financial.disabledBonuses.includes(bonus.value)
+    );
+
+    // State for bonus menu
+    const [bonusMenuAnchor, setBonusMenuAnchor] = useState(null);
+    const bonusMenuOpen = Boolean(bonusMenuAnchor);
+
     // Filter out disabled bonuses
     const filteredBonusRows = Array.isArray(financial.disabledBonuses)
       ? bonusRows.filter(row => !financial.disabledBonuses.includes(row.value))
@@ -208,7 +230,29 @@ function FinancialsDetail({ financial, onChange, onDelete, item }) {
 
         {/* Bonus-Tabelle */}
         <Box>
-          <Typography variant="subtitle2" sx={{ mb: 1 }}>Boni</Typography>
+          <Box display="flex" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+            <Typography variant="subtitle2">Boni</Typography>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<AddIcon />}
+              onClick={(e) => setBonusMenuAnchor(e.currentTarget)}
+              disabled={availableBonusTypes.length === 0}
+            >
+              Bonus hinzufügen
+            </Button>
+          </Box>
+          <Menu
+            anchorEl={bonusMenuAnchor}
+            open={bonusMenuOpen}
+            onClose={() => setBonusMenuAnchor(null)}
+          >
+            {availableBonusTypes.map((bonus) => (
+              <MenuItem key={bonus.value} onClick={() => handleBonusAdd(bonus.value)}>
+                {bonus.label}
+              </MenuItem>
+            ))}
+          </Menu>
           <Table size="small">
             <TableHead>
               <TableRow>
