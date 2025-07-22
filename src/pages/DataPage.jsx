@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   SpeedDial,
@@ -6,32 +6,14 @@ import {
   Paper,
   SpeedDialIcon,
   Typography,
-  Button, // hinzugefügt
-  MenuItem,
-  Select,
+  Button, 
 } from '@mui/material';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
-import AddIcon from '@mui/icons-material/Add';
-import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import DataImportModal from '../components/modals/DataImportModal';
 import SimDataList from '../components/SimDataList';
 import SimDataDetailForm from '../components/SimDataDetailForm';
 import useSimScenarioStore from '../store/simScenarioStore';
 import useSimDataStore from '../store/simDataStore';
-import useSimGroupStore from '../store/simGroupStore';
-import useSimBookingStore from '../store/simBookingStore';
-import useSimFinancialsStore from '../store/simFinancialsStore';
-import useSimQualificationStore from '../store/simQualificationStore';
-import CryptoJS from 'crypto-js';
-import Dialog from '@mui/material/Dialog';
-import DialogTitle from '@mui/material/DialogTitle';
-import DialogContent from '@mui/material/DialogContent';
-import DialogActions from '@mui/material/DialogActions';
-import TextField from '@mui/material/TextField';
-import IconButton from '@mui/material/IconButton';
-import InputAdornment from '@mui/material/InputAdornment';
-import Visibility from '@mui/icons-material/Visibility';
-import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import ScenarioSaveDialog from '../components/modals/ScenarioSaveDialog';
 import PersonIcon from '@mui/icons-material/Person';
 import ChildCareIcon from '@mui/icons-material/ChildCare';
@@ -40,9 +22,7 @@ import { extractAdebisZipAndData } from '../utils/adebis-import';
 
 function DataPage() {
   const [modalOpen, setModalOpen] = useState(false);
-  // const [addItemModalOpen, setAddItemModalOpen] = useState(false);
-  // const [saveDialogOpen, setSaveDialogOpen] = useState(false);
-  // const [pendingSave, setPendingSave] = useState(false);
+
 
   // Use store for dialog state
   const scenarioSaveDialogOpen = useSimScenarioStore(state => state.scenarioSaveDialogOpen);
@@ -54,27 +34,25 @@ function DataPage() {
   const setSelectedScenarioId = useSimScenarioStore(state => state.setSelectedScenarioId);
   const scenarios = useSimScenarioStore(state => state.scenarios);
 
-  // Use per-scenario selectedItemId from store
+  // Get selected item id from scenario store
   const selectedItemId = useSimScenarioStore(state => state.selectedItems?.[selectedScenarioId]);
-  // Get the selected item from the data store
+  // Get selected item from data store using selectedScenarioId and selectedItemId
   const selectedItem = useSimDataStore(state => state.getDataItem(selectedScenarioId, selectedItemId));
 
-  // Use new stores for simulation data and overlays
-  const simDataStore = useSimDataStore();
-  const simGroupStore = useSimGroupStore();
-  const simBookingStore = useSimBookingStore();
-  const simFinancialsStore = useSimFinancialsStore();
-  const simQualificationStore = useSimQualificationStore();
+  // Use useSimDataStore directly
+  const simDataItemAdd = useSimDataStore(state => state.simDataItemAdd);
+  const getDataItems = useSimDataStore(state => state.getDataItems);
+
 
   // Get simulation data for the selected scenario
-  const simulationData = simDataStore.getDataItems(selectedScenarioId);
+  const simulationData = getDataItems(selectedScenarioId);
 
   // --- Hilfsfunktionen wie in simulator_poc.html ---
   // Parse DD.MM.YYYY zu Date
 
   const handleImport = async ({ file, isAnonymized }) => {
     // Use the centralized import utility
-    const { processedData, newGroupsLookup, uniqueQualifications } = await extractAdebisZipAndData(
+    const { newGroupsLookup, uniqueQualifications } = await extractAdebisZipAndData(
       file,
       isAnonymized,
       // Remove useAppSettingsStore import hooks, just pass null
@@ -112,26 +90,8 @@ function DataPage() {
       name: key
     })) || [];
 
-    // Always provide organisation property, even if empty
-    const organisation = {
-      groupdefs,
-      qualidefs
-    };
 
-    const scenarioName = isAnonymized ? 'Importiertes Szenario (anonymisiert)' : 'Importiertes Szenario';
-    const newScenario = {
-      name: scenarioName,
-      remark: '',
-      confidence: 50,
-      likelihood: 50,
-      baseScenarioId: null,
-      simulationData: processedData,
-      imported: true,
-      importedAnonymized: !!isAnonymized,
-      organisation // always present
-    };
-    addScenario(newScenario);
-
+    
     // Find the new scenario's id (last added)
     const scenarios = useSimScenarioStore.getState().scenarios;
     const lastScenario = scenarios[scenarios.length - 1];
@@ -151,60 +111,29 @@ function DataPage() {
     setModalOpen(false);
   };
 
-  // Add item using simDataStore
-  const handleAddCapacity = () => {
-    const newItem = simDataStore.simDataItemAdd(selectedScenarioId, "manual entry", "capacity");
-    setSelectedItem(newItem);
-  };
 
-  const handleAddDemand = () => {
-    const newItem = simDataStore.simDataItemAdd(selectedScenarioId, "manual entry", "demand");
-    setSelectedItem(newItem);
-  };
-
-  // Reference for scenario manager (if needed for handleAdd)
-  const scenarioManagerRef = React.useRef(null);
-
-  // Add scenario via SpeedDial: trigger handleAdd of ScenarioManager for current scenario
-  const handleAddScenario = () => {
-    if (!selectedScenarioId) return;
-    // Find the current scenario object
-    const currentScenario = scenarios.find(s => s.id === selectedScenarioId);
-    if (scenarioManagerRef.current && scenarioManagerRef.current.handleAdd) {
-      scenarioManagerRef.current.handleAdd(currentScenario);
-    } else {
-      // fallback: add as root if ref not available
-      const newScenario = {
-        name: 'Neues Szenario',
-        remark: '',
-        confidence: 50,
-        likelihood: 50,
-        baseScenarioId: currentScenario?.id || null
-      };
-      addScenario(newScenario);
-      const scenariosList = useSimScenarioStore.getState().scenarios;
-      const lastScenario = scenariosList[scenariosList.length - 1];
-      if (lastScenario) {
-        setSelectedScenarioId(lastScenario.id);
-      }
-    }
-  };
 
   const actions = [
     {
       icon: <PersonIcon />,
       name: 'Kapazität',
-      onClick: handleAddCapacity
+      onClick: () => simDataItemAdd(selectedScenarioId, "manual entry", "capacity")
     },
     {
       icon: <ChildCareIcon />,
       name: 'Bedarf',
-      onClick: handleAddDemand
+      onClick: () => simDataItemAdd(selectedScenarioId, "manual entry", "demand")
     },
     {
       icon: <LayersIcon />,
       name: 'Szenario',
-      onClick: handleAddScenario
+      onClick: () => useSimScenarioStore.getState().addScenario({
+        name: 'Neues Szenario',
+        remark: '',
+        confidence: 50,
+        likelihood: 50,
+        baseScenarioId: selectedScenarioId || null
+      })
     },
     {
       icon: <FileUploadIcon />,
@@ -231,11 +160,11 @@ function DataPage() {
   if (!scenarios || scenarios.length === 0) {
     return (
       <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#f0f2f5' }}>
-        <Paper 
-          sx={{ 
+        <Paper
+          sx={{
             m: 'auto',
-            p: 4, 
-            textAlign: 'center', 
+            p: 4,
+            textAlign: 'center',
             bgcolor: '#f5f5f5',
             border: '2px dashed #ccc',
             maxWidth: 480
@@ -247,8 +176,8 @@ function DataPage() {
           <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
             Um mit der Simulation zu starten, importieren Sie bitte zuerst Daten.
           </Typography>
-          <Button 
-            variant="contained" 
+          <Button
+            variant="contained"
             startIcon={<FileUploadIcon />}
             onClick={() => setModalOpen(true)}
             size="large"
@@ -313,24 +242,11 @@ function DataPage() {
                 </Button>
               </Box>
             )}
-            <SimDataList
-              data={simulationData}
-              scenarioId={selectedScenarioId}
-              simGroupStore={simGroupStore}
-              // onRowClick and selectedItem props removed
-            />
+            <SimDataList/>
           </Box>
           <Box sx={{ flex: 1, p: 3, overflow: 'auto', height: '100vh', maxHeight: '100vh' }}>
             {simulationData.length > 0 && selectedItem && (
-              <SimDataDetailForm
-                scenarioId={selectedScenarioId}
-                simDataStore={simDataStore}
-                simGroupStore={simGroupStore}
-                simBookingStore={simBookingStore}
-                simFinancialsStore={simFinancialsStore}
-                simQualificationStore={simQualificationStore}
-                // item prop removed
-              />
+              <SimDataDetailForm/>
             )}
           </Box>
         </>

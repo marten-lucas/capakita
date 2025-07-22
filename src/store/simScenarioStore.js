@@ -17,8 +17,9 @@ const useSimScenarioStore = create(
 
       setSelectedScenarioId: (id) => set({ selectedScenarioId: id }),
       setLastImportAnonymized: (value) => set({ lastImportAnonymized: value }),
-      setSelectedItem: (scenarioId, itemId) =>
+      setSelectedItem: (itemId) =>
         set(produce((state) => {
+          const scenarioId = state.selectedScenarioId;
           if (!scenarioId) return;
           state.selectedItems[scenarioId] = itemId;
         })),
