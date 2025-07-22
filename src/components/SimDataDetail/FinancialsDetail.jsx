@@ -11,9 +11,7 @@ import {
   getBonusDefinition,
   calcAvrChildBonus,
   calcAvrInstructorBonus,
-  calcAvrYearlyBonus,
-  findApplicableAvrData
-} from '../../utils/avr-calculator';
+  calcAvrYearlyBonus} from '../../utils/avr-calculator';
 
 function FinancialsDetail({ financial, onChange, onDelete, item }) {
   // Debug: Show the item as stored in simScenarioStore
@@ -29,12 +27,44 @@ function FinancialsDetail({ financial, onChange, onDelete, item }) {
     : '';
 
   // Hilfsfunktion: Hole Wochenstunden und fulltimeHours
-  const wochenstunden = Number(item?.parseddata?.worktime) || Number(item?.parseddata?.wochenstunden) || Number(financial.wochenstunden) || 0;
+  const getWochenstunden = () => {
+    // Try to get from worktime field (handle German decimal format)
+    let worktime = item?.parseddata?.worktime || item?.parseddata?.wochenstunden || financial.wochenstunden;
+    if (worktime && typeof worktime === 'string') {
+      // Replace German decimal comma with dot
+      worktime = worktime.replace(',', '.');
+    }
+    let wochenstunden = Number(worktime) || 0;
+    
+    // Note: worktime should now be automatically calculated from bookings
+    // This fallback calculation is kept for safety but should rarely be needed
+    if (wochenstunden === 0 && item?.parseddata?.booking) {
+      let totalMinutesPerWeek = 0;
+      item.parseddata.booking.forEach(booking => {
+        if (booking.times) {
+          booking.times.forEach(dayTime => {
+            if (dayTime.segments) {
+              dayTime.segments.forEach(segment => {
+                if (segment.booking_start && segment.booking_end) {
+                  const [sh, sm] = segment.booking_start.split(':').map(Number);
+                  const [eh, em] = segment.booking_end.split(':').map(Number);
+                  const minutes = (eh * 60 + em) - (sh * 60 + sm);
+                  if (minutes > 0) totalMinutesPerWeek += minutes;
+                }
+              });
+            }
+          });
+        }
+      });
+      wochenstunden = totalMinutesPerWeek / 60;
+    }
+    
+    return wochenstunden;
+  };
+  
+  const wochenstunden = getWochenstunden();
   // Use today's date as reference for AVR calculator, normalized
-  const todayStr = normalizeDateString(new Date().toISOString().slice(0, 10));
   // Hole fulltimeHours aus AVR-Daten
-  const avrData = findApplicableAvrData(todayStr) || {};
-  const fulltimeHours = avrData.fulltimehours || 39;
 
   if (financial.type === 'expense-avr') {
     // Use today's date as reference for AVR calculator, normalized
@@ -98,10 +128,10 @@ function FinancialsDetail({ financial, onChange, onDelete, item }) {
 
       // Betrag berechnen
       if (bonus.value === 'avr-childbonus') {
-        amount = calcAvrChildBonus(todayStr, financial.kinderanzahl || 0, wochenstunden, fulltimeHours);
+        amount = calcAvrChildBonus(todayStr, financial.kinderanzahl || 0, wochenstunden);
         payout = 'Monatlich';
       } else if (bonus.value === 'avr-instructor') {
-        amount = calcAvrInstructorBonus(todayStr, wochenstunden, fulltimeHours);
+        amount = calcAvrInstructorBonus(todayStr, wochenstunden, bonusStart, bonusEnd);
         payout = 'Monatlich';
       } else if (bonus.value === 'avr-yearly') {
         const yearly = calcAvrYearlyBonus(
@@ -325,6 +355,14 @@ function FinancialsDetail({ financial, onChange, onDelete, item }) {
             </TableBody>
           </Table>
         </Box>
+        <Button
+          variant="outlined"
+          color="error"
+          size="small"
+          onClick={onDelete}
+        >
+          Entfernen
+        </Button>
       </Box>
     );
   }

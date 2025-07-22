@@ -264,7 +264,10 @@ export function calcAvrChildBonus(dateStr, kinderanzahl, wochenstunden) {
   let bonus = value * (Number(kinderanzahl) || 0);
   const fulltimeHours = getFulltimeHours(dateStr);
   if (def.reduce_parttime && fulltimeHours && wochenstunden) {
-    bonus = bonus * (wochenstunden / fulltimeHours);
+    const ratio = wochenstunden / fulltimeHours;
+    console.log(`[AVR] Kinderzuschlag Teilzeit-Kürzung: ${wochenstunden} / ${fulltimeHours} = ${ratio}, bonus vorher: ${bonus}`);
+    bonus = bonus * ratio;
+    console.log(`[AVR] Kinderzuschlag nach Teilzeit-Kürzung: ${bonus}`);
   }
   return Math.round(bonus * 100) / 100;
 }
@@ -272,19 +275,42 @@ export function calcAvrChildBonus(dateStr, kinderanzahl, wochenstunden) {
 /**
  * Calculate the instructor bonus amount for a given date.
  * Takes into account part-time reduction if reduce_parttime is true.
+ * Returns 0 if no start date is provided.
  * @param {string} dateStr
  * @param {number} wochenstunden
+ * @param {string} startdate - Start date for the bonus (optional)
+ * @param {string} enddate - End date for the bonus (optional)
  * @returns {number|null}
  */
-export function calcAvrInstructorBonus(dateStr, wochenstunden) {
+export function calcAvrInstructorBonus(dateStr, wochenstunden, startdate, enddate) {
   const def = getBonusDefinition(dateStr, 'avr-instructor');
   if (!def || !def.value) return null;
+  if (!startdate) {
+    console.log('[AVR] Praxisanleiterzulage: Kein Startdatum, Bonus = 0');
+    return 0;
+  }
+  const currentDate = new Date(normalizeDateString(dateStr));
+  const start = new Date(normalizeDateString(startdate));
+  if (currentDate < start) {
+    console.log(`[AVR] Praxisanleiterzulage: currentDate (${currentDate}) < start (${start}), Bonus = 0`);
+    return 0;
+  }
+  if (enddate) {
+    const end = new Date(normalizeDateString(enddate));
+    if (currentDate > end) {
+      console.log(`[AVR] Praxisanleiterzulage: currentDate (${currentDate}) > end (${end}), Bonus = 0`);
+      return 0;
+    }
+  }
   const value = Number(def.value);
   if (isNaN(value)) return null;
   let bonus = value;
   const fulltimeHours = getFulltimeHours(dateStr);
   if (def.reduce_parttime && fulltimeHours && wochenstunden) {
-    bonus = bonus * (wochenstunden / fulltimeHours);
+    const ratio = wochenstunden / fulltimeHours;
+    console.log(`[AVR] Praxisanleiterzulage Teilzeit-Kürzung: ${wochenstunden} / ${fulltimeHours} = ${ratio}, bonus vorher: ${bonus}`);
+    bonus = bonus * ratio;
+    console.log(`[AVR] Praxisanleiterzulage nach Teilzeit-Kürzung: ${bonus}`);
   }
   return Math.round(bonus * 100) / 100;
 }
@@ -343,15 +369,20 @@ export function calcAvrYearlyBonus(dateStr, groupName, stage, wochenstunden, sta
   let amount = avgSalary * percentage;
 
   // Teilzeit-Kürzung
-  if (def.reduce_parttime && fulltimeHours && wochenstunden) {
-    amount = amount * (wochenstunden / fulltimeHours);
+   
+
+  console.log(`[AVR] Jahressonderzahlung Teilzeit-Kürzung: ${def.reduce_parttime} | ${fulltimeHours}| ${wochenstunden}`);
+  if (def.reduce_parttime && fulltimeHours ) {
+    const ratio = wochenstunden / fulltimeHours;
+    console.log(`[AVR] Jahressonderzahlung Teilzeit-Kürzung: ${wochenstunden} / ${fulltimeHours} = ${ratio}, amount vorher: ${amount}`);
+    amount = amount * ratio;
+    console.log(`[AVR] Jahressonderzahlung nach Teilzeit-Kürzung: ${amount}`);
   }
 
   // Teiljahr-Kürzung
   if (def.reduce_partyear && startdate) {
     const start = new Date(normalizeDateString(startdate));
     const end = enddate ? new Date(normalizeDateString(enddate)) : null;
-    // Berechne wie viele Monate im Jahr gearbeitet wurde
     let monthsWorked = 12;
     if (start.getFullYear() === year) {
       monthsWorked -= (start.getMonth());
@@ -360,7 +391,10 @@ export function calcAvrYearlyBonus(dateStr, groupName, stage, wochenstunden, sta
       monthsWorked -= (11 - end.getMonth());
     }
     monthsWorked = Math.max(0, Math.min(12, monthsWorked));
-    amount = amount * (monthsWorked / 12);
+    const ratio = monthsWorked / 12;
+    console.log(`[AVR] Jahressonderzahlung Teiljahr-Kürzung: monthsWorked=${monthsWorked}/12 = ${ratio}, amount vorher: ${amount}`);
+    amount = amount * ratio;
+    console.log(`[AVR] Jahressonderzahlung nach Teiljahr-Kürzung: ${amount}`);
   }
 
   amount = Math.round(amount * 100) / 100;

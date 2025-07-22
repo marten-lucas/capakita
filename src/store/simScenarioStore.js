@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { produce } from 'immer';
+import { calculateWorktimeFromBookings } from '../utils/bookingUtils';
 
 // Helper to generate a random UID
 function generateUID() {
@@ -479,15 +480,28 @@ const useSimScenarioStore = create(
         const scenario = state.scenarios.find(s => s.id === state.selectedScenarioId);
         if (!scenario) return;
 
+        // Deep clone helper
+        const deepClone = (obj) => {
+          if (typeof structuredClone === 'function') return structuredClone(obj);
+          return JSON.parse(JSON.stringify(obj));
+        };
+
+        // Calculate worktime from bookings
+        const calculatedWorktime = calculateWorktimeFromBookings(bookings);
+
         if (!scenario.baseScenarioId) {
-          // Root scenario - existing implementation
+          // Root scenario - existing implementation with deep cloning and worktime update
           set(produce((draft) => {
             const draftScenario = draft.scenarios.find(s => s.id === state.selectedScenarioId);
             if (!draftScenario) return;
             const item = draftScenario.simulationData.find((i) => i.id === itemId);
             if (item) {
               const previousValue = JSON.stringify(item.parseddata.booking);
-              const bookingsWithIds = bookings.map((booking, bookingIdx) => ({
+              
+              // Deep clone bookings before processing
+              const clonedBookings = deepClone(bookings);
+              
+              const bookingsWithIds = clonedBookings.map((booking, bookingIdx) => ({
                 ...booking,
                 times: booking.times?.map((timeEntry) => ({
                   ...timeEntry,
@@ -497,6 +511,7 @@ const useSimScenarioStore = create(
                   }))
                 }))
               }));
+              
               const currentSegmentIds = new Set();
               bookingsWithIds.forEach(booking => {
                 booking.times?.forEach(timeEntry => {
@@ -507,6 +522,7 @@ const useSimScenarioStore = create(
                   });
                 });
               });
+              
               if (item.parseddata.group) {
                 item.parseddata.group = item.parseddata.group.map(group => {
                   if (group.segmentOverrides) {
@@ -521,6 +537,10 @@ const useSimScenarioStore = create(
                   return group;
                 });
               }
+              
+              // Update worktime based on calculated hours
+              item.parseddata.worktime = calculatedWorktime.toString().replace('.', ','); // German decimal format
+              
               const newValue = JSON.stringify(bookingsWithIds);
               if (!item.modifications) {
                 item.modifications = [];
@@ -538,9 +558,12 @@ const useSimScenarioStore = create(
             }
           }));
         } else {
-          // Based scenario - track change
+          // Based scenario - track change with deep clone and worktime
           get().trackItemChange(itemId, 'bookings', {
-            parseddata: { booking: bookings }
+            parseddata: { 
+              booking: deepClone(bookings),
+              worktime: calculatedWorktime.toString().replace('.', ',') // German decimal format
+            }
           });
         }
       },

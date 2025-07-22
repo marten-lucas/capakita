@@ -44,7 +44,6 @@ function SimDataBookingTab({
         lastAddedIndex={lastAddedBookingIdx}
         importedCount={importedBookingCount}
         originalBookings={item?.originalParsedData?.booking}
-        onRestoreBooking={handleRestoreBooking}
         onDelete={handleDeleteBooking}
         isManualEntry={item?.rawdata?.source === 'manual entry'}
       />
@@ -53,3 +52,4 @@ function SimDataBookingTab({
 }
 
 export default SimDataBookingTab;
+

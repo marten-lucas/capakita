@@ -105,87 +105,77 @@ function BookingDetail({
   // Remove expanded state and Accordion logic
 
   const handleDayToggle = (dayAbbr, isEnabled) => {
-    const updatedBooking = {
-      ...booking,
-      times: (() => {
-        const newTimes = [...(booking.times || [])];
-        const dayIndex = newTimes.findIndex((t) => t.day_name === dayAbbr);
+    // Deep clone booking and times
+    const newTimes = Array.isArray(booking.times) ? booking.times.map(t => ({ ...t, segments: t.segments.map(s => ({ ...s })) })) : [];
+    const dayIndex = newTimes.findIndex((t) => t.day_name === dayAbbr);
 
-        if (isEnabled && dayIndex === -1) {
-          const dayNr = ['Mo', 'Di', 'Mi', 'Do', 'Fr'].indexOf(dayAbbr) + 1;
-          newTimes.push({
-            day: dayNr,
-            day_name: dayAbbr,
-            segments: [{
-              id: `${parentItemId}-${index}-${dayAbbr}-${Date.now()}`,
-              booking_start: '08:00',
-              booking_end: '16:00'
-            }]
-          });
-        } else if (!isEnabled && dayIndex !== -1) {
-          newTimes.splice(dayIndex, 1);
-        }
-        return newTimes;
-      })(),
-    };
+    if (isEnabled && dayIndex === -1) {
+      const dayNr = ['Mo', 'Di', 'Mi', 'Do', 'Fr'].indexOf(dayAbbr) + 1;
+      newTimes.push({
+        day: dayNr,
+        day_name: dayAbbr,
+        segments: [{
+          id: `${parentItemId}-${index}-${dayAbbr}-${Date.now()}`,
+          booking_start: '08:00',
+          booking_end: '16:00'
+        }]
+      });
+    } else if (!isEnabled && dayIndex !== -1) {
+      newTimes.splice(dayIndex, 1);
+    }
+    const updatedBooking = { ...booking, times: newTimes };
     onUpdateBooking(updatedBooking);
   };
 
   const handleAddSegment = (dayAbbr) => {
-    const updatedBooking = {
-      ...booking,
-      times: booking.times.map((t) =>
-        t.day_name === dayAbbr
-          ? {
-            ...t,
-            segments: [
-              ...t.segments,
-              {
-                id: `${parentItemId}-${index}-${dayAbbr}-${Date.now()}`,
-                booking_start: '13:00',
-                booking_end: '16:00'
-              }
-            ]
-          }
-          : t
-      ),
-    };
+    const newTimes = booking.times.map((t) =>
+      t.day_name === dayAbbr
+        ? {
+          ...t,
+          segments: [
+            ...t.segments.map(s => ({ ...s })),
+            {
+              id: `${parentItemId}-${index}-${dayAbbr}-${Date.now()}`,
+              booking_start: '13:00',
+              booking_end: '16:00'
+            }
+          ]
+        }
+        : { ...t, segments: t.segments.map(s => ({ ...s })) }
+    );
+    const updatedBooking = { ...booking, times: newTimes };
     onUpdateBooking(updatedBooking);
   };
 
   const handleTimeChange = (dayAbbr, segIdx, newValues) => {
-    const updatedBooking = {
-      ...booking,
-      times: booking.times.map((t) => {
-        if (t.day_name === dayAbbr) {
-          const newSegments = t.segments.map((seg, i) =>
-            i === segIdx
-              ? {
-                ...seg,
-                booking_start: valueToTime(newValues[0]),
-                booking_end: valueToTime(newValues[1])
-              }
-              : seg
-          );
-          return { ...t, segments: newSegments };
-        }
-        return t;
-      }),
-    };
+    const newTimes = booking.times.map((t) => {
+      if (t.day_name === dayAbbr) {
+        const newSegments = t.segments.map((seg, i) =>
+          i === segIdx
+            ? {
+              ...seg,
+              booking_start: valueToTime(newValues[0]),
+              booking_end: valueToTime(newValues[1])
+            }
+            : { ...seg }
+        );
+        return { ...t, segments: newSegments };
+      }
+      return { ...t, segments: t.segments.map(s => ({ ...s })) };
+    });
+    const updatedBooking = { ...booking, times: newTimes };
     onUpdateBooking(updatedBooking);
   };
 
   const handleRemoveSegment = (dayAbbr, segIdx) => {
-    const updatedBooking = {
-      ...booking,
-      times: booking.times.map((t) => {
-        if (t.day_name === dayAbbr && t.segments.length > 1) {
-          const newSegments = t.segments.filter((_, i) => i !== segIdx);
-          return { ...t, segments: newSegments };
-        }
-        return t;
-      }),
-    };
+    const newTimes = booking.times.map((t) => {
+      if (t.day_name === dayAbbr && t.segments.length > 1) {
+        const newSegments = t.segments.filter((_, i) => i !== segIdx).map(s => ({ ...s }));
+        return { ...t, segments: newSegments };
+      }
+      return { ...t, segments: t.segments.map(s => ({ ...s })) };
+    });
+    const updatedBooking = { ...booking, times: newTimes };
     onUpdateBooking(updatedBooking);
   };
 

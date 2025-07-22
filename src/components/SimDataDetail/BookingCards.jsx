@@ -26,7 +26,7 @@ function getBookingHours(times) {
 }
 
 function BookingCards({
-  itemId, type, importedCount, originalBookings, onRestoreBooking, onDelete, isManualEntry
+  itemId, type, importedCount, originalBookings, onDelete, isManualEntry
 }) {
   const { getItemBookings, updateItemBookings } = useSimScenarioDataStore((state) => ({
     getItemBookings: state.getItemBookings,
@@ -52,7 +52,14 @@ function BookingCards({
   };
 
   const handleUpdateBooking = (index, updatedBooking) => {
-    const updatedBookings = bookings.map((b, idx) => (idx === index ? updatedBooking : b));
+    // Deep clone bookings to avoid mutating Zustand/Immer state
+    const deepClone = (obj) => {
+      if (typeof structuredClone === 'function') return structuredClone(obj);
+      return JSON.parse(JSON.stringify(obj));
+    };
+    const updatedBookings = bookings.map((b, idx) =>
+      idx === index ? deepClone(updatedBooking) : deepClone(b)
+    );
     updateItemBookings(itemId, updatedBookings);
   };
 
@@ -95,7 +102,6 @@ function BookingCards({
                 type={type}
                 canDelete={typeof importedCount === 'number' ? idx >= importedCount : true}
                 originalBooking={Array.isArray(originalBookings) ? originalBookings[idx] : undefined}
-                onRestoreBooking={onRestoreBooking}
                 onUpdateBooking={(updatedBooking) => handleUpdateBooking(idx, updatedBooking)}
                 onDelete={onDelete}
                 isManualEntry={isManualEntry}

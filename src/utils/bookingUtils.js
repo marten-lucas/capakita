@@ -37,3 +37,33 @@ export function consolidateBookingSummary(times) {
     return `${dayPart} ${timeStr}`;
   }).join(', ');
 }
+
+/**
+ * Calculate total weekly hours from booking data
+ * @param {Array} bookings - Array of booking objects with times/segments
+ * @returns {number} - Total hours per week
+ */
+export function calculateWorktimeFromBookings(bookings) {
+  if (!Array.isArray(bookings)) return 0;
+  
+  let totalMinutesPerWeek = 0;
+  
+  bookings.forEach(booking => {
+    if (Array.isArray(booking.times)) {
+      booking.times.forEach(dayTime => {
+        if (Array.isArray(dayTime.segments)) {
+          dayTime.segments.forEach(segment => {
+            if (segment.booking_start && segment.booking_end) {
+              const [sh, sm] = segment.booking_start.split(':').map(Number);
+              const [eh, em] = segment.booking_end.split(':').map(Number);
+              const minutes = (eh * 60 + em) - (sh * 60 + sm);
+              if (minutes > 0) totalMinutesPerWeek += minutes;
+            }
+          });
+        }
+      });
+    }
+  });
+  
+  return totalMinutesPerWeek / 60; // Convert to hours
+}

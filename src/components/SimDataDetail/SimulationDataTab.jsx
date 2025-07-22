@@ -36,8 +36,6 @@ function SimulationDataTab({
   const { 
     updateItemAbsenceState, 
     getItemAbsenceStateList,
-    getItemBookings, 
-    updateItemBookings, 
     getItemGroups, 
     updateItemGroups, 
     updateItemDates, 
@@ -56,8 +54,6 @@ function SimulationDataTab({
   } = useSimScenarioDataStore((state) => ({
     updateItemAbsenceState: state.updateItemAbsenceState,
     getItemAbsenceStateList: state.getItemAbsenceStateList,
-    getItemBookings: state.getItemBookings,
-    updateItemBookings: state.updateItemBookings,
     getItemGroups: state.getItemGroups,
     updateItemGroups: state.updateItemGroups,
     updateItemDates: state.updateItemDates,
@@ -78,7 +74,6 @@ function SimulationDataTab({
   }));
 
   const absenceStateList = getItemAbsenceStateList(item.id) || [];
-  const bookings = getItemBookings(item.id);
   const groups = getItemGroups(item.id);
   const currentDates = getItemDates(item.id);
   const itemNameFromStore = getItemName ? getItemName(item.id) : '';
@@ -129,20 +124,6 @@ function SimulationDataTab({
 
   const handleAbsenceChange = (enabled, start, end) => {
     updateItemAbsenceState(item.id, enabled, start, end);
-  };
-
-  const handleAddBooking = () => {
-    const newBooking = {
-      startdate: '',
-      enddate: '',
-      times: []
-    };
-    updateItemBookings(item.id, [...bookings, newBooking]);
-  };
-
-  const handleDeleteBooking = (index) => {
-    const updatedBookings = bookings.filter((_, idx) => idx !== index);
-    updateItemBookings(item.id, updatedBookings);
   };
 
   const handleAddGroup = () => {
@@ -277,12 +258,8 @@ function SimulationDataTab({
       {activeTab === 1 && (
         <SimDataBookingTab
           item={item}
-          bookings={bookings}
           lastAddedBookingIdx={lastAddedBookingIdx}
           importedBookingCount={importedBookingCount}
-          handleAddBooking={handleAddBooking}
-          handleDeleteBooking={handleDeleteBooking}
-          handleRestoreBooking={updateItemBookings}
         />
       )}
       {activeTab === 2 && (
@@ -306,3 +283,4 @@ function SimulationDataTab({
 }
 
 export default SimulationDataTab;
+
