@@ -1,8 +1,7 @@
 import React from 'react';
 import { Box, TextField, Button, Typography, MenuItem, IconButton } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
-import avgData from '../../assets/avg-data/avg-data-2024.json'; // Adjust as needed
-import { getSalaryForGroupAndStage, normalizeDateString, getFutureSalaryForGroupAndStage } from '../../utils/avr-calculator';
+import { getSalaryForGroupAndStage, normalizeDateString, getFutureSalaryForGroupAndStage, getAllSalaryGroups, getAllSalaryStages } from '../../utils/avr-calculator';
 
 function FinancialsDetail({ financial, onChange, onDelete, item }) {
   // Debug: Show the item as stored in simScenarioStore
@@ -17,41 +16,33 @@ function FinancialsDetail({ financial, onChange, onDelete, item }) {
     ? item.parseddata.startdate.split('.').reverse().join('-')
     : '';
 
-  // Helper to get group/stage names for AVR calculator
-  const getGroupName = () => {
-    const group = avgData.salery_groups.find(g => g.group_id === financial.group);
-    return group ? group.group_name : '';
-  };
-
   if (financial.type === 'expense-avr') {
-    // Gruppe options
-    const groupOptions = avgData.salery_groups.map(g => ({
+    // Use today's date as reference for AVR calculator, normalized
+    const todayStr = normalizeDateString(new Date().toISOString().slice(0, 10));
+
+    // Gruppe options from reference data
+    const groupOptions = getAllSalaryGroups(todayStr).map(g => ({
       value: g.group_id,
       label: g.group_name
     }));
 
-    // Find selected group
-    const selectedGroup = avgData.salery_groups.find(
-      g => g.group_id === financial.group
-    );
+    // Find selected group name
+    const selectedGroupName = groupOptions.find(g => g.value === financial.group)?.label || '';
 
-    // Stufe options
-    const stageOptions = selectedGroup
-      ? selectedGroup.amount.map(a => ({
+    // Stufe options from reference data
+    const stageOptions = financial.group
+      ? getAllSalaryStages(todayStr, financial.group).map(a => ({
           value: a.stage,
           label: `Stufe ${a.stage}`
         }))
       : [];
-
-    // Use today's date as reference for AVR calculator, normalized
-    const todayStr = normalizeDateString(new Date().toISOString().slice(0, 10));
 
     // Determine salary using AVR calculator
     let avrSalary = null;
     if (financial.group && financial.stage) {
       avrSalary = getSalaryForGroupAndStage(
         todayStr,
-        getGroupName(),
+        selectedGroupName,
         financial.stage // pass stage id directly
       );
     }

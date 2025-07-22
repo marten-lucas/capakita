@@ -1,5 +1,5 @@
 // Dynamically import all AVR JSONs in the avg-data folder (Vite syntax)
-const avrDataModules = import.meta.glob('../assets/avg-data/*.json', { eager: true });
+const avrDataModules = import.meta.glob('../assets/avr-data/*.json', { eager: true });
 
 // Extract all JSON objects into an array
 const avrDataArray = Object.values(avrDataModules).map(mod => mod.default);
@@ -173,6 +173,37 @@ export function getFutureSalaryForGroupAndStage(futureDateStr, groupName, curren
   }
 
   return { salary: Math.round(inflated * 100) / 100, futureStage, calculationBase: 'inflated' };
+}
+
+/**
+ * Returns all salary groups for a given date (or latest if not found).
+ * @param {string} dateStr
+ * @returns {Array<{group_id:number, group_name:string}>}
+ */
+export function getAllSalaryGroups(dateStr) {
+  const avrData = findApplicableAvrData(dateStr) || avrDataArray[avrDataArray.length - 1];
+  if (!avrData) return [];
+  return avrData.salery_groups.map(g => ({
+    group_id: g.group_id,
+    group_name: g.group_name
+  }));
+}
+
+/**
+ * Returns all salary stages for a group_id at a given date (or latest if not found).
+ * @param {string} dateStr
+ * @param {number} groupId
+ * @returns {Array<{stage:number, amount:number}>}
+ */
+export function getAllSalaryStages(dateStr, groupId) {
+  const avrData = findApplicableAvrData(dateStr) || avrDataArray[avrDataArray.length - 1];
+  if (!avrData) return [];
+  const group = avrData.salery_groups.find(g => g.group_id === groupId);
+  if (!group) return [];
+  return group.amount.map(a => ({
+    stage: a.stage,
+    amount: a.amount
+  }));
 }
 
 // Export all loaded AVR data if needed elsewhere

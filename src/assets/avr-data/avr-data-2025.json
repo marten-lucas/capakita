@@ -1,0 +1,241 @@
+{
+  "tarifvertrag": "AVR Caritas",
+  "region": "Bayern",
+  "validfrom": "01.07.2025",
+  "validto": "31.01.2026",
+  "fulltimehours": 39,
+  "salery_groups": [
+    {
+      "group_id": 1,
+      "group_name": "S 18",
+      "amount": [
+        { "stage": 1, "amount": 4591.95 },
+        { "stage": 2, "amount": 4708.94 },
+        { "stage": 3, "amount": 5288.55 },
+        { "stage": 4, "amount": 5723.21 },
+        { "stage": 5, "amount": 6375.22 },
+        { "stage": 6, "amount": 6773.65 }
+      ]
+    },
+    {
+      "group_id": 2,
+      "group_name": "S 17",
+      "amount": [
+        { "stage": 1, "amount": 4233.84 },
+        { "stage": 2, "amount": 4527.84 },
+        { "stage": 3, "amount": 4998.73 },
+        { "stage": 4, "amount": 5288.55 },
+        { "stage": 5, "amount": 5868.09 },
+        { "stage": 6, "amount": 6208.58 }
+      ]
+    },
+    {
+      "group_id": 3,
+      "group_name": "S 16",
+      "amount": [
+        { "stage": 1, "amount": 4147.17 },
+        { "stage": 2, "amount": 4433.68 },
+        { "stage": 3, "amount": 4752.42 },
+        { "stage": 4, "amount": 5143.62 },
+        { "stage": 5, "amount": 5578.29 },
+        { "stage": 6, "amount": 5839.11 }
+      ]
+    },
+    {
+      "group_id": 4,
+      "group_name": "S 15",
+      "amount": [
+        { "stage": 1, "amount": 4000.66 },
+        { "stage": 2, "amount": 4274.25 },
+        { "stage": 3, "amount": 4564.08 },
+        { "stage": 4, "amount": 4897.32 },
+        { "stage": 5, "amount": 5433.43 },
+        { "stage": 6, "amount": 5665.23 }
+      ]
+    },
+    {
+      "group_id": 5,
+      "group_name": "S 14",
+      "amount": [
+        { "stage": 1, "amount": 3962.44 },
+        { "stage": 2, "amount": 4232.66 },
+        { "stage": 3, "amount": 4554.71 },
+        { "stage": 4, "amount": 4882.30 },
+        { "stage": 5, "amount": 5244.56 },
+        { "stage": 6, "amount": 5498.11 }
+      ]
+    },
+    {
+      "group_id": 6,
+      "group_name": "S 13",
+      "amount": [
+        { "stage": 1, "amount": 3869.68 },
+        { "stage": 2, "amount": 4132.98 },
+        { "stage": 3, "amount": 4491.62 },
+        { "stage": 4, "amount": 4781.38 },
+        { "stage": 5, "amount": 5143.62 },
+        { "stage": 6, "amount": 5324.74 }
+      ]
+    },
+    {
+      "group_id": 7,
+      "group_name": "S 12",
+      "amount": [
+        { "stage": 1, "amount": 3859.50 },
+        { "stage": 2, "amount": 4122.07 },
+        { "stage": 3, "amount": 4465.71 },
+        { "stage": 4, "amount": 4769.97 },
+        { "stage": 5, "amount": 5146.70 },
+        { "stage": 6, "amount": 5306.08 }
+      ]
+    },
+    {
+      "group_id": 8,
+      "group_name": "S 11b",
+      "amount": [
+        { "stage": 1, "amount": 3808.48 },
+        { "stage": 2, "amount": 4067.31 },
+        { "stage": 3, "amount": 4249.15 },
+        { "stage": 4, "amount": 4712.82 },
+        { "stage": 5, "amount": 5075.04 },
+        { "stage": 6, "amount": 5292.38 }
+      ]
+    },
+    {
+      "group_id": 9,
+      "group_name": "S 11a",
+      "amount": [
+        { "stage": 1, "amount": 3741.49 },
+        { "stage": 2, "amount": 3994.28 },
+        { "stage": 3, "amount": 4174.59 },
+        { "stage": 4, "amount": 4636.51 },
+        { "stage": 5, "amount": 4998.73 },
+        { "stage": 6, "amount": 5216.07 }
+      ]
+    },
+    {
+      "group_id": 10,
+      "group_name": "S 10",
+      "amount": [
+        { "stage": 1, "amount": 3504.81 },
+        { "stage": 2, "amount": 3829.79 },
+        { "stage": 3, "amount": 3996.37 },
+        { "stage": 4, "amount": 4494.03 },
+        { "stage": 5, "amount": 4899.97 },
+        { "stage": 6, "amount": 5216.07 }
+      ]
+    },
+    {
+      "group_id": 11,
+      "group_name": "S 9",
+      "amount": [
+        { "stage": 1, "amount": 3549.30 },
+        { "stage": 2, "amount": 3781.54 },
+        { "stage": 3, "amount": 4053.20 },
+        { "stage": 4, "amount": 4455.27 },
+        { "stage": 5, "amount": 4835.59 },
+        { "stage": 6, "amount": 5128.99 }
+      ]
+    },
+    {
+      "group_id": 12,
+      "group_name": "S 8b",
+      "amount": [
+        { "stage": 1, "amount": 3481.39 },
+        { "stage": 2, "amount": 3708.79 },
+        { "stage": 3, "amount": 3980.49 },
+        { "stage": 4, "amount": 4380.82 },
+        { "stage": 5, "amount": 4759.33 },
+        { "stage": 6, "amount": 5049.51 }
+      ]
+    },
+    {
+      "group_id": 13,
+      "group_name": "S 8a",
+      "amount": [
+        { "stage": 1, "amount": 3413.85 },
+        { "stage": 2, "amount": 3636.31 },
+        { "stage": 3, "amount": 3868.50 },
+        { "stage": 4, "amount": 4092.49 },
+        { "stage": 5, "amount": 4311.44 },
+        { "stage": 6, "amount": 4541.67 }
+      ]
+    },
+    {
+      "group_id": 14,
+      "group_name": "S 7",
+      "amount": [
+        { "stage": 1, "amount": 3333.59 },
+        { "stage": 2, "amount": 3550.19 },
+        { "stage": 3, "amount": 3765.70 },
+        { "stage": 4, "amount": 3987.31 },
+        { "stage": 5, "amount": 4153.80 },
+        { "stage": 6, "amount": 4404.69 }
+      ]
+    },
+    {
+      "group_id": 15,
+      "group_name": "S 4",
+      "amount": [
+        { "stage": 1, "amount": 3201.81 },
+        { "stage": 2, "amount": 3408.76 },
+        { "stage": 3, "amount": 3597.33 },
+        { "stage": 4, "amount": 3725.30 },
+        { "stage": 5, "amount": 3848.61 },
+        { "stage": 6, "amount": 4043.12 }
+      ]
+    },
+    {
+      "group_id": 16,
+      "group_name": "S 3",
+      "amount": [
+        { "stage": 1, "amount": 3034.89 },
+        { "stage": 2, "amount": 3229.62 },
+        { "stage": 3, "amount": 3410.78 },
+        { "stage": 4, "amount": 3577.12 },
+        { "stage": 5, "amount": 3653.23 },
+        { "stage": 6, "amount": 3744.14 }
+      ]
+    },
+    {
+      "group_id": 17,
+      "group_name": "S 2",
+      "amount": [
+        { "stage": 1, "amount": 2829.14 },
+        { "stage": 2, "amount": 2948.41 },
+        { "stage": 3, "amount": 3036.64 },
+        { "stage": 4, "amount": 3132.45 },
+        { "stage": 5, "amount": 3240.19 },
+        { "stage": 6, "amount": 3347.95 }
+      ]
+    }
+  ],
+  "stage_upgrade": [
+    {
+      "from_stage": 1,
+      "to_stage": 2,
+      "years": 1
+    },
+    {
+      "from_stage": 2,
+      "to_stage": 3,
+      "years": 3
+    },
+    {
+      "from_stage": 3,
+      "to_stage": 4,
+      "years": 4
+    },
+    {
+      "from_stage": 4,
+      "to_stage": 5,
+      "years": 4
+    },
+    {
+      "from_stage": 5,
+      "to_stage": 6,
+      "years": 5
+    }
+  ]
+}
+    
