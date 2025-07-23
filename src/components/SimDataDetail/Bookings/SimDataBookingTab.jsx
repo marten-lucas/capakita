@@ -17,6 +17,11 @@ function SimDataBookingTab() {
   // Use booking store for bookings
   const bookings = useSimBookingStore(state => state.getSelectedItemBookings());
 
+  // Log bookings for inspection
+  React.useEffect(() => {
+    console.log('[SimDataBookingTab] bookings:', bookings);
+  }, [bookings]);
+
   // Use booking store's addBooking
   const addBooking = useSimBookingStore(state => state.addBooking);
 

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { produce } from 'immer';
+import { devtools } from 'zustand/middleware';
 import useSimScenarioStore from './simScenarioStore';
 
 // Helper to generate a random UID
@@ -55,87 +56,87 @@ function consolidateBookingTimes(booking) {
   };
 }
 
-const useSimBookingStore = create((set, get) => ({
-  // { [scenarioId]: { [dataItemId]: { [bookingId]: { ...bookingData, overlays: {...} } } } }
-  bookingsByScenario: {},
+const useSimBookingStore = create(
+  devtools(
+    (set, get) => ({
+      // { [scenarioId]: { [dataItemId]: { [bookingId]: { ...bookingData, overlays: {...} } } } }
+      bookingsByScenario: {},
 
-  addBooking: (scenarioId, dataItemId, booking) =>
-    set(produce((state) => {
-      if (!state.bookingsByScenario[scenarioId]) state.bookingsByScenario[scenarioId] = {};
-      if (!state.bookingsByScenario[scenarioId][dataItemId]) state.bookingsByScenario[scenarioId][dataItemId] = {};
-      const id = booking.id || generateUID();
-      state.bookingsByScenario[scenarioId][dataItemId][id] = { ...booking, id, overlays: {} };
-    })),
+      addBooking: (scenarioId, dataItemId, booking) =>
+        set(produce((state) => {
+          if (!state.bookingsByScenario[scenarioId]) state.bookingsByScenario[scenarioId] = {};
+          if (!state.bookingsByScenario[scenarioId][dataItemId]) state.bookingsByScenario[scenarioId][dataItemId] = {};
+          const id = booking.id || generateUID();
+          state.bookingsByScenario[scenarioId][dataItemId][id] = { ...booking, id, overlays: {} };
+        })),
 
-  updateBooking: (scenarioId, dataItemId, bookingId, updates) =>
-    set(produce((state) => {
-      if (!state.bookingsByScenario[scenarioId]?.[dataItemId]?.[bookingId]) return;
-      state.bookingsByScenario[scenarioId][dataItemId][bookingId] = {
-        ...state.bookingsByScenario[scenarioId][dataItemId][bookingId],
-        ...updates,
-        overlays: {
-          ...state.bookingsByScenario[scenarioId][dataItemId][bookingId].overlays,
-          ...updates.overlays
-        }
-      };
-    })),
+      updateBooking: (scenarioId, dataItemId, bookingId, updates) =>
+        set(produce((state) => {
+          if (!state.bookingsByScenario[scenarioId]?.[dataItemId]?.[bookingId]) return;
+          state.bookingsByScenario[scenarioId][dataItemId][bookingId] = {
+            ...state.bookingsByScenario[scenarioId][dataItemId][bookingId],
+            ...updates,
+            overlays: {
+              ...state.bookingsByScenario[scenarioId][dataItemId][bookingId].overlays,
+              ...updates.overlays
+            }
+          };
+        })),
 
-  deleteBooking: (scenarioId, dataItemId, bookingId) =>
-    set(produce((state) => {
-      if (state.bookingsByScenario[scenarioId]?.[dataItemId]) {
-        delete state.bookingsByScenario[scenarioId][dataItemId][bookingId];
-      }
-    })),
+      deleteBooking: (scenarioId, dataItemId, bookingId) =>
+        set(produce((state) => {
+          if (state.bookingsByScenario[scenarioId]?.[dataItemId]) {
+            delete state.bookingsByScenario[scenarioId][dataItemId][bookingId];
+          }
+        })),
 
-  getBookings: (scenarioId, dataItemId) => {
-    const state = get();
-    return Object.values(state.bookingsByScenario[scenarioId]?.[dataItemId] || {});
-  },
+      getBookings: (scenarioId, dataItemId) => {
+        const state = get();
+        return Object.values(state.bookingsByScenario[scenarioId]?.[dataItemId] || {});
+      },
 
-  getBooking: (scenarioId, dataItemId, bookingId) => {
-    const state = get();
-    return state.bookingsByScenario[scenarioId]?.[dataItemId]?.[bookingId];
-  },
+      getBooking: (scenarioId, dataItemId, bookingId) => {
+        const state = get();
+        return state.bookingsByScenario[scenarioId]?.[dataItemId]?.[bookingId];
+      },
 
-  // Returns all bookings for the currently selected item (using scenario store)
-  getSelectedItemBookings: () => {
-    const scenarioId = useSimScenarioStore.getState().selectedScenarioId;
-    const itemId = useSimScenarioStore.getState().selectedItems?.[scenarioId];
-    if (!scenarioId || !itemId) return [];
-    return get().getBookings(scenarioId, itemId);
-  },
+      // Returns all bookings for the currently selected item (using scenario store)
+      getSelectedItemBookings: () => {
+        const scenarioId = useSimScenarioStore.getState().selectedScenarioId;
+        const itemId = useSimScenarioStore.getState().selectedItems?.[scenarioId];
+        if (!scenarioId || !itemId) return [];
+        return get().getBookings(scenarioId, itemId);
+      },
 
-  // Import bookings for all data items in a scenario
-  importBookings: (scenarioId, items) =>
-    set(produce((state) => {
-      console.log('[simBookingStore.importBookings] items:', items);
-      if (!state.bookingsByScenario[scenarioId]) state.bookingsByScenario[scenarioId] = {};
-      items.forEach(item => {
-        if (!item.id) return;
-        // If item has a 'times' property, treat it as a single booking object
-        if (Array.isArray(item.times)) {
-          if (!state.bookingsByScenario[scenarioId][item.id]) state.bookingsByScenario[scenarioId][item.id] = {};
-          const bookingId = item.id;
-          console.log('[simBookingStore.importBookings] storing booking with times:', item);
-          state.bookingsByScenario[scenarioId][item.id][bookingId] = { ...item, id: bookingId, overlays: {} };
-          return;
-        }
-        // Accept both booking and bookings fields (legacy)
-        const bookingsArr = item.booking || item.bookings;
-        console.log('[simBookingStore.importBookings] item:', item);
-        console.log('[simBookingStore.importBookings] bookingsArr:', bookingsArr);
-        if (Array.isArray(bookingsArr)) {
-          bookingsArr.forEach((booking, idx) => {
-            const id = booking.id || `${item.id}-import-${idx}-${Date.now()}`;
-            state.bookingsByScenario[scenarioId][item.id][id] = { ...booking, id, overlays: {} };
+      // Import bookings for all data items in a scenario
+      importBookings: (scenarioId, items) =>
+        set(produce((state) => {
+          if (!state.bookingsByScenario[scenarioId]) state.bookingsByScenario[scenarioId] = {};
+          items.forEach(item => {
+            if (!item.id) return;
+            // If item has a 'times' property, treat it as a single booking object
+            if (Array.isArray(item.times)) {
+              if (!state.bookingsByScenario[scenarioId][item.id]) state.bookingsByScenario[scenarioId][item.id] = {};
+              const bookingId = item.id;
+              state.bookingsByScenario[scenarioId][item.id][bookingId] = { ...item, id: bookingId, overlays: {} };
+              return;
+            }
+            // Accept both booking and bookings fields (legacy)
+            const bookingsArr = item.booking || item.bookings;
+            if (Array.isArray(bookingsArr)) {
+              bookingsArr.forEach((booking, idx) => {
+                const id = booking.id || `${item.id}-import-${idx}-${Date.now()}`;
+                state.bookingsByScenario[scenarioId][item.id][id] = { ...booking, id, overlays: {} };
+              });
+            }
           });
-        }
-      });
-      console.log('[simBookingStore.importBookings] bookingsByScenario[scenarioId]:', state.bookingsByScenario[scenarioId]);
-    })),
+        })),
 
-  // Utility export
-  consolidateBookingTimes,
-}));
+      // Utility export
+      consolidateBookingTimes,
+    }),
+    { name: 'sim-booking-devtools' }
+  )
+);
 
 export default useSimBookingStore;

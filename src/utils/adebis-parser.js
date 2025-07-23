@@ -21,13 +21,12 @@ function assignSegmentIdsToBookings(bookings) {
 
 // Converts Adebis raw kids and employees data to a normalized simDataList
 export function adebis2simData(kidsRaw, employeesRaw) {
-  let idCounter = 1;
   let simDataList = [];
 
   // Kids (demand)
   for (const kind of kidsRaw || []) {
     simDataList.push(copyToOriginalData({
-      id: String(idCounter++),
+      id: String(kind.KINDNR), // Use KINDNR as id!
       type: 'demand',
       source: "adebis export",
       name: kind.FNAME || `Kind ${kind.KINDNR}`,
@@ -41,9 +40,10 @@ export function adebis2simData(kidsRaw, employeesRaw) {
   }
 
   // Employees (capacity)
+  let idCounter = 1;
   for (const emp of employeesRaw || []) {
     simDataList.push(copyToOriginalData({
-      id: String(idCounter++),
+      id: String(100000 + idCounter++), // Ensure unique id for employees, not overlapping with KINDNRs
       type: 'capacity',
       source: "adebis export",
       name: `Mitarbeiter ${emp.IDNR}`,
