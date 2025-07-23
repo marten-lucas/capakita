@@ -1,6 +1,6 @@
-import { 
-  Typography, 
-  Box, 
+import {
+  Typography,
+  Box,
 
   Tabs,
   Tab
@@ -59,33 +59,26 @@ function SimDataTabs() {
       >
         <Tab icon={<PersonIcon />} label="Allgemein" />
         <Tab icon={<AccessTimeIcon />} label="Zeiten" />
-        {/* <Tab icon={<GroupIcon />} label="Gruppen" />
-        <Tab icon={<EuroIcon />} label="Finanzen" /> */}
-        <Tab icon={<BugReportIcon />} label="Debug" /> 
+         <Tab icon={<GroupIcon />} label="Gruppen" />
+        {/*<Tab icon={<EuroIcon />} label="Finanzen" /> */}
+        <Tab icon={<BugReportIcon />} label="Debug" />
       </Tabs>
       {activeTab === 0 && (
         <SimDataGeneralTab />
       )}
       {activeTab === 1 && (
-        <SimDataBookingTab/>
+        <SimDataBookingTab />
       )}
-      {/* {activeTab === 2 && (
-        <SimDataGroupsTab
-          item={item}
-          lastAddedGroupIdx={lastAddedGroupIdx}
-          importedGroupCount={importedGroupCount}
-          handleAddGroup={handleAddGroup}
-          handleDeleteGroup={handleDeleteGroup}
-          handleRestoreGroup={handleRestoreGroup}
-          allGroups={allGroups}
-        />
-      )} 
+      {activeTab === 2 && (
+        <SimDataGroupsTab />
+      )}
+      {/*
       {activeTab === 3 && (
         <SimDataFinanceTab
           item={item}
         />
       )} */}
-      {activeTab === 2 && (
+      {activeTab === 3 && (
         <Box sx={{ p: 2, overflow: 'auto', maxHeight: 400 }}>
           <Typography variant="h6" gutterBottom>Simulation Item Debug</Typography>
           <pre style={{

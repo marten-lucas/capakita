@@ -1,18 +1,21 @@
 import React from 'react';
-import { Typography, Box, Button } from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
+import { Typography, Box } from '@mui/material';
 import ModMonitor from '../ModMonitor';
 import GroupCards from './GroupCards';
+import useSimScenarioStore from '../../../store/simScenarioStore';
+import useSimDataStore from '../../../store/simDataStore';
 
-function SimDataGroupsTab({
-  item,
-  groups,
-  lastAddedGroupIdx,
-  importedGroupCount,
-  handleAddGroup,
-  handleDeleteGroup,
-  handleRestoreGroup,
-}) {
+function SimDataGroupsTab() {
+  // Get scenario and item selection
+  const selectedScenarioId = useSimScenarioStore(state => state.selectedScenarioId);
+  const selectedItemId = useSimScenarioStore(state => state.selectedItems?.[selectedScenarioId]);
+  const dataItems = useSimDataStore(state => state.getDataItems(selectedScenarioId));
+  const item = dataItems?.find(i => i.id === selectedItemId);
+
+  if (!item) return null;
+
+  const groups = item.groups || [];
+
   return (
     <Box flex={1} display="flex" flexDirection="column" gap={2} sx={{ overflowY: 'auto' }}>
       <Box display="flex" alignItems="center" gap={2} sx={{ mt: 2, mb: 1 }}>
@@ -23,32 +26,16 @@ function SimDataGroupsTab({
             field="groups"
             value={JSON.stringify(groups)}
             originalValue={JSON.stringify(item.originalParsedData?.group || [])}
-            onRestore={() => handleRestoreGroup()}
+            // onRestore logic can be implemented as needed
             title="Alle Gruppen auf importierte Werte zurücksetzen"
             confirmMsg="Alle Gruppen auf importierten Wert zurücksetzen?"
           />
         </Typography>
-        <Button
-          variant="outlined"
-          size="small"
-          startIcon={<AddIcon />}
-          onClick={handleAddGroup}
-        >
-          Gruppe hinzufügen
-        </Button>
       </Box>
-      <GroupCards
-        itemId={item.id}
-        groups={groups}
-        lastAddedIndex={lastAddedGroupIdx}
-        onDelete={handleDeleteGroup}
-        importedCount={importedGroupCount}
-        originalGroups={item?.originalParsedData?.group}
-        onRestoreGroup={handleRestoreGroup}
-        isManualEntry={item?.rawdata?.source === 'manual entry'}
-      />
+      <GroupCards />
     </Box>
   );
 }
 
 export default SimDataGroupsTab;
+   

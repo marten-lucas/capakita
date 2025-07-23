@@ -1,45 +1,39 @@
 import {
-  Typography, Box, Accordion, AccordionSummary, AccordionDetails
+  Typography, Box, Accordion, AccordionSummary, AccordionDetails, Button
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import AddIcon from '@mui/icons-material/Add';
 import React from 'react';
 import GroupDetail from './GroupDetail';
-import useSimScenarioDataStore from '../../../store/simScenarioStore';
+import useSimScenarioStore from '../../../store/simScenarioStore';
+import useSimDataStore from '../../../store/simDataStore';
 
-// Helper: compare groups for modification
-function groupsModified(localGroups, origGroups) {
-  if (!Array.isArray(localGroups) && !Array.isArray(origGroups)) return false;
-  if (!Array.isArray(localGroups) || !Array.isArray(origGroups)) return true;
-  if (localGroups.length !== origGroups.length) return true;
-  for (let i = 0; i < localGroups.length; ++i) {
-    const l = localGroups[i], o = origGroups[i];
-    if (String(l.id) !== String(o.id)) return true;
-    if (l.start !== o.start) return true;
-    if (l.end !== o.end) return true;
-  }
-  return false;
-}
+function GroupCards() {
+  // Get scenario and item selection
+  const selectedScenarioId = useSimScenarioStore(state => state.selectedScenarioId);
+  const selectedItemId = useSimScenarioStore(state => state.selectedItems?.[selectedScenarioId]);
+  const dataItems = useSimDataStore(state => state.getDataItems(selectedScenarioId));
+  const item = dataItems?.find(i => i.id === selectedItemId);
 
-function GroupCards({ itemId, importedCount, originalGroups, onRestoreGroup, isManualEntry }) {
-  const { getItemGroups, updateItemGroups, getItemBookings, getGroupDefs } = useSimScenarioDataStore((state) => ({
-    getItemGroups: state.getItemGroups,
-    updateItemGroups: state.updateItemGroups,
-    getItemBookings: state.getItemBookings,
-    getGroupDefs: state.getGroupDefs,
-  }));
+  // Read groups directly from the item (not from scenario store)
+  const groups = React.useMemo(() => item?.groups || [], [item]);
+  const bookings = item?.bookings || [];
 
-  // Use scenario-based groupdefs for lookup
-  const allGroups = React.useMemo(() => {
-    const defs = getGroupDefs();
-    const lookup = {};
-    defs.forEach(g => {
-      lookup[g.id] = g.name;
-    });
-    return lookup;
-  }, [getGroupDefs]);
+  // Add group logic
+  const updateDataItem = useSimDataStore(state => state.updateDataItem);
 
-  const groups = getItemGroups(itemId);
-  const bookings = getItemBookings(itemId);
+  const handleAddGroup = () => {
+    if (!item) return;
+    const newGroup = {
+      id: Date.now().toString(),
+      name: 'Neue Gruppe',
+      start: '',
+      end: '',
+      // Add other default fields as needed
+    };
+    const updatedGroups = [...groups, newGroup];
+    updateDataItem(selectedScenarioId, item.id, { groups: updatedGroups });
+  };
 
   // Track expanded accordion index
   const [expandedIdx, setExpandedIdx] = React.useState(groups && groups.length > 0 ? 0 : null);
@@ -57,29 +51,38 @@ function GroupCards({ itemId, importedCount, originalGroups, onRestoreGroup, isM
     setExpandedIdx(expanded ? idx : null);
   };
 
-  const handleUpdateGroup = (index, updatedGroup) => {
-    const updatedGroups = groups.map((g, idx) => (idx === index ? updatedGroup : g));
-    updateItemGroups(itemId, updatedGroups);
-  };
-
-  const handleDeleteGroup = (index) => {
-    const updatedGroups = groups.filter((_, idx) => idx !== index);
-    updateItemGroups(itemId, updatedGroups);
-  };
-
   if (!groups || groups.length === 0) {
-    return <Typography variant="body2" color="text.secondary">Keine Gruppenzuordnungen vorhanden.</Typography>;
+    // Show add button even if no groups exist
+    return (
+      <Box>
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<AddIcon />}
+            onClick={handleAddGroup}
+          >
+            Gruppe hinzufügen
+          </Button>
+        </Box>
+        <Typography variant="body2" color="text.secondary">Keine Gruppenzuordnungen vorhanden.</Typography>
+      </Box>
+    );
   }
-
-  
-
 
   return (
     <Box>
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+        <Button
+          variant="outlined"
+          size="small"
+          startIcon={<AddIcon />}
+          onClick={handleAddGroup}
+        >
+          Gruppe hinzufügen
+        </Button>
+      </Box>
       {groups.map((group, idx) => {
-        const orig = Array.isArray(originalGroups) ? originalGroups[idx] : undefined;
-        const isMod = orig ? groupsModified([group], [orig]) : false;
-
         // Use dateRangeText logic for header
         const { start, end } = group;
         let dateRangeText = '';
@@ -103,19 +106,7 @@ function GroupCards({ itemId, importedCount, originalGroups, onRestoreGroup, isM
               </Typography>
             </AccordionSummary>
             <AccordionDetails>
-              <GroupDetail
-                group={group}
-                index={idx}
-                allGroups={allGroups}
-                onDelete={handleDeleteGroup}
-                canDelete={typeof importedCount === 'number' ? idx >= importedCount : true}
-                isModified={isMod}
-                onRestore={onRestoreGroup}
-                originalGroup={orig}
-                onUpdateGroup={(updatedGroup) => handleUpdateGroup(idx, updatedGroup)}
-                isManualEntry={isManualEntry}
-                parentItemId={itemId}
-              />
+              <GroupDetail index={idx} />
             </AccordionDetails>
           </Accordion>
         );

@@ -7,17 +7,30 @@ import React, { useMemo, useEffect } from 'react';
 import { convertYYYYMMDDtoDDMMYYYY, convertDDMMYYYYtoYYYYMMDD } from '../../../utils/dateUtils';
 import ModMonitor from '../ModMonitor';
 import useSimScenarioDataStore from '../../../store/simScenarioStore';
+import useSimScenarioStore from '../../../store/simScenarioStore';
+import useSimDataStore from '../../../store/simDataStore';
+import useSimGroupStore from '../../../store/simGroupStore';
 
-function GroupDetail({ group, index, onDelete, onRestore, originalGroup, onUpdateGroup, parentItemId }) {
-  const { getItemBookings, updateItemBookings } = useSimScenarioDataStore((state) => ({
-    getItemBookings: state.getItemBookings,
-    updateItemBookings: state.updateItemBookings,
-  }));
+function GroupDetail({ index }) {
+  // Get scenario and item selection
+  const selectedScenarioId = useSimScenarioStore(state => state.selectedScenarioId);
+  const selectedItemId = useSimScenarioStore(state => state.selectedItems?.[selectedScenarioId]);
+  const dataItems = useSimDataStore(state => state.getDataItems(selectedScenarioId));
+  const item = dataItems?.find(i => i.id === selectedItemId);
 
-  // Get bookings and memoize segments calculation
-  const bookings = getItemBookings(parentItemId);
+  // Read groups directly from the item (not from scenario store)
+  const groups = item?.groups || [];
+  const group = groups?.[index];
+  const bookings = React.useMemo(() => item?.bookings || [], [item]);
 
-  // --- FIX: Assign missing segment IDs in an effect, not during render ---
+  // Get original group from scenario store's simulationData (for ModMonitor)
+  const scenario = useSimScenarioStore(state =>
+    state.scenarios.find(s => s.id === selectedScenarioId)
+  );
+  const originalGroup = scenario?.simulationData?.find(i => i.id === selectedItemId)?.originalParsedData?.group?.[index];
+  const parentItemId = selectedItemId;
+
+  // Assign missing segment IDs in an effect, not during render
   useEffect(() => {
     let needsUpdate = false;
     const updatedBookings = bookings.map((booking, bookingIdx) => ({
@@ -37,11 +50,12 @@ function GroupDetail({ group, index, onDelete, onRestore, originalGroup, onUpdat
       }))
     }));
     if (needsUpdate) {
-      updateItemBookings(parentItemId, updatedBookings);
+      // Only update if something changed
+      useSimScenarioDataStore.getState().updateItemBookings(parentItemId, updatedBookings);
     }
-  }, [bookings, parentItemId, updateItemBookings]);
+  }, [bookings, parentItemId]);
 
-  // Now just collect all segments for display
+  // Collect all segments for display
   const getAllBookingSegments = useMemo(() => {
     const segments = [];
     bookings.forEach((booking, bookingIdx) => {
@@ -60,19 +74,43 @@ function GroupDetail({ group, index, onDelete, onRestore, originalGroup, onUpdat
     return segments;
   }, [bookings]);
 
+  // Handler to update group in store
+  const updateDataItem = useSimDataStore(state => state.updateDataItem);
+  const handleUpdateGroup = (updatedGroup) => {
+    if (!groups || !group) return;
+    const updatedGroups = groups.map((g, idx) => (idx === index ? updatedGroup : g));
+    updateDataItem(selectedScenarioId, selectedItemId, { groups: updatedGroups });
+  };
+
+  // Handler to delete group in store
+  const handleDeleteGroup = () => {
+    if (!groups || !group) return;
+    const updatedGroups = groups.filter((_, idx) => idx !== index);
+    updateDataItem(selectedScenarioId, selectedItemId, { groups: updatedGroups });
+  };
+
   const handleDateChange = (field, value) => {
     const updatedGroup = { ...group, [field]: convertYYYYMMDDtoDDMMYYYY(value) };
-    onUpdateGroup(updatedGroup);
+    handleUpdateGroup(updatedGroup);
   };
 
   // Restore für Feld
   const handleRestoreGroupDate = (field) => {
     if (!originalGroup) return;
     const updatedGroup = { ...group, [field]: originalGroup[field] || '' };
-    onUpdateGroup(updatedGroup);
+    handleUpdateGroup(updatedGroup);
   };
 
   // Restore für Gruppen-ID
+  const groupDefs = useSimGroupStore(state => state.getGroupDefs(selectedScenarioId));
+  const allGroupsLookup = React.useMemo(() => {
+    const lookup = {};
+    groupDefs.forEach(g => {
+      lookup[g.id] = g.name;
+    });
+    return lookup;
+  }, [groupDefs]);
+
   const handleRestoreGroupId = () => {
     if (!originalGroup) return;
     const updatedGroup = {
@@ -80,36 +118,36 @@ function GroupDetail({ group, index, onDelete, onRestore, originalGroup, onUpdat
       id: originalGroup.id,
       name: allGroupsLookup[originalGroup.id] || `Gruppe ${originalGroup.id}`,
     };
-    onUpdateGroup(updatedGroup);
+    handleUpdateGroup(updatedGroup);
   };
 
   // Restore für alles
   const handleRestoreAll = () => {
-    if (window.confirm('Gruppenzuordnung auf importierte Adebis-Daten zurücksetzen?')) {
-      onRestore && onRestore(index);
-    }
+    if (!originalGroup) return;
+    // Replace group with original
+    handleUpdateGroup({ ...originalGroup });
   };
 
   const handleGroupModeChange = (event) => {
     const mode = event.target.value;
     if (mode === 'mehrere') {
-      const updatedGroup = { 
-        ...group, 
-        id: 'mehrere', 
+      const updatedGroup = {
+        ...group,
+        id: 'mehrere',
         name: 'Mehrere Gruppen',
         segmentOverrides: group.segmentOverrides || {}
       };
-      onUpdateGroup(updatedGroup);
+      handleUpdateGroup(updatedGroup);
     } else {
       const newGroupId = parseInt(mode, 10);
       const newGroupName = allGroupsLookup[newGroupId] || `Gruppe ${newGroupId}`;
-      const updatedGroup = { 
-        ...group, 
-        id: newGroupId, 
+      const updatedGroup = {
+        ...group,
+        id: newGroupId,
         name: newGroupName,
         segmentOverrides: undefined
       };
-      onUpdateGroup(updatedGroup);
+      handleUpdateGroup(updatedGroup);
     }
   };
 
@@ -121,24 +159,14 @@ function GroupDetail({ group, index, onDelete, onRestore, originalGroup, onUpdat
         [segmentId]: groupId ? parseInt(groupId, 10) : undefined
       }
     };
-    onUpdateGroup(updatedGroup);
+    handleUpdateGroup(updatedGroup);
   };
 
-  // Get allGroups from scenario groupdefs
-  const groupDefs = useSimScenarioDataStore(state => state.getGroupDefs());
-  // Build allGroups lookup { id: name }
-  const allGroupsLookup = React.useMemo(() => {
-    const lookup = {};
-    groupDefs.forEach(g => {
-      lookup[g.id] = g.name;
-    });
-    return lookup;
-  }, [groupDefs]);
+  if (!group) return null;
 
   return (
     <Box sx={{ mb: 2 }}>
       <Box alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
-        
         <Box alignItems="center" gap={1}>
           <ModMonitor
             itemId={parentItemId}
@@ -149,15 +177,13 @@ function GroupDetail({ group, index, onDelete, onRestore, originalGroup, onUpdat
             title="Komplette Gruppenzuordnung auf importierte Werte zurücksetzen"
             confirmMsg="Gruppenzuordnung auf importierte Adebis-Daten zurücksetzen?"
           />
-          {onDelete && (
-            <Button
-              size="small"
-              color="error"
-              onClick={() => onDelete(index)}
-            >
-              Löschen
-            </Button>
-          )}
+          <Button
+            size="small"
+            color="error"
+            onClick={handleDeleteGroup}
+          >
+            Löschen
+          </Button>
         </Box>
       </Box>
       {/* Start/Enddatum section at the top */}
@@ -219,16 +245,16 @@ function GroupDetail({ group, index, onDelete, onRestore, originalGroup, onUpdat
           onChange={handleGroupModeChange}
         >
           {Object.entries(allGroupsLookup).map(([groupId, groupName]) => (
-            <FormControlLabel 
-              key={groupId} 
-              value={groupId} 
-              control={<Radio />} 
+            <FormControlLabel
+              key={groupId}
+              value={groupId}
+              control={<Radio />}
               label={groupName}
             />
           ))}
-          <FormControlLabel 
-            value="mehrere" 
-            control={<Radio />} 
+          <FormControlLabel
+            value="mehrere"
+            control={<Radio />}
             label="Mehrere Gruppen"
           />
         </RadioGroup>
@@ -236,7 +262,6 @@ function GroupDetail({ group, index, onDelete, onRestore, originalGroup, onUpdat
       {/* Segment Override Section - Only shown when "mehrere" is selected */}
       {group.id === 'mehrere' && (
         <Box sx={{ mb: 3 }}>
-
           <TableContainer component={Paper} variant="outlined">
             <Table size="small">
               <TableHead>
@@ -268,7 +293,7 @@ function GroupDetail({ group, index, onDelete, onRestore, originalGroup, onUpdat
                           onChange={(e) => handleSegmentOverride(segment.id, e.target.value)}
                         >
                           {Object.entries(allGroupsLookup).map(([groupId, groupName]) => (
-                            <FormControlLabel 
+                            <FormControlLabel
                               key={groupId}
                               value={groupId}
                               control={<Radio size="small" />}

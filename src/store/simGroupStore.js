@@ -46,6 +46,38 @@ const useSimGroupStore = create((set, get) => ({
     const state = get();
     return state.groupsByScenario[scenarioId]?.[groupId];
   },
+
+  // Groupdefs CRUD (global group definitions, not assignments)
+  groupDefsByScenario: {},
+
+  addGroupDef: (scenarioId, groupDef) =>
+    set(produce((state) => {
+      if (!state.groupDefsByScenario[scenarioId]) state.groupDefsByScenario[scenarioId] = [];
+      const id = groupDef.id || generateUID();
+      state.groupDefsByScenario[scenarioId].push({ ...groupDef, id });
+    })),
+
+  updateGroupDef: (scenarioId, groupId, updates) =>
+    set(produce((state) => {
+      const defs = state.groupDefsByScenario[scenarioId];
+      if (!defs) return;
+      const idx = defs.findIndex(g => g.id === groupId);
+      if (idx !== -1) {
+        defs[idx] = { ...defs[idx], ...updates };
+      }
+    })),
+
+  deleteGroupDef: (scenarioId, groupId) =>
+    set(produce((state) => {
+      const defs = state.groupDefsByScenario[scenarioId];
+      if (!defs) return;
+      state.groupDefsByScenario[scenarioId] = defs.filter(g => g.id !== groupId);
+    })),
+
+  getGroupDefs: (scenarioId) => {
+    const state = get();
+    return state.groupDefsByScenario[scenarioId] || [];
+  },
 }));
 
 export default useSimGroupStore;
