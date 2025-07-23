@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { produce } from 'immer';
+import useSimScenarioStore from './simScenarioStore';
 
 // Helper to generate a random UID
 function generateUID() {
@@ -94,6 +95,14 @@ const useSimBookingStore = create((set, get) => ({
   getBooking: (scenarioId, dataItemId, bookingId) => {
     const state = get();
     return state.bookingsByScenario[scenarioId]?.[dataItemId]?.[bookingId];
+  },
+
+  // Returns all bookings for the currently selected item (using scenario store)
+  getSelectedItemBookings: () => {
+    const scenarioId = useSimScenarioStore.getState().selectedScenarioId;
+    const itemId = useSimScenarioStore.getState().selectedItems?.[scenarioId];
+    if (!scenarioId || !itemId) return [];
+    return get().getBookings(scenarioId, itemId);
   },
 
   // Utility export

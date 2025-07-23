@@ -11,7 +11,7 @@ import {
 import FileUploadIcon from '@mui/icons-material/FileUpload';
 import DataImportModal from '../components/modals/DataImportModal';
 import SimDataList from '../components/SimDataList';
-import SimDataDetailForm from '../components/SimDataDetailForm';
+import SimDataDetailForm from '../components/SimDataDetail/SimDataDetailForm';
 import useSimScenarioStore from '../store/simScenarioStore';
 import useSimDataStore from '../store/simDataStore';
 import ScenarioSaveDialog from '../components/modals/ScenarioSaveDialog';

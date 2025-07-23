@@ -2,7 +2,7 @@ import React from 'react';
 import { Typography, Box, Accordion, AccordionSummary, AccordionDetails } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import BookingDetail from './BookingDetail';
-import useSimScenarioDataStore from '../../../store/simScenarioStore';
+import useSimBookingStore from '../../../store/simBookingStore';
 import { consolidateBookingSummary } from '../../../utils/bookingUtils';
 
 
@@ -25,15 +25,9 @@ function getBookingHours(times) {
   return `${(totalMinutes / 60).toFixed(1)} h`;
 }
 
-function BookingCards({
-  itemId, type, importedCount, originalBookings, onDelete, isManualEntry
-}) {
-  const { getItemBookings, updateItemBookings } = useSimScenarioDataStore((state) => ({
-    getItemBookings: state.getItemBookings,
-    updateItemBookings: state.updateItemBookings,
-  }));
-
-  const bookings = getItemBookings(itemId);
+function BookingCards() {
+  // Use booking store for bookings of the selected item
+  const bookings = useSimBookingStore(state => state.getSelectedItemBookings());
 
   // Track expanded accordion index
   const [expandedIdx, setExpandedIdx] = React.useState(bookings && bookings.length > 0 ? 0 : null);
@@ -51,17 +45,6 @@ function BookingCards({
     setExpandedIdx(expanded ? idx : null);
   };
 
-  const handleUpdateBooking = (index, updatedBooking) => {
-    // Deep clone bookings to avoid mutating Zustand/Immer state
-    const deepClone = (obj) => {
-      if (typeof structuredClone === 'function') return structuredClone(obj);
-      return JSON.parse(JSON.stringify(obj));
-    };
-    const updatedBookings = bookings.map((b, idx) =>
-      idx === index ? deepClone(updatedBooking) : deepClone(b)
-    );
-    updateItemBookings(itemId, updatedBookings);
-  };
 
   if (!bookings || bookings.length === 0) {
     return <Typography variant="body2" color="text.secondary">Keine Buchungszeiten vorhanden.</Typography>;
@@ -97,15 +80,7 @@ function BookingCards({
             </AccordionSummary>
             <AccordionDetails>
               <BookingDetail
-                booking={booking}
                 index={idx}
-                type={type}
-                canDelete={typeof importedCount === 'number' ? idx >= importedCount : true}
-                originalBooking={Array.isArray(originalBookings) ? originalBookings[idx] : undefined}
-                onUpdateBooking={(updatedBooking) => handleUpdateBooking(idx, updatedBooking)}
-                onDelete={onDelete}
-                isManualEntry={isManualEntry}
-                parentItemId={itemId}
               />
             </AccordionDetails>
           </Accordion>

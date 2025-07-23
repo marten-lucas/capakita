@@ -5,104 +5,34 @@ import {
 import { convertYYYYMMDDtoDDMMYYYY, convertDDMMYYYYtoYYYYMMDD } from '../../../utils/dateUtils';
 import { timeToValue, valueToTime } from '../../../utils/timeUtils';
 import ModMonitor from '../ModMonitor';
+import useSimScenarioStore from '../../../store/simScenarioStore';
+import useSimDataStore from '../../../store/simDataStore';
+import useSimBookingStore from '../../../store/simBookingStore';
+import DayControl from './BookingDayControl';
 
-// DayControl component
-function DayControl({ dayLabel, dayAbbr, dayData, onToggle, onTimeChange, onAddSegment, onRemoveSegment, type }) {
-  const isActive = !!dayData;
-  const segments = React.useMemo(() =>
-    isActive ? dayData.segments : [],
-    [isActive, dayData?.segments]
-  );
+// BookingDetail component
+function BookingDetail({ index }) {
+  // Get scenario and item selection
+  const selectedScenarioId = useSimScenarioStore(state => state.selectedScenarioId);
+  const selectedItemId = useSimScenarioStore(state => state.selectedItems?.[selectedScenarioId]);
+  const dataItems = useSimDataStore(state => state.getDataItems(selectedScenarioId));
+  const item = dataItems?.find(i => i.id === selectedItemId);
 
-  // Local state for slider values per segment
-  const [sliderValues, setSliderValues] = React.useState(
-    segments.map(seg => [
-      timeToValue(seg.booking_start),
-      timeToValue(seg.booking_end)
-    ])
-  );
+  // Use booking store for bookings and deleteBooking
+  const bookings = useSimBookingStore(state => state.getSelectedItemBookings());
+  const deleteBooking = useSimBookingStore(state => state.deleteBooking);
+  const updateBooking = useSimBookingStore(state => state.updateBooking);
+  const booking = bookings?.[index];
+  const originalBooking = item?.originalParsedData?.booking?.[index];
+  const type = item?.type;
+  const parentItemId = selectedItemId;
+  const isManualEntry = item?.rawdata?.source === 'manual entry';
 
-  // Sync local slider state if segments change (e.g. add/remove)
-  React.useEffect(() => {
-    setSliderValues(
-      segments.map(seg => [
-        timeToValue(seg.booking_start),
-        timeToValue(seg.booking_end)
-      ])
-    );
-  }, [segments, segments.length]);
-
-  return (
-    <Box display="flex" alignItems="flex-start" gap={2} sx={{ mb: 1 }}>
-      <Typography sx={{ width: 80, mt: 1 }}>{dayLabel}</Typography>
-      <Switch checked={isActive} onChange={(e) => onToggle(dayAbbr, e.target.checked)} />
-      <Box sx={{ flex: 1, px: 2 }}>
-        {isActive && (
-          <Box>
-            {segments.map((seg, idx) => (
-              <Box key={idx} display="flex" alignItems="center" gap={1} sx={{ mb: 1 }}>
-                <Box sx={{ flex: 1, minWidth: 220, maxWidth: 400 }}>
-                  <Slider
-                    value={sliderValues[idx] || [
-                      timeToValue(seg.booking_start),
-                      timeToValue(seg.booking_end)
-                    ]}
-                    onChange={(_, newValue) => {
-                      // Update local slider state only
-                      setSliderValues(vals => {
-                        const next = [...vals];
-                        next[idx] = newValue;
-                        return next;
-                      });
-                    }}
-                    onChangeCommitted={(_, newValue) => {
-                      onTimeChange(dayAbbr, idx, newValue);
-                    }}
-                    min={0}
-                    max={47}
-                    step={1}
-                    valueLabelFormat={valueToTime}
-                    valueLabelDisplay="auto"
-                    marks={[
-                      { value: 14, label: '07:00' },
-                      { value: 24, label: '12:00' },
-                      { value: 33, label: '16:30' },
-                    ]}
-                  />
-                </Box>
-                {segments.length > 1 && (
-                  <Button
-                    size="small"
-                    color="error"
-                    variant="outlined"
-                    sx={{ minWidth: 32, px: 1, ml: 0.5 }}
-                    onClick={() => onRemoveSegment(dayAbbr, idx)}
-                    title="Segment entfernen"
-                  >−</Button>
-                )}
-                {type === 'capacity' && (
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    sx={{ minWidth: 32, px: 1, ml: 0.5 }}
-                    onClick={() => onAddSegment(dayAbbr)}
-                    title="Zeitbereich hinzufügen"
-                  >+</Button>
-                )}
-              </Box>
-            ))}
-          </Box>
-        )}
-      </Box>
-    </Box>
-  );
-}
-
-function BookingDetail({
-  booking, index, type, 
-  originalBooking, onUpdateBooking, onDelete, isManualEntry, parentItemId
-}) {
-  // Remove expanded state and Accordion logic
+  // Helper to update the booking in the store
+  const handleUpdateBooking = (updatedBooking) => {
+    if (!selectedScenarioId || !selectedItemId || !booking?.id) return;
+    updateBooking(selectedScenarioId, selectedItemId, booking.id, updatedBooking);
+  };
 
   const handleDayToggle = (dayAbbr, isEnabled) => {
     // Deep clone booking and times
@@ -124,7 +54,7 @@ function BookingDetail({
       newTimes.splice(dayIndex, 1);
     }
     const updatedBooking = { ...booking, times: newTimes };
-    onUpdateBooking(updatedBooking);
+    handleUpdateBooking(updatedBooking);
   };
 
   const handleAddSegment = (dayAbbr) => {
@@ -144,7 +74,7 @@ function BookingDetail({
         : { ...t, segments: t.segments.map(s => ({ ...s })) }
     );
     const updatedBooking = { ...booking, times: newTimes };
-    onUpdateBooking(updatedBooking);
+    handleUpdateBooking(updatedBooking);
   };
 
   const handleTimeChange = (dayAbbr, segIdx, newValues) => {
@@ -164,7 +94,7 @@ function BookingDetail({
       return { ...t, segments: t.segments.map(s => ({ ...s })) };
     });
     const updatedBooking = { ...booking, times: newTimes };
-    onUpdateBooking(updatedBooking);
+    handleUpdateBooking(updatedBooking);
   };
 
   const handleRemoveSegment = (dayAbbr, segIdx) => {
@@ -176,7 +106,7 @@ function BookingDetail({
       return { ...t, segments: t.segments.map(s => ({ ...s })) };
     });
     const updatedBooking = { ...booking, times: newTimes };
-    onUpdateBooking(updatedBooking);
+    handleUpdateBooking(updatedBooking);
   };
 
   const handleDateChange = (field, value) => {
@@ -184,7 +114,7 @@ function BookingDetail({
       ...booking,
       [field]: convertYYYYMMDDtoDDMMYYYY(value),
     };
-    onUpdateBooking(updatedBooking);
+    handleUpdateBooking(updatedBooking);
   };
 
   // Prüft, ob ein einzelner Tag (Mo, Di, ...) im Booking geändert wurde
@@ -242,7 +172,7 @@ function BookingDetail({
         return newTimes;
       })(),
     };
-    onUpdateBooking(updatedBooking);
+    handleUpdateBooking(updatedBooking);
   };
 
   // Restore-Funktion für das gesamte Booking
@@ -254,8 +184,16 @@ function BookingDetail({
       ...booking,
       [field]: originalBooking[field] || '',
     };
-    onUpdateBooking(updatedBooking);
+    handleUpdateBooking(updatedBooking);
   };
+
+  // Handler for deleting a booking
+  const handleDeleteBooking = () => {
+    if (!selectedScenarioId || !selectedItemId || !booking?.id) return;
+    deleteBooking(selectedScenarioId, selectedItemId, booking.id);
+  };
+
+  if (!booking) return null;
 
   return (
     <Box sx={{ mb: 3 }}>
@@ -337,20 +275,17 @@ function BookingDetail({
           );
         })}
       </Box>
-      {onDelete && (
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-          <Button
-            size="small"
-            color="error"
-            onClick={e => { e.stopPropagation(); onDelete(index); }}
-          >
-            Löschen
-          </Button>
-        </Box>
-      )}
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+        <Button
+          size="small"
+          color="error"
+          onClick={e => { e.stopPropagation(); handleDeleteBooking(); }}
+        >
+          Löschen
+        </Button>
+      </Box>
     </Box>
   );
 }
 
 export default BookingDetail;
-
