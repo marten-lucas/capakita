@@ -16,13 +16,12 @@ const useSimDataStore = create((set, get) => ({
       if (!state.dataByScenario[scenarioId]) state.dataByScenario[scenarioId] = {};
       const id = item.id || generateUID();
       // Ensure absences array exists
-      if (!item.parseddata) item.parseddata = {};
-      if (!Array.isArray(item.parseddata.absences)) item.parseddata.absences = [];
+      if (!Array.isArray(item.absences)) item.absences = [];
       state.dataByScenario[scenarioId][id] = { ...item, id, overlays: {} };
     })),
 
   // Helper: Add a new manual entry item of given type ("demand" or "capacity")
-  simDataItemAdd: (scenarioId, source, type) => {
+  simDataItemAdd: (scenarioId, source, type, { selected = true } = {}) => {
     const id = generateUID();
     let newItem;
     let newName = type === 'capacity' ? 'Neuer Mitarbeiter' : 'Neues Kind';
@@ -51,6 +50,16 @@ const useSimDataStore = create((set, get) => ({
     };
 
     get().addDataItem(scenarioId, newItem);
+
+    if (selected) {
+      // Set as selected in scenario store
+      // Import here to avoid circular dependency at top-level
+      import('./simScenarioStore').then(module => {
+        const useSimScenarioStore = module.default;
+        useSimScenarioStore.getState().setSelectedItem(id);
+      });
+    }
+
     return newItem;
   },
 
@@ -73,12 +82,8 @@ const useSimDataStore = create((set, get) => ({
     set(produce((state) => {
       const item = state.dataByScenario[scenarioId]?.[itemId];
       if (!item) return;
-      // Update fields in root and parseddata if present
       Object.entries(fields).forEach(([key, value]) => {
         item[key] = value;
-        if (item.parseddata && key in item.parseddata) {
-          item.parseddata[key] = value;
-        }
       });
     })),
 
@@ -116,8 +121,9 @@ const useSimDataStore = create((set, get) => ({
   getItemAbsenceStateList: (scenarioId, itemId) => {
     const state = get();
     const item = state.dataByScenario[scenarioId]?.[itemId];
-    return item?.parseddata?.absences || [];
+    return item?.absences || [];
   },
 }));
 
 export default useSimDataStore;
+

@@ -122,7 +122,7 @@ function DataPage() {
     {
       icon: <ChildCareIcon />,
       name: 'Bedarf',
-      onClick: () => simDataItemAdd(selectedScenarioId, "manual entry", "demand")
+      onClick: () => simDataItemAdd(selectedScenarioId, "manual entry", "demand", true)
     },
     {
       icon: <LayersIcon />,

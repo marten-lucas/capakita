@@ -26,6 +26,8 @@ function SimDataGeneralTab() {
   const [localName, setLocalName] = useState(item?.name ?? '');
   const [localNote, setLocalNote] = useState(item?.remark ?? '');
 
+
+
   // Manual entry check
   const isManualEntry = item?.rawdata?.source === 'manual';
 
@@ -219,18 +221,18 @@ function SimDataGeneralTab() {
           variant="outlined"
           size="small"
           onClick={() => {
-            const absences = Array.isArray(item?.parseddata?.absences) ? item.parseddata.absences : [];
+            const absences = Array.isArray(item?.absences) ? item.absences : [];
             const newAbsence = { start: '', end: '' };
             const newList = [...absences, newAbsence];
-            simDataStore.updateDataItemFields(scenarioId, item.id, { parseddata: { ...item.parseddata, absences: newList } });
+            simDataStore.updateDataItemFields(scenarioId, item.id, { absences: newList });
           }}
           sx={{ mb: 1 }}
         >
           Abwesenheit hinzufügen
         </Button>
-        {item?.parseddata?.absences && item.parseddata.absences.length > 0 && (
+        {item?.absences && item.absences.length > 0 && (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            {item.parseddata.absences.map((absence, idx) => {
+            {item.absences.map((absence, idx) => {
               let workdays = 0;
               if (absence.start && absence.end) {
                 const start = new Date(absence.start);
@@ -250,8 +252,8 @@ function SimDataGeneralTab() {
                     value={absence.start}
                     onChange={(e) => {
                       const newAbsence = { ...absence, start: e.target.value };
-                      const newList = item.parseddata.absences.map((a, i) => (i === idx ? newAbsence : a));
-                      simDataStore.updateDataItemFields(scenarioId, item.id, { parseddata: { ...item.parseddata, absences: newList } });
+                      const newList = item.absences.map((a, i) => (i === idx ? newAbsence : a));
+                      simDataStore.updateDataItemFields(scenarioId, item.id, { absences: newList });
                     }}
                     sx={{ width: 130 }}
                     inputProps={{ min: new Date().toISOString().split('T')[0] }}
@@ -265,8 +267,8 @@ function SimDataGeneralTab() {
                     value={absence.end}
                     onChange={(e) => {
                       const newAbsence = { ...absence, end: e.target.value };
-                      const newList = item.parseddata.absences.map((a, i) => (i === idx ? newAbsence : a));
-                      simDataStore.updateDataItemFields(scenarioId, item.id, { parseddata: { ...item.parseddata, absences: newList } });
+                      const newList = item.absences.map((a, i) => (i === idx ? newAbsence : a));
+                      simDataStore.updateDataItemFields(scenarioId, item.id, { absences: newList });
                     }}
                     sx={{ width: 130 }}
                     inputProps={{ min: new Date().toISOString().split('T')[0] }}
@@ -279,8 +281,8 @@ function SimDataGeneralTab() {
                     color="error"
                     size="small"
                     onClick={() => {
-                      const newList = item.parseddata.absences.filter((_, i) => i !== idx);
-                      simDataStore.updateDataItemFields(scenarioId, item.id, { parseddata: { ...item.parseddata, absences: newList } });
+                      const newList = item.absences.filter((_, i) => i !== idx);
+                      simDataStore.updateDataItemFields(scenarioId, item.id, { absences: newList });
                     }}
                     sx={{ ml: 1 }}
                   >
@@ -297,4 +299,3 @@ function SimDataGeneralTab() {
 }
 
 export default SimDataGeneralTab;
-    
