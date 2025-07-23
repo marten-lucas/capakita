@@ -37,16 +37,30 @@ const useSimScenarioStore = create(
         baseScenarioId = null,
         imported = false,
         importedAnonymized = false,
-        organisation = undefined
+        organisation = undefined,
+        makeNameUnique = true
       }) =>
         set(produce((state) => {
+          let finalName = name;
+          if (makeNameUnique) {
+            const existingNames = state.scenarios.map(s => s.name);
+            if (existingNames.includes(finalName)) {
+              let counter = 2;
+              let candidate;
+              do {
+                candidate = `${name} (${counter})`;
+                counter++;
+              } while (existingNames.includes(candidate));
+              finalName = candidate;
+            }
+          }
           const id = Date.now().toString();
           const uid = generateUID();
           const org = organisation || { groupdefs: [], qualidefs: [] };
           state.scenarios.push({
             id,
             uid,
-            name,
+            name: finalName,
             remark,
             confidence,
             likelihood,

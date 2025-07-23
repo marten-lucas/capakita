@@ -31,7 +31,9 @@ function ScenarioPicker() {
         const addScenario = useSimScenarioStore.getState().addScenario;
         addScenario({
             name: 'Neues Szenario',
-            baseScenarioId: baseScenario?.id || null
+            baseScenarioId: baseScenario?.id || null,
+            makeNameUnique: true
+
         });
         setTimeout(() => {
             const allScenarios = useSimScenarioStore.getState().scenarios;
