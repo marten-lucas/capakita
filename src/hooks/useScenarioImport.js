@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import useSimScenarioStore from '../store/simScenarioStore';
 import useSimDataStore from '../store/simDataStore';
 import useSimBookingStore from '../store/simBookingStore';
+import useSimGroupStore from '../store/simGroupStore';
 import { extractAdebisZipAndData } from '../utils/adebis-import';
 import { convertDDMMYYYYtoYYYYMMDD } from '../utils/dateUtils';
 
@@ -71,6 +72,7 @@ export function useScenarioImport() {
   const setSelectedScenarioId = useSimScenarioStore(state => state.setSelectedScenarioId);
   const importDataItems = useSimDataStore(state => state.importDataItems);
   const importBookings = useSimBookingStore(state => state.importBookings);
+  const addGroupDef = useSimGroupStore(state => state.addGroupDef);
 
   const importScenario = useCallback(
     async ({ file, isAnonymized }) => {
@@ -158,9 +160,11 @@ export function useScenarioImport() {
         setSelectedScenarioId(lastScenario.id);
         importDataItems(lastScenario.id, normalizedItems);
         importBookings(lastScenario.id, bookingsImportItems);
+        // Import groupdefs into group store
+        groupdefs.forEach(def => addGroupDef(lastScenario.id, def));
       }
     },
-    [addScenario, setSelectedScenarioId, importDataItems, importBookings]
+    [addScenario, setSelectedScenarioId, importDataItems, importBookings, addGroupDef]
   );
 
   // Return as object for destructuring
