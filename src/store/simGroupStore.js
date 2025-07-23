@@ -78,6 +78,26 @@ const useSimGroupStore = create((set, get) => ({
     const state = get();
     return state.groupDefsByScenario[scenarioId] || [];
   },
+
+  // Import multiple group definitions for a scenario (overwrite or merge)
+  importGroupDefs: (scenarioId, defs) =>
+    set(produce((state) => {
+      if (!state.groupDefsByScenario[scenarioId]) state.groupDefsByScenario[scenarioId] = [];
+      defs.forEach(def => {
+        const id = def.id || generateUID();
+        state.groupDefsByScenario[scenarioId].push({ ...def, id });
+      });
+    })),
+
+  // Import multiple group assignments for a scenario (overwrite or merge)
+  importGroupAssignments: (scenarioId, assignments) =>
+    set(produce((state) => {
+      if (!state.groupsByScenario[scenarioId]) state.groupsByScenario[scenarioId] = {};
+      assignments.forEach(assignment => {
+        const id = assignment.id || generateUID();
+        state.groupsByScenario[scenarioId][id] = { ...assignment, id, overlays: {} };
+      });
+    })),
 }));
 
 export default useSimGroupStore;

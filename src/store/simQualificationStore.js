@@ -81,6 +81,26 @@ const useSimQualificationStore = create((set, get) => ({
     const state = get();
     return (state.qualificationAssignmentsByScenario[scenarioId] || []).find(a => a.id === assignmentId);
   },
+
+  // Import multiple qualification definitions for a scenario (overwrite or merge)
+  importQualificationDefs: (scenarioId, defs) =>
+    set(produce((state) => {
+      if (!state.qualificationDefsByScenario[scenarioId]) state.qualificationDefsByScenario[scenarioId] = [];
+      defs.forEach(def => {
+        const key = def.key || generateUID();
+        state.qualificationDefsByScenario[scenarioId].push({ ...def, key });
+      });
+    })),
+
+  // Import multiple qualification assignments for a scenario (overwrite or merge)
+  importQualificationAssignments: (scenarioId, assignments) =>
+    set(produce((state) => {
+      if (!state.qualificationAssignmentsByScenario[scenarioId]) state.qualificationAssignmentsByScenario[scenarioId] = [];
+      assignments.forEach(assignment => {
+        const id = assignment.id || generateUID();
+        state.qualificationAssignmentsByScenario[scenarioId].push({ ...assignment, id });
+      });
+    })),
 }));
 
 export default useSimQualificationStore;
