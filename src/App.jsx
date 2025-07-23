@@ -12,7 +12,6 @@ import ScenarioPicker from './components/ScenarioManager/ScenarioPicker'
 
 function App() {
   const scenarios = useSimScenarioStore(state => state.scenarios);
-  console.log(scenarios);
   // Wenn keine Szenarien vorhanden sind, immer WelcomePage anzeigen
   if (!scenarios || scenarios.length === 0) {
     return (

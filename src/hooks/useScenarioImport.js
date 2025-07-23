@@ -39,7 +39,7 @@ export function useScenarioImport() {
         importedAnonymized: !!isAnonymized
       };
 
-      // Use the new importScenario function
+      // Use the new importScenario function and get the created scenario
       await importScenarioToStore({
         scenarioSettings,
         groupDefs,
@@ -49,6 +49,8 @@ export function useScenarioImport() {
         simDataList,
         bookingsList
       });
+
+    
     },
     [importScenarioToStore]
   );

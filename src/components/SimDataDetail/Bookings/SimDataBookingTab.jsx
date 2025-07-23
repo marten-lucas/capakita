@@ -15,11 +15,7 @@ function SimDataBookingTab() {
   const selectedItem = dataItems?.find(item => item.id === selectedItemId);
 
   // Use booking store for bookings
-  const bookings = useSimBookingStore(state =>
-    selectedScenarioId && selectedItemId
-      ? state.getSelectedItemBookings(selectedScenarioId, selectedItemId)
-      : []
-  );
+  const bookings = useSimBookingStore(state => state.getSelectedItemBookings());
 
   // Use booking store's addBooking
   const addBooking = useSimBookingStore(state => state.addBooking);
@@ -70,4 +66,3 @@ function SimDataBookingTab() {
 }
 
 export default SimDataBookingTab;
-

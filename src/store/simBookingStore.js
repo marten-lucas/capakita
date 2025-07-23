@@ -108,20 +108,30 @@ const useSimBookingStore = create((set, get) => ({
   // Import bookings for all data items in a scenario
   importBookings: (scenarioId, items) =>
     set(produce((state) => {
+      console.log('[simBookingStore.importBookings] items:', items);
       if (!state.bookingsByScenario[scenarioId]) state.bookingsByScenario[scenarioId] = {};
       items.forEach(item => {
         if (!item.id) return;
-        if (!state.bookingsByScenario[scenarioId][item.id]) state.bookingsByScenario[scenarioId][item.id] = {};
-        // Accept both booking and bookings fields
+        // If item has a 'times' property, treat it as a single booking object
+        if (Array.isArray(item.times)) {
+          if (!state.bookingsByScenario[scenarioId][item.id]) state.bookingsByScenario[scenarioId][item.id] = {};
+          const bookingId = item.id;
+          console.log('[simBookingStore.importBookings] storing booking with times:', item);
+          state.bookingsByScenario[scenarioId][item.id][bookingId] = { ...item, id: bookingId, overlays: {} };
+          return;
+        }
+        // Accept both booking and bookings fields (legacy)
         const bookingsArr = item.booking || item.bookings;
+        console.log('[simBookingStore.importBookings] item:', item);
+        console.log('[simBookingStore.importBookings] bookingsArr:', bookingsArr);
         if (Array.isArray(bookingsArr)) {
           bookingsArr.forEach((booking, idx) => {
-            // Generate a unique id for each booking if not present
             const id = booking.id || `${item.id}-import-${idx}-${Date.now()}`;
             state.bookingsByScenario[scenarioId][item.id][id] = { ...booking, id, overlays: {} };
           });
         }
       });
+      console.log('[simBookingStore.importBookings] bookingsByScenario[scenarioId]:', state.bookingsByScenario[scenarioId]);
     })),
 
   // Utility export

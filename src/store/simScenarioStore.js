@@ -135,34 +135,28 @@ const useSimScenarioStore = create(
         // Get the new scenario id
         const scenarios = get().scenarios;
         const lastScenario = scenarios[scenarios.length - 1];
-        if (!lastScenario) return;
+        if (!lastScenario) return null;
         const scenarioId = lastScenario.id;
 
         // Import to other stores
-        // Import groupDefs
         const useSimGroupStore = (await import('./simGroupStore')).default;
         useSimGroupStore.getState().importGroupDefs(scenarioId, groupDefs);
-
-        // Import groupAssignments
         useSimGroupStore.getState().importGroupAssignments(scenarioId, groupAssignments);
 
-        // Import qualiDefs
         const useSimQualificationStore = (await import('./simQualificationStore')).default;
         useSimQualificationStore.getState().importQualificationDefs(scenarioId, qualiDefs);
-
-        // Import qualiAssignments
         useSimQualificationStore.getState().importQualificationAssignments(scenarioId, qualiAssignments);
 
-        // Import simDataList
         const useSimDataStore = (await import('./simDataStore')).default;
         useSimDataStore.getState().importDataItems(scenarioId, simDataList);
 
-        // Import bookingsList
         const useSimBookingStore = (await import('./simBookingStore')).default;
         useSimBookingStore.getState().importBookings(scenarioId, bookingsList);
 
-        // Optionally select the new scenario
         set({ selectedScenarioId: scenarioId });
+
+        // Return the actually created scenario object
+        return lastScenario;
       },
     }),
     {

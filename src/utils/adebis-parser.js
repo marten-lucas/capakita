@@ -1,3 +1,24 @@
+import { convertDDMMYYYYtoYYYYMMDD } from './dateUtils';
+
+// Helper to assign unique IDs to all segments in all bookings
+function assignSegmentIdsToBookings(bookings) {
+  let counter = 0;
+  bookings.forEach(booking => {
+    if (Array.isArray(booking.times)) {
+      booking.times.forEach(day => {
+        if (Array.isArray(day.segments)) {
+          day.segments.forEach(segment => {
+            if (!segment.id) {
+              segment.id = `${booking.id}-${day.day_name}-${counter++}`;
+            }
+          });
+        }
+      });
+    }
+  });
+  return bookings;
+}
+
 // Converts Adebis raw kids and employees data to a normalized simDataList
 export function adebis2simData(kidsRaw, employeesRaw) {
   let idCounter = 1;
@@ -11,9 +32,9 @@ export function adebis2simData(kidsRaw, employeesRaw) {
       source: "adebis export",
       name: kind.FNAME || `Kind ${kind.KINDNR}`,
       remark: "",
-      startdate: kind.AUFNDAT,
-      enddate: kind.AUSTRDAT,
-      dateofbirth: kind.GEBDATUM,
+      startdate: convertDDMMYYYYtoYYYYMMDD(kind.AUFNDAT),
+      enddate: convertDDMMYYYYtoYYYYMMDD(kind.AUSTRDAT),
+      dateofbirth: convertDDMMYYYYtoYYYYMMDD(kind.GEBDATUM),
       groupId: kind.GRUNR,
       rawdata: { ...kind }
     }));
@@ -27,8 +48,8 @@ export function adebis2simData(kidsRaw, employeesRaw) {
       source: "adebis export",
       name: `Mitarbeiter ${emp.IDNR}`,
       remark: "",
-      startdate: emp.BEGINNDAT,
-      enddate: emp.ENDDAT,
+      startdate: convertDDMMYYYYtoYYYYMMDD(emp.BEGINNDAT),
+      enddate: convertDDMMYYYYtoYYYYMMDD(emp.ENDDAT),
       qualification: emp.QUALIFIK,
       vacation: emp.URLAUB,
       worktime: emp.ARBZEIT,
@@ -44,17 +65,19 @@ export function adebis2simData(kidsRaw, employeesRaw) {
  * Each booking will have id, kindId, startdate, enddate, times, rawdata, and originalData.
  */
 export function adebis2bookings(belegungRaw) {
-  return (belegungRaw || []).map((b, idx) => {
+  const bookings = (belegungRaw || []).map((b, idx) => {
     const booking = {
       id: b.IDNR || String(idx + 1),
       kindId: b.KINDNR,
-      startdate: b.BELVON,
+      startdate: convertDDMMYYYYtoYYYYMMDD(b.BELVON),
+      enddate: convertDDMMYYYYtoYYYYMMDD(b.BELBIS),
       times: Zeiten2Booking(b.ZEITEN),
       rawdata: { ...b }
     };
     booking.originalData = { ...booking };
     return booking;
   });
+  return assignSegmentIdsToBookings(bookings);
 }
 
 /**
@@ -176,8 +199,8 @@ export function adebis2GroupAssignments(grukiRaw) {
     const assignment = {
       kindId: g.KINDNR,
       groupId: g.GRUNR,
-      start: g.GKVON,
-      end: g.GKBIS,
+      start: convertDDMMYYYYtoYYYYMMDD(g.GKVON),
+      end: convertDDMMYYYYtoYYYYMMDD(g.GKBIS),
       rawdata: { ...g }
     };
     assignment.originalData = { ...assignment };
