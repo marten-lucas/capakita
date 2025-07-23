@@ -18,7 +18,7 @@ import ScenarioSaveDialog from '../components/modals/ScenarioSaveDialog';
 import PersonIcon from '@mui/icons-material/Person';
 import ChildCareIcon from '@mui/icons-material/ChildCare';
 import LayersIcon from '@mui/icons-material/Layers';
-import { extractAdebisZipAndData } from '../utils/adebis-import';
+import { useScenarioImport } from '../hooks/useScenarioImport';
 
 function DataPage() {
   const [modalOpen, setModalOpen] = useState(false);
@@ -42,6 +42,7 @@ function DataPage() {
   // Use useSimDataStore directly
   const simDataItemAdd = useSimDataStore(state => state.simDataItemAdd);
   const getDataItems = useSimDataStore(state => state.getDataItems);
+  const { importScenario } = useScenarioImport();
 
 
   // Get simulation data for the selected scenario
@@ -51,56 +52,8 @@ function DataPage() {
   // Parse DD.MM.YYYY zu Date
 
   const handleImport = async ({ file, isAnonymized }) => {
-    // Use the centralized import utility
-    const { newGroupsLookup, uniqueQualifications } = await extractAdebisZipAndData(
-      file,
-      isAnonymized,
-      // Remove useAppSettingsStore import hooks, just pass null
-      null,
-      null
-    );
+    await importScenario({ file, isAnonymized });
     setModalOpen(false);
-
-    // Defensive: always create groupdefs and qualidefs arrays
-    const groupdefs = Object.entries(newGroupsLookup).map(([id, name]) => ({
-      id,
-      name,
-      icon: (() => {
-        const lowerName = name.toLowerCase();
-        if (lowerName.includes('fuchs')) return '🦊';
-        if (lowerName.includes('bär') || lowerName.includes('baer')) return '🐻';
-        if (lowerName.includes('hase') || lowerName.includes('kaninchen')) return '🐰';
-        if (lowerName.includes('frosch')) return '🐸';
-        if (lowerName.includes('schmetterling')) return '🦋';
-        if (lowerName.includes('marienkäfer') || lowerName.includes('käfer')) return '🐞';
-        if (lowerName.includes('biene')) return '🐝';
-        if (lowerName.includes('schule') || lowerName.includes('schulkind')) return '🎒';
-        if (lowerName.includes('stern')) return '⭐';
-        if (lowerName.includes('sonne')) return '☀️';
-        if (lowerName.includes('mond')) return '🌙';
-        if (lowerName.includes('regenbogen')) return '🌈';
-        if (lowerName.includes('blume')) return '🌸';
-        if (lowerName.includes('baum')) return '🌳';
-        return '👥';
-      })()
-    })) || [];
-
-    const qualidefs = uniqueQualifications.map(key => ({
-      key,
-      name: key
-    })) || [];
-
-
-    
-    // Find the new scenario's id (last added)
-    const scenarios = useSimScenarioStore.getState().scenarios;
-    const lastScenario = scenarios[scenarios.length - 1];
-    if (lastScenario) {
-      setSelectedScenarioId(lastScenario.id);
-      // Defensive: ensure groupdefs/qualidefs are set (for overlays etc.)
-      useSimScenarioStore.getState().setGroupDefs(groupdefs);
-      useSimScenarioStore.getState().setQualiDefs(qualidefs);
-    }
   };
 
   const handleOpenModal = () => {

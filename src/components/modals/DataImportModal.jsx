@@ -55,7 +55,7 @@ function DatenImportModal({ open, onClose, onImport }) {
     if (selectedFile) {
       setLastImportAnonymized(isAnonymized); // Track checkbox state
       onImport({ file: selectedFile, isAnonymized });
-      handleInternalClose();
+      // Do not call handleInternalClose here, let parent close after import
     }
   };
 
