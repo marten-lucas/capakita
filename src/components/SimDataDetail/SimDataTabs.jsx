@@ -19,6 +19,7 @@ import SimDataFinanceTab from './Financials/SimDataFinanceTab';
 import useSimDataStore from '../../store/simDataStore';
 import useSimScenarioStore from '../../store/simScenarioStore';
 import useSimBookingStore from '../../store/simBookingStore';
+import useSimQualificationStore from '../../store/simQualificationStore';
 
 import React, { useState } from 'react';
 
@@ -36,6 +37,12 @@ function SimDataTabs() {
     selectedScenarioId && selectedItemId
       ? state.getBookings(selectedScenarioId, selectedItemId)
       : []
+  );
+
+  // Get group assignments and qualifications for debug tab
+  const groupAssignments = selectedItem?.groups || [];
+  const qualifications = useSimQualificationStore(state =>
+    state.getQualificationDefs(selectedScenarioId)
   );
 
   // Guard: Wenn item nicht gesetzt, Hinweis anzeigen und return
@@ -90,7 +97,9 @@ function SimDataTabs() {
           }}>
             {JSON.stringify({
               item: selectedItem,
-              bookings: bookings
+              bookings: bookings,
+              groupAssignments: groupAssignments,
+              qualifications: qualifications
             }, null, 2)}
           </pre>
         </Box>

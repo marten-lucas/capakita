@@ -130,10 +130,10 @@ function GroupDetail({ index }) {
 
   const handleGroupModeChange = (event) => {
     const mode = event.target.value;
-    if (mode === 'mehrere') {
+    if (mode === 'multiple') {
       const updatedGroup = {
         ...group,
-        id: 'mehrere',
+        id: 'multiple',
         name: 'Mehrere Gruppen',
         segmentOverrides: group.segmentOverrides || {}
       };
@@ -241,7 +241,7 @@ function GroupDetail({ index }) {
         </Box>
         <RadioGroup
           row
-          value={group.id === 'mehrere' ? 'mehrere' : (group.id ? String(group.id) : '')}
+          value={group.id === 'multiple' ? 'multiple' : (group.id ? String(group.id) : '')}
           onChange={handleGroupModeChange}
         >
           {Object.entries(allGroupsLookup).map(([groupId, groupName]) => (
@@ -252,15 +252,17 @@ function GroupDetail({ index }) {
               label={groupName}
             />
           ))}
-          <FormControlLabel
-            value="mehrere"
-            control={<Radio />}
-            label="Mehrere Gruppen"
-          />
+          {groupDefs.length > 1 && (
+            <FormControlLabel
+              value="multiple"
+              control={<Radio />}
+              label="Mehrere Gruppen"
+            />
+          )}
         </RadioGroup>
       </Box>
-      {/* Segment Override Section - Only shown when "mehrere" is selected */}
-      {group.id === 'mehrere' && (
+      {/* Segment Override Section - Only shown when "multiple" is selected */}
+      {group.id === 'multiple' && (
         <Box sx={{ mb: 3 }}>
           <TableContainer component={Paper} variant="outlined">
             <Table size="small">

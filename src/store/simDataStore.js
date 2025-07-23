@@ -29,16 +29,14 @@ const useSimDataStore = create((set, get) => ({
     newItem = {
       id,
       type: type,
+      source: source, 
       name: newName,
       remark: '',
       startdate: '',
       enddate: '',
       vacation: '',
       absences: [],
-      rawdata: {
-        source,
-        data: {}
-      },
+      rawdata: {},
       originalData: {
         name: '',
         startdate: '',
