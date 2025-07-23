@@ -7,6 +7,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import ModMonitor from './ModMonitor';
 import useSimDataStore from '../../store/simDataStore';
 import useSimScenarioStore from '../../store/simScenarioStore';
+import useSimQualificationStore from '../../store/simQualificationStore';
 
 function SimDataGeneralTab() {
   // Get scenarioId and selected item from store
@@ -15,12 +16,10 @@ function SimDataGeneralTab() {
   const item = useSimDataStore(state => state.getDataItem(scenarioId, selectedItemId));
   const simDataStore = useSimDataStore();
 
-  // Organisation/qualidefs from scenario
-  const organisation = useSimScenarioStore(state => {
-    const scenario = state.scenarios.find(s => s.id === scenarioId);
-    return scenario?.organisation;
-  });
-  const qualiDefs = organisation?.qualidefs || [];
+  // Organisation/qualidefs from qualification store (not scenario)
+  const qualiDefs = useSimQualificationStore(state =>
+    state.getQualificationDefs(scenarioId)
+  );
 
   // Local state for controlled fields
   const [localName, setLocalName] = useState(item?.name ?? '');

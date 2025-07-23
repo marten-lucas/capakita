@@ -7,12 +7,16 @@ import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import useSimScenarioStore from '../../store/simScenarioStore';
+import useSimQualificationStore from '../../store/simQualificationStore';
 
 function OrgaTabQualificationDefs() {
-  const qualiDefs = useSimScenarioStore(state => state.getQualiDefs());
-  const addQualiDef = useSimScenarioStore(state => state.addQualiDef);
-  const updateQualiDef = useSimScenarioStore(state => state.updateQualiDef);
-  const deleteQualiDef = useSimScenarioStore(state => state.deleteQualiDef);
+  const selectedScenarioId = useSimScenarioStore(state => state.selectedScenarioId);
+
+  // Use qualificationDefs CRUD from qualification store
+  const qualiDefs = useSimQualificationStore(state => state.getQualificationDefs(selectedScenarioId));
+  const addQualificationDef = useSimQualificationStore(state => state.addQualificationDef);
+  const updateQualificationDef = useSimQualificationStore(state => state.updateQualificationDef);
+  const deleteQualificationDef = useSimQualificationStore(state => state.deleteQualificationDef);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingQualification, setEditingQualification] = useState(null);
@@ -39,16 +43,16 @@ function OrgaTabQualificationDefs() {
       return;
     }
     if (editingQualification) {
-      updateQualiDef(editingQualification.key, form);
+      updateQualificationDef(selectedScenarioId, editingQualification.key, form);
     } else {
-      addQualiDef(form);
+      addQualificationDef(selectedScenarioId, { ...form });
     }
     handleCloseDialog();
   };
 
   const handleDelete = (qualification) => {
     if (window.confirm(`Möchten Sie die Qualifikation "${qualification.name}" wirklich löschen?`)) {
-      deleteQualiDef(qualification.key);
+      deleteQualificationDef(selectedScenarioId, qualification.key);
     }
   };
 
