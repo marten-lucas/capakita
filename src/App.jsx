@@ -8,13 +8,10 @@ import WelcomePage from './pages/WelcomePage';
 import useSimScenarioStore from './store/simScenarioStore'; 
 import theme from './theme';
 import './App.css'
-import ScenarioManager from './components/ScenarioManager'
+import ScenarioPicker from './components/ScenarioManager/ScenarioPicker'
 
 function App() {
   const scenarios = useSimScenarioStore(state => state.scenarios);
-  const selectedScenarioId = useSimScenarioStore(state => state.selectedScenarioId);
-  const setSelectedScenarioId = useSimScenarioStore(state => state.setSelectedScenarioId);
-  const setSelectedItem = useSimScenarioStore(state => state.setSelectedItem);
 
   // Wenn keine Szenarien vorhanden sind, immer WelcomePage anzeigen
   if (!scenarios || scenarios.length === 0) {
@@ -44,13 +41,8 @@ function App() {
         width: "100vw"
       }}>
         <TopNav />
-        {/* ScenarioManager is now shown below TopNav and above page content */}
-        <ScenarioManager
-          selectedScenarioId={selectedScenarioId}
-          setSelectedScenarioId={setSelectedScenarioId}
-          scenarios={scenarios}
-          setSelectedItem={setSelectedItem}
-        />
+        {/* Use ScenarioPicker directly */}
+        <ScenarioPicker />
         <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
           <Container maxWidth='l'>
             <Routes>
