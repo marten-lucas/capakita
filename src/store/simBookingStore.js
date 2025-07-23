@@ -105,6 +105,25 @@ const useSimBookingStore = create((set, get) => ({
     return get().getBookings(scenarioId, itemId);
   },
 
+  // Import bookings for all data items in a scenario
+  importBookings: (scenarioId, items) =>
+    set(produce((state) => {
+      if (!state.bookingsByScenario[scenarioId]) state.bookingsByScenario[scenarioId] = {};
+      items.forEach(item => {
+        if (!item.id) return;
+        if (!state.bookingsByScenario[scenarioId][item.id]) state.bookingsByScenario[scenarioId][item.id] = {};
+        // Accept both booking and bookings fields
+        const bookingsArr = item.booking || item.bookings;
+        if (Array.isArray(bookingsArr)) {
+          bookingsArr.forEach((booking, idx) => {
+            // Generate a unique id for each booking if not present
+            const id = booking.id || `${item.id}-import-${idx}-${Date.now()}`;
+            state.bookingsByScenario[scenarioId][item.id][id] = { ...booking, id, overlays: {} };
+          });
+        }
+      });
+    })),
+
   // Utility export
   consolidateBookingTimes,
 }));

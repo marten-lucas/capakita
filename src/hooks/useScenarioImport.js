@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import useSimScenarioStore from '../store/simScenarioStore';
 import useSimDataStore from '../store/simDataStore';
+import useSimBookingStore from '../store/simBookingStore';
 import { extractAdebisZipAndData } from '../utils/adebis-import';
 import { convertDDMMYYYYtoYYYYMMDD } from '../utils/dateUtils';
 
@@ -69,6 +70,7 @@ export function useScenarioImport() {
   const addScenario = useSimScenarioStore(state => state.addScenario);
   const setSelectedScenarioId = useSimScenarioStore(state => state.setSelectedScenarioId);
   const importDataItems = useSimDataStore(state => state.importDataItems);
+  const importBookings = useSimBookingStore(state => state.importBookings);
 
   const importScenario = useCallback(
     async ({ file, isAnonymized }) => {
@@ -130,6 +132,12 @@ export function useScenarioImport() {
       // --- Normalize and map imported items ---
       const normalizedItems = processedData.map(mapRawDataToSimData);
 
+      // --- Extract bookings from processedData ---
+      const bookingsImportItems = processedData.map(item => ({
+        id: String(item.id),
+        booking: Array.isArray(item.parseddata?.booking) ? item.parseddata.booking : []
+      }));
+
       const scenarioName = isAnonymized ? 'Importiertes Szenario (anonymisiert)' : 'Importiertes Szenario';
       const newScenario = {
         name: scenarioName,
@@ -149,9 +157,10 @@ export function useScenarioImport() {
       if (lastScenario) {
         setSelectedScenarioId(lastScenario.id);
         importDataItems(lastScenario.id, normalizedItems);
+        importBookings(lastScenario.id, bookingsImportItems);
       }
     },
-    [addScenario, setSelectedScenarioId, importDataItems]
+    [addScenario, setSelectedScenarioId, importDataItems, importBookings]
   );
 
   // Return as object for destructuring

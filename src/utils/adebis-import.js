@@ -210,11 +210,28 @@ export async function extractAdebisZipAndData(
       start: g.GKVON,
       end: g.GKBIS
     }));
-    const bookings = belegungList.filter(b => b.KINDNR === kind.KINDNR).map(b => ({
-      startdate: b.BELVON,
-      enddate: b.BELBIS,
-      times: parseZeiten(b.ZEITEN)
-    }));
+    // --- Build bookings with rawdata and originalData ---
+    const bookings = belegungList.filter(b => b.KINDNR === kind.KINDNR).map(b => {
+      const times = parseZeiten(b.ZEITEN);
+      const rawdata = {
+        BELVON: b.BELVON,
+        BELBIS: b.BELBIS,
+        ZEITEN: b.ZEITEN
+      };
+      const bookingObj = {
+        startdate: b.BELVON,
+        enddate: b.BELBIS,
+        times,
+        rawdata,
+      };
+      bookingObj.originalData = JSON.parse(JSON.stringify({
+        startdate: bookingObj.startdate,
+        enddate: bookingObj.enddate,
+        times: bookingObj.times,
+        rawdata: bookingObj.rawdata
+      }));
+      return bookingObj;
+    });
 
     processedData.push({
       id: idCounter++,
@@ -253,9 +270,28 @@ export async function extractAdebisZipAndData(
   // Employees (capacity)
   const employeeItems = [];
   for (const a of anstellList) {
+    // --- Build booking with rawdata and originalData ---
     const initialBookingTimes = parseZeiten(a.ZEITEN).map(dayTime => ({
       ...dayTime,
       segments: dayTime.segments.map(segment => ({ ...segment, groupId: '' }))
+    }));
+    const bookingRawdata = {
+      BEGINNDAT: a.BEGINNDAT,
+      ENDDAT: a.ENDDAT,
+      ARBZEIT: a.ARBZEIT,
+      ZEITEN: a.ZEITEN
+    };
+    const bookingObj = {
+      startdate: a.BEGINNDAT,
+      enddate: a.ENDDAT,
+      times: initialBookingTimes,
+      rawdata: bookingRawdata
+    };
+    bookingObj.originalData = JSON.parse(JSON.stringify({
+      startdate: bookingObj.startdate,
+      enddate: bookingObj.enddate,
+      times: bookingObj.times,
+      rawdata: bookingObj.rawdata
     }));
 
     const employeeItem = {
@@ -283,11 +319,7 @@ export async function extractAdebisZipAndData(
         qualification: a.QUALIFIK,
         vacation: a.URLAUB,
         worktime: a.ARBZEIT,
-        booking: [{
-          startdate: a.BEGINNDAT,
-          enddate: a.ENDDAT,
-          times: initialBookingTimes
-        }],
+        booking: [bookingObj],
         group: []
       },
       originalParsedData: JSON.parse(JSON.stringify({
@@ -296,11 +328,7 @@ export async function extractAdebisZipAndData(
         qualification: a.QUALIFIK,
         vacation: a.URLAUB,
         worktime: a.ARBZEIT,
-        booking: [{
-          startdate: a.BEGINNDAT,
-          enddate: a.ENDDAT,
-          times: initialBookingTimes
-        }],
+        booking: [bookingObj],
         group: []
       }))
     };
