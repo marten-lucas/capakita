@@ -32,7 +32,16 @@ function mapRawDataToSimData(item) {
     simData.vacation = "";
   } else if (type === 'capacity' && rawdata?.data?.ANSTELLUNG) {
     const anst = rawdata.data.ANSTELLUNG;
-    simData.rawdata = { ANSTELLUNG: anst };
+    // Only keep required fields for rawdata
+    simData.rawdata = {
+      ANSTELLUNG: {
+        IDNR: anst.IDNR,
+        BEGINNDAT: anst.BEGINNDAT,
+        ENDDAT: anst.ENDDAT,
+        URLAUB: anst.URLAUB,
+        VERTRAGART: anst.VERTRAGART
+      }
+    };
     simData.startdate = convertDDMMYYYYtoYYYYMMDD(parseddata?.startdate || anst.BEGINNDAT);
     simData.enddate = convertDDMMYYYYtoYYYYMMDD(parseddata?.enddate || anst.ENDDAT);
     simData.name = name || `Mitarbeiter ${anst.IDNR}` || "";
