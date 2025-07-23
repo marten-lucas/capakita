@@ -1,16 +1,66 @@
 import { useCallback } from 'react';
 import useSimScenarioStore from '../store/simScenarioStore';
-import useSimDataStore from '../store/simDataStore'; // <-- import the data store
-
+import useSimDataStore from '../store/simDataStore';
 import { extractAdebisZipAndData } from '../utils/adebis-import';
+import { convertDDMMYYYYtoYYYYMMDD } from '../utils/dateUtils';
+
+// Utility: Map rawdata to simData attributes
+function mapRawDataToSimData(item) {
+  const { type, rawdata, parseddata, name, id } = item;
+  let simData = {
+    id: String(id),
+    type,
+    source: rawdata?.source || "adebis import",
+    name: name || "",
+    remark: "",
+    startdate: "",
+    enddate: "",
+    dateofbirth: "",
+    vacation: "",
+    absences: [],
+    rawdata: {},
+    overlays: {},
+  };
+
+  if (type === 'demand' && rawdata?.data?.KIND) {
+    const kind = rawdata.data.KIND;
+    simData.rawdata = { KIND: kind };
+    simData.startdate = convertDDMMYYYYtoYYYYMMDD(parseddata?.startdate || kind.AUFNDAT);
+    simData.enddate = convertDDMMYYYYtoYYYYMMDD(parseddata?.enddate || kind.AUSTRDAT);
+    simData.name = name || kind.FNAME || "";
+    simData.dateofbirth = convertDDMMYYYYtoYYYYMMDD(parseddata?.geburtsdatum || kind.GEBDATUM);
+    simData.vacation = "";
+  } else if (type === 'capacity' && rawdata?.data?.ANSTELLUNG) {
+    const anst = rawdata.data.ANSTELLUNG;
+    simData.rawdata = { ANSTELLUNG: anst };
+    simData.startdate = convertDDMMYYYYtoYYYYMMDD(parseddata?.startdate || anst.BEGINNDAT);
+    simData.enddate = convertDDMMYYYYtoYYYYMMDD(parseddata?.enddate || anst.ENDDAT);
+    simData.name = name || `Mitarbeiter ${anst.IDNR}` || "";
+    simData.dateofbirth = ""; // Not available for employees
+    simData.vacation = parseddata?.vacation || (anst.URLAUB !== undefined ? String(anst.URLAUB) : "");
+  } else {
+    simData.rawdata = {};
+  }
+
+  if (Array.isArray(item.absences)) simData.absences = item.absences;
+
+  simData.originalData = JSON.parse(JSON.stringify({
+    name: simData.name,
+    startdate: simData.startdate,
+    enddate: simData.enddate,
+    vacation: simData.vacation,
+    absences: simData.absences,
+    dateofbirth: simData.dateofbirth
+  }));
+
+  return simData;
+}
 
 export function useScenarioImport() {
-  // Use new store API
   const addScenario = useSimScenarioStore(state => state.addScenario);
   const setSelectedScenarioId = useSimScenarioStore(state => state.setSelectedScenarioId);
-  const importDataItems = useSimDataStore(state => state.importDataItems); // <-- get the import function
+  const importDataItems = useSimDataStore(state => state.importDataItems);
 
-  // Return an async callback for importing a scenario
   const importScenario = useCallback(
     async ({ file, isAnonymized }) => {
       const {
@@ -55,23 +105,11 @@ export function useScenarioImport() {
         })()
       }));
 
-      // Ensure group IDs in simulationData are strings
-      const processedDataWithStringGroupIds = processedData.map(item => {
-        if (item.parseddata?.group && Array.isArray(item.parseddata.group)) {
-          item.parseddata.group = item.parseddata.group.map(g => ({
-            ...g,
-            id: g.id !== undefined ? String(g.id) : g.id
-          }));
-        }
-        return item;
-      });
-
       const qualidefs = uniqueQualifications.map(key => ({
         key,
         name: key
       }));
 
-      // Compose rates with amounts (flatten: merge first valid amount into rate)
       const ratesWithAmounts = rates.map(rate => {
         const amountObj = rateAmounts.find(a => a.id === rate.id);
         if (!amountObj) return null;
@@ -80,6 +118,9 @@ export function useScenarioImport() {
 
       const organisation = { groupdefs, qualidefs, rates: ratesWithAmounts };
 
+      // --- Normalize and map imported items ---
+      const normalizedItems = processedData.map(mapRawDataToSimData);
+
       const scenarioName = isAnonymized ? 'Importiertes Szenario (anonymisiert)' : 'Importiertes Szenario';
       const newScenario = {
         name: scenarioName,
@@ -87,20 +128,18 @@ export function useScenarioImport() {
         confidence: 50,
         likelihood: 50,
         baseScenarioId: null,
-        // simulationData: processedDataWithStringGroupIds, // <-- REMOVE this line!
         imported: true,
         importedAnonymized: !!isAnonymized,
         organisation
       };
       addScenario(newScenario);
 
-      // Select the new scenario
+      // Select the new scenario and import normalized data items
       const scenarios = useSimScenarioStore.getState().scenarios;
       const lastScenario = scenarios[scenarios.length - 1];
       if (lastScenario) {
         setSelectedScenarioId(lastScenario.id);
-        // Import data items into simDataStore for this scenario
-        importDataItems(lastScenario.id, processedDataWithStringGroupIds);
+        importDataItems(lastScenario.id, normalizedItems);
       }
     },
     [addScenario, setSelectedScenarioId, importDataItems]
