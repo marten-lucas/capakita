@@ -7,49 +7,11 @@ function generateUID() {
 }
 
 const useSimQualificationStore = create((set, get) => ({
-  // { [scenarioId]: { [qualificationId]: { ...qualificationData, overlays: {...} } } }
-  qualificationsByScenario: {},
-
-  addQualification: (scenarioId, qualification) =>
-    set(produce((state) => {
-      if (!state.qualificationsByScenario[scenarioId]) state.qualificationsByScenario[scenarioId] = {};
-      const id = qualification.id || generateUID();
-      state.qualificationsByScenario[scenarioId][id] = { ...qualification, id, overlays: {} };
-    })),
-
-  updateQualification: (scenarioId, qualificationId, updates) =>
-    set(produce((state) => {
-      if (!state.qualificationsByScenario[scenarioId]?.[qualificationId]) return;
-      state.qualificationsByScenario[scenarioId][qualificationId] = {
-        ...state.qualificationsByScenario[scenarioId][qualificationId],
-        ...updates,
-        overlays: {
-          ...state.qualificationsByScenario[scenarioId][qualificationId].overlays,
-          ...updates.overlays
-        }
-      };
-    })),
-
-  deleteQualification: (scenarioId, qualificationId) =>
-    set(produce((state) => {
-      if (state.qualificationsByScenario[scenarioId]) {
-        delete state.qualificationsByScenario[scenarioId][qualificationId];
-      }
-    })),
-
-  getQualifications: (scenarioId) => {
-    const state = get();
-    return Object.values(state.qualificationsByScenario[scenarioId] || {});
-  },
-
-  getQualification: (scenarioId, qualificationId) => {
-    const state = get();
-    return state.qualificationsByScenario[scenarioId]?.[qualificationId];
-  },
-
-  // Qualification Defs CRUD (global qualification definitions, not assignments)
+  // Structure: { [scenarioId]: [ { ...def } ] }
   qualificationDefsByScenario: {},
+  qualificationAssignmentsByScenario: {},
 
+  // Qualification Defs CRUD
   addQualificationDef: (scenarioId, qualiDef) =>
     set(produce((state) => {
       if (!state.qualificationDefsByScenario[scenarioId]) state.qualificationDefsByScenario[scenarioId] = [];
@@ -77,6 +39,47 @@ const useSimQualificationStore = create((set, get) => ({
   getQualificationDefs: (scenarioId) => {
     const state = get();
     return state.qualificationDefsByScenario[scenarioId] || [];
+  },
+
+  // Qualification Assignments CRUD
+  addQualificationAssignment: (scenarioId, assignment) =>
+    set(produce((state) => {
+      if (!state.qualificationAssignmentsByScenario[scenarioId]) state.qualificationAssignmentsByScenario[scenarioId] = [];
+      const id = assignment.id || generateUID();
+      state.qualificationAssignmentsByScenario[scenarioId].push({ ...assignment, id });
+    })),
+
+  updateQualificationAssignment: (scenarioId, assignmentId, updates) =>
+    set(produce((state) => {
+      const assignments = state.qualificationAssignmentsByScenario[scenarioId];
+      if (!assignments) return;
+      const idx = assignments.findIndex(a => a.id === assignmentId);
+      if (idx !== -1) {
+        assignments[idx] = { ...assignments[idx], ...updates };
+      }
+    })),
+
+  deleteQualificationAssignment: (scenarioId, assignmentId) =>
+    set(produce((state) => {
+      const assignments = state.qualificationAssignmentsByScenario[scenarioId];
+      if (!assignments) return;
+      state.qualificationAssignmentsByScenario[scenarioId] = assignments.filter(a => a.id !== assignmentId);
+    })),
+
+  getQualificationAssignments: (scenarioId) => {
+    const state = get();
+    return state.qualificationAssignmentsByScenario[scenarioId] || [];
+  },
+
+  // Provide a getQualifications method for backward compatibility (returns assignments)
+  getQualifications: (scenarioId) => {
+    const state = get();
+    return state.qualificationAssignmentsByScenario[scenarioId] || [];
+  },
+
+  getQualificationAssignment: (scenarioId, assignmentId) => {
+    const state = get();
+    return (state.qualificationAssignmentsByScenario[scenarioId] || []).find(a => a.id === assignmentId);
   },
 }));
 

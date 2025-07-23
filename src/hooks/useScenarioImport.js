@@ -35,19 +35,18 @@ function mapRawDataToSimData(item) {
     simData.vacation = "";
   } else if (type === 'capacity' && rawdata?.data?.ANSTELLUNG) {
     const anst = rawdata.data.ANSTELLUNG;
-    // Only keep required fields for rawdata
     simData.rawdata = {
       ANSTELLUNG: {
         IDNR: anst.IDNR,
         BEGINNDAT: anst.BEGINNDAT,
         ENDDAT: anst.ENDDAT,
         URLAUB: anst.URLAUB,
-        VERTRAGART: anst.VERTRAGART
+        VERTRAGART: anst.VERTRAGART,
+        QUALIFIK: anst.QUALIFIK
       }
     };
     simData.startdate = convertDDMMYYYYtoYYYYMMDD(parseddata?.startdate || anst.BEGINNDAT);
     simData.enddate = convertDDMMYYYYtoYYYYMMDD(parseddata?.enddate || anst.ENDDAT);
-    // Fallback for name if name and qualification are the same
     let fallbackName = name || `Mitarbeiter ${anst.IDNR}` || "";
     if (
       (anst.QUALIFIK && fallbackName && fallbackName.trim() === anst.QUALIFIK.trim())
@@ -56,8 +55,9 @@ function mapRawDataToSimData(item) {
       else if (anst.QUALIFIK === 'K') fallbackName = 'Kinderpfleger';
     }
     simData.name = fallbackName;
-    simData.dateofbirth = ""; // Not available for employees
+    simData.dateofbirth = "";
     simData.vacation = parseddata?.vacation || (anst.URLAUB !== undefined ? String(anst.URLAUB) : "");
+    // Do not add qualification or qualificationAssignment to simData
   } else {
     simData.rawdata = {};
   }
@@ -71,6 +71,7 @@ function mapRawDataToSimData(item) {
     vacation: simData.vacation,
     absences: simData.absences,
     dateofbirth: simData.dateofbirth
+    // Do not include qualification or qualificationAssignment
   }));
 
   return simData;
@@ -83,6 +84,7 @@ export function useScenarioImport() {
   const importBookings = useSimBookingStore(state => state.importBookings);
   const addGroupDef = useSimGroupStore(state => state.addGroupDef);
   const addQualificationDef = useSimQualificationStore(state => state.addQualificationDef);
+  const addQualificationAssignment = useSimQualificationStore(state => state.addQualificationAssignment);
 
   const importScenario = useCallback(
     async ({ file, isAnonymized }) => {
@@ -175,11 +177,40 @@ export function useScenarioImport() {
         importDataItems(lastScenario.id, normalizedItems);
         importBookings(lastScenario.id, bookingsImportItems);
         groupdefs.forEach(def => addGroupDef(lastScenario.id, def));
-        // Use qualidefs with fallback
         qualidefs.forEach(def => addQualificationDef(lastScenario.id, def));
+        // Only add qualification assignments to qualification store, not to simData items
+        processedData.forEach(item => {
+          if (item.type === 'capacity' && item.parseddata?.qualification) {
+            addQualificationAssignment(lastScenario.id, {
+              qualification: item.parseddata.qualification,
+              rawdata: { QUALIFIK: item.parseddata.qualification },
+              originalData: {
+                qualification: item.parseddata.qualification,
+                rawdata: { QUALIFIK: item.parseddata.qualification }
+              },
+              dataItemId: String(item.id)
+            });
+          }
+        });
+        // Select the first item after import and set tab to "general"
+        setTimeout(() => {
+          const items = useSimDataStore.getState().getDataItems(lastScenario.id);
+          if (items && items.length > 0) {
+            useSimScenarioStore.getState().setSelectedItem(items[0].id);
+            useSimScenarioStore.getState().setSelectedTab?.('general');
+          }
+        }, 0);
       }
     },
-    [addScenario, setSelectedScenarioId, importDataItems, importBookings, addGroupDef, addQualificationDef]
+    [
+      addScenario,
+      setSelectedScenarioId,
+      importDataItems,
+      importBookings,
+      addGroupDef,
+      addQualificationDef,
+      addQualificationAssignment
+    ]
   );
 
   // Return as object for destructuring

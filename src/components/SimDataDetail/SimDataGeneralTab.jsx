@@ -21,6 +21,13 @@ function SimDataGeneralTab() {
     state.getQualificationDefs(scenarioId)
   );
 
+  // Get qualification assignment for this item (for capacity)
+  const qualificationAssignment = useSimQualificationStore(
+    state => item?.type === 'capacity'
+      ? state.getQualificationAssignments(scenarioId).find(a => a.dataItemId === item.id)
+      : null
+  );
+
   // Local state for controlled fields
   const [localName, setLocalName] = useState(item?.name ?? '');
   const [localNote, setLocalNote] = useState(item?.remark ?? '');
@@ -49,6 +56,12 @@ function SimDataGeneralTab() {
   if (!item) {
     return null;
   }
+
+  // For capacity: derive selected qualification from assignment if present
+  const selectedQualification =
+    item?.type === 'capacity'
+      ? (qualificationAssignment?.qualification ?? '')
+      : (item?.qualification ?? '');
 
   return (
     <Box flex={1} display="flex" flexDirection="column" sx={{ overflowY: 'auto', gap: 0 }}>
@@ -148,8 +161,28 @@ function SimDataGeneralTab() {
             </Box>
             <RadioGroup
               row
-              value={item.qualification ?? ''}
-              onChange={(e) => simDataStore.updateDataItemFields(scenarioId, item.id, { qualification: e.target.value })}
+              value={selectedQualification}
+              onChange={(e) => {
+                // Update assignment in qualification store
+                const assignment = useSimQualificationStore
+                  .getState()
+                  .getQualificationAssignments(scenarioId)
+                  .find(a => a.dataItemId === item.id);
+                if (assignment) {
+                  useSimQualificationStore
+                    .getState()
+                    .updateQualificationAssignment(scenarioId, assignment.id, { qualification: e.target.value });
+                } else {
+                  useSimQualificationStore
+                    .getState()
+                    .addQualificationAssignment(scenarioId, {
+                      qualification: e.target.value,
+                      rawdata: { QUALIFIK: e.target.value },
+                      originalData: { qualification: e.target.value, rawdata: { QUALIFIK: e.target.value } },
+                      dataItemId: item.id
+                    });
+                }
+              }}
             >
               {qualiDefs && qualiDefs.length > 0 ? (
                 qualiDefs.map(q => (

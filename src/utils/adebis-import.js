@@ -294,6 +294,18 @@ export async function extractAdebisZipAndData(
       rawdata: bookingObj.rawdata
     }));
 
+    // --- Qualification assignment with rawdata and originalData ---
+    const qualificationAssignment = {
+      qualification: a.QUALIFIK,
+      rawdata: {
+        QUALIFIK: a.QUALIFIK
+      }
+    };
+    qualificationAssignment.originalData = JSON.parse(JSON.stringify({
+      qualification: qualificationAssignment.qualification,
+      rawdata: qualificationAssignment.rawdata
+    }));
+
     const employeeItem = {
       id: idCounter++,
       type: "capacity",
@@ -317,6 +329,7 @@ export async function extractAdebisZipAndData(
         startdate: a.BEGINNDAT,
         enddate: a.ENDDAT,
         qualification: a.QUALIFIK,
+        qualificationAssignment, // <--- add assignment object
         vacation: a.URLAUB,
         worktime: a.ARBZEIT,
         booking: [bookingObj],
@@ -326,6 +339,7 @@ export async function extractAdebisZipAndData(
         startdate: a.BEGINNDAT,
         enddate: a.ENDDAT,
         qualification: a.QUALIFIK,
+        qualificationAssignment,
         vacation: a.URLAUB,
         worktime: a.ARBZEIT,
         booking: [bookingObj],
