@@ -4,9 +4,9 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper
 } from '@mui/material';
 import React, { useMemo, useEffect } from 'react';
-import { convertYYYYMMDDtoDDMMYYYY, convertDDMMYYYYtoYYYYMMDD } from '../../utils/dateUtils';
-import ModMonitor from './ModMonitor';
-import useSimScenarioDataStore from '../../store/simScenarioStore';
+import { convertYYYYMMDDtoDDMMYYYY, convertDDMMYYYYtoYYYYMMDD } from '../../../utils/dateUtils';
+import ModMonitor from '../ModMonitor';
+import useSimScenarioDataStore from '../../../store/simScenarioStore';
 
 function GroupDetail({ group, index, onDelete, onRestore, originalGroup, onUpdateGroup, parentItemId }) {
   const { getItemBookings, updateItemBookings } = useSimScenarioDataStore((state) => ({

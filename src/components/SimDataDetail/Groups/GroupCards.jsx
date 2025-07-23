@@ -4,7 +4,7 @@ import {
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import React from 'react';
 import GroupDetail from './GroupDetail';
-import useSimScenarioDataStore from '../../store/simScenarioStore';
+import useSimScenarioDataStore from '../../../store/simScenarioStore';
 
 // Helper: compare groups for modification
 function groupsModified(localGroups, origGroups) {

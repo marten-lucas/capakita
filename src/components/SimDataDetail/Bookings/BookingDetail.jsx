@@ -2,9 +2,9 @@ import React from 'react';
 import {
   Typography, Box, Button, Divider, TextField, Switch, Slider,
 } from '@mui/material';
-import { convertYYYYMMDDtoDDMMYYYY, convertDDMMYYYYtoYYYYMMDD } from '../../utils/dateUtils';
-import { timeToValue, valueToTime } from '../../utils/timeUtils';
-import ModMonitor from './ModMonitor';
+import { convertYYYYMMDDtoDDMMYYYY, convertDDMMYYYYtoYYYYMMDD } from '../../../utils/dateUtils';
+import { timeToValue, valueToTime } from '../../../utils/timeUtils';
+import ModMonitor from '../ModMonitor';
 
 // DayControl component
 function DayControl({ dayLabel, dayAbbr, dayData, onToggle, onTimeChange, onAddSegment, onRemoveSegment, type }) {

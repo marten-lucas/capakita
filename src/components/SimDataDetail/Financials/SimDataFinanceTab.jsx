@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Box, Button, Menu, MenuItem, Typography } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import useSimScenarioDataStore from '../../store/simScenarioStore';
+import useSimScenarioDataStore from '../../../store/simScenarioStore';
 import FinancialsCards from './FinancialsCards';
 
 const FINANCIAL_TYPES = [

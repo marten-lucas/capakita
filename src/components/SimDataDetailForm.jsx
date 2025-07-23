@@ -1,7 +1,8 @@
 import {
   Typography, Box
 } from '@mui/material';
-import SimulationDataTab from './SimDataDetail/SimulationDataTab';
+import SimDataTabs from './SimDataDetail/SimDataTabs';
+import SimDataGeneralTab from "./SimDataDetail/SimDataGeneralTab";
 import useSimScenarioStore from '../store/simScenarioStore';
 import useSimDataStore from '../store/simDataStore'; 
 
@@ -35,10 +36,9 @@ function SimDataDetailForm() {
       flexDirection="column"
       overflow="auto"
     >
-      <SimulationDataTab />
+      <SimDataTabs />
     </Box>
   );
 }
 
 export default SimDataDetailForm;
-      

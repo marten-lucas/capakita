@@ -11,7 +11,7 @@ import {
   getBonusDefinition,
   calcAvrChildBonus,
   calcAvrInstructorBonus,
-  calcAvrYearlyBonus} from '../../utils/avr-calculator';
+  calcAvrYearlyBonus} from '../../../utils/avr-calculator';
 
 function FinancialsDetail({ financial, onChange, onDelete, item }) {
   // Debug: Show the item as stored in simScenarioStore

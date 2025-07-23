@@ -13,15 +13,15 @@ import GroupIcon from '@mui/icons-material/Group';
 import EuroIcon from '@mui/icons-material/Euro';
 import BugReportIcon from '@mui/icons-material/BugReport'; // Add icon for debug tab
 import SimDataGeneralTab from './SimDataGeneralTab';
-import SimDataBookingTab from './SimDataBookingTab';
-import SimDataGroupsTab from './SimDataGroupsTab';
-import SimDataFinanceTab from './SimDataFinanceTab';
+import SimDataBookingTab from './Bookings/SimDataBookingTab';
+import SimDataGroupsTab from './Groups/SimDataGroupsTab';
+import SimDataFinanceTab from './Financials/SimDataFinanceTab';
 import useSimDataStore from '../../store/simDataStore';
 import useSimScenarioStore from '../../store/simScenarioStore';
 
 import React, { useState } from 'react';
 
-function SimulationDataTab() {
+function SimDataTabs() {
   const [activeTab, setActiveTab] = useState(0);
 
   // Get selected scenario and item id from scenario store
@@ -50,25 +50,20 @@ function SimulationDataTab() {
         sx={{ mb: 2 }}
       >
         <Tab icon={<PersonIcon />} label="Allgemein" />
-        {/* <Tab icon={<AccessTimeIcon />} label="Zeiten" />
-        <Tab icon={<GroupIcon />} label="Gruppen" />
+        <Tab icon={<AccessTimeIcon />} label="Zeiten" />
+        {/* <Tab icon={<GroupIcon />} label="Gruppen" />
         <Tab icon={<EuroIcon />} label="Finanzen" /> */}
         <Tab icon={<BugReportIcon />} label="Debug" /> 
       </Tabs>
       {activeTab === 0 && (
         <SimDataGeneralTab />
       )}
-      {/* {activeTab === 1 && (
-        <SimDataBookingTab
-          item={item}
-          lastAddedBookingIdx={lastAddedBookingIdx}
-          importedBookingCount={importedBookingCount}
-        />
+      {activeTab === 1 && (
+        <SimDataBookingTab/>
       )}
-      {activeTab === 2 && (
+      {/* {activeTab === 2 && (
         <SimDataGroupsTab
           item={item}
-          groups={groups}
           lastAddedGroupIdx={lastAddedGroupIdx}
           importedGroupCount={importedGroupCount}
           handleAddGroup={handleAddGroup}
@@ -82,7 +77,7 @@ function SimulationDataTab() {
           item={item}
         />
       )} */}
-      {activeTab === 1 && (
+      {activeTab === 2 && (
         <Box sx={{ p: 2, overflow: 'auto', maxHeight: 400 }}>
           <Typography variant="h6" gutterBottom>Simulation Item Debug</Typography>
           <pre style={{
@@ -100,5 +95,7 @@ function SimulationDataTab() {
   );
 }
 
-export default SimulationDataTab;
+export default SimDataTabs;
+
+
 

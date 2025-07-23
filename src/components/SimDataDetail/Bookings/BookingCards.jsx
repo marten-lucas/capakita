@@ -2,8 +2,8 @@ import React from 'react';
 import { Typography, Box, Accordion, AccordionSummary, AccordionDetails } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import BookingDetail from './BookingDetail';
-import useSimScenarioDataStore from '../../store/simScenarioStore';
-import { consolidateBookingSummary } from '../../utils/bookingUtils';
+import useSimScenarioDataStore from '../../../store/simScenarioStore';
+import { consolidateBookingSummary } from '../../../utils/bookingUtils';
 
 
 // Hilfsfunktion analog zu SimDataList

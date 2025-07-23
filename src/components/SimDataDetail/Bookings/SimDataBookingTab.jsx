@@ -1,7 +1,7 @@
 import React from 'react';
 import { Typography, Box, Button } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import ModMonitor from './ModMonitor';
+import ModMonitor from '../ModMonitor';
 import BookingCards from './BookingCards';
 
 function SimDataBookingTab({
