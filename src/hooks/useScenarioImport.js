@@ -3,6 +3,7 @@ import useSimScenarioStore from '../store/simScenarioStore';
 import useSimDataStore from '../store/simDataStore';
 import useSimBookingStore from '../store/simBookingStore';
 import useSimGroupStore from '../store/simGroupStore';
+import useSimQualificationStore from '../store/simQualificationStore';
 import { extractAdebisZipAndData } from '../utils/adebis-import';
 import { convertDDMMYYYYtoYYYYMMDD } from '../utils/dateUtils';
 
@@ -46,7 +47,15 @@ function mapRawDataToSimData(item) {
     };
     simData.startdate = convertDDMMYYYYtoYYYYMMDD(parseddata?.startdate || anst.BEGINNDAT);
     simData.enddate = convertDDMMYYYYtoYYYYMMDD(parseddata?.enddate || anst.ENDDAT);
-    simData.name = name || `Mitarbeiter ${anst.IDNR}` || "";
+    // Fallback for name if name and qualification are the same
+    let fallbackName = name || `Mitarbeiter ${anst.IDNR}` || "";
+    if (
+      (anst.QUALIFIK && fallbackName && fallbackName.trim() === anst.QUALIFIK.trim())
+    ) {
+      if (anst.QUALIFIK === 'E') fallbackName = 'Erzieher';
+      else if (anst.QUALIFIK === 'K') fallbackName = 'Kinderpfleger';
+    }
+    simData.name = fallbackName;
     simData.dateofbirth = ""; // Not available for employees
     simData.vacation = parseddata?.vacation || (anst.URLAUB !== undefined ? String(anst.URLAUB) : "");
   } else {
@@ -73,6 +82,7 @@ export function useScenarioImport() {
   const importDataItems = useSimDataStore(state => state.importDataItems);
   const importBookings = useSimBookingStore(state => state.importBookings);
   const addGroupDef = useSimGroupStore(state => state.addGroupDef);
+  const addQualificationDef = useSimQualificationStore(state => state.addQualificationDef);
 
   const importScenario = useCallback(
     async ({ file, isAnonymized }) => {
@@ -118,10 +128,14 @@ export function useScenarioImport() {
         })()
       }));
 
-      const qualidefs = uniqueQualifications.map(key => ({
-        key,
-        name: key
-      }));
+      // QualificationDefs with fallback for E/K
+      const qualidefs = uniqueQualifications.map(key => {
+        let name = key;
+        // Fallback: if name and key are the same and key is E or K, use German name
+        if (key === 'E') name = 'Erzieher';
+        else if (key === 'K') name = 'Kinderpfleger';
+        return { key, name };
+      });
 
       const ratesWithAmounts = rates.map(rate => {
         const amountObj = rateAmounts.find(a => a.id === rate.id);
@@ -160,11 +174,12 @@ export function useScenarioImport() {
         setSelectedScenarioId(lastScenario.id);
         importDataItems(lastScenario.id, normalizedItems);
         importBookings(lastScenario.id, bookingsImportItems);
-        // Import groupdefs into group store
         groupdefs.forEach(def => addGroupDef(lastScenario.id, def));
+        // Use qualidefs with fallback
+        qualidefs.forEach(def => addQualificationDef(lastScenario.id, def));
       }
     },
-    [addScenario, setSelectedScenarioId, importDataItems, importBookings, addGroupDef]
+    [addScenario, setSelectedScenarioId, importDataItems, importBookings, addGroupDef, addQualificationDef]
   );
 
   // Return as object for destructuring
