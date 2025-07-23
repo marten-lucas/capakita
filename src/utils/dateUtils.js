@@ -27,3 +27,23 @@ export function isDateModified(local, original) {
   const origIso = `${origParts[2]}-${origParts[1].padStart(2, '0')}-${origParts[0].padStart(2, '0')}`;
   return origIso !== local;
 }
+
+// Parse date string (dd.mm.yyyy)
+export function parseDate(dateString) {
+  if (!dateString) return null;
+  const parts = dateString.split('.');
+  if (parts.length === 3) {
+    return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+  }
+  return null;
+}
+
+// Check if date is in the future or empty
+export function isFutureOrEmptyDate(dateString) {
+  if (!dateString || dateString.trim() === '') return true;
+  const date = parseDate(dateString);
+  if (!date) return false;
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  return date >= now;
+}

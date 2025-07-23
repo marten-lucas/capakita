@@ -123,10 +123,10 @@ const useSimDataStore = create((set, get) => ({
   },
 
   // Import multiple data items for a scenario (overwrite or merge)
-  importDataItems: (scenarioId, items) =>
+  importDataItems: (scenarioId, simDataList) =>
     set(produce((state) => {
       if (!state.dataByScenario[scenarioId]) state.dataByScenario[scenarioId] = {};
-      items.forEach(item => {
+      simDataList.forEach(item => {
         const id = item.id || generateUID();
         if (!Array.isArray(item.absences)) item.absences = [];
         state.dataByScenario[scenarioId][id] = { ...item, id, overlays: {} };

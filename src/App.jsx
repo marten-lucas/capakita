@@ -5,14 +5,14 @@ import DataPage from './pages/DataPage'
 import VisuPage from './pages/VisuPage'
 import OrgaPage from './pages/OrgaPage'
 import WelcomePage from './pages/WelcomePage';
-import useSimScenarioStore from './store/simScenarioStore'; 
+import useSimScenarioStore from './store/simScenarioStore';
 import theme from './theme';
 import './App.css'
 import ScenarioPicker from './components/ScenarioManager/ScenarioPicker'
 
 function App() {
   const scenarios = useSimScenarioStore(state => state.scenarios);
-
+  console.log(scenarios);
   // Wenn keine Szenarien vorhanden sind, immer WelcomePage anzeigen
   if (!scenarios || scenarios.length === 0) {
     return (

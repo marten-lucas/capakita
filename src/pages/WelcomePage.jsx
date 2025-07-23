@@ -39,7 +39,6 @@ function WelcomePage() {
       confidence: 50,
       likelihood: 50,
       baseScenarioId: null
-      // simulationData removed, handled by simDataStore
     };
     addScenario(newScenario);
     // Setze das neue Szenario als ausgewählt

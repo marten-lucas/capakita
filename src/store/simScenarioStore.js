@@ -114,6 +114,56 @@ const useSimScenarioStore = create(
         if (imported.length === 0) return true;
         return imported.every(s => s.importedAnonymized);
       },
+
+      importScenario: async ({
+        scenarioSettings,
+        groupDefs = [],
+        qualiDefs = [],
+        groupAssignments = [],
+        qualiAssignments = [],
+        simDataList = [],
+        bookingsList = []
+      }) => {
+        // Add scenario (with groupDefs and qualiDefs in organisation)
+        const organisation = {
+          groupdefs: groupDefs,
+          qualidefs: qualiDefs
+        };
+        const scenarioObj = { ...scenarioSettings, organisation };
+        get().addScenario(scenarioObj);
+
+        // Get the new scenario id
+        const scenarios = get().scenarios;
+        const lastScenario = scenarios[scenarios.length - 1];
+        if (!lastScenario) return;
+        const scenarioId = lastScenario.id;
+
+        // Import to other stores
+        // Import groupDefs
+        const useSimGroupStore = (await import('./simGroupStore')).default;
+        useSimGroupStore.getState().importGroupDefs(scenarioId, groupDefs);
+
+        // Import groupAssignments
+        useSimGroupStore.getState().importGroupAssignments(scenarioId, groupAssignments);
+
+        // Import qualiDefs
+        const useSimQualificationStore = (await import('./simQualificationStore')).default;
+        useSimQualificationStore.getState().importQualificationDefs(scenarioId, qualiDefs);
+
+        // Import qualiAssignments
+        useSimQualificationStore.getState().importQualificationAssignments(scenarioId, qualiAssignments);
+
+        // Import simDataList
+        const useSimDataStore = (await import('./simDataStore')).default;
+        useSimDataStore.getState().importDataItems(scenarioId, simDataList);
+
+        // Import bookingsList
+        const useSimBookingStore = (await import('./simBookingStore')).default;
+        useSimBookingStore.getState().importBookings(scenarioId, bookingsList);
+
+        // Optionally select the new scenario
+        set({ selectedScenarioId: scenarioId });
+      },
     }),
     {
       name: 'sim-scenario-storage',
