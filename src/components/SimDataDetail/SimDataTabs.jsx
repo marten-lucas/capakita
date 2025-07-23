@@ -18,6 +18,7 @@ import SimDataGroupsTab from './Groups/SimDataGroupsTab';
 import SimDataFinanceTab from './Financials/SimDataFinanceTab';
 import useSimDataStore from '../../store/simDataStore';
 import useSimScenarioStore from '../../store/simScenarioStore';
+import useSimBookingStore from '../../store/simBookingStore';
 
 import React, { useState } from 'react';
 
@@ -29,6 +30,13 @@ function SimDataTabs() {
   const selectedItemId = useSimScenarioStore(state => state.selectedItems?.[selectedScenarioId]);
   const dataItems = useSimDataStore(state => state.getDataItems(selectedScenarioId));
   const selectedItem = dataItems?.find(item => item.id === selectedItemId);
+
+  // Get bookings for debug tab
+  const bookings = useSimBookingStore(state =>
+    selectedScenarioId && selectedItemId
+      ? state.getBookings(selectedScenarioId, selectedItemId)
+      : []
+  );
 
   // Guard: Wenn item nicht gesetzt, Hinweis anzeigen und return
   if (!selectedItemId) {
@@ -87,7 +95,10 @@ function SimDataTabs() {
             fontSize: 13,
             overflowX: 'auto'
           }}>
-            {JSON.stringify(selectedItem, null, 2)}
+            {JSON.stringify({
+              item: selectedItem,
+              bookings: bookings
+            }, null, 2)}
           </pre>
         </Box>
       )}

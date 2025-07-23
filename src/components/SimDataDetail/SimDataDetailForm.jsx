@@ -1,5 +1,5 @@
 import {
-  Typography, Box
+  Typography, Box, Button
 } from '@mui/material';
 import SimDataTabs from './SimDataTabs';
 import SimDataGeneralTab from "./SimDataGeneralTab";
@@ -25,6 +25,9 @@ function SimDataDetailForm() {
     );
   }
 
+  // Delete handler for manual entry
+  const deleteItem = useSimDataStore(state => state.deleteDataItem);
+
   return (
     <Box
       bgcolor="background.paper"
@@ -37,6 +40,21 @@ function SimDataDetailForm() {
       overflow="auto"
     >
       <SimDataTabs />
+      {/* Show delete button if manual entry */}
+      {item?.rawdata?.source === 'manual entry' && (
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+          <Button
+            variant="outlined"
+            color="error"
+            size="small"
+            fullWidth
+            sx={{ mt: 2 }}
+            onClick={() => deleteItem(item.id)}
+          >
+            Eintrag löschen
+          </Button>
+        </Box>
+      )}
     </Box>
   );
 }

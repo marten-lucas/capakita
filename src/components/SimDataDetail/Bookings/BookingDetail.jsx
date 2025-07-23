@@ -3,7 +3,7 @@ import {
   Typography, Box, Button, Divider, TextField, Switch, Slider,
 } from '@mui/material';
 import { convertYYYYMMDDtoDDMMYYYY, convertDDMMYYYYtoYYYYMMDD } from '../../../utils/dateUtils';
-import { timeToValue, valueToTime } from '../../../utils/timeUtils';
+import { valueToTime } from '../../../utils/timeUtils';
 import ModMonitor from '../ModMonitor';
 import useSimScenarioStore from '../../../store/simScenarioStore';
 import useSimDataStore from '../../../store/simDataStore';
