@@ -14,6 +14,9 @@ function SimDataDetailForm() {
   // Get item from data store using scenarioId and selectedItemId
   const item = useSimDataStore(state => state.getDataItem(scenarioId, selectedItemId));
 
+  // Delete handler for manual entry
+  const deleteItem = useSimDataStore(state => state.deleteDataItem);
+
   // Guard: Wenn item nicht gesetzt, Hinweis anzeigen und return
   if (!item) {
     return (
@@ -24,9 +27,6 @@ function SimDataDetailForm() {
       </Box>
     );
   }
-
-  // Delete handler for manual entry
-  const deleteItem = useSimDataStore(state => state.deleteDataItem);
 
   return (
     <Box
