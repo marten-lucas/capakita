@@ -8,6 +8,7 @@ import ModMonitor from '../ModMonitor';
 import { useSelector, useDispatch } from 'react-redux';
 import DayControl from './BookingDayControl';
 import { selectDataItemsByScenario } from '../../../store/simDataSlice';
+import { createSelector } from '@reduxjs/toolkit';
 
 // BookingDetail component
 const EMPTY_BOOKINGS = [];
@@ -23,13 +24,26 @@ function BookingDetail({ index }) {
   const dataItems = useSelector(dataItemsSelector);
   const item = dataItems?.find(i => i.id === selectedItemId);
 
-  // Use booking slice for bookings and actions
-  const bookings = useSelector(state => {
-    if (!selectedScenarioId || !selectedItemId) return EMPTY_BOOKINGS;
-    const scenarioBookings = state.simBooking.bookingsByScenario[selectedScenarioId] || {};
-    const itemBookings = scenarioBookings[selectedItemId];
-    return itemBookings ? Object.values(itemBookings) : EMPTY_BOOKINGS;
-  });
+  // Create memoized selector for bookings
+  const bookingsSelector = React.useMemo(() => 
+    createSelector(
+      [
+        state => state.simBooking.bookingsByScenario,
+        () => selectedScenarioId,
+        () => selectedItemId
+      ],
+      (bookingsByScenario, scenarioId, itemId) => {
+        if (!scenarioId || !itemId) return EMPTY_BOOKINGS;
+        const scenarioBookings = bookingsByScenario[scenarioId];
+        if (!scenarioBookings) return EMPTY_BOOKINGS;
+        const itemBookings = scenarioBookings[itemId];
+        return itemBookings ? Object.values(itemBookings) : EMPTY_BOOKINGS;
+      }
+    ),
+    [selectedScenarioId, selectedItemId]
+  );
+  
+  const bookings = useSelector(bookingsSelector);
   const booking = bookings?.[index];
   const originalBooking = item?.originalParsedData?.booking?.[index];
   const type = item?.type;

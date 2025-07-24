@@ -5,6 +5,7 @@ import ModMonitor from '../ModMonitor';
 import BookingCards from './BookingCards';
 import { useSelector, useDispatch } from 'react-redux';
 import { selectDataItemsByScenario } from '../../../store/simDataSlice';
+import { createSelector } from '@reduxjs/toolkit';
 
 const EMPTY_BOOKINGS = [];
 
@@ -20,14 +21,26 @@ function SimDataBookingTab() {
   const dataItems = useSelector(dataItemsSelector);
   const selectedItem = dataItems?.find(item => item.id === selectedItemId);
 
-  // Use booking slice for bookings
-  const bookings = useSelector(state => {
-    if (!selectedScenarioId || !selectedItemId) return EMPTY_BOOKINGS;
-    const scenarioBookings = state.simBooking.bookingsByScenario[selectedScenarioId] || {};
-    const itemBookings = scenarioBookings[selectedItemId];
-    return itemBookings ? Object.values(itemBookings) : EMPTY_BOOKINGS;
-  });
-
+  // Create memoized selector for bookings
+  const bookingsSelector = React.useMemo(() => 
+    createSelector(
+      [
+        state => state.simBooking.bookingsByScenario,
+        () => selectedScenarioId,
+        () => selectedItemId
+      ],
+      (bookingsByScenario, scenarioId, itemId) => {
+        if (!scenarioId || !itemId) return EMPTY_BOOKINGS;
+        const scenarioBookings = bookingsByScenario[scenarioId];
+        if (!scenarioBookings) return EMPTY_BOOKINGS;
+        const itemBookings = scenarioBookings[itemId];
+        return itemBookings ? Object.values(itemBookings) : EMPTY_BOOKINGS;
+      }
+    ),
+    [selectedScenarioId, selectedItemId]
+  );
+  
+  const bookings = useSelector(bookingsSelector);
 
   // Handler to add a new booking
   const handleAddBooking = () => {

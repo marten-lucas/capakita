@@ -4,6 +4,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import BookingDetail from './BookingDetail';
 import { useSelector } from 'react-redux';
 import { consolidateBookingSummary } from '../../../utils/bookingUtils';
+import { createSelector } from '@reduxjs/toolkit';
 
 
 // Hilfsfunktion analog zu SimDataList
@@ -30,12 +31,27 @@ function BookingCards() {
   // Use selector for bookings of the selected item
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems[selectedScenarioId]);
-  const bookings = useSelector(state => {
-    if (!selectedScenarioId || !selectedItemId) return EMPTY_BOOKINGS;
-    const scenarioBookings = state.simBooking.bookingsByScenario[selectedScenarioId] || {};
-    const itemBookings = scenarioBookings[selectedItemId];
-    return itemBookings ? Object.values(itemBookings) : EMPTY_BOOKINGS;
-  });
+  
+  // Create memoized selector for bookings
+  const bookingsSelector = React.useMemo(() => 
+    createSelector(
+      [
+        state => state.simBooking.bookingsByScenario,
+        () => selectedScenarioId,
+        () => selectedItemId
+      ],
+      (bookingsByScenario, scenarioId, itemId) => {
+        if (!scenarioId || !itemId) return EMPTY_BOOKINGS;
+        const scenarioBookings = bookingsByScenario[scenarioId];
+        if (!scenarioBookings) return EMPTY_BOOKINGS;
+        const itemBookings = scenarioBookings[itemId];
+        return itemBookings ? Object.values(itemBookings) : EMPTY_BOOKINGS;
+      }
+    ),
+    [selectedScenarioId, selectedItemId]
+  );
+  
+  const bookings = useSelector(bookingsSelector);
 
   // Track expanded accordion index
   const [expandedIdx, setExpandedIdx] = React.useState(bookings && bookings.length > 0 ? 0 : null);
