@@ -36,7 +36,8 @@ const simGroupSlice = createSlice({
     addGroupDef(state, action) {
       const { scenarioId, groupDef } = action.payload;
       if (!state.groupDefsByScenario[scenarioId]) state.groupDefsByScenario[scenarioId] = [];
-      state.groupDefsByScenario[scenarioId].push({ ...groupDef });
+      const defWithId = { ...groupDef, id: groupDef.id || Date.now().toString() };
+      state.groupDefsByScenario[scenarioId].push(defWithId);
     },
     updateGroupDef(state, action) {
       const { scenarioId, groupId, updates } = action.payload;

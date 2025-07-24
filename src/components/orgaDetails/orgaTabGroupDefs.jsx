@@ -52,7 +52,11 @@ function OrgaTabGroupDefs() {
     if (editingGroup) {
       dispatch(updateGroupDef({ scenarioId: selectedScenarioId, groupId: editingGroup.id, updates: groupForm }));
     } else {
-      dispatch(addGroupDef({ scenarioId: selectedScenarioId, groupDef: { ...groupForm } }));
+      // Ensure a unique id is assigned
+      dispatch(addGroupDef({
+        scenarioId: selectedScenarioId,
+        groupDef: { ...groupForm, id: Date.now().toString() }
+      }));
     }
     handleCloseDialog();
   };

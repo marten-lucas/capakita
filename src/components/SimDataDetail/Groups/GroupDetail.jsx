@@ -8,6 +8,9 @@ import { convertYYYYMMDDtoDDMMYYYY, convertDDMMYYYYtoYYYYMMDD } from '../../../u
 import ModMonitor from '../ModMonitor';
 import { useSelector, useDispatch } from 'react-redux';
 import { selectDataItemsByScenario } from '../../../store/simDataSlice';
+import { createSelector } from '@reduxjs/toolkit';
+
+const EMPTY_GROUP_DEFS = [];
 
 function GroupDetail({ index }) {
   const dispatch = useDispatch();
@@ -121,7 +124,19 @@ function GroupDetail({ index }) {
   };
 
   // Restore für Gruppen-ID
-  const groupDefs = useSelector(state => state.simGroup.groupDefsByScenario[selectedScenarioId] || []);
+  const groupDefsSelector = React.useMemo(() =>
+    createSelector(
+      [
+        state => state.simGroup.groupDefsByScenario,
+        () => selectedScenarioId
+      ],
+      (groupDefsByScenario, scenarioId) => {
+        return groupDefsByScenario[scenarioId] || EMPTY_GROUP_DEFS;
+      }
+    ),
+    [selectedScenarioId]
+  );
+  const groupDefs = useSelector(groupDefsSelector);
   const allGroupsLookup = React.useMemo(() => {
     const lookup = {};
     groupDefs.forEach(g => {
