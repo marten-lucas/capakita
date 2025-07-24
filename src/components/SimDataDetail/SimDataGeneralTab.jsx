@@ -14,15 +14,10 @@ function SimDataGeneralTab() {
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
   
-  // Memoized selector for data items
-  const dataItemsSelector = React.useMemo(
-    () => (state) => {
-      if (!selectedScenarioId) return [];
-      return selectDataItemsByScenario(state, selectedScenarioId);
-    },
-    [selectedScenarioId]
+  // Use the memoized selector directly
+  const dataItems = useSelector(state => 
+    selectedScenarioId ? selectDataItemsByScenario(state, selectedScenarioId) : []
   );
-  const dataItems = useSelector(dataItemsSelector);
   
   // Find the selected item
   const item = React.useMemo(() => {
@@ -30,27 +25,22 @@ function SimDataGeneralTab() {
     return dataItems.find(i => i.id === selectedItemId) || null;
   }, [dataItems, selectedItemId]);
 
-  // Memoized selector for qualification definitions
-  const qualiDefsSelector = React.useMemo(
-    () => (state) => {
-      return state.simQualification.qualificationDefsByScenario[selectedScenarioId] || [];
-    },
-    [selectedScenarioId]
-  );
-  const qualiDefs = useSelector(qualiDefsSelector);
+  // Use a static empty array to prevent new references
+  const EMPTY_QUALIFICATIONS = React.useMemo(() => [], []);
+  
+  // Qualification definitions with consistent empty array
+  const qualiDefs = useSelector(state => {
+    if (!selectedScenarioId) return EMPTY_QUALIFICATIONS;
+    return state.simQualification.qualificationDefsByScenario[selectedScenarioId] || EMPTY_QUALIFICATIONS;
+  });
 
-  // Memoized selector for qualification assignment
-  const qualificationAssignmentSelector = React.useMemo(
-    () => (state) => {
-      if (item?.type === 'capacity') {
-        const assignments = state.simQualification.qualificationAssignmentsByScenario[selectedScenarioId] || [];
-        return assignments.find(a => a.dataItemId === item.id) || null;
-      }
-      return null;
-    },
-    [item?.type, item?.id, selectedScenarioId]
-  );
-  const qualificationAssignment = useSelector(qualificationAssignmentSelector);
+  // Qualification assignment with consistent null return
+  const qualificationAssignment = useSelector(state => {
+    if (!item?.id || item?.type !== 'capacity' || !selectedScenarioId) return null;
+    const assignments = state.simQualification.qualificationAssignmentsByScenario[selectedScenarioId];
+    if (!assignments) return null;
+    return assignments.find(a => a.dataItemId === item.id) || null;
+  });
 
   // Local state for controlled fields
   const [localName, setLocalName] = useState(item?.name ?? '');
