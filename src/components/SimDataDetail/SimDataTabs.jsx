@@ -18,7 +18,7 @@ import SimDataGroupsTab from './Groups/SimDataGroupsTab';
 import SimDataFinanceTab from './Financials/SimDataFinanceTab';
 import React, { useState } from 'react';
 import { useSelector } from 'react-redux';
-import { getDataItems } from '../../store/simDataSlice';
+import { selectDataItemsByScenario } from '../../store/simDataSlice';
 import { getBookings } from '../../store/simBookingSlice';
 import { createSelector } from '@reduxjs/toolkit';
 
@@ -42,8 +42,12 @@ function SimDataTabs() {
   const scenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[scenarioId]);
 
-  // Correct selector for data items:
-  const dataItems = useSelector(state => getDataItems(state, scenarioId));
+  // Memoize selector for scenarioId
+  const dataItemsSelector = React.useMemo(
+    () => (state) => selectDataItemsByScenario(state, scenarioId),
+    [scenarioId]
+  );
+  const dataItems = useSelector(dataItemsSelector);
 
   const selectedItem = dataItems?.find(item => item.id === selectedItemId);
 

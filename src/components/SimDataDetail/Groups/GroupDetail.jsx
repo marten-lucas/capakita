@@ -7,15 +7,17 @@ import React, { useMemo, useEffect } from 'react';
 import { convertYYYYMMDDtoDDMMYYYY, convertDDMMYYYYtoYYYYMMDD } from '../../../utils/dateUtils';
 import ModMonitor from '../ModMonitor';
 import { useSelector, useDispatch } from 'react-redux';
+import { selectDataItemsByScenario } from '../../../store/simDataSlice';
 
 function GroupDetail({ index }) {
   const dispatch = useDispatch();
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
-  const dataItems = useSelector(state => {
-    const scenarioData = state.simData.dataByScenario[selectedScenarioId] || {};
-    return Object.values(scenarioData);
-  });
+  const dataItemsSelector = React.useMemo(
+    () => (state) => selectDataItemsByScenario(state, selectedScenarioId),
+    [selectedScenarioId]
+  );
+  const dataItems = useSelector(dataItemsSelector);
   const item = dataItems?.find(i => i.id === selectedItemId);
 
   // Read groups directly from the item (not from scenario store)

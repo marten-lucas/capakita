@@ -7,6 +7,7 @@ import { valueToTime } from '../../../utils/timeUtils';
 import ModMonitor from '../ModMonitor';
 import { useSelector, useDispatch } from 'react-redux';
 import DayControl from './BookingDayControl';
+import { selectDataItemsByScenario } from '../../../store/simDataSlice';
 
 // BookingDetail component
 function BookingDetail({ index }) {
@@ -14,10 +15,11 @@ function BookingDetail({ index }) {
   const dispatch = useDispatch();
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
-  const dataItems = useSelector(state => {
-    const scenarioData = state.simData.dataByScenario[selectedScenarioId] || {};
-    return Object.values(scenarioData);
-  });
+  const dataItemsSelector = React.useMemo(
+    () => (state) => selectDataItemsByScenario(state, selectedScenarioId),
+    [selectedScenarioId]
+  );
+  const dataItems = useSelector(dataItemsSelector);
   const item = dataItems?.find(i => i.id === selectedItemId);
 
   // Use booking slice for bookings and actions

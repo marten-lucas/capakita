@@ -3,15 +3,17 @@ import { Typography, Box } from '@mui/material';
 import ModMonitor from '../ModMonitor';
 import GroupCards from './GroupCards';
 import { useSelector } from 'react-redux';
+import { selectDataItemsByScenario } from '../../../store/simDataSlice';
 
 function SimDataGroupsTab() {
   // Get scenario and item selection
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
-  const dataItems = useSelector(state => {
-    const scenarioData = state.simData.dataByScenario[selectedScenarioId] || {};
-    return Object.values(scenarioData);
-  });
+  const dataItemsSelector = React.useMemo(
+    () => (state) => selectDataItemsByScenario(state, selectedScenarioId),
+    [selectedScenarioId]
+  );
+  const dataItems = useSelector(dataItemsSelector);
   const item = dataItems?.find(i => i.id === selectedItemId);
 
   if (!item) return null;

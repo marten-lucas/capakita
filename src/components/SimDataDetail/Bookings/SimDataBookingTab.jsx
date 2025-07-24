@@ -4,16 +4,18 @@ import AddIcon from '@mui/icons-material/Add';
 import ModMonitor from '../ModMonitor';
 import BookingCards from './BookingCards';
 import { useSelector, useDispatch } from 'react-redux';
+import { selectDataItemsByScenario } from '../../../store/simDataSlice';
 
 function SimDataBookingTab() {
   // Get scenario and item selection
   const dispatch = useDispatch();
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
-  const dataItems = useSelector(state => {
-    const scenarioData = state.simData.dataByScenario[selectedScenarioId] || {};
-    return Object.values(scenarioData);
-  });
+  const dataItemsSelector = React.useMemo(
+    () => (state) => selectDataItemsByScenario(state, selectedScenarioId),
+    [selectedScenarioId]
+  );
+  const dataItems = useSelector(dataItemsSelector);
   const selectedItem = dataItems?.find(item => item.id === selectedItemId);
 
   // Use booking slice for bookings

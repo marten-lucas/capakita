@@ -93,8 +93,7 @@ export const addDataItemAndSelect = ({ scenarioId, item }) => (dispatch, getStat
   });
 };
 
-// Memoized selector: getDataItems
-export const getDataItems = createSelector(
+export const selectDataItemsByScenario = createSelector(
   [
     state => state.simData.dataByScenario,
     (state, scenarioId) => scenarioId

@@ -2,16 +2,19 @@ import {
   Typography, Box, Button
 } from '@mui/material';
 import SimDataTabs from './SimDataTabs';
-import SimDataGeneralTab from "./SimDataGeneralTab";
 import { useSelector, useDispatch } from 'react-redux';
-import { deleteDataItem } from '../../store/simDataSlice';
+import { deleteDataItem, selectDataItemsByScenario } from '../../store/simDataSlice';
 
 function SimDataDetailForm() {
   // Get scenarioId and selected item id from Redux store
   const scenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[scenarioId]);
-  // Get item from data store using scenarioId and selectedItemId
-  const item = useSelector(state => state.simData.dataByScenario[scenarioId]?.[selectedItemId]);
+  const dataItemsSelector = React.useMemo(
+    () => (state) => selectDataItemsByScenario(state, scenarioId),
+    [scenarioId]
+  );
+  const dataItems = useSelector(dataItemsSelector);
+  const item = dataItems?.find(i => i.id === selectedItemId);
   const dispatch = useDispatch();
 
   // Guard: Wenn item nicht gesetzt, Hinweis anzeigen und return

@@ -2,16 +2,18 @@ import React from 'react';
 import { List, ListItemButton, ListItemText, Divider, Box } from '@mui/material';
 import { useSelector, useDispatch } from 'react-redux';
 import { setSelectedItem } from '../store/simScenarioSlice';
-import { getDataItems } from '../store/simDataSlice';
+import { selectDataItemsByScenario } from '../store/simDataSlice';
 
 function SimDataList() {
   const dispatch = useDispatch();
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
-  const data = useSelector(state => {
-    if (!state || !state.simData) return [];
-    return getDataItems(state, selectedScenarioId);
-  });
+
+  const dataSelector = React.useMemo(
+    () => (state) => selectDataItemsByScenario(state, selectedScenarioId),
+    [selectedScenarioId]
+  );
+  const data = useSelector(dataSelector);
   // Define colors for demand/capacity
   const DEMAND_COLOR = '#c0d9f3ff';   // blue for children
   const CAPACITY_COLOR = '#a3c7a5ff'; // green for employees

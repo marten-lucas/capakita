@@ -10,11 +10,11 @@ import {
 } from '@mui/material';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
 import DataImportModal from '../components/modals/DataImportModal';
-import SimDataList from '../components/SimDataList';
+import SimDataList from '../components/SimDataDetail/SimDataList';
 import SimDataDetailForm from '../components/SimDataDetail/SimDataDetailForm';
 import { useSelector, useDispatch } from 'react-redux';
 import { setSelectedScenarioId, addScenario, setScenarioSaveDialogOpen, setScenarioSaveDialogPending } from '../store/simScenarioSlice';
-import { addDataItemAndSelect, getDataItems } from '../store/simDataSlice';
+import { addDataItemAndSelect, selectDataItemsByScenario } from '../store/simDataSlice';
 import ScenarioSaveDialog from '../components/modals/ScenarioSaveDialog';
 import PersonIcon from '@mui/icons-material/Person';
 import ChildCareIcon from '@mui/icons-material/ChildCare';
@@ -31,13 +31,14 @@ function DataPage() {
   const scenarios = useSelector(state => state.simScenario.scenarios);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
   const selectedItem = useSelector(state => state.simData.dataByScenario[selectedScenarioId]?.[selectedItemId]);
-  const simulationData = useSelector(
-    state => {
+  const simulationDataSelector = React.useMemo(
+    () => (state) => {
       const scenarioId = state?.simScenario?.selectedScenarioId;
-      return scenarioId ? getDataItems(state, scenarioId) : [];
+      return scenarioId ? selectDataItemsByScenario(state, scenarioId) : [];
     },
-    []
+    [selectedScenarioId]
   );
+  const simulationData = useSelector(simulationDataSelector);
 
   const { importScenario } = useScenarioImport();
 

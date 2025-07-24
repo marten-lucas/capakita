@@ -6,17 +6,22 @@ import {
 import DeleteIcon from '@mui/icons-material/Delete';
 import ModMonitor from './ModMonitor';
 import { useSelector, useDispatch } from 'react-redux';
+import { selectDataItemsByScenario } from '../../store/simDataSlice';
 
 function SimDataGeneralTab() {
   // Get scenarioId and selected item from store
   const dispatch = useDispatch();
   const scenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[scenarioId]);
-  const item = useSelector(state => {
-    if (!state.simData || !state.simData.dataByScenario) return undefined;
-    const scenarioData = state.simData.dataByScenario[scenarioId] || {};
-    return scenarioData[selectedItemId];
-  });
+
+  const dataItemsSelector = React.useMemo(
+    () => (state) => selectDataItemsByScenario(state, scenarioId),
+    [scenarioId]
+  );
+  const dataItems = useSelector(dataItemsSelector);
+
+  // Get item from data store using scenarioId and selectedItemId
+  const item = dataItems?.find(i => i.id === selectedItemId);
 
   // Organisation/qualidefs from qualification store (not scenario)
   const qualiDefs = useSelector(state => {
