@@ -10,11 +10,20 @@ import AddIcon from '@mui/icons-material/Add';
 import { useSelector, useDispatch } from 'react-redux';
 import { addGroupDef, updateGroupDef, deleteGroupDef } from '../../store/simGroupSlice';
 import IconPicker from './IconPicker';
+import { createSelector } from '@reduxjs/toolkit';
+
+const getGroupDefs = createSelector(
+  [
+    state => state.simGroup.groupDefsByScenario,
+    (state, scenarioId) => scenarioId
+  ],
+  (groupDefsByScenario, scenarioId) => groupDefsByScenario[scenarioId] || []
+);
 
 function OrgaTabGroupDefs() {
   const dispatch = useDispatch();
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
-  const groupDefs = useSelector(state => state.simGroup.groupDefsByScenario[selectedScenarioId] || []);
+  const groupDefs = useSelector(state => getGroupDefs(state, selectedScenarioId));
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState(null);

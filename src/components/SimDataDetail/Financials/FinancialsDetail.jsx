@@ -14,8 +14,7 @@ import {
   calcAvrYearlyBonus} from '../../../utils/avr-calculator';
 
 function FinancialsDetail({ financial, onChange, onDelete, item }) {
-  // Debug: Show the item as stored in simScenarioStore
-  console.log('simScenarioStore item:', item);
+
 
   const handleField = (field, value) => {
     onChange({ ...financial, [field]: value });

@@ -23,9 +23,6 @@ function SimDataBookingTab() {
     return Object.values(scenarioBookings[selectedItemId] || {});
   });
 
-  React.useEffect(() => {
-    console.log('[SimDataBookingTab] bookings:', bookings);
-  }, [bookings]);
 
   // Handler to add a new booking
   const handleAddBooking = () => {

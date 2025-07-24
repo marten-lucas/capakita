@@ -13,6 +13,7 @@ function SimDataGeneralTab() {
   const scenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[scenarioId]);
   const item = useSelector(state => {
+    if (!state.simData || !state.simData.dataByScenario) return undefined;
     const scenarioData = state.simData.dataByScenario[scenarioId] || {};
     return scenarioData[selectedItemId];
   });

@@ -8,7 +8,6 @@ import {
 } from '@mui/material';
 import GroupIcon from '@mui/icons-material/Group';
 import PersonIcon from '@mui/icons-material/Person';
-import { useSelector } from 'react-redux';
 import OrgaTabGroupDefs from '../components/orgaDetails/orgaTabGroupDefs';
 import OrgaTabQualificationDefs from '../components/orgaDetails/orgaTabQualificatoinDefs';
 import OrgaTabRateDefs from '../components/orgaDetails/orgTabRateDefs';
@@ -16,9 +15,6 @@ import OrgaTabRateDefs from '../components/orgaDetails/orgTabRateDefs';
 function OrgaPage() {
   const [activeTab, setActiveTab] = useState(0);
 
-  const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
-  const scenario = useSelector(state => state.simScenario.scenarios.find(s => s.id === selectedScenarioId));
-  console.log('OrgaPage scenario:', scenario);
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#f0f2f5' }}>

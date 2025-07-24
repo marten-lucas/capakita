@@ -12,11 +12,21 @@ import {
   updateQualificationDef,
   deleteQualificationDef
 } from '../../store/simQualificationSlice';
+import { createSelector } from '@reduxjs/toolkit';
+
+// Memoized selector for qualiDefs
+const getQualiDefs = createSelector(
+  [
+    state => state.simQualification.qualificationDefsByScenario,
+    (state, scenarioId) => scenarioId
+  ],
+  (qualificationDefsByScenario, scenarioId) => qualificationDefsByScenario[scenarioId] || []
+);
 
 function OrgaTabQualificationDefs() {
   const dispatch = useDispatch();
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
-  const qualiDefs = useSelector(state => state.simQualification.qualificationDefsByScenario[selectedScenarioId] || []);
+  const qualiDefs = useSelector(state => getQualiDefs(state, selectedScenarioId));
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingQualification, setEditingQualification] = useState(null);
