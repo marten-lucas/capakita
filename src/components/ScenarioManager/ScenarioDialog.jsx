@@ -1,18 +1,14 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Typography, TextField, Slider, Accordion, AccordionSummary, AccordionDetails, List, ListItemButton, ListItemText } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import useSimScenarioStore from '../../store/simScenarioStore';
+import { useSelector, useDispatch } from 'react-redux';
+import { updateScenario, deleteScenario } from '../../store/simScenarioSlice';
 import ScenarioTree from './ScenarioTree';
 
 function ScenarioDialog({ scenarioId, isNew, mode = 'edit', onClose }) {
-    const {
-        getScenarioById,
-        updateScenario,
-        deleteScenario,
-        scenarios
-    } = useSimScenarioStore();
-
-    const scenario = scenarioId ? getScenarioById(scenarioId) : null;
+    const dispatch = useDispatch();
+    const scenarios = useSelector(state => state.simScenario.scenarios);
+    const scenario = scenarioId ? scenarios.find(s => s.id === scenarioId) : null;
 
     const [form, setForm] = useState(() => ({
         name: scenario?.name || '',
@@ -60,14 +56,14 @@ function ScenarioDialog({ scenarioId, isNew, mode = 'edit', onClose }) {
 
     const handleSave = () => {
         if (scenario) {
-            updateScenario(scenario.id, { ...form });
+            dispatch(updateScenario({ scenarioId: scenario.id, updates: { ...form } }));
         }
         onClose?.();
     };
 
     const handleCancel = () => {
         if (isNew && scenario) {
-            deleteScenario(scenario.id);
+            dispatch(deleteScenario(scenario.id));
         }
         onClose?.();
     };
@@ -85,7 +81,7 @@ function ScenarioDialog({ scenarioId, isNew, mode = 'edit', onClose }) {
 
     const handleDeleteConfirmed = () => {
         if (!scenario) return;
-        deleteScenario(scenario.id);
+        dispatch(deleteScenario(scenario.id));
         onClose?.();
     };
 

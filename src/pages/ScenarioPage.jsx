@@ -6,7 +6,8 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
-import useSimScenarioStore from '../store/simScenarioStore';
+import { useSelector, useDispatch } from 'react-redux';
+import { addScenario, updateScenario, deleteScenario } from '../store/simScenarioSlice';
 
 // Helper to build a tree from flat scenario list
 function buildScenarioTree(scenarios) {
@@ -72,13 +73,8 @@ function ScenarioTreeList({ scenarioTree, selectedId, onSelect, level = 0, expan
 }
 
 function ScenarioDetailForm({ scenarioId, scenarios, onCancel }) {
-  const {
-    getScenarioById,
-    updateScenario,
-    deleteScenario,
-  } = useSimScenarioStore();
-
-  const scenario = scenarioId ? getScenarioById(scenarioId) : null;
+  const dispatch = useDispatch();
+  const scenario = scenarios.find(s => s.id === scenarioId);
 
   const [form, setForm] = useState(() => ({
     name: scenario?.name || '',
@@ -114,7 +110,7 @@ function ScenarioDetailForm({ scenarioId, scenarios, onCancel }) {
   const handleChange = (field, value) => {
     setForm(f => ({ ...f, [field]: value }));
     if (scenario) {
-      updateScenario(scenario.id, { ...form, [field]: value });
+      dispatch(updateScenario({ id: scenario.id, updates: { ...form, [field]: value } }));
     }
   };
 
@@ -137,7 +133,7 @@ function ScenarioDetailForm({ scenarioId, scenarios, onCancel }) {
       )
     ) {
       // Delete the main scenario - the store will handle cascading deletes and selection updates
-      deleteScenario(scenario.id);
+      dispatch(deleteScenario(scenario.id));
       onCancel?.();
     }
   };
@@ -222,7 +218,8 @@ function ScenarioDetailForm({ scenarioId, scenarios, onCancel }) {
 }
 
 function ScenarioPage() {
-  const { scenarios, addScenario } = useSimScenarioStore();
+  const scenarios = useSelector(state => state.simScenario.scenarios);
+  const dispatch = useDispatch();
   const [selectedScenario, setSelectedScenario] = useState(null);
   const [expandedMap, setExpandedMap] = useState({});
 
@@ -237,7 +234,7 @@ function ScenarioPage() {
       likelihood: 50,
       baseScenarioId: selectedScenario?.id || null // Use selected scenario as base
     };
-    addScenario(newScenario);
+    dispatch(addScenario(newScenario));
   };
 
   const handleSelect = (scenario) => {

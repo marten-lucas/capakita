@@ -4,14 +4,15 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import EditIcon from '@mui/icons-material/Edit';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
-import useSimScenarioStore from '../../store/simScenarioStore';
+import { useSelector, useDispatch } from 'react-redux';
+import { addScenario, setSelectedScenarioId } from '../../store/simScenarioSlice';
 import ScenarioTree from './ScenarioTree';
 import ScenarioDialog from './ScenarioDialog';
 
 function ScenarioPicker() {
-    const scenarios = useSimScenarioStore(state => state.scenarios);
-    const selectedScenarioId = useSimScenarioStore(state => state.selectedScenarioId);
-    const setSelectedScenarioId = useSimScenarioStore(state => state.setSelectedScenarioId);
+    const dispatch = useDispatch();
+    const scenarios = useSelector(state => state.simScenario.scenarios);
+    const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
 
     const [expanded, setExpanded] = useState(false);
     const [dialogOpen, setDialogOpen] = useState(false);
@@ -27,22 +28,23 @@ function ScenarioPicker() {
         setDialogOpen(true);
     };
     const handleAdd = (baseScenario) => {
-        // Add scenario to store, then open dialog for it
-        const addScenario = useSimScenarioStore.getState().addScenario;
-        addScenario({
+        dispatch(addScenario({
             name: 'Neues Szenario',
             baseScenarioId: baseScenario?.id || null,
             makeNameUnique: true
-
-        });
+        }));
         setTimeout(() => {
-            const allScenarios = useSimScenarioStore.getState().scenarios;
+            const allScenarios = [...scenarios, {
+                name: 'Neues Szenario',
+                baseScenarioId: baseScenario?.id || null,
+                makeNameUnique: true
+            }];
             const lastScenario = allScenarios[allScenarios.length - 1];
             if (lastScenario) {
                 setDialogScenarioId(lastScenario.id);
                 setDialogIsNew(true);
                 setDialogOpen(true);
-                setSelectedScenarioId(lastScenario.id);
+                dispatch(setSelectedScenarioId(lastScenario.id));
             }
         }, 0);
         setExpanded(false);

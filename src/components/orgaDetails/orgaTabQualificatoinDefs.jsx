@@ -6,17 +6,17 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
-import useSimScenarioStore from '../../store/simScenarioStore';
-import useSimQualificationStore from '../../store/simQualificationStore';
+import { useSelector, useDispatch } from 'react-redux';
+import {
+  addQualificationDef,
+  updateQualificationDef,
+  deleteQualificationDef
+} from '../../store/simQualificationSlice';
 
 function OrgaTabQualificationDefs() {
-  const selectedScenarioId = useSimScenarioStore(state => state.selectedScenarioId);
-
-  // Use qualificationDefs CRUD from qualification store
-  const qualiDefs = useSimQualificationStore(state => state.getQualificationDefs(selectedScenarioId));
-  const addQualificationDef = useSimQualificationStore(state => state.addQualificationDef);
-  const updateQualificationDef = useSimQualificationStore(state => state.updateQualificationDef);
-  const deleteQualificationDef = useSimQualificationStore(state => state.deleteQualificationDef);
+  const dispatch = useDispatch();
+  const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
+  const qualiDefs = useSelector(state => state.simQualification.qualificationDefsByScenario[selectedScenarioId] || []);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingQualification, setEditingQualification] = useState(null);
@@ -43,16 +43,16 @@ function OrgaTabQualificationDefs() {
       return;
     }
     if (editingQualification) {
-      updateQualificationDef(selectedScenarioId, editingQualification.key, form);
+      dispatch(updateQualificationDef({ scenarioId: selectedScenarioId, qualiKey: editingQualification.key, updates: form }));
     } else {
-      addQualificationDef(selectedScenarioId, { ...form });
+      dispatch(addQualificationDef({ scenarioId: selectedScenarioId, qualiDef: { ...form } }));
     }
     handleCloseDialog();
   };
 
   const handleDelete = (qualification) => {
     if (window.confirm(`Möchten Sie die Qualifikation "${qualification.name}" wirklich löschen?`)) {
-      deleteQualificationDef(selectedScenarioId, qualification.key);
+      dispatch(deleteQualificationDef({ scenarioId: selectedScenarioId, qualiKey: qualification.key }));
     }
   };
 

@@ -2,11 +2,13 @@ import React from 'react';
 import {
   Box, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Alert
 } from '@mui/material';
-import useSimScenarioStore from '../../store/simScenarioStore';
+import { useSelector } from 'react-redux';
 
 function OrgaTabRateDefs() {
-  const selectedScenarioId = useSimScenarioStore(state => state.selectedScenarioId);
-  const scenario = useSimScenarioStore(state => state.getScenarioById(selectedScenarioId));
+  const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
+  const scenario = useSelector(state =>
+    state.simScenario.scenarios.find(s => s.id === selectedScenarioId)
+  );
   const rates = scenario?.organisation?.rates || [];
 
   return (

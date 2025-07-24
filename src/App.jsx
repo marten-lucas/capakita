@@ -5,13 +5,13 @@ import DataPage from './pages/DataPage'
 import VisuPage from './pages/VisuPage'
 import OrgaPage from './pages/OrgaPage'
 import WelcomePage from './pages/WelcomePage';
-import useSimScenarioStore from './store/simScenarioStore';
+import { useSelector } from 'react-redux';
 import theme from './theme';
 import './App.css'
 import ScenarioPicker from './components/ScenarioManager/ScenarioPicker'
 
 function App() {
-  const scenarios = useSimScenarioStore(state => state.scenarios);
+  const scenarios = useSelector(state => state.simScenario.scenarios);
   // Wenn keine Szenarien vorhanden sind, immer WelcomePage anzeigen
   if (!scenarios || scenarios.length === 0) {
     return (

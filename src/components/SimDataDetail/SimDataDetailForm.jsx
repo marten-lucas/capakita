@@ -3,19 +3,16 @@ import {
 } from '@mui/material';
 import SimDataTabs from './SimDataTabs';
 import SimDataGeneralTab from "./SimDataGeneralTab";
-import useSimScenarioStore from '../../store/simScenarioStore';
-import useSimDataStore from '../../store/simDataStore'; 
+import { useSelector, useDispatch } from 'react-redux';
+import { deleteDataItem } from '../../store/simDataSlice';
 
 function SimDataDetailForm() {
-  // Get scenarioId from store
-  const scenarioId = useSimScenarioStore(state => state.selectedScenarioId);
-  // Get selected item id from scenario store
-  const selectedItemId = useSimScenarioStore(state => state.selectedItems?.[scenarioId]);
+  // Get scenarioId and selected item id from Redux store
+  const scenarioId = useSelector(state => state.simScenario.selectedScenarioId);
+  const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[scenarioId]);
   // Get item from data store using scenarioId and selectedItemId
-  const item = useSimDataStore(state => state.getDataItem(scenarioId, selectedItemId));
-
-  // Delete handler for manual entry
-  const deleteItem = useSimDataStore(state => state.deleteDataItem);
+  const item = useSelector(state => state.simData.dataByScenario[scenarioId]?.[selectedItemId]);
+  const dispatch = useDispatch();
 
   // Guard: Wenn item nicht gesetzt, Hinweis anzeigen und return
   if (!item) {
@@ -49,7 +46,7 @@ function SimDataDetailForm() {
             size="small"
             fullWidth
             sx={{ mt: 2 }}
-            onClick={() => deleteItem(item.id)}
+            onClick={() => dispatch(deleteDataItem({ scenarioId, itemId: item.id }))}
           >
             Eintrag löschen
           </Button>
@@ -60,3 +57,4 @@ function SimDataDetailForm() {
 }
 
 export default SimDataDetailForm;
+

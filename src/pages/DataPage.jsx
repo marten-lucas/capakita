@@ -12,8 +12,9 @@ import FileUploadIcon from '@mui/icons-material/FileUpload';
 import DataImportModal from '../components/modals/DataImportModal';
 import SimDataList from '../components/SimDataList';
 import SimDataDetailForm from '../components/SimDataDetail/SimDataDetailForm';
-import useSimScenarioStore from '../store/simScenarioStore';
-import useSimDataStore from '../store/simDataStore';
+import { useSelector, useDispatch } from 'react-redux';
+import { setSelectedScenarioId, addScenario, setScenarioSaveDialogOpen, setScenarioSaveDialogPending } from '../store/simScenarioSlice';
+import { simDataItemAdd, getDataItems } from '../store/simDataSlice';
 import ScenarioSaveDialog from '../components/modals/ScenarioSaveDialog';
 import PersonIcon from '@mui/icons-material/Person';
 import ChildCareIcon from '@mui/icons-material/ChildCare';
@@ -23,33 +24,17 @@ import { useScenarioImport } from '../hooks/useScenarioImport';
 function DataPage() {
   const [modalOpen, setModalOpen] = useState(false);
 
+  const dispatch = useDispatch();
+  const scenarioSaveDialogOpen = useSelector(state => state.simScenario.scenarioSaveDialogOpen);
+  const scenarioSaveDialogPending = useSelector(state => state.simScenario.scenarioSaveDialogPending);
+  const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
+  const scenarios = useSelector(state => state.simScenario.scenarios);
+  const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
+  const selectedItem = useSelector(state => state.simData.dataByScenario[selectedScenarioId]?.[selectedItemId]);
+  const simulationData = useSelector(() => getDataItems(selectedScenarioId));
 
-  // Use store for dialog state
-  const scenarioSaveDialogOpen = useSimScenarioStore(state => state.scenarioSaveDialogOpen);
-  const setScenarioSaveDialogOpen = useSimScenarioStore(state => state.setScenarioSaveDialogOpen);
-  const scenarioSaveDialogPending = useSimScenarioStore(state => state.scenarioSaveDialogPending);
-  const setScenarioSaveDialogPending = useSimScenarioStore(state => state.setScenarioSaveDialogPending);
-
-  const selectedScenarioId = useSimScenarioStore(state => state.selectedScenarioId);
-  const setSelectedScenarioId = useSimScenarioStore(state => state.setSelectedScenarioId);
-  const scenarios = useSimScenarioStore(state => state.scenarios);
-
-  // Get selected item id from scenario store
-  const selectedItemId = useSimScenarioStore(state => state.selectedItems?.[selectedScenarioId]);
-  // Get selected item from data store using selectedScenarioId and selectedItemId
-  const selectedItem = useSimDataStore(state => state.getDataItem(selectedScenarioId, selectedItemId));
-
-  // Use useSimDataStore directly
-  const simDataItemAdd = useSimDataStore(state => state.simDataItemAdd);
-  const getDataItems = useSimDataStore(state => state.getDataItems);
   const { importScenario } = useScenarioImport();
 
-
-  // Get simulation data for the selected scenario
-  const simulationData = getDataItems(selectedScenarioId);
-
-  // --- Hilfsfunktionen wie in simulator_poc.html ---
-  // Parse DD.MM.YYYY zu Date
 
   const handleImport = async ({ file, isAnonymized }) => {
     await importScenario({ file, isAnonymized });
@@ -64,29 +49,27 @@ function DataPage() {
     setModalOpen(false);
   };
 
-
-
   const actions = [
     {
       icon: <PersonIcon />,
       name: 'Kapazität',
-      onClick: () => simDataItemAdd(selectedScenarioId, "manual entry", "capacity")
+      onClick: () => dispatch(simDataItemAdd(selectedScenarioId, "manual entry", "capacity"))
     },
     {
       icon: <ChildCareIcon />,
       name: 'Bedarf',
-      onClick: () => simDataItemAdd(selectedScenarioId, "manual entry", "demand", true)
+      onClick: () => dispatch(simDataItemAdd(selectedScenarioId, "manual entry", "demand", true))
     },
     {
       icon: <LayersIcon />,
       name: 'Szenario',
-      onClick: () => useSimScenarioStore.getState().addScenario({
+      onClick: () => dispatch(addScenario({
         name: 'Neues Szenario',
         remark: '',
         confidence: 50,
         likelihood: 50,
         baseScenarioId: selectedScenarioId || null
-      })
+      }))
     },
     {
       icon: <FileUploadIcon />,
@@ -101,13 +84,13 @@ function DataPage() {
       const scenarioExists = scenarios.some(s => s.id === selectedScenarioId);
       if (!scenarioExists) {
         // Selected scenario was deleted, select the first available one
-        setSelectedScenarioId(scenarios[0].id);
+        dispatch(setSelectedScenarioId(scenarios[0].id));
       }
     } else if (!selectedScenarioId && scenarios.length > 0) {
       // No scenario selected but scenarios exist, select the first one
-      setSelectedScenarioId(scenarios[0].id);
+      dispatch(setSelectedScenarioId(scenarios[0].id));
     }
-  }, [selectedScenarioId, scenarios, setSelectedScenarioId]);
+  }, [selectedScenarioId, scenarios, dispatch]);
 
   // Show notice if no scenario exists
   if (!scenarios || scenarios.length === 0) {
@@ -171,12 +154,12 @@ function DataPage() {
       />
       <ScenarioSaveDialog
         open={scenarioSaveDialogOpen}
-        onClose={() => { setScenarioSaveDialogOpen(false); setScenarioSaveDialogPending(null); }}
+        onClose={() => { dispatch(setScenarioSaveDialogOpen(false)); dispatch(setScenarioSaveDialogPending(null)); }}
         onSave={(password) => {
           if (scenarioSaveDialogPending) {
             scenarioSaveDialogPending(password);
-            setScenarioSaveDialogOpen(false);
-            setScenarioSaveDialogPending(null);
+            dispatch(setScenarioSaveDialogOpen(false));
+            dispatch(setScenarioSaveDialogPending(null));
           }
         }}
       />

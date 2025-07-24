@@ -7,18 +7,14 @@ import GroupIcon from '@mui/icons-material/Group';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
-import useSimScenarioStore from '../../store/simScenarioStore';
-import useSimGroupStore from '../../store/simGroupStore';
-import IconPicker from '../IconPicker';
+import { useSelector, useDispatch } from 'react-redux';
+import { addGroupDef, updateGroupDef, deleteGroupDef } from '../../store/simGroupSlice';
+import IconPicker from './IconPicker';
 
 function OrgaTabGroupDefs() {
-  const selectedScenarioId = useSimScenarioStore(state => state.selectedScenarioId);
-
-  // Use group store for groupdefs CRUD
-  const groupDefs = useSimGroupStore(state => state.getGroupDefs(selectedScenarioId));
-  const addGroupDef = useSimGroupStore(state => state.addGroupDef);
-  const updateGroupDef = useSimGroupStore(state => state.updateGroupDef);
-  const deleteGroupDef = useSimGroupStore(state => state.deleteGroupDef);
+  const dispatch = useDispatch();
+  const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
+  const groupDefs = useSelector(state => state.simGroup.groupDefsByScenario[selectedScenarioId] || []);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState(null);
@@ -45,16 +41,16 @@ function OrgaTabGroupDefs() {
       return;
     }
     if (editingGroup) {
-      updateGroupDef(selectedScenarioId, editingGroup.id, groupForm);
+      dispatch(updateGroupDef({ scenarioId: selectedScenarioId, groupId: editingGroup.id, updates: groupForm }));
     } else {
-      addGroupDef(selectedScenarioId, { ...groupForm });
+      dispatch(addGroupDef({ scenarioId: selectedScenarioId, groupDef: { ...groupForm } }));
     }
     handleCloseDialog();
   };
 
   const handleDeleteGroup = (group) => {
     if (window.confirm(`Möchten Sie die Gruppe "${group.name}" wirklich löschen?`)) {
-      deleteGroupDef(selectedScenarioId, group.id);
+      dispatch(deleteGroupDef({ scenarioId: selectedScenarioId, groupId: group.id }));
     }
   };
 
@@ -156,4 +152,3 @@ function OrgaTabGroupDefs() {
 }
 
 export default OrgaTabGroupDefs;
- 

@@ -3,25 +3,23 @@ import FileUploadIcon from '@mui/icons-material/FileUpload'
 import { useNavigate } from 'react-router-dom'
 import WeeklyChart from '../components/SimDataCharts/WeeklyChart'
 import MidtermChart from '../components/SimDataCharts/MidtermChart'
-import useSimScenarioStore from '../store/simScenarioStore'
+import { useSelector, useDispatch } from 'react-redux';
+import { setSelectedScenarioId, setScenarioSaveDialogOpen, setScenarioSaveDialogPending } from '../store/simScenarioSlice';
+import React from 'react'
 import ScenarioSaveDialog from '../components/modals/ScenarioSaveDialog'
 import ChartFilterForm from '../components/SimDataCharts/ChartFilterForm'
-import React from 'react'
-import useChartStore from '../store/chartStore'
 
 function VisuPage() {
-  const navigate = useNavigate()
+  const navigate = useNavigate();
 
   // Scenario management
-  const selectedScenarioId = useSimScenarioStore(state => state.selectedScenarioId);
-  const setSelectedScenarioId = useSimScenarioStore(state => state.setSelectedScenarioId);
-  const scenarios = useSimScenarioStore(state => state.scenarios);
+  const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
+  const scenarios = useSelector(state => state.simScenario.scenarios);
+  const dispatch = useDispatch();
 
   // Use store for dialog state
-  const scenarioSaveDialogOpen = useSimScenarioStore(state => state.scenarioSaveDialogOpen);
-  const setScenarioSaveDialogOpen = useSimScenarioStore(state => state.setScenarioSaveDialogOpen);
-  const scenarioSaveDialogPending = useSimScenarioStore(state => state.scenarioSaveDialogPending);
-  const setScenarioSaveDialogPending = useSimScenarioStore(state => state.setScenarioSaveDialogPending);
+  const scenarioSaveDialogOpen = useSelector(state => state.simScenario.scenarioSaveDialogOpen);
+  const scenarioSaveDialogPending = useSelector(state => state.simScenario.scenarioSaveDialogPending);
 
   // Find the selected scenario object
   const selectedScenario = scenarios.find(s => s.id === selectedScenarioId);
@@ -30,21 +28,19 @@ function VisuPage() {
   const simulationData = selectedScenario?.simulationData || [];
 
   // Use chartToggles from store
-  const chartToggles = useChartStore(state => state.chartToggles);
+  const chartToggles = useSelector(state => state.chart.chartToggles);
 
   // Check if selected scenario still exists, if not select the first available one
   React.useEffect(() => {
     if (selectedScenarioId && scenarios.length > 0) {
       const scenarioExists = scenarios.some(s => s.id === selectedScenarioId);
       if (!scenarioExists) {
-        // Selected scenario was deleted, select the first available one
-        setSelectedScenarioId(scenarios[0].id);
+        dispatch(setSelectedScenarioId(scenarios[0].id));
       }
     } else if (!selectedScenarioId && scenarios.length > 0) {
-      // No scenario selected but scenarios exist, select the first one
-      setSelectedScenarioId(scenarios[0].id);
+      dispatch(setSelectedScenarioId(scenarios[0].id));
     }
-  }, [selectedScenarioId, scenarios, setSelectedScenarioId]);
+  }, [selectedScenarioId, scenarios, dispatch]);
 
   // Prüfe ob Szenarien vorhanden sind
   if (!scenarios || scenarios.length === 0) {
@@ -84,12 +80,12 @@ function VisuPage() {
       {/* Scenario Save Dialog */}
       <ScenarioSaveDialog
         open={scenarioSaveDialogOpen}
-        onClose={() => { setScenarioSaveDialogOpen(false); setScenarioSaveDialogPending(null); }}
+        onClose={() => { dispatch(setScenarioSaveDialogOpen(false)); dispatch(setScenarioSaveDialogPending(null)); }}
         onSave={(password) => {
           if (scenarioSaveDialogPending) {
             scenarioSaveDialogPending(password);
-            setScenarioSaveDialogOpen(false);
-            setScenarioSaveDialogPending(null);
+            dispatch(setScenarioSaveDialogOpen(false));
+            dispatch(setScenarioSaveDialogPending(null));
           }
         }}
       />

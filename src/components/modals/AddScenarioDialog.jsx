@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Box } from '@mui/material';
-import useSimScenarioStore from '../../store/simScenarioStore';
+import { useDispatch } from 'react-redux';
+import { addScenario } from '../../store/simScenarioSlice';
 
 function AddScenarioDialog({ open, onClose, onAdded }) {
-  const addScenario = useSimScenarioStore(state => state.addScenario);
+  const dispatch = useDispatch();
 
   const [form, setForm] = useState({
     name: 'Neues Szenario',
@@ -18,7 +19,7 @@ function AddScenarioDialog({ open, onClose, onAdded }) {
   };
 
   const handleAdd = () => {
-    addScenario(form);
+    dispatch(addScenario(form));
     if (onAdded) onAdded();
     setForm({
       name: 'Neues Szenario',

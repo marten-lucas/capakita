@@ -5,34 +5,35 @@ import {
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ModMonitor from './ModMonitor';
-import useSimDataStore from '../../store/simDataStore';
-import useSimScenarioStore from '../../store/simScenarioStore';
-import useSimQualificationStore from '../../store/simQualificationStore';
+import { useSelector, useDispatch } from 'react-redux';
 
 function SimDataGeneralTab() {
   // Get scenarioId and selected item from store
-  const scenarioId = useSimScenarioStore(state => state.selectedScenarioId);
-  const selectedItemId = useSimScenarioStore(state => state.selectedItems?.[scenarioId]);
-  const item = useSimDataStore(state => state.getDataItem(scenarioId, selectedItemId));
-  const simDataStore = useSimDataStore();
+  const dispatch = useDispatch();
+  const scenarioId = useSelector(state => state.simScenario.selectedScenarioId);
+  const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[scenarioId]);
+  const item = useSelector(state => {
+    const scenarioData = state.simData.dataByScenario[scenarioId] || {};
+    return scenarioData[selectedItemId];
+  });
 
   // Organisation/qualidefs from qualification store (not scenario)
-  const qualiDefs = useSimQualificationStore(state =>
-    state.getQualificationDefs(scenarioId)
-  );
+  const qualiDefs = useSelector(state => {
+    return state.simQualification.qualificationDefsByScenario[scenarioId] || [];
+  });
 
   // Get qualification assignment for this item (for capacity)
-  const qualificationAssignment = useSimQualificationStore(
-    state => item?.type === 'capacity'
-      ? state.getQualificationAssignments(scenarioId).find(a => a.dataItemId === item.id)
-      : null
-  );
+  const qualificationAssignment = useSelector(state => {
+    if (item?.type === 'capacity') {
+      const assignments = state.simQualification.qualificationAssignmentsByScenario[scenarioId] || [];
+      return assignments.find(a => a.dataItemId === item.id) || null;
+    }
+    return null;
+  });
 
   // Local state for controlled fields
   const [localName, setLocalName] = useState(item?.name ?? '');
   const [localNote, setLocalNote] = useState(item?.remark ?? '');
-
-
 
   // Manual entry check
   const isManualEntry = item?.rawdata?.source === 'manual';
@@ -43,19 +44,15 @@ function SimDataGeneralTab() {
 
   // Handlers
   const handleDeleteItem = () => {
-    simDataStore.deleteDataItem(scenarioId, item.id);
-    // Optionally: clear selection in scenario store
-    useSimScenarioStore.getState().setSelectedItem(null);
+    dispatch({
+      type: 'simData/deleteDataItem',
+      payload: { scenarioId, itemId: item.id }
+    });
+    dispatch({
+      type: 'simScenario/setSelectedItem',
+      payload: null
+    });
   };
-
-  // Absence handlers
-
-
-
-
-  if (!item) {
-    return null;
-  }
 
   // For capacity: derive selected qualification from assignment if present
   const selectedQualification =
@@ -87,7 +84,10 @@ function SimDataGeneralTab() {
           onChange={(e) => setLocalName(e.target.value)}
           onBlur={() => {
             if (localName !== item.name) {
-              simDataStore.updateDataItemFields(scenarioId, item.id, { name: localName });
+              dispatch({
+                type: 'simData/updateDataItemFields',
+                payload: { scenarioId, itemId: item.id, fields: { name: localName } }
+              });
             }
           }}
           size="small"
@@ -104,7 +104,10 @@ function SimDataGeneralTab() {
           onChange={(e) => setLocalNote(e.target.value)}
           onBlur={() => {
             if (localNote !== item.remark) {
-              simDataStore.updateDataItemFields(scenarioId, item.id, { remark: localNote });
+              dispatch({
+                type: 'simData/updateDataItemFields',
+                payload: { scenarioId, itemId: item.id, fields: { remark: localNote } }
+              });
             }
           }}
           size="small"
@@ -124,7 +127,10 @@ function SimDataGeneralTab() {
             <TextField
               type="date"
               value={item.dateofbirth ?? ''}
-              onChange={(e) => simDataStore.updateDataItemFields(scenarioId, item.id, { dateofbirth: e.target.value })}
+              onChange={(e) => dispatch({
+                type: 'simData/updateDataItemFields',
+                payload: { scenarioId, itemId: item.id, fields: { dateofbirth: e.target.value } }
+              })}
               onBlur={() => {}}
               size="small"
               sx={{ width: 355 }}
@@ -164,23 +170,28 @@ function SimDataGeneralTab() {
               value={selectedQualification}
               onChange={(e) => {
                 // Update assignment in qualification store
-                const assignment = useSimQualificationStore
-                  .getState()
-                  .getQualificationAssignments(scenarioId)
-                  .find(a => a.dataItemId === item.id);
-                if (assignment) {
-                  useSimQualificationStore
-                    .getState()
-                    .updateQualificationAssignment(scenarioId, assignment.id, { qualification: e.target.value });
+                if (qualificationAssignment) {
+                  dispatch({
+                    type: 'simQualification/updateQualificationAssignment',
+                    payload: {
+                      scenarioId,
+                      assignmentId: qualificationAssignment.id,
+                      updates: { qualification: e.target.value }
+                    }
+                  });
                 } else {
-                  useSimQualificationStore
-                    .getState()
-                    .addQualificationAssignment(scenarioId, {
-                      qualification: e.target.value,
-                      rawdata: { QUALIFIK: e.target.value },
-                      originalData: { qualification: e.target.value, rawdata: { QUALIFIK: e.target.value } },
-                      dataItemId: item.id
-                    });
+                  dispatch({
+                    type: 'simQualification/addQualificationAssignment',
+                    payload: {
+                      scenarioId,
+                      assignment: {
+                        qualification: e.target.value,
+                        rawdata: { QUALIFIK: e.target.value },
+                        originalData: { qualification: e.target.value, rawdata: { QUALIFIK: e.target.value } },
+                        dataItemId: item.id
+                      }
+                    }
+                  });
                 }
               }}
             >
@@ -213,7 +224,10 @@ function SimDataGeneralTab() {
             size="small"
             InputLabelProps={{ shrink: true }}
             value={item.startdate ?? ''}
-            onChange={(e) => simDataStore.updateDataItemFields(scenarioId, item.id, { startdate: e.target.value })}
+            onChange={(e) => dispatch({
+              type: 'simData/updateDataItemFields',
+              payload: { scenarioId, itemId: item.id, fields: { startdate: e.target.value } }
+            })}
             sx={{ width: 150 }}
           />
           {/* <ModMonitor
@@ -232,7 +246,10 @@ function SimDataGeneralTab() {
             size="small"
             InputLabelProps={{ shrink: true }}
             value={item.enddate ?? ''}
-            onChange={(e) => simDataStore.updateDataItemFields(scenarioId, item.id, { enddate: e.target.value })}
+            onChange={(e) => dispatch({
+              type: 'simData/updateDataItemFields',
+              payload: { scenarioId, itemId: item.id, fields: { enddate: e.target.value } }
+            })}
             sx={{ width: 150 }}
           />
           {/* <ModMonitor
@@ -256,7 +273,10 @@ function SimDataGeneralTab() {
             const absences = Array.isArray(item?.absences) ? item.absences : [];
             const newAbsence = { start: '', end: '' };
             const newList = [...absences, newAbsence];
-            simDataStore.updateDataItemFields(scenarioId, item.id, { absences: newList });
+            dispatch({
+              type: 'simData/updateDataItemFields',
+              payload: { scenarioId, itemId: item.id, fields: { absences: newList } }
+            });
           }}
           sx={{ mb: 1 }}
         >
@@ -285,7 +305,10 @@ function SimDataGeneralTab() {
                     onChange={(e) => {
                       const newAbsence = { ...absence, start: e.target.value };
                       const newList = item.absences.map((a, i) => (i === idx ? newAbsence : a));
-                      simDataStore.updateDataItemFields(scenarioId, item.id, { absences: newList });
+                      dispatch({
+                        type: 'simData/updateDataItemFields',
+                        payload: { scenarioId, itemId: item.id, fields: { absences: newList } }
+                      });
                     }}
                     sx={{ width: 130 }}
                     inputProps={{ min: new Date().toISOString().split('T')[0] }}
@@ -300,7 +323,10 @@ function SimDataGeneralTab() {
                     onChange={(e) => {
                       const newAbsence = { ...absence, end: e.target.value };
                       const newList = item.absences.map((a, i) => (i === idx ? newAbsence : a));
-                      simDataStore.updateDataItemFields(scenarioId, item.id, { absences: newList });
+                      dispatch({
+                        type: 'simData/updateDataItemFields',
+                        payload: { scenarioId, itemId: item.id, fields: { absences: newList } }
+                      });
                     }}
                     sx={{ width: 130 }}
                     inputProps={{ min: new Date().toISOString().split('T')[0] }}
@@ -314,7 +340,10 @@ function SimDataGeneralTab() {
                     size="small"
                     onClick={() => {
                       const newList = item.absences.filter((_, i) => i !== idx);
-                      simDataStore.updateDataItemFields(scenarioId, item.id, { absences: newList });
+                      dispatch({
+                        type: 'simData/updateDataItemFields',
+                        payload: { scenarioId, itemId: item.id, fields: { absences: newList } }
+                      });
                     }}
                     sx={{ ml: 1 }}
                   >

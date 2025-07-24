@@ -7,15 +7,16 @@ import { useNavigate } from 'react-router-dom';
 import DataImportModal from '../components/modals/DataImportModal';
 import ScenarioLoadDialog from '../components/modals/ScenarioLoadDialog.jsx';
 import { useScenarioImport } from '../hooks/useScenarioImport';
-import useSimScenarioStore from '../store/simScenarioStore';
+import { useSelector, useDispatch } from 'react-redux';
+import { addScenario, setSelectedScenarioId } from '../store/simScenarioSlice';
 
 function WelcomePage() {
   const [importOpen, setImportOpen] = useState(false);
   const [loadOpen, setLoadOpen] = useState(false);
   const navigate = useNavigate();
 
-  const addScenario = useSimScenarioStore(state => state.addScenario);
-  const setSelectedScenarioId = useSimScenarioStore(state => state.setSelectedScenarioId);
+  const dispatch = useDispatch();
+  const scenarios = useSelector(state => state.simScenario.scenarios);
   const { importScenario } = useScenarioImport();
 
   // Handler für DataImportModal
@@ -40,12 +41,11 @@ function WelcomePage() {
       likelihood: 50,
       baseScenarioId: null
     };
-    addScenario(newScenario);
+    dispatch(addScenario(newScenario));
     // Setze das neue Szenario als ausgewählt
-    const scenarios = useSimScenarioStore.getState().scenarios;
     const lastScenario = scenarios[scenarios.length - 1];
     if (lastScenario) {
-      setSelectedScenarioId(lastScenario.id);
+      dispatch(setSelectedScenarioId(lastScenario.id));
     }
     navigate('/data');
   };

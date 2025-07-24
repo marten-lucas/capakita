@@ -5,14 +5,17 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import AddIcon from '@mui/icons-material/Add';
 import React from 'react';
 import GroupDetail from './GroupDetail';
-import useSimScenarioStore from '../../../store/simScenarioStore';
-import useSimDataStore from '../../../store/simDataStore';
+import { useSelector, useDispatch } from 'react-redux';
 
 function GroupCards() {
   // Get scenario and item selection
-  const selectedScenarioId = useSimScenarioStore(state => state.selectedScenarioId);
-  const selectedItemId = useSimScenarioStore(state => state.selectedItems?.[selectedScenarioId]);
-  const dataItems = useSimDataStore(state => state.getDataItems(selectedScenarioId));
+  const dispatch = useDispatch();
+  const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
+  const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
+  const dataItems = useSelector(state => {
+    const scenarioData = state.simData.dataByScenario[selectedScenarioId] || {};
+    return Object.values(scenarioData);
+  });
   const item = dataItems?.find(i => i.id === selectedItemId);
 
   // Read groups directly from the item (not from scenario store)
@@ -20,8 +23,6 @@ function GroupCards() {
   const bookings = item?.bookings || [];
 
   // Add group logic
-  const updateDataItem = useSimDataStore(state => state.updateDataItem);
-
   const handleAddGroup = () => {
     if (!item) return;
     const newGroup = {
@@ -32,7 +33,14 @@ function GroupCards() {
       // Add other default fields as needed
     };
     const updatedGroups = [...groups, newGroup];
-    updateDataItem(selectedScenarioId, item.id, { groups: updatedGroups });
+    dispatch({
+      type: 'simData/updateDataItem',
+      payload: {
+        scenarioId: selectedScenarioId,
+        itemId: item.id,
+        updates: { groups: updatedGroups }
+      }
+    });
   };
 
   // Track expanded accordion index

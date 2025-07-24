@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Box, Button, Menu, MenuItem, Typography } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import useSimScenarioDataStore from '../../../store/simScenarioStore';
+import { useSelector, useDispatch } from 'react-redux';
 import FinancialsCards from './FinancialsCards';
 
 const FINANCIAL_TYPES = [
@@ -12,8 +12,13 @@ const FINANCIAL_TYPES = [
 ];
 
 function SimDataFinanceTab({ item }) {
-  const { getItemFinancials, updateItemFinancials } = useSimScenarioDataStore();
-  const financials = getItemFinancials(item.id);
+  const dispatch = useDispatch();
+  const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
+  const financials = useSelector(state => {
+    if (!selectedScenarioId || !item?.id) return [];
+    const scenarioFinancials = state.simFinancials.financialsByScenario[selectedScenarioId] || {};
+    return Object.values(scenarioFinancials[item.id] || {});
+  });
   const [anchorEl, setAnchorEl] = useState(null);
   const [expandedItems, setExpandedItems] = useState(new Set());
   const open = Boolean(anchorEl);
@@ -37,7 +42,14 @@ function SimDataFinanceTab({ item }) {
       to: '',
       note: ''
     };
-    updateItemFinancials(item.id, [...financials, newObj]);
+    dispatch({
+      type: 'simFinancials/addFinancial',
+      payload: {
+        scenarioId: selectedScenarioId,
+        dataItemId: item.id,
+        financial: newObj
+      }
+    });
     setExpandedItems(prev => new Set([...prev, newId]));
     handleMenuClose();
   };
@@ -55,16 +67,30 @@ function SimDataFinanceTab({ item }) {
   };
 
   const handleUpdateFinancial = (idx, updated) => {
-    const updatedArr = financials.map((f, i) => (i === idx ? updated : f));
-    updateItemFinancials(item.id, updatedArr);
+    const financialId = financials[idx]?.id;
+    if (!financialId) return;
+    dispatch({
+      type: 'simFinancials/updateFinancial',
+      payload: {
+        scenarioId: selectedScenarioId,
+        dataItemId: item.id,
+        financialId,
+        updates: updated
+      }
+    });
   };
 
   const handleDeleteFinancial = (idx) => {
     const financialToDelete = financials[idx];
-    const updatedArr = financials.filter((_, i) => i !== idx);
-    updateItemFinancials(item.id, updatedArr);
-    
-    // Remove deleted item from expanded state
+    if (!financialToDelete) return;
+    dispatch({
+      type: 'simFinancials/deleteFinancial',
+      payload: {
+        scenarioId: selectedScenarioId,
+        dataItemId: item.id,
+        financialId: financialToDelete.id
+      }
+    });
     setExpandedItems(prev => {
       const newSet = new Set(prev);
       newSet.delete(financialToDelete.id);
@@ -106,7 +132,7 @@ function SimDataFinanceTab({ item }) {
         onToggleExpanded={handleToggleExpanded}
         onUpdate={handleUpdateFinancial}
         onDelete={handleDeleteFinancial}
-        item={item} // <-- pass item here
+        item={item}
       />
       {(!financials || financials.length === 0) && (
         <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>

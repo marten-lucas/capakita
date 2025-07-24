@@ -5,23 +5,28 @@ import {
 import { convertYYYYMMDDtoDDMMYYYY, convertDDMMYYYYtoYYYYMMDD } from '../../../utils/dateUtils';
 import { valueToTime } from '../../../utils/timeUtils';
 import ModMonitor from '../ModMonitor';
-import useSimScenarioStore from '../../../store/simScenarioStore';
-import useSimDataStore from '../../../store/simDataStore';
-import useSimBookingStore from '../../../store/simBookingStore';
+import { useSelector, useDispatch } from 'react-redux';
 import DayControl from './BookingDayControl';
+import { deleteBooking } from '../../../store/simBooking'; // Adjust path if needed
 
 // BookingDetail component
 function BookingDetail({ index }) {
   // Get scenario and item selection
-  const selectedScenarioId = useSimScenarioStore(state => state.selectedScenarioId);
-  const selectedItemId = useSimScenarioStore(state => state.selectedItems?.[selectedScenarioId]);
-  const dataItems = useSimDataStore(state => state.getDataItems(selectedScenarioId));
+  const dispatch = useDispatch();
+  const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
+  const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
+  const dataItems = useSelector(state => {
+    const scenarioData = state.simData.dataByScenario[selectedScenarioId] || {};
+    return Object.values(scenarioData);
+  });
   const item = dataItems?.find(i => i.id === selectedItemId);
 
-  // Use booking store for bookings and deleteBooking
-  const bookings = useSimBookingStore(state => state.getSelectedItemBookings());
-  const deleteBooking = useSimBookingStore(state => state.deleteBooking);
-  const updateBooking = useSimBookingStore(state => state.updateBooking);
+  // Use booking slice for bookings and actions
+  const bookings = useSelector(state => {
+    if (!selectedScenarioId || !selectedItemId) return [];
+    const scenarioBookings = state.simBooking.bookingsByScenario[selectedScenarioId] || {};
+    return Object.values(scenarioBookings[selectedItemId] || {});
+  });
   const booking = bookings?.[index];
   const originalBooking = item?.originalParsedData?.booking?.[index];
   const type = item?.type;
@@ -31,7 +36,15 @@ function BookingDetail({ index }) {
   // Helper to update the booking in the store
   const handleUpdateBooking = (updatedBooking) => {
     if (!selectedScenarioId || !selectedItemId || !booking?.id) return;
-    updateBooking(selectedScenarioId, selectedItemId, booking.id, updatedBooking);
+    dispatch({
+      type: 'simBooking/updateBooking',
+      payload: {
+        scenarioId: selectedScenarioId,
+        dataItemId: selectedItemId,
+        bookingId: booking.id,
+        updates: updatedBooking
+      }
+    });
   };
 
   const handleDayToggle = (dayAbbr, isEnabled) => {

@@ -3,41 +3,58 @@ import { Typography, Box, Button } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import ModMonitor from '../ModMonitor';
 import BookingCards from './BookingCards';
-import useSimScenarioStore from '../../../store/simScenarioStore';
-import useSimDataStore from '../../../store/simDataStore';
-import useSimBookingStore from '../../../store/simBookingStore';
+import { useSelector, useDispatch } from 'react-redux';
 
 function SimDataBookingTab() {
   // Get scenario and item selection
-  const selectedScenarioId = useSimScenarioStore(state => state.selectedScenarioId);
-  const selectedItemId = useSimScenarioStore(state => state.selectedItems?.[selectedScenarioId]);
-  const dataItems = useSimDataStore(state => state.getDataItems(selectedScenarioId));
+  const dispatch = useDispatch();
+  const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
+  const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
+  const dataItems = useSelector(state => {
+    const scenarioData = state.simData.dataByScenario[selectedScenarioId] || {};
+    return Object.values(scenarioData);
+  });
   const selectedItem = dataItems?.find(item => item.id === selectedItemId);
 
-  // Use booking store for bookings
-  const bookings = useSimBookingStore(state => state.getSelectedItemBookings());
+  // Use booking slice for bookings
+  const bookings = useSelector(state => {
+    if (!selectedScenarioId || !selectedItemId) return [];
+    const scenarioBookings = state.simBooking.bookingsByScenario[selectedScenarioId] || {};
+    return Object.values(scenarioBookings[selectedItemId] || {});
+  });
 
-  // Log bookings for inspection
   React.useEffect(() => {
     console.log('[SimDataBookingTab] bookings:', bookings);
   }, [bookings]);
 
-  // Use booking store's addBooking
-  const addBooking = useSimBookingStore(state => state.addBooking);
-
   // Handler to add a new booking
   const handleAddBooking = () => {
     if (!selectedScenarioId || !selectedItemId) return;
-    // Add a minimal booking object, adjust as needed
-    addBooking(selectedScenarioId, selectedItemId, {
-      startdate: '',
-      enddate: '',
-      times: [],
+    dispatch({
+      type: 'simBooking/addBooking',
+      payload: {
+        scenarioId: selectedScenarioId,
+        dataItemId: selectedItemId,
+        booking: {
+          startdate: '',
+          enddate: '',
+          times: [],
+        }
+      }
     });
   };
 
-  // Get bookings and handlers from scenario store
-  const handleRestoreBooking = useSimScenarioStore(state => state.handleRestoreBooking);
+  // Restore all bookings to original
+  const handleRestoreBooking = (itemId, originalBookings) => {
+    // Implement your restore logic here, e.g. dispatch an action to replace all bookings for the item
+    dispatch({
+      type: 'simBooking/importBookings',
+      payload: {
+        scenarioId: selectedScenarioId,
+        items: [{ id: itemId, booking: originalBookings }]
+      }
+    });
+  };
 
   if (!selectedItem) return null;
 

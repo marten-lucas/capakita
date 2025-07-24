@@ -1,18 +1,13 @@
-import { List, ListItem, ListItemButton, ListItemText, Divider, Box, ListItemAvatar, Avatar, Chip } from '@mui/material';
-import AccountCircleIcon from '@mui/icons-material/AccountCircle';
-import useSimDataStore from '../store/simDataStore';
-import useSimScenarioStore from '../store/simScenarioStore';
+import { List, ListItemButton, ListItemText, Divider, Box } from '@mui/material';
+import { useSelector, useDispatch } from 'react-redux';
+import { setSelectedItem } from '../store/simScenarioSlice';
+import { getDataItems } from '../store/simDataSlice';
 
 function SimDataList() {
-  // Get selected scenario id from scenario store
-  const selectedScenarioId = useSimScenarioStore(state => state.selectedScenarioId);
-  // Get selected item id for the current scenario from scenario store
-  const selectedItemId = useSimScenarioStore(state => state.selectedItems?.[selectedScenarioId]);
-  // Setter for selected item
-  const setSelectedItem = useSimScenarioStore(state => state.setSelectedItem);
-
-  // Get all items of the selected scenario from the data store
-  const data = useSimDataStore(state => state.getDataItems(selectedScenarioId));
+  const dispatch = useDispatch();
+  const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
+  const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
+  const data = useSelector(() => getDataItems(selectedScenarioId));
   // Define colors for demand/capacity
   const DEMAND_COLOR = '#c0d9f3ff';   // blue for children
   const CAPACITY_COLOR = '#a3c7a5ff'; // green for employees
@@ -42,17 +37,10 @@ function SimDataList() {
         return (
           <div key={item.id}>
             <ListItemButton
-              onClick={() => setSelectedItem(item.id)} // This already saves the selected item id to the scenario store
+              onClick={() => dispatch(setSelectedItem(item.id))}
               selected={selectedItemId === item.id}
               sx={selectedItemId === item.id ? { bgcolor: 'action.selected' } : undefined}
             >
-              {/* <ListItemAvatar>
-                <Avatar sx={{ bgcolor: avatarColor }}>
-                  {item.type === 'demand'
-                    ? groupIcon
-                    : <AccountCircleIcon />}
-                </Avatar>
-              </ListItemAvatar> */}
               <ListItemText
                 primary={
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>

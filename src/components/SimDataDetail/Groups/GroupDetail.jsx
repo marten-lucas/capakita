@@ -6,16 +6,17 @@ import {
 import React, { useMemo, useEffect } from 'react';
 import { convertYYYYMMDDtoDDMMYYYY, convertDDMMYYYYtoYYYYMMDD } from '../../../utils/dateUtils';
 import ModMonitor from '../ModMonitor';
-import useSimScenarioDataStore from '../../../store/simScenarioStore';
-import useSimScenarioStore from '../../../store/simScenarioStore';
-import useSimDataStore from '../../../store/simDataStore';
-import useSimGroupStore from '../../../store/simGroupStore';
+import { useSelector, useDispatch } from 'react-redux';
+import { useSimScenarioDataStore } from '../../../store/simScenarioDataStore';
 
 function GroupDetail({ index }) {
-  // Get scenario and item selection
-  const selectedScenarioId = useSimScenarioStore(state => state.selectedScenarioId);
-  const selectedItemId = useSimScenarioStore(state => state.selectedItems?.[selectedScenarioId]);
-  const dataItems = useSimDataStore(state => state.getDataItems(selectedScenarioId));
+  const dispatch = useDispatch();
+  const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
+  const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
+  const dataItems = useSelector(state => {
+    const scenarioData = state.simData.dataByScenario[selectedScenarioId] || {};
+    return Object.values(scenarioData);
+  });
   const item = dataItems?.find(i => i.id === selectedItemId);
 
   // Read groups directly from the item (not from scenario store)
@@ -23,11 +24,8 @@ function GroupDetail({ index }) {
   const group = groups?.[index];
   const bookings = React.useMemo(() => item?.bookings || [], [item]);
 
-  // Get original group from scenario store's simulationData (for ModMonitor)
-  const scenario = useSimScenarioStore(state =>
-    state.scenarios.find(s => s.id === selectedScenarioId)
-  );
-  const originalGroup = scenario?.simulationData?.find(i => i.id === selectedItemId)?.originalParsedData?.group?.[index];
+  // Get original group from item.originalParsedData (from import)
+  const originalGroup = item?.originalParsedData?.group?.[index];
   const parentItemId = selectedItemId;
 
   // Assign missing segment IDs in an effect, not during render
@@ -75,18 +73,31 @@ function GroupDetail({ index }) {
   }, [bookings]);
 
   // Handler to update group in store
-  const updateDataItem = useSimDataStore(state => state.updateDataItem);
   const handleUpdateGroup = (updatedGroup) => {
     if (!groups || !group) return;
     const updatedGroups = groups.map((g, idx) => (idx === index ? updatedGroup : g));
-    updateDataItem(selectedScenarioId, selectedItemId, { groups: updatedGroups });
+    dispatch({
+      type: 'simData/updateDataItem',
+      payload: {
+        scenarioId: selectedScenarioId,
+        itemId: selectedItemId,
+        updates: { groups: updatedGroups }
+      }
+    });
   };
 
   // Handler to delete group in store
   const handleDeleteGroup = () => {
     if (!groups || !group) return;
     const updatedGroups = groups.filter((_, idx) => idx !== index);
-    updateDataItem(selectedScenarioId, selectedItemId, { groups: updatedGroups });
+    dispatch({
+      type: 'simData/updateDataItem',
+      payload: {
+        scenarioId: selectedScenarioId,
+        itemId: selectedItemId,
+        updates: { groups: updatedGroups }
+      }
+    });
   };
 
   const handleDateChange = (field, value) => {
@@ -102,7 +113,7 @@ function GroupDetail({ index }) {
   };
 
   // Restore für Gruppen-ID
-  const groupDefs = useSimGroupStore(state => state.getGroupDefs(selectedScenarioId));
+  const groupDefs = useSelector(state => state.simGroup.groupDefsByScenario[selectedScenarioId] || []);
   const allGroupsLookup = React.useMemo(() => {
     const lookup = {};
     groupDefs.forEach(g => {
@@ -318,5 +329,4 @@ function GroupDetail({ index }) {
 }
 
 export default GroupDetail;
-
 

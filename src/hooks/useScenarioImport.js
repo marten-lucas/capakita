@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
-import useSimScenarioStore from '../store/simScenarioStore';
+import { useDispatch } from 'react-redux';
+import { importScenario } from '../store/simScenarioSlice';
 import { extractAdebisData } from '../utils/adebis-import';
 import {
   adebis2simData,
@@ -12,9 +13,9 @@ import {
 
 // Minimal scenario import hook using the new adebis-import
 export function useScenarioImport() {
-  const importScenarioToStore = useSimScenarioStore(state => state.importScenario);
+  const dispatch = useDispatch();
 
-  const importScenario = useCallback(
+  const importScenarioHandler = useCallback(
     async ({ file, isAnonymized }) => {
       // Extract rawdata from Adebis ZIP
       const { rawdata } = await extractAdebisData(file, isAnonymized);
@@ -39,8 +40,8 @@ export function useScenarioImport() {
         importedAnonymized: !!isAnonymized
       };
 
-      // Use the new importScenario function and get the created scenario
-      await importScenarioToStore({
+      // Dispatch the importScenario thunk/action
+      await dispatch(importScenario({
         scenarioSettings,
         groupDefs,
         qualiDefs,
@@ -48,12 +49,10 @@ export function useScenarioImport() {
         qualiAssignments,
         simDataList,
         bookingsList
-      });
-
-    
+      }));
     },
-    [importScenarioToStore]
+    [dispatch]
   );
 
-  return { importScenario };
+  return { importScenario: importScenarioHandler };
 }

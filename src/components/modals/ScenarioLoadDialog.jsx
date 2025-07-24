@@ -3,8 +3,9 @@ import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, T
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import CryptoJS from 'crypto-js';
-import useSimScenarioStore from '../../store/simScenarioStore';
-import useChartStore from '../../store/chartStore';
+import { useDispatch } from 'react-redux';
+import { setSelectedScenarioId, setSelectedItem } from '../../store/simScenarioSlice';
+import { setStichtag, setSelectedGroups, setSelectedQualifications, setWeeklySelectedScenarioId, setMidtermSelectedScenarioId, setMidtermTimeDimension, setMidtermSelectedGroups, setMidtermSelectedQualifications, setChartToggles } from '../../store/chartSlice';
 
 function ScenarioLoadDialog({ open, onClose, onLoaded }) {
   const [pwValue, setPwValue] = useState('');
@@ -12,7 +13,7 @@ function ScenarioLoadDialog({ open, onClose, onLoaded }) {
   const [showPw, setShowPw] = useState(false);
   const [file, setFile] = useState(null);
 
-  const setSelectedItem = useSimScenarioStore(state => state.setSelectedItem);
+  const dispatch = useDispatch();
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
@@ -41,12 +42,28 @@ function ScenarioLoadDialog({ open, onClose, onLoaded }) {
       const decrypted = bytes.toString(CryptoJS.enc.Utf8);
       if (!decrypted) throw new Error('Falsches Passwort oder beschädigte Datei.');
       const data = JSON.parse(decrypted);
-      useSimScenarioStore.setState({
-        scenarios: data.scenarios || [],
-        selectedScenarioId: data.selectedScenarioId || null
-      });
-      useChartStore.setState(data.chartStore || {});
-      setSelectedItem(null);
+
+      // Set scenarios and selectedScenarioId
+      if (data.scenarios) {
+        // You may need to dispatch an action to set scenarios array if you have one
+        // dispatch(setScenarios(data.scenarios));
+      }
+      dispatch(setSelectedScenarioId(data.selectedScenarioId || null));
+
+      // Set chart store values if present
+      if (data.chartStore) {
+        if (data.chartStore.stichtag) dispatch(setStichtag(data.chartStore.stichtag));
+        if (data.chartStore.selectedGroups) dispatch(setSelectedGroups(data.chartStore.selectedGroups));
+        if (data.chartStore.selectedQualifications) dispatch(setSelectedQualifications(data.chartStore.selectedQualifications));
+        if (data.chartStore.weeklySelectedScenarioId) dispatch(setWeeklySelectedScenarioId(data.chartStore.weeklySelectedScenarioId));
+        if (data.chartStore.midtermSelectedScenarioId) dispatch(setMidtermSelectedScenarioId(data.chartStore.midtermSelectedScenarioId));
+        if (data.chartStore.midtermTimeDimension) dispatch(setMidtermTimeDimension(data.chartStore.midtermTimeDimension));
+        if (data.chartStore.midtermSelectedGroups) dispatch(setMidtermSelectedGroups(data.chartStore.midtermSelectedGroups));
+        if (data.chartStore.midtermSelectedQualifications) dispatch(setMidtermSelectedQualifications(data.chartStore.midtermSelectedQualifications));
+        if (data.chartStore.chartToggles) dispatch(setChartToggles(data.chartStore.chartToggles));
+      }
+
+      dispatch(setSelectedItem(null));
       setPwError('');
       setPwValue('');
       setFile(null);

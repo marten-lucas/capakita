@@ -2,7 +2,7 @@ import React from 'react';
 import { Typography, Box, Accordion, AccordionSummary, AccordionDetails } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import BookingDetail from './BookingDetail';
-import useSimBookingStore from '../../../store/simBookingStore';
+import { useSelector } from 'react-redux';
 import { consolidateBookingSummary } from '../../../utils/bookingUtils';
 
 
@@ -26,8 +26,14 @@ function getBookingHours(times) {
 }
 
 function BookingCards() {
-  // Use booking store for bookings of the selected item
-  const bookings = useSimBookingStore(state => state.getSelectedItemBookings());
+  // Use selector for bookings of the selected item
+  const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
+  const selectedItemId = useSelector(state => state.simScenario.selectedItems[selectedScenarioId]);
+  const bookings = useSelector(state => {
+    if (!selectedScenarioId || !selectedItemId) return [];
+    const scenarioBookings = state.simBooking.bookingsByScenario[selectedScenarioId] || {};
+    return Object.values(scenarioBookings[selectedItemId] || {});
+  });
 
   // Track expanded accordion index
   const [expandedIdx, setExpandedIdx] = React.useState(bookings && bookings.length > 0 ? 0 : null);

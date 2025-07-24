@@ -6,7 +6,8 @@ import Typography from '@mui/material/Typography'
 import Container from '@mui/material/Container'
 import Button from '@mui/material/Button'
 import { NavLink } from 'react-router-dom'
-import useSimScenarioStore from '../store/simScenarioStore'
+import { useSelector, useDispatch } from 'react-redux';
+import { setScenarioSaveDialogOpen, setScenarioSaveDialogPending } from '../store/simScenarioSlice';
 import StorageIcon from '@mui/icons-material/Storage'
 import BarChartIcon from '@mui/icons-material/BarChart'
 import SettingsIcon from '@mui/icons-material/Settings'
@@ -15,7 +16,6 @@ import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import IconButton from '@mui/material/IconButton';
 import ScenarioSaveDialog from './modals/ScenarioSaveDialog';
-import useChartStore from '../store/chartStore';
 import CryptoJS from 'crypto-js';
 
 const pages = [
@@ -25,19 +25,19 @@ const pages = [
 ];
 
 function TopNav() {
-  const isSaveAllowed = useSimScenarioStore(state => state.isSaveAllowed());
-  const scenarios = useSimScenarioStore(state => state.scenarios);
-
-  // Prüfe, ob alle importierten Szenarien anonymisiert sind oder keine Imports vorliegen
+  const dispatch = useDispatch();
+  const isSaveAllowed = useSelector(state => state.simScenario.isSaveAllowed);
+  const scenarios = useSelector(state => state.simScenario.scenarios);
+  const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
 
   // State for menu anchor
   const [anchorEl, setAnchorEl] = React.useState(null);
 
   // Use store for dialog state
-  const scenarioSaveDialogOpen = useSimScenarioStore(state => state.scenarioSaveDialogOpen);
-  const setScenarioSaveDialogOpen = useSimScenarioStore(state => state.setScenarioSaveDialogOpen);
-  const scenarioSaveDialogPending = useSimScenarioStore(state => state.scenarioSaveDialogPending);
-  const setScenarioSaveDialogPending = useSimScenarioStore(state => state.setScenarioSaveDialogPending);
+  const scenarioSaveDialogOpen = useSelector(state => state.simScenario.scenarioSaveDialogOpen);
+  const scenarioSaveDialogPending = useSelector(state => state.simScenario.scenarioSaveDialogPending);
+
+  const chartData = useSelector(state => state.chart);
 
   const handleMenuOpen = (event) => {
     setAnchorEl(event.currentTarget);
@@ -47,21 +47,13 @@ function TopNav() {
   };
 
   const handleSaveClick = () => {
-    setScenarioSaveDialogOpen(true);
-    setScenarioSaveDialogPending(() => (password) => {
-      const simState = useSimScenarioStore.getState();
-      const chartData = useChartStore.getState();
-
-      // If you want to include all new stores, gather their state here:
-      // const dataItems = useSimDataStore.getState();
-      // const groups = useSimGroupStore.getState();
-      // const bookings = useSimBookingStore.getState();
-      // const financials = useSimFinancialsStore.getState();
-      // const qualifications = useSimQualificationStore.getState();
-
+    dispatch(setScenarioSaveDialogPending(() => (password) => {
+      const simState = {
+        scenarios,
+        selectedScenarioId,
+      };
       const data = {
-        scenarios: simState.scenarios,
-        selectedScenarioId: simState.selectedScenarioId,
+        ...simState,
         chartStore: {
           stichtag: chartData.stichtag,
           selectedGroups: chartData.selectedGroups,
@@ -70,8 +62,6 @@ function TopNav() {
           midtermSelectedGroups: chartData.midtermSelectedGroups,
           midtermSelectedQualifications: chartData.midtermSelectedQualifications
         }
-        // Add new store states here if you want to export them
-        // , dataItems, groups, bookings, financials, qualifications
       };
 
       const json = JSON.stringify(data, null, 2);
@@ -84,7 +74,7 @@ function TopNav() {
       a.download = 'kiga-simulator-data.enc';
       a.click();
       URL.revokeObjectURL(url);
-    });
+    }));
     handleMenuClose();
   };
 
@@ -173,12 +163,12 @@ function TopNav() {
             </Menu>
             <ScenarioSaveDialog
               open={scenarioSaveDialogOpen}
-              onClose={() => { setScenarioSaveDialogOpen(false); setScenarioSaveDialogPending(null); }}
+              onClose={() => { dispatch(setScenarioSaveDialogOpen(false)); dispatch(setScenarioSaveDialogPending(null)); }}
               onSave={(password) => {
                 if (scenarioSaveDialogPending) {
                   scenarioSaveDialogPending(password);
-                  setScenarioSaveDialogOpen(false);
-                  setScenarioSaveDialogPending(null);
+                  dispatch(setScenarioSaveDialogOpen(false));
+                  dispatch(setScenarioSaveDialogPending(null));
                 }
               }}
             />

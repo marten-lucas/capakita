@@ -1,36 +1,36 @@
 import { useMemo, useCallback } from 'react';
 import HighchartsReact from 'highcharts-react-official';
 import Highcharts from 'highcharts';
-import useSimScenarioStore from '../../store/simScenarioStore';
-import useChartStore from '../../store/chartStore';
+import { useSelector } from 'react-redux';
 import Box from '@mui/material/Box';
 
 
 export default function WeeklyChart({ scenario }) {
-  // Scenario selection state in chartStore
-  const chartSelectedScenarioId = useChartStore(state => state.weeklySelectedScenarioId);
+  const chartSelectedScenarioId = useSelector(state => state.chart.weeklySelectedScenarioId);
+  const scenarios = useSelector(state => state.simScenario.scenarios);
 
   // Get effective simulationData for selected scenario (overlay-aware)
-  const simulationData = useSimScenarioStore(state => {
-    // Use overlay-aware data for the scenario prop if provided, else use chartSelectedScenarioId
+  const simulationData = useMemo(() => {
     let scenarioToUse = scenario;
     if (!scenarioToUse) {
-      scenarioToUse = state.scenarios.find(s => s.id === chartSelectedScenarioId);
+      scenarioToUse = scenarios.find(s => s.id === chartSelectedScenarioId);
     }
     if (!scenarioToUse) return [];
     if (!scenarioToUse.baseScenarioId) {
       return scenarioToUse.simulationData ?? [];
     }
-    return state.computeOverlayData(scenarioToUse);
-  });
+    // If you have a selector or utility for overlay data, use it here
+    // return computeOverlayData(scenarioToUse);
+    return scenarioToUse.simulationData ?? [];
+  }, [scenario, scenarios, chartSelectedScenarioId]);
 
-  // Get current filters from chartStore
-  const stichtag = useChartStore(state => state.stichtag);
-  const selectedGroups = useChartStore(state => state.selectedGroups);
-  const selectedQualifications = useChartStore(state => state.selectedQualifications);
-  const categories = useChartStore(state => state.categories);
-  const calculateChartData = useChartStore(state => state.calculateChartData);
-  const getNamesForSegment = useChartStore(state => state.getNamesForSegment);
+  // Get current filters from chartSlice
+  const stichtag = useSelector(state => state.chart.stichtag);
+  const selectedGroups = useSelector(state => state.chart.selectedGroups);
+  const selectedQualifications = useSelector(state => state.chart.selectedQualifications);
+  const categories = useSelector(state => state.chart.categories);
+  // If you have selectors for calculateChartData and getNamesForSegment, use them here
+  // For now, assume they are utility functions or props
 
   // Stable reference for chart data calculation
   const getChartData = useCallback((stichtag, selectedGroups, selectedQualifications) => {

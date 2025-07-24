@@ -15,8 +15,16 @@ import {
 } from '@mui/material';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import TimelineIcon from '@mui/icons-material/Timeline';
-import useChartStore from '../../store/chartStore';
-import useSimScenarioStore from '../../store/simScenarioStore';
+import { useSelector, useDispatch } from 'react-redux';
+import {
+  setStichtag,
+  setSelectedGroups,
+  setSelectedQualifications,
+  setMidtermTimeDimension,
+  setMidtermSelectedGroups,
+  setMidtermSelectedQualifications,
+  setChartToggles
+} from '../../store/chartSlice';
 
 const ITEM_HEIGHT = 48;
 const ITEM_PADDING_TOP = 8;
@@ -110,31 +118,30 @@ function extractDatesOfInterest(simulationData) {
 }
 
 function ChartFilterForm({ showStichtag = false, simulationData }) {
-  const {
-    // Weekly filters
-    stichtag,
-    setStichtag,
-    selectedGroups,
-    setSelectedGroups,
-    selectedQualifications,
-    setSelectedQualifications,
+  const dispatch = useDispatch();
 
-    // Midterm filters
-    midtermTimeDimension,
-    setMidtermTimeDimension,
-    midtermSelectedGroups,
-    setMidtermSelectedGroups,
-    midtermSelectedQualifications,
-    setMidtermSelectedQualifications,
+  // Weekly filters
+  const stichtag = useSelector(state => state.chart.stichtag);
+  const selectedGroups = useSelector(state => state.chart.selectedGroups);
+  const selectedQualifications = useSelector(state => state.chart.selectedQualifications);
 
-    // Chart toggles
-    chartToggles,
-    setChartToggles
-  } = useChartStore();
+  // Midterm filters
+  const midtermTimeDimension = useSelector(state => state.chart.midtermTimeDimension);
+  const midtermSelectedGroups = useSelector(state => state.chart.midtermSelectedGroups);
+  const midtermSelectedQualifications = useSelector(state => state.chart.midtermSelectedQualifications);
+
+  // Chart toggles
+  const chartToggles = useSelector(state => state.chart.chartToggles);
 
   // Get available groups/qualifications from scenario
-  const groupDefs = useSimScenarioStore(state => state.getGroupDefs());
-  const qualiDefs = useSimScenarioStore(state => state.getQualiDefs());
+  const groupDefs = useSelector(state => {
+    const scenarioId = state.simScenario.selectedScenarioId;
+    return state.simGroup.groupDefsByScenario[scenarioId] || [];
+  });
+  const qualiDefs = useSelector(state => {
+    const scenarioId = state.simScenario.selectedScenarioId;
+    return state.simQualification.qualificationDefsByScenario[scenarioId] || [];
+  });
   // Build availableGroups lookup { id: name }
   const availableGroups = React.useMemo(() => {
     const lookup = {};
@@ -171,39 +178,38 @@ function ChartFilterForm({ showStichtag = false, simulationData }) {
   const currentQualifications = showMidterm && !showWeekly ? midtermSelectedQualifications : selectedQualifications;
 
   const handleGroupChange = (event) => {
-    // Ensure only IDs are used
     const value = typeof event.target.value === 'string'
       ? event.target.value.split(',')
       : event.target.value;
     if (showMidterm && !showWeekly) {
-      setMidtermSelectedGroups(value);
+      dispatch(setMidtermSelectedGroups(value));
     } else {
-      setSelectedGroups(value);
+      dispatch(setSelectedGroups(value));
     }
     // Sync both if both charts are visible
     if (showWeekly && showMidterm) {
-      setMidtermSelectedGroups(value);
-      setSelectedGroups(value);
+      dispatch(setMidtermSelectedGroups(value));
+      dispatch(setSelectedGroups(value));
     }
   };
 
   const handleQualificationChange = (event) => {
     const value = typeof event.target.value === 'string' ? event.target.value.split(',') : event.target.value;
     if (showMidterm && !showWeekly) {
-      setMidtermSelectedQualifications(value);
+      dispatch(setMidtermSelectedQualifications(value));
     } else {
-      setSelectedQualifications(value);
+      dispatch(setSelectedQualifications(value));
     }
     // Sync both if both charts are visible
     if (showWeekly && showMidterm) {
-      setMidtermSelectedQualifications(value);
-      setSelectedQualifications(value);
+      dispatch(setMidtermSelectedQualifications(value));
+      dispatch(setSelectedQualifications(value));
     }
   };
 
   // Chart toggle logic (allow toggling both on/off independently)
   const handleToggle = (event, newToggles) => {
-    setChartToggles(newToggles);
+    dispatch(setChartToggles(newToggles));
   };
 
   // Dates of Interest for weekly chart
@@ -303,7 +309,7 @@ function ChartFilterForm({ showStichtag = false, simulationData }) {
                 label="Stichtag"
                 type="date"
                 value={stichtag}
-                onChange={(e) => setStichtag(e.target.value)}
+                onChange={(e) => dispatch(setStichtag(e.target.value))}
                 InputLabelProps={{
                   shrink: true,
                 }}
@@ -320,7 +326,7 @@ function ChartFilterForm({ showStichtag = false, simulationData }) {
                 label="Dates of Interest"
                 displayEmpty
                 value={datesOfInterest.find(item => item.date === stichtag)?.date || ""}
-                onChange={(e) => setStichtag(e.target.value)}
+                onChange={(e) => dispatch(setStichtag(e.target.value))}
                 renderValue={selected => {
                   if (!selected) return <span style={{ color: '#888' }}>Dates of Interest</span>;
                   const item = datesOfInterest.find(i => i.date === selected);
@@ -374,7 +380,7 @@ function ChartFilterForm({ showStichtag = false, simulationData }) {
               <InputLabel>Zeitdimension</InputLabel>
               <Select
                 value={midtermTimeDimension}
-                onChange={(e) => setMidtermTimeDimension(e.target.value)}
+                onChange={(e) => dispatch(setMidtermTimeDimension(e.target.value))}
                 label="Zeitdimension"
               >
                 <MenuItem value="week">Woche</MenuItem>

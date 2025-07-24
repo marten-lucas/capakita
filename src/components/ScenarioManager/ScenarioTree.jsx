@@ -5,7 +5,8 @@ import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import EditIcon from '@mui/icons-material/Edit';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
-import useSimScenarioStore from '../../store/simScenarioStore';
+import { useSelector, useDispatch } from 'react-redux';
+import { setSelectedScenarioId } from '../../store/simScenarioSlice';
 
 // Context to track nesting level
 const LevelContext = createContext(0);
@@ -14,10 +15,9 @@ function ScenarioTreeList({ onEdit, onAdd, onDelete }) {
     const [expandedMap, setExpandedMap] = useState({});
     const level = useContext(LevelContext);
 
-    // Read scenarios and selection directly from store
-    const scenarios = useSimScenarioStore(state => state.scenarios);
-    const selectedScenarioId = useSimScenarioStore(state => state.selectedScenarioId);
-    const setSelectedScenarioId = useSimScenarioStore(state => state.setSelectedScenarioId);
+    const dispatch = useDispatch();
+    const scenarios = useSelector(state => state.simScenario.scenarios);
+    const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
 
     // Build scenario tree structure
     const scenarioTree = useMemo(() => {
@@ -44,7 +44,7 @@ function ScenarioTreeList({ onEdit, onAdd, onDelete }) {
                 <ListItemButton
                     selected={isSelected}
                     onClick={() => {
-                        setSelectedScenarioId(scenario.id);
+                        dispatch(setSelectedScenarioId(scenario.id));
                     }}
                     sx={{
                         pl: 2 + level * 2,
@@ -146,8 +146,8 @@ function ScenarioTreeList({ onEdit, onAdd, onDelete }) {
 function ScenarioTreeChildren({ childrenScenarios, onEdit, onAdd, onDelete }) {
     const [expandedMap, setExpandedMap] = useState({});
     const level = useContext(LevelContext);
-    const selectedScenarioId = useSimScenarioStore(state => state.selectedScenarioId);
-    const setSelectedScenarioId = useSimScenarioStore(state => state.setSelectedScenarioId);
+    const dispatch = useDispatch();
+    const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
 
     return childrenScenarios.map(scenario => {
         const hasChildren = scenario.children && scenario.children.length > 0;
@@ -158,7 +158,7 @@ function ScenarioTreeChildren({ childrenScenarios, onEdit, onAdd, onDelete }) {
                 <ListItemButton
                     selected={isSelected}
                     onClick={() => {
-                        setSelectedScenarioId(scenario.id);
+                        dispatch(setSelectedScenarioId(scenario.id));
                     }}
                     sx={{
                         pl: 2 + level * 2,
