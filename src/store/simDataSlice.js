@@ -84,7 +84,7 @@ const simDataSlice = createSlice({
 });
 
 // Thunk for adding a data item and selecting it
-export const addDataItemAndSelect = ({ scenarioId, item }) => (dispatch, getState) => {
+export const addDataItemAndSelect = ({ scenarioId, item }) => (dispatch) => {
   const id = item.id || Date.now();
   dispatch(simDataItemAdd({ scenarioId, item: { ...item, id } }));
   dispatch({

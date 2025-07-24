@@ -29,10 +29,6 @@ const simScenarioSlice = createSlice({
     setScenarioSaveDialogPending(state, action) {
       state.scenarioSaveDialogPending = action.payload;
     },
-    importScenario(state, action) {
-      // Implementation for importing a scenario
-      // Example: state.scenarios.push(action.payload);
-    },
     addScenario(state, action) {
       // Assign a unique id if not present
       const now = Date.now();
@@ -79,13 +75,84 @@ const simScenarioSlice = createSlice({
   },
 });
 
+// Thunk for importing a scenario and all related data
+export const importScenario = ({
+  scenarioSettings,
+  groupDefs,
+  qualiDefs,
+  groupAssignments,
+  qualiAssignments,
+  simDataList,
+  bookingsList
+}) => async (dispatch) => {
+  // Generate unique scenario id
+  const scenarioId = Date.now().toString();
+
+  // Add scenario to scenario slice
+  dispatch(addScenario({
+    ...scenarioSettings,
+    id: scenarioId
+  }));
+
+  // Import group definitions
+  if (groupDefs && groupDefs.length > 0) {
+    dispatch({
+      type: 'simGroup/importGroupDefs',
+      payload: { scenarioId, defs: groupDefs }
+    });
+  }
+
+  // Import qualification definitions
+  if (qualiDefs && qualiDefs.length > 0) {
+    dispatch({
+      type: 'simQualification/importQualificationDefs',
+      payload: { scenarioId, defs: qualiDefs }
+    });
+  }
+
+  // Import group assignments
+  if (groupAssignments && groupAssignments.length > 0) {
+    dispatch({
+      type: 'simGroup/importGroupAssignments',
+      payload: { scenarioId, assignments: groupAssignments }
+    });
+  }
+
+  // Import qualification assignments
+  if (qualiAssignments && qualiAssignments.length > 0) {
+    dispatch({
+      type: 'simQualification/importQualificationAssignments',
+      payload: { scenarioId, assignments: qualiAssignments }
+    });
+  }
+
+  // Import sim data items
+  if (simDataList && simDataList.length > 0) {
+    dispatch({
+      type: 'simData/importDataItems',
+      payload: { scenarioId, simDataList }
+    });
+  }
+
+  // Import bookings
+  if (bookingsList && bookingsList.length > 0) {
+    dispatch({
+      type: 'simBooking/importBookings',
+      payload: { scenarioId, items: bookingsList }
+    });
+  }
+
+  // Select the new scenario
+  dispatch(setSelectedScenarioId(scenarioId));
+};
+
 export const {
   setSelectedScenarioId,
   setLastImportAnonymized,
   setSelectedItem,
   setScenarioSaveDialogOpen,
   setScenarioSaveDialogPending,
-  importScenario,
+  // importScenario, // Remove from exports, now a thunk
   addScenario,
   updateScenario,
   deleteScenario,
@@ -93,3 +160,4 @@ export const {
 } = simScenarioSlice.actions;
 
 export default simScenarioSlice.reducer;
+

@@ -18,46 +18,10 @@ import SimDataGroupsTab from './Groups/SimDataGroupsTab';
 import SimDataFinanceTab from './Financials/SimDataFinanceTab';
 import React, { useState } from 'react';
 import { useSelector } from 'react-redux';
-import { selectDataItemsByScenario } from '../../store/simDataSlice';
-import { getBookings } from '../../store/simBookingSlice';
-import { createSelector } from '@reduxjs/toolkit';
 
-// Memoized selector for financials
-const getFinancials = createSelector(
-  [
-    state => state.simFinancials.financialsByScenario,
-    (state, scenarioId) => scenarioId,
-    (state, scenarioId, itemId) => itemId
-  ],
-  (financialsByScenario, scenarioId, itemId) => {
-    if (!scenarioId || !itemId || !financialsByScenario[scenarioId]) return [];
-    return Object.values(financialsByScenario[scenarioId][itemId] || {});
-  }
-);
 
-// Memoized selector for group assignments
-const getGroupAssignments = createSelector(
-  [
-    state => state.simGroup.groupsByScenario,
-    (state, scenarioId) => scenarioId
-  ],
-  (groupsByScenario, scenarioId) => {
-    if (!scenarioId || !groupsByScenario?.[scenarioId]) return [];
-    return Object.values(groupsByScenario[scenarioId]);
-  }
-);
 
-// Memoized selector for qualifications
-const getQualifications = createSelector(
-  [
-    state => state.simQualification.qualificationDefsByScenario,
-    (state, scenarioId) => scenarioId
-  ],
-  (qualificationDefsByScenario, scenarioId) => {
-    if (!scenarioId || !qualificationDefsByScenario?.[scenarioId]) return [];
-    return qualificationDefsByScenario[scenarioId];
-  }
-);
+
 
 function SimDataTabs() {
   const [activeTab, setActiveTab] = useState(0);
@@ -66,22 +30,9 @@ function SimDataTabs() {
   const scenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[scenarioId]);
 
-  // Memoize selector for scenarioId
-  const dataItemsSelector = React.useMemo(
-    () => (state) => selectDataItemsByScenario(state, scenarioId),
-    [scenarioId]
-  );
-  const dataItems = useSelector(dataItemsSelector);
+  
 
-  const selectedItem = dataItems?.find(item => item.id === selectedItemId);
-
-  // Get data from all slices for debug - using memoized selectors
-  const simDataItem = selectedItem;
-  const bookings = useSelector(state => getBookings(state, scenarioId, selectedItemId));
-  const groupAssignments = useSelector(state => getGroupAssignments(state, scenarioId));
-  const financials = useSelector(state => getFinancials(state, scenarioId, selectedItemId));
-  const qualifications = useSelector(state => getQualifications(state, scenarioId));
-
+  
   // Guard: Wenn item nicht gesetzt, Hinweis anzeigen und return
   if (!selectedItemId) {
     return (
@@ -105,7 +56,6 @@ function SimDataTabs() {
         <Tab icon={<AccessTimeIcon />} label="Zeiten" />
          <Tab icon={<GroupIcon />} label="Gruppen" />
         {/*<Tab icon={<EuroIcon />} label="Finanzen" /> */}
-        <Tab icon={<BugReportIcon />} label="Debug" />
       </Tabs>
       {activeTab === 0 && (
         <SimDataGeneralTab />
@@ -122,61 +72,7 @@ function SimDataTabs() {
           item={item}
         />
       )} */}
-      {activeTab === 3 && (
-        <Box sx={{ p: 2, overflow: 'auto', maxHeight: 400 }}>
-          <Typography variant="h6" gutterBottom>Simulation Item Debug</Typography>
-          <Typography variant="subtitle2" sx={{ mt: 2 }}>simDataStore</Typography>
-          <pre style={{
-            background: '#f5f5f5',
-            padding: 12,
-            borderRadius: 4,
-            fontSize: 13,
-            overflowX: 'auto'
-          }}>
-            {JSON.stringify(simDataItem, null, 2)}
-          </pre>
-          <Typography variant="subtitle2" sx={{ mt: 2 }}>bookingStore</Typography>
-          <pre style={{
-            background: '#f5f5f5',
-            padding: 12,
-            borderRadius: 4,
-            fontSize: 13,
-            overflowX: 'auto'
-          }}>
-            {JSON.stringify(bookings, null, 2)}
-          </pre>
-          <Typography variant="subtitle2" sx={{ mt: 2 }}>groupStore</Typography>
-          <pre style={{
-            background: '#f5f5f5',
-            padding: 12,
-            borderRadius: 4,
-            fontSize: 13,
-            overflowX: 'auto'
-          }}>
-            {JSON.stringify(groupAssignments, null, 2)}
-          </pre>
-          <Typography variant="subtitle2" sx={{ mt: 2 }}>financialsStore</Typography>
-          <pre style={{
-            background: '#f5f5f5',
-            padding: 12,
-            borderRadius: 4,
-            fontSize: 13,
-            overflowX: 'auto'
-          }}>
-            {JSON.stringify(financials, null, 2)}
-          </pre>
-          <Typography variant="subtitle2" sx={{ mt: 2 }}>qualificationsStore</Typography>
-          <pre style={{
-            background: '#f5f5f5',
-            padding: 12,
-            borderRadius: 4,
-            fontSize: 13,
-            overflowX: 'auto'
-          }}>
-            {JSON.stringify(qualifications, null, 2)}
-          </pre>
-        </Box>
-      )}
+
     </Box>
   );
 }
