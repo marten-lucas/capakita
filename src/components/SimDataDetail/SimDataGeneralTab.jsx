@@ -9,33 +9,48 @@ import { useSelector, useDispatch } from 'react-redux';
 import { selectDataItemsByScenario } from '../../store/simDataSlice';
 
 function SimDataGeneralTab() {
-  // Get scenarioId and selected item from store
+  // Get scenario and item selection
   const dispatch = useDispatch();
-  const scenarioId = useSelector(state => state.simScenario.selectedScenarioId);
-  const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[scenarioId]);
-
+  const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
+  const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
+  
+  // Memoized selector for data items
   const dataItemsSelector = React.useMemo(
-    () => (state) => selectDataItemsByScenario(state, scenarioId),
-    [scenarioId]
+    () => (state) => {
+      if (!selectedScenarioId) return [];
+      return selectDataItemsByScenario(state, selectedScenarioId);
+    },
+    [selectedScenarioId]
   );
   const dataItems = useSelector(dataItemsSelector);
+  
+  // Find the selected item
+  const item = React.useMemo(() => {
+    if (!selectedItemId || !dataItems) return null;
+    return dataItems.find(i => i.id === selectedItemId) || null;
+  }, [dataItems, selectedItemId]);
 
-  // Get item from data store using scenarioId and selectedItemId
-  const item = dataItems?.find(i => i.id === selectedItemId);
+  // Memoized selector for qualification definitions
+  const qualiDefsSelector = React.useMemo(
+    () => (state) => {
+      return state.simQualification.qualificationDefsByScenario[selectedScenarioId] || [];
+    },
+    [selectedScenarioId]
+  );
+  const qualiDefs = useSelector(qualiDefsSelector);
 
-  // Organisation/qualidefs from qualification store (not scenario)
-  const qualiDefs = useSelector(state => {
-    return state.simQualification.qualificationDefsByScenario[scenarioId] || [];
-  });
-
-  // Get qualification assignment for this item (for capacity)
-  const qualificationAssignment = useSelector(state => {
-    if (item?.type === 'capacity') {
-      const assignments = state.simQualification.qualificationAssignmentsByScenario[scenarioId] || [];
-      return assignments.find(a => a.dataItemId === item.id) || null;
-    }
-    return null;
-  });
+  // Memoized selector for qualification assignment
+  const qualificationAssignmentSelector = React.useMemo(
+    () => (state) => {
+      if (item?.type === 'capacity') {
+        const assignments = state.simQualification.qualificationAssignmentsByScenario[selectedScenarioId] || [];
+        return assignments.find(a => a.dataItemId === item.id) || null;
+      }
+      return null;
+    },
+    [item?.type, item?.id, selectedScenarioId]
+  );
+  const qualificationAssignment = useSelector(qualificationAssignmentSelector);
 
   // Local state for controlled fields
   const [localName, setLocalName] = useState(item?.name ?? '');
@@ -52,7 +67,7 @@ function SimDataGeneralTab() {
   const handleDeleteItem = () => {
     dispatch({
       type: 'simData/deleteDataItem',
-      payload: { scenarioId, itemId: item.id }
+      payload: { scenarioId: selectedScenarioId, itemId: item.id }
     });
     dispatch({
       type: 'simScenario/setSelectedItem',
@@ -92,7 +107,7 @@ function SimDataGeneralTab() {
             if (localName !== item.name) {
               dispatch({
                 type: 'simData/updateDataItemFields',
-                payload: { scenarioId, itemId: item.id, fields: { name: localName } }
+                payload: { scenarioId: selectedScenarioId, itemId: item.id, fields: { name: localName } }
               });
             }
           }}
@@ -112,7 +127,7 @@ function SimDataGeneralTab() {
             if (localNote !== item.remark) {
               dispatch({
                 type: 'simData/updateDataItemFields',
-                payload: { scenarioId, itemId: item.id, fields: { remark: localNote } }
+                payload: { scenarioId: selectedScenarioId, itemId: item.id, fields: { remark: localNote } }
               });
             }
           }}
@@ -135,7 +150,7 @@ function SimDataGeneralTab() {
               value={item.dateofbirth ?? ''}
               onChange={(e) => dispatch({
                 type: 'simData/updateDataItemFields',
-                payload: { scenarioId, itemId: item.id, fields: { dateofbirth: e.target.value } }
+                payload: { scenarioId: selectedScenarioId, itemId: item.id, fields: { dateofbirth: e.target.value } }
               })}
               onBlur={() => {}}
               size="small"
@@ -180,7 +195,7 @@ function SimDataGeneralTab() {
                   dispatch({
                     type: 'simQualification/updateQualificationAssignment',
                     payload: {
-                      scenarioId,
+                      scenarioId: selectedScenarioId,
                       assignmentId: qualificationAssignment.id,
                       updates: { qualification: e.target.value }
                     }
@@ -189,7 +204,7 @@ function SimDataGeneralTab() {
                   dispatch({
                     type: 'simQualification/addQualificationAssignment',
                     payload: {
-                      scenarioId,
+                      scenarioId: selectedScenarioId,
                       assignment: {
                         qualification: e.target.value,
                         rawdata: { QUALIFIK: e.target.value },
@@ -232,7 +247,7 @@ function SimDataGeneralTab() {
             value={item.startdate ?? ''}
             onChange={(e) => dispatch({
               type: 'simData/updateDataItemFields',
-              payload: { scenarioId, itemId: item.id, fields: { startdate: e.target.value } }
+              payload: { scenarioId: selectedScenarioId, itemId: item.id, fields: { startdate: e.target.value } }
             })}
             sx={{ width: 150 }}
           />
@@ -254,7 +269,7 @@ function SimDataGeneralTab() {
             value={item.enddate ?? ''}
             onChange={(e) => dispatch({
               type: 'simData/updateDataItemFields',
-              payload: { scenarioId, itemId: item.id, fields: { enddate: e.target.value } }
+              payload: { scenarioId: selectedScenarioId, itemId: item.id, fields: { enddate: e.target.value } }
             })}
             sx={{ width: 150 }}
           />
@@ -281,7 +296,7 @@ function SimDataGeneralTab() {
             const newList = [...absences, newAbsence];
             dispatch({
               type: 'simData/updateDataItemFields',
-              payload: { scenarioId, itemId: item.id, fields: { absences: newList } }
+              payload: { scenarioId: selectedScenarioId, itemId: item.id, fields: { absences: newList } }
             });
           }}
           sx={{ mb: 1 }}
@@ -313,7 +328,7 @@ function SimDataGeneralTab() {
                       const newList = item.absences.map((a, i) => (i === idx ? newAbsence : a));
                       dispatch({
                         type: 'simData/updateDataItemFields',
-                        payload: { scenarioId, itemId: item.id, fields: { absences: newList } }
+                        payload: { scenarioId: selectedScenarioId, itemId: item.id, fields: { absences: newList } }
                       });
                     }}
                     sx={{ width: 130 }}
@@ -331,7 +346,7 @@ function SimDataGeneralTab() {
                       const newList = item.absences.map((a, i) => (i === idx ? newAbsence : a));
                       dispatch({
                         type: 'simData/updateDataItemFields',
-                        payload: { scenarioId, itemId: item.id, fields: { absences: newList } }
+                        payload: { scenarioId: selectedScenarioId, itemId: item.id, fields: { absences: newList } }
                       });
                     }}
                     sx={{ width: 130 }}
@@ -348,7 +363,7 @@ function SimDataGeneralTab() {
                       const newList = item.absences.filter((_, i) => i !== idx);
                       dispatch({
                         type: 'simData/updateDataItemFields',
-                        payload: { scenarioId, itemId: item.id, fields: { absences: newList } }
+                        payload: { scenarioId: selectedScenarioId, itemId: item.id, fields: { absences: newList } }
                       });
                     }}
                     sx={{ ml: 1 }}

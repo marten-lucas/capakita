@@ -9,12 +9,20 @@ function SimDataGroupsTab() {
   // Get scenario and item selection
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
+  
   const dataItemsSelector = React.useMemo(
-    () => (state) => selectDataItemsByScenario(state, selectedScenarioId),
+    () => (state) => {
+      if (!selectedScenarioId) return [];
+      return selectDataItemsByScenario(state, selectedScenarioId);
+    },
     [selectedScenarioId]
   );
   const dataItems = useSelector(dataItemsSelector);
-  const item = dataItems?.find(i => i.id === selectedItemId);
+  
+  const item = React.useMemo(() => {
+    if (!selectedItemId || !dataItems) return null;
+    return dataItems.find(i => i.id === selectedItemId) || null;
+  }, [dataItems, selectedItemId]);
 
   if (!item) return null;
 

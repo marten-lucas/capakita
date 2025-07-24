@@ -31,14 +31,11 @@ function DataPage() {
   const scenarios = useSelector(state => state.simScenario.scenarios);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
   const selectedItem = useSelector(state => state.simData.dataByScenario[selectedScenarioId]?.[selectedItemId]);
-  const simulationDataSelector = React.useMemo(
-    () => (state) => {
-      const scenarioId = state?.simScenario?.selectedScenarioId;
-      return scenarioId ? selectDataItemsByScenario(state, scenarioId) : [];
-    },
-    [selectedScenarioId]
-  );
-  const simulationData = useSelector(simulationDataSelector);
+  
+  // Simplified selector usage without unnecessary memoization
+  const simulationData = useSelector(state => {
+    return selectedScenarioId ? selectDataItemsByScenario(state, selectedScenarioId) : [];
+  });
 
   const { importScenario } = useScenarioImport();
 

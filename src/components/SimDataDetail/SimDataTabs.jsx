@@ -35,6 +35,30 @@ const getFinancials = createSelector(
   }
 );
 
+// Memoized selector for group assignments
+const getGroupAssignments = createSelector(
+  [
+    state => state.simGroup.groupsByScenario,
+    (state, scenarioId) => scenarioId
+  ],
+  (groupsByScenario, scenarioId) => {
+    if (!scenarioId || !groupsByScenario?.[scenarioId]) return [];
+    return Object.values(groupsByScenario[scenarioId]);
+  }
+);
+
+// Memoized selector for qualifications
+const getQualifications = createSelector(
+  [
+    state => state.simQualification.qualificationDefsByScenario,
+    (state, scenarioId) => scenarioId
+  ],
+  (qualificationDefsByScenario, scenarioId) => {
+    if (!scenarioId || !qualificationDefsByScenario?.[scenarioId]) return [];
+    return qualificationDefsByScenario[scenarioId];
+  }
+);
+
 function SimDataTabs() {
   const [activeTab, setActiveTab] = useState(0);
 
@@ -51,23 +75,12 @@ function SimDataTabs() {
 
   const selectedItem = dataItems?.find(item => item.id === selectedItemId);
 
-  // Get data from all slices for debug
+  // Get data from all slices for debug - using memoized selectors
   const simDataItem = selectedItem;
-  // Correct selector for bookings:
   const bookings = useSelector(state => getBookings(state, scenarioId, selectedItemId));
-  const groupAssignments = useSelector(state =>
-    scenarioId
-      ? Object.values(state.simGroup.groupsByScenario?.[scenarioId] || {})
-      : []
-  );
+  const groupAssignments = useSelector(state => getGroupAssignments(state, scenarioId));
   const financials = useSelector(state => getFinancials(state, scenarioId, selectedItemId));
-
-  // Fix qualifications selector to use qualificationDefsByScenario
-  const qualifications = useSelector(state =>
-    scenarioId
-      ? (state.simQualification.qualificationDefsByScenario?.[scenarioId] || [])
-      : []
-  );
+  const qualifications = useSelector(state => getQualifications(state, scenarioId));
 
   // Guard: Wenn item nicht gesetzt, Hinweis anzeigen und return
   if (!selectedItemId) {
