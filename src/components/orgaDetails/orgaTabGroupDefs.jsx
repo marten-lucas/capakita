@@ -131,22 +131,38 @@ function OrgaTabGroupDefs() {
         </DialogTitle>
         <DialogContent>
           <Box sx={{ pt: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
-            <TextField
-              label="Gruppenname"
-              value={groupForm.name}
-              onChange={(e) => setGroupForm({ ...groupForm, name: e.target.value })}
-              fullWidth
-              error={!!error}
-              helperText={error}
-              autoFocus
-            />
-            <Box>
-              <Typography variant="body2" sx={{ mb: 1 }}>Icon:</Typography>
-              <IconPicker
-                value={groupForm.icon}
-                onChange={(icon) => setGroupForm({ ...groupForm, icon })}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Box
+                sx={{
+                  width: 48,
+                  height: 48,
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  borderRadius: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '2em',
+                  backgroundColor: 'background.paper'
+                }}
+              >
+                {groupForm.icon || '👥'}
+              </Box>
+              <TextField
+                label="Gruppenname"
+                value={groupForm.name}
+                onChange={(e) => setGroupForm({ ...groupForm, name: e.target.value })}
+                fullWidth
+                error={!!error}
+                helperText={error}
+                autoFocus
               />
             </Box>
+            <Typography variant="body2" sx={{ mb: 1 }}>Icon auswählen:</Typography>
+            <IconPicker
+              value={groupForm.icon}
+              onChange={(icon) => setGroupForm({ ...groupForm, icon })}
+            />
           </Box>
         </DialogContent>
         <DialogActions>
