@@ -7,7 +7,6 @@ import { valueToTime } from '../../../utils/timeUtils';
 import ModMonitor from '../ModMonitor';
 import { useSelector, useDispatch } from 'react-redux';
 import DayControl from './BookingDayControl';
-import { deleteBooking } from '../../../store/simBooking'; // Adjust path if needed
 
 // BookingDetail component
 function BookingDetail({ index }) {
@@ -203,7 +202,14 @@ function BookingDetail({ index }) {
   // Handler for deleting a booking
   const handleDeleteBooking = () => {
     if (!selectedScenarioId || !selectedItemId || !booking?.id) return;
-    deleteBooking(selectedScenarioId, selectedItemId, booking.id);
+    dispatch({
+      type: 'simBooking/deleteBooking',
+      payload: {
+        scenarioId: selectedScenarioId,
+        dataItemId: selectedItemId,
+        bookingId: booking.id
+      }
+    });
   };
 
   if (!booking) return null;

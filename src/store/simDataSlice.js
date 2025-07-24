@@ -58,9 +58,21 @@ const simDataSlice = createSlice({
         state.dataByScenario[scenarioId][id] = { ...item, overlays: {} };
       });
     },
-    // ...existing code...
+    simDataItemAdd(state, action) {
+      const { scenarioId, item } = action.payload;
+      if (!state.dataByScenario[scenarioId]) state.dataByScenario[scenarioId] = {};
+      const id = item.id;
+      if (!Array.isArray(item.absences)) item.absences = [];
+      state.dataByScenario[scenarioId][id] = { ...item, overlays: {} };
+    },
   },
 });
+
+// Selector: getDataItems
+export const getDataItems = (state, scenarioId) => {
+  const scenarioData = state.simData.dataByScenario[scenarioId] || {};
+  return Object.values(scenarioData);
+};
 
 export const {
   addDataItem,
@@ -69,7 +81,7 @@ export const {
   deleteDataItem,
   setOverlay,
   importDataItems,
-  // ...other actions...
+  simDataItemAdd,
 } = simDataSlice.actions;
 
 export default simDataSlice.reducer;

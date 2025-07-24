@@ -16,46 +16,40 @@ import SimDataGeneralTab from './SimDataGeneralTab';
 import SimDataBookingTab from './Bookings/SimDataBookingTab';
 import SimDataGroupsTab from './Groups/SimDataGroupsTab';
 import SimDataFinanceTab from './Financials/SimDataFinanceTab';
-import useSimDataStore from "../../store/simDataStore";
-import useSimScenarioStore from "../../store/simScenarioStore";
-import useSimBookingStore from "../../store/simBookingStore";
-import useSimGroupStore from "../../store/simGroupStore";
-import useSimFinancialsStore from "../../store/simFinancialsStore";
-import useSimQualificationStore from "../../store/simQualificationStore";
-
 import React, { useState } from 'react';
+import { useSelector } from 'react-redux';
 
 function SimDataTabs() {
   const [activeTab, setActiveTab] = useState(0);
 
-  // Get selected scenario and item id from scenario store
-  const selectedScenarioId = useSimScenarioStore(state => state.selectedScenarioId);
-  const selectedItemId = useSimScenarioStore(state => state.selectedItems?.[selectedScenarioId]);
-  const dataItems = useSimDataStore(state => state.getDataItems(selectedScenarioId));
+  // Get selected scenario and item id from Redux
+  const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
+  const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
+  const dataItems = useSelector(state => state.simData.items[selectedScenarioId] || []);
   const selectedItem = dataItems?.find(item => item.id === selectedItemId);
 
-  // Get data from all stores for debug
+  // Get data from all slices for debug
   const simDataItem = selectedItem;
-  const bookings = useSimBookingStore(state =>
+  const bookings = useSelector(state =>
     selectedScenarioId && selectedItemId
-      ? state.getBookings(selectedScenarioId, selectedItemId)
+      ? (state.simBooking.bookings[selectedScenarioId]?.[selectedItemId] || [])
       : []
   );
-  const groupAssignments = useSimGroupStore(state =>
+  const groupAssignments = useSelector(state =>
     selectedScenarioId && selectedItemId
-      ? state.getGroups(selectedScenarioId).filter(g =>
+      ? (state.simGroup.groups[selectedScenarioId] || []).filter(g =>
         g.members && Array.isArray(g.members) && g.members.includes(selectedItemId)
       )
       : []
   );
-  const financials = useSimFinancialsStore(state =>
+  const financials = useSelector(state =>
     selectedScenarioId && selectedItemId
-      ? state.getFinancials(selectedScenarioId, selectedItemId)
+      ? (state.simFinancials.financials[selectedScenarioId]?.[selectedItemId] || [])
       : []
   );
-  const qualifications = useSimQualificationStore(state =>
+  const qualifications = useSelector(state =>
     selectedScenarioId
-      ? state.getQualifications(selectedScenarioId)
+      ? (state.simQualification.qualifications[selectedScenarioId] || [])
       : []
   );
 
@@ -159,6 +153,3 @@ function SimDataTabs() {
 }
 
 export default SimDataTabs;
-
-
-

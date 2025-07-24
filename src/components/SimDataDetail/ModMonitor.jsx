@@ -1,5 +1,5 @@
 import RestoreIcon from '@mui/icons-material/Restore';
-import useSimScenarioStore from '../../store/simScenarioStore';
+import { useSelector, useDispatch } from 'react-redux';
 
 /**
  * ModMonitor: Monitors a specific field of an item for modifications.
@@ -14,14 +14,14 @@ import useSimScenarioStore from '../../store/simScenarioStore';
  *   iconProps: object (optional, extra props for icon)
  */
 function ModMonitor({ itemId, field, value, originalValue, onRestore, title, confirmMsg, iconProps }) {
-  // Only use scenario store for manual entry check
-  const { scenarios, selectedScenarioId } = useSimScenarioStore();
+  // Replace with Redux state and actions
+  const someState = useSelector(state => state.simScenario.someState);
+  const dispatch = useDispatch();
 
   // Find the item in the current scenario for manual entry check
-  const scenario = scenarios.find(s => s.id === selectedScenarioId);
   let item = null;
-  if (scenario && Array.isArray(scenario.simulationData)) {
-    item = scenario.simulationData.find(i => i.id === itemId);
+  if (Array.isArray(someState)) {
+    item = someState.find(i => i.id === itemId);
   }
   const isManualEntry = item?.rawdata?.source === 'manual entry';
 

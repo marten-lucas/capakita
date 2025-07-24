@@ -44,10 +44,6 @@ export default function MidtermChart({ hideFilters = false, scenario }) {
   // For now, assume it's a prop or utility function.
   // const calculateMidtermChartData = ...existing code...
 
-  // Use scenario-based groupdefs and qualidefs
-  const groupDefs = useSelector(state => state.simGroup.groupDefsByScenario(scenarioId));
-  const qualiDefs = useSelector(state => state.simQualification.qualificationDefsByScenario(scenarioId));
-
   const hasNoGroup = useMemo(() => (
     simulationData.some(item =>
       (item.type === 'demand' || item.type === 'capacity') &&

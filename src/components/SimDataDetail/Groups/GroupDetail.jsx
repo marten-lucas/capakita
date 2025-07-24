@@ -7,7 +7,6 @@ import React, { useMemo, useEffect } from 'react';
 import { convertYYYYMMDDtoDDMMYYYY, convertDDMMYYYYtoYYYYMMDD } from '../../../utils/dateUtils';
 import ModMonitor from '../ModMonitor';
 import { useSelector, useDispatch } from 'react-redux';
-import { useSimScenarioDataStore } from '../../../store/simScenarioDataStore';
 
 function GroupDetail({ index }) {
   const dispatch = useDispatch();
@@ -49,9 +48,16 @@ function GroupDetail({ index }) {
     }));
     if (needsUpdate) {
       // Only update if something changed
-      useSimScenarioDataStore.getState().updateItemBookings(parentItemId, updatedBookings);
+      dispatch({
+        type: 'simData/updateItemBookings',
+        payload: {
+          scenarioId: selectedScenarioId,
+          itemId: parentItemId,
+          bookings: updatedBookings
+        }
+      });
     }
-  }, [bookings, parentItemId]);
+  }, [bookings, parentItemId, dispatch, selectedScenarioId]);
 
   // Collect all segments for display
   const getAllBookingSegments = useMemo(() => {
