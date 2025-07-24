@@ -1,65 +1,67 @@
-
-import {
-  Typography, Box, Button
-} from '@mui/material';
-import SimDataTabs from './SimDataTabs';
-import { useSelector, useDispatch } from 'react-redux';
-import { deleteDataItem, selectDataItemsByScenario } from '../../store/simDataSlice';
 import React from 'react';
+import { List, ListItemButton, ListItemText, Divider, Box } from '@mui/material';
+import { useSelector, useDispatch } from 'react-redux';
+import { setSelectedItem } from '../../store/simScenarioSlice';
+import { selectDataItemsByScenario } from '../../store/simDataSlice';
 
-function SimDataDetailForm() {
-  // Get scenarioId and selected item id from Redux store
-  const scenarioId = useSelector(state => state.simScenario.selectedScenarioId);
-  const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[scenarioId]);
-  const dataItemsSelector = React.useMemo(
-    () => (state) => selectDataItemsByScenario(state, scenarioId),
-    [scenarioId]
-  );
-  const dataItems = useSelector(dataItemsSelector);
-  const item = dataItems?.find(i => i.id === selectedItemId);
+function SimDataList() {
   const dispatch = useDispatch();
+  const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
+  const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
 
-  // Guard: Wenn item nicht gesetzt, Hinweis anzeigen und return
-  if (!item) {
+  const dataSelector = React.useMemo(
+    () => (state) => selectDataItemsByScenario(state, selectedScenarioId),
+    [selectedScenarioId]
+  );
+  const data = useSelector(dataSelector);
+  // Define colors for demand/capacity
+  const DEMAND_COLOR = '#c0d9f3ff';   // blue for children
+  const CAPACITY_COLOR = '#a3c7a5ff'; // green for employees
+
+  if (!data || data.length === 0) {
     return (
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-        <Typography color="text.secondary">
-          Wählen Sie einen Eintrag aus, um Details anzuzeigen.
-        </Typography>
+      <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Box sx={{ p: 3, color: 'text.secondary', textAlign: 'center', width: '100%' }}>
+          Importieren Sie Adebis-Daten oder fügen Sie Datensätze manuell hinzu
+        </Box>
       </Box>
     );
   }
-
   return (
-    <Box
-      bgcolor="background.paper"
-      boxShadow={3}
-      borderRadius={2}
-      p={3}
-      height="90%"
-      display="flex"
-      flexDirection="column"
-      overflow="auto"
+    <List
+      sx={{
+        width: 320,
+        bgcolor: 'background.paper',
+        borderRight: 1,
+        borderColor: 'divider',
+        height: '100vh',
+        maxHeight: '100vh',
+        overflowY: 'auto'
+      }}
     >
-      <SimDataTabs />
-      {/* Show delete button if manual entry */}
-      {item?.rawdata?.source === 'manual entry' && (
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
-          <Button
-            variant="outlined"
-            color="error"
-            size="small"
-            fullWidth
-            sx={{ mt: 2 }}
-            onClick={() => dispatch(deleteDataItem({ scenarioId, itemId: item.id }))}
-          >
-            Eintrag löschen
-          </Button>
-        </Box>
-      )}
-    </Box>
+      {data.map((item) => {
+        return (
+          <div key={item.id}>
+            <ListItemButton
+              onClick={() => dispatch(setSelectedItem(item.id))}
+              selected={selectedItemId === item.id}
+              sx={selectedItemId === item.id ? { bgcolor: 'action.selected' } : undefined}
+            >
+              <ListItemText
+                primary={
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <span>{item.name}</span>
+                  </Box>
+                }
+                secondaryTypographyProps={{ component: 'div' }}
+              />
+            </ListItemButton>
+            <Divider />
+          </div>
+        );
+      })}
+    </List>
   );
 }
 
-export default SimDataDetailForm;
-
+export default SimDataList;
