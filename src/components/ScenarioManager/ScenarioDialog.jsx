@@ -1,9 +1,56 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Typography, TextField, Slider, Accordion, AccordionSummary, AccordionDetails, List, ListItemButton, ListItemText } from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Typography, TextField, Slider, Accordion, AccordionSummary, AccordionDetails, List, ListItemButton, ListItemText, Collapse, IconButton } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import { useSelector, useDispatch } from 'react-redux';
 import { updateScenario, deleteScenario } from '../../store/simScenarioSlice';
-import ScenarioTree from './ScenarioTree';
+
+// Recursive component for rendering individual scenarios in the dialog
+function ScenarioTreeItem({ scenario, selectedId, onSelect, expandedMap, setExpandedMap, level = 0 }) {
+    const hasChildren = scenario.children && scenario.children.length > 0;
+    const expanded = expandedMap[scenario.id] ?? true;
+    const isSelected = selectedId === scenario.id;
+
+    return (
+        <React.Fragment>
+            <ListItemButton
+                selected={isSelected}
+                onClick={() => onSelect(scenario)}
+                sx={{ pl: 2 + level * 2 }}
+            >
+                {hasChildren && (
+                    <IconButton
+                        size="small"
+                        onClick={e => {
+                            e.stopPropagation();
+                            setExpandedMap(map => ({ ...map, [scenario.id]: !expanded }));
+                        }}
+                        sx={{ mr: 1 }}
+                    >
+                        {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                    </IconButton>
+                )}
+                {!hasChildren && <Box sx={{ width: 32, display: 'inline-block' }} />}
+                <ListItemText primary={scenario.name} />
+            </ListItemButton>
+            {hasChildren && (
+                <Collapse in={expanded} timeout="auto" unmountOnExit>
+                    {scenario.children.map(child => (
+                        <ScenarioTreeItem
+                            key={child.id}
+                            scenario={child}
+                            selectedId={selectedId}
+                            onSelect={onSelect}
+                            expandedMap={expandedMap}
+                            setExpandedMap={setExpandedMap}
+                            level={level + 1}
+                        />
+                    ))}
+                </Collapse>
+            )}
+        </React.Fragment>
+    );
+}
 
 function ScenarioDialog({ scenarioId, isNew, mode = 'edit', onClose }) {
     const dispatch = useDispatch();
@@ -166,16 +213,13 @@ function ScenarioDialog({ scenarioId, isNew, mode = 'edit', onClose }) {
                                         <ListItemText primary="Keines" />
                                     </ListItemButton>
                                     {scenarioTree.map(scenario => (
-                                        <ScenarioTree
+                                        <ScenarioTreeItem
                                             key={scenario.id}
-                                            scenarioTree={[scenario]}
+                                            scenario={scenario}
                                             selectedId={form.baseScenarioId}
                                             onSelect={handleBaseScenarioSelect}
                                             expandedMap={treeExpandedMap}
                                             setExpandedMap={setTreeExpandedMap}
-                                            onEdit={undefined}
-                                            onAdd={undefined}
-                                            onDelete={undefined}
                                         />
                                     ))}
                                 </List>

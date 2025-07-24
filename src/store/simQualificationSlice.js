@@ -12,7 +12,8 @@ const simQualificationSlice = createSlice({
     addQualificationDef(state, action) {
       const { scenarioId, qualiDef } = action.payload;
       if (!state.qualificationDefsByScenario[scenarioId]) state.qualificationDefsByScenario[scenarioId] = [];
-      state.qualificationDefsByScenario[scenarioId].push({ ...qualiDef });
+      const key = qualiDef.key || Date.now();
+      state.qualificationDefsByScenario[scenarioId].push({ ...qualiDef, key });
     },
     updateQualificationDef(state, action) {
       const { scenarioId, qualiKey, updates } = action.payload;
@@ -32,7 +33,8 @@ const simQualificationSlice = createSlice({
     addQualificationAssignment(state, action) {
       const { scenarioId, assignment } = action.payload;
       if (!state.qualificationAssignmentsByScenario[scenarioId]) state.qualificationAssignmentsByScenario[scenarioId] = [];
-      state.qualificationAssignmentsByScenario[scenarioId].push({ ...assignment });
+      const id = assignment.id || Date.now();
+      state.qualificationAssignmentsByScenario[scenarioId].push({ ...assignment, id });
     },
     updateQualificationAssignment(state, action) {
       const { scenarioId, assignmentId, updates } = action.payload;
@@ -53,14 +55,16 @@ const simQualificationSlice = createSlice({
       const { scenarioId, defs } = action.payload;
       if (!state.qualificationDefsByScenario[scenarioId]) state.qualificationDefsByScenario[scenarioId] = [];
       defs.forEach(def => {
-        state.qualificationDefsByScenario[scenarioId].push({ ...def });
+        const key = def.key || Date.now();
+        state.qualificationDefsByScenario[scenarioId].push({ ...def, key });
       });
     },
     importQualificationAssignments(state, action) {
       const { scenarioId, assignments } = action.payload;
       if (!state.qualificationAssignmentsByScenario[scenarioId]) state.qualificationAssignmentsByScenario[scenarioId] = [];
       assignments.forEach(assignment => {
-        state.qualificationAssignmentsByScenario[scenarioId].push({ ...assignment });
+        const id = assignment.id || Date.now();
+        state.qualificationAssignmentsByScenario[scenarioId].push({ ...assignment, id });
       });
     },
   },

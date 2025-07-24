@@ -85,7 +85,7 @@ export default function MidtermChart({ hideFilters = false, scenario }) {
     // ...existing code...
     // calculateMidtermChartData(simulationData, midtermTimeDimension, midtermSelectedGroups, midtermSelectedQualifications)
     // ...existing code...
-  }, [simulationData /*, calculateMidtermChartData */]);
+  }, []);
 
   // Calculate chart data with proper dependencies
   const chartData = useMemo(() => {

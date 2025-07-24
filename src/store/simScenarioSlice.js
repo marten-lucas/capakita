@@ -34,19 +34,46 @@ const simScenarioSlice = createSlice({
       // Example: state.scenarios.push(action.payload);
     },
     addScenario(state, action) {
-      // Implementation for adding a scenario
-      state.scenarios.push(action.payload);
+      // Assign a unique id if not present
+      const now = Date.now();
+      const scenario = {
+        name: action.payload.name || 'Neues Szenario',
+        remark: action.payload.remark ?? '',
+        confidence: action.payload.confidence ?? 50,
+        likelihood: action.payload.likelihood ?? 50,
+        desirability: action.payload.desirability ?? 50,
+        baseScenarioId: action.payload.baseScenarioId ?? null,
+        id: action.payload.id || now,
+        // ...other fields if needed...
+      };
+      state.scenarios.push(scenario);
+      state.selectedScenarioId = scenario.id; // select the new scenario
     },
     updateScenario(state, action) {
-      const { id, updates } = action.payload;
-      const scenario = state.scenarios.find(s => s.id === id);
+      const { scenarioId, updates } = action.payload; // <-- fix: use scenarioId
+      const scenario = state.scenarios.find(s => s.id === scenarioId);
       if (scenario) {
         Object.assign(scenario, updates);
       }
     },
     deleteScenario(state, action) {
       const id = action.payload;
-      state.scenarios = state.scenarios.filter(s => s.id !== id);
+      // Collect all descendant scenario ids recursively
+      const collectDescendants = (parentId) => {
+        let ids = [parentId];
+        state.scenarios.forEach(s => {
+          if (s.baseScenarioId === parentId) {
+            ids = ids.concat(collectDescendants(s.id));
+          }
+        });
+        return ids;
+      };
+      const idsToDelete = collectDescendants(id);
+      state.scenarios = state.scenarios.filter(s => !idsToDelete.includes(s.id));
+      // Optionally, clear selectedScenarioId if it was deleted
+      if (idsToDelete.includes(state.selectedScenarioId)) {
+        state.selectedScenarioId = state.scenarios.length > 0 ? state.scenarios[0].id : null;
+      }
     },
     // ...other reducers (e.g., for importing scenarios)...
   },

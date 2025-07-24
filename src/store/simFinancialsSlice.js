@@ -12,8 +12,8 @@ const simFinancialsSlice = createSlice({
       const { scenarioId, dataItemId, financial } = action.payload;
       if (!state.financialsByScenario[scenarioId]) state.financialsByScenario[scenarioId] = {};
       if (!state.financialsByScenario[scenarioId][dataItemId]) state.financialsByScenario[scenarioId][dataItemId] = {};
-      const id = financial.id;
-      state.financialsByScenario[scenarioId][dataItemId][id] = { ...financial, overlays: {} };
+      const id = financial.id || Date.now();
+      state.financialsByScenario[scenarioId][dataItemId][id] = { ...financial, id, overlays: {} };
     },
     updateFinancial(state, action) {
       const { scenarioId, dataItemId, financialId, updates } = action.payload;

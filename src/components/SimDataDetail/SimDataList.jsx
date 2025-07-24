@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Box, Typography, Stack, Card, CardActionArea, CardContent } from '@mui/material';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
 import FolderOpenIcon from '@mui/icons-material/FolderOpen';
@@ -7,8 +7,9 @@ import { useNavigate } from 'react-router-dom';
 import DataImportModal from '../components/modals/DataImportModal';
 import ScenarioLoadDialog from '../components/modals/ScenarioLoadDialog.jsx';
 import { useScenarioImport } from '../hooks/useScenarioImport';
-import { useDispatch } from 'react-redux';
-import { addScenario } from '../store/simScenarioSlice';
+import { useSelector, useDispatch } from 'react-redux';
+import { addScenario, setSelectedScenarioId } from '../store/simScenarioSlice';
+import { getDataItems } from '../../store/simDataSlice';
 
 function WelcomePage() {
   const [importOpen, setImportOpen] = useState(false);
@@ -16,7 +17,16 @@ function WelcomePage() {
   const navigate = useNavigate();
 
   const dispatch = useDispatch();
+  const scenarios = useSelector(state => state.simScenario.scenarios);
   const { importScenario } = useScenarioImport();
+
+  // Selector für die Daten, memoized
+  const scenarioId = useSelector(state => state?.simScenario?.selectedScenarioId);
+  const data = useSelector(
+    state => scenarioId ? getDataItems(state, scenarioId) : [],
+    [scenarioId]
+  );
+  const memoizedData = useMemo(() => data, [data]);
 
   // Handler für DataImportModal
   const handleImport = async ({ file, isAnonymized }) => {
@@ -41,6 +51,11 @@ function WelcomePage() {
       baseScenarioId: null
     };
     dispatch(addScenario(newScenario));
+    // Setze das neue Szenario als ausgewählt
+    const lastScenario = scenarios[scenarios.length - 1];
+    if (lastScenario) {
+      dispatch(setSelectedScenarioId(lastScenario.id));
+    }
     navigate('/data');
   };
 
@@ -100,7 +115,7 @@ function WelcomePage() {
         <Card
           sx={{
             minWidth: 220,
-            bgcolor: '#f3e5f5',
+            bgcolor: '#e8f5e9',
             boxShadow: 3,
             borderRadius: 3,
             textAlign: 'center'
@@ -110,7 +125,7 @@ function WelcomePage() {
             <CardContent>
               <FolderOpenIcon sx={{ fontSize: 56, color: 'secondary.main', mb: 1 }} />
               <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                CapaKita-Datei laden
+                CapaKita-Datei laden,
               </Typography>
             </CardContent>
           </CardActionArea>
@@ -128,7 +143,7 @@ function WelcomePage() {
             <CardContent>
               <AddCircleOutlineIcon sx={{ fontSize: 56, color: 'success.main', mb: 1 }} />
               <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                Leeres Szenario anlegen
+                Leeres Szenario anlegen,
               </Typography>
             </CardContent>
           </CardActionArea>
@@ -142,4 +157,3 @@ function WelcomePage() {
 }
 
 export default WelcomePage;
-

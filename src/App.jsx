@@ -40,7 +40,6 @@ function App() {
         width: "100vw"
       }}>
         <TopNav />
-        {/* Use ScenarioPicker directly */}
         <ScenarioPicker />
         <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
           <Container maxWidth='l'>

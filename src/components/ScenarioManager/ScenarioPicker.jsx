@@ -8,6 +8,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { addScenario, setSelectedScenarioId } from '../../store/simScenarioSlice';
 import ScenarioTree from './ScenarioTree';
 import ScenarioDialog from './ScenarioDialog';
+import store from '../../store/store';
 
 function ScenarioPicker() {
     const dispatch = useDispatch();
@@ -34,11 +35,7 @@ function ScenarioPicker() {
             makeNameUnique: true
         }));
         setTimeout(() => {
-            const allScenarios = [...scenarios, {
-                name: 'Neues Szenario',
-                baseScenarioId: baseScenario?.id || null,
-                makeNameUnique: true
-            }];
+            const allScenarios = [...store.getState().simScenario.scenarios];
             const lastScenario = allScenarios[allScenarios.length - 1];
             if (lastScenario) {
                 setDialogScenarioId(lastScenario.id);

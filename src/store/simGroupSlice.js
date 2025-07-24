@@ -12,8 +12,8 @@ const simGroupSlice = createSlice({
     addGroup(state, action) {
       const { scenarioId, group } = action.payload;
       if (!state.groupsByScenario[scenarioId]) state.groupsByScenario[scenarioId] = {};
-      const id = group.id;
-      state.groupsByScenario[scenarioId][id] = { ...group, overlays: {} };
+      const id = group.id || Date.now();
+      state.groupsByScenario[scenarioId][id] = { ...group, id, overlays: {} };
     },
     updateGroup(state, action) {
       const { scenarioId, groupId, updates } = action.payload;
@@ -64,8 +64,8 @@ const simGroupSlice = createSlice({
       const { scenarioId, assignments } = action.payload;
       if (!state.groupsByScenario[scenarioId]) state.groupsByScenario[scenarioId] = {};
       assignments.forEach(assignment => {
-        const id = assignment.id;
-        state.groupsByScenario[scenarioId][id] = { ...assignment, overlays: {} };
+        const id = assignment.id || Date.now();
+        state.groupsByScenario[scenarioId][id] = { ...assignment, id, overlays: {} };
       });
     },
   },

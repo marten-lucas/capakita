@@ -31,7 +31,14 @@ function DataPage() {
   const scenarios = useSelector(state => state.simScenario.scenarios);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
   const selectedItem = useSelector(state => state.simData.dataByScenario[selectedScenarioId]?.[selectedItemId]);
-  const simulationData = useSelector(() => getDataItems(selectedScenarioId));
+  const scenarioId = useSelector(state => state.simScenario.selectedScenarioId);
+  const simulationData = useSelector(
+    state => {
+      const scenarioId = state?.simScenario?.selectedScenarioId;
+      return scenarioId ? getDataItems(state, scenarioId) : [];
+    },
+    []
+  );
 
   const { importScenario } = useScenarioImport();
 
@@ -53,23 +60,25 @@ function DataPage() {
     {
       icon: <PersonIcon />,
       name: 'Kapazität',
-      onClick: () => dispatch(simDataItemAdd(selectedScenarioId, "manual entry", "capacity"))
+      onClick: () => dispatch(simDataItemAdd({ scenarioId: selectedScenarioId, item: { type: "capacity", source: "manual entry" } }))
     },
     {
       icon: <ChildCareIcon />,
       name: 'Bedarf',
-      onClick: () => dispatch(simDataItemAdd(selectedScenarioId, "manual entry", "demand", true))
+      onClick: () => dispatch(simDataItemAdd({ scenarioId: selectedScenarioId, item: { type: "demand", source: "manual entry" } }))
     },
     {
       icon: <LayersIcon />,
       name: 'Szenario',
-      onClick: () => dispatch(addScenario({
-        name: 'Neues Szenario',
-        remark: '',
-        confidence: 50,
-        likelihood: 50,
-        baseScenarioId: selectedScenarioId || null
-      }))
+      onClick: () => {
+        dispatch(addScenario({
+          name: 'Neues Szenario',
+          remark: '',
+          confidence: 50,
+          likelihood: 50,
+          baseScenarioId: selectedScenarioId || null
+        }));
+      }
     },
     {
       icon: <FileUploadIcon />,

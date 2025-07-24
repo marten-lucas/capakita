@@ -1,4 +1,4 @@
-import { createSlice } from '@reduxjs/toolkit';
+import { createSlice, createSelector } from '@reduxjs/toolkit';
 
 const initialState = {
   dataByScenario: {},
@@ -11,9 +11,9 @@ const simDataSlice = createSlice({
     addDataItem(state, action) {
       const { scenarioId, item } = action.payload;
       if (!state.dataByScenario[scenarioId]) state.dataByScenario[scenarioId] = {};
-      const id = item.id;
+      const id = item.id || Date.now();
       if (!Array.isArray(item.absences)) item.absences = [];
-      state.dataByScenario[scenarioId][id] = { ...item, overlays: {} };
+      state.dataByScenario[scenarioId][id] = { ...item, id, overlays: {} };
     },
     updateDataItem(state, action) {
       const { scenarioId, itemId, updates } = action.payload;
@@ -53,26 +53,33 @@ const simDataSlice = createSlice({
       const { scenarioId, simDataList } = action.payload;
       if (!state.dataByScenario[scenarioId]) state.dataByScenario[scenarioId] = {};
       simDataList.forEach(item => {
-        const id = item.id;
+        const id = item.id || Date.now();
         if (!Array.isArray(item.absences)) item.absences = [];
-        state.dataByScenario[scenarioId][id] = { ...item, overlays: {} };
+        state.dataByScenario[scenarioId][id] = { ...item, id, overlays: {} };
       });
     },
     simDataItemAdd(state, action) {
       const { scenarioId, item } = action.payload;
       if (!state.dataByScenario[scenarioId]) state.dataByScenario[scenarioId] = {};
-      const id = item.id;
+      const id = item.id || Date.now();
       if (!Array.isArray(item.absences)) item.absences = [];
-      state.dataByScenario[scenarioId][id] = { ...item, overlays: {} };
+      state.dataByScenario[scenarioId][id] = { ...item, id, overlays: {} };
     },
   },
 });
 
-// Selector: getDataItems
-export const getDataItems = (state, scenarioId) => {
-  const scenarioData = state.simData.dataByScenario[scenarioId] || {};
-  return Object.values(scenarioData);
-};
+// Memoized selector: getDataItems
+export const getDataItems = createSelector(
+  [
+    state => state?.simData?.dataByScenario ?? {},
+    (state, scenarioId) => scenarioId
+  ],
+  (dataByScenario, scenarioId) => {
+    if (!scenarioId || !dataByScenario[scenarioId]) return [];
+    const scenarioData = dataByScenario[scenarioId];
+    return Object.values(scenarioData);
+  }
+);
 
 export const {
   addDataItem,
