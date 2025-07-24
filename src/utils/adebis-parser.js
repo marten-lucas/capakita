@@ -22,6 +22,7 @@ function assignSegmentIdsToBookings(bookings) {
 // Converts Adebis raw kids and employees data to a normalized simDataList
 export function adebis2simData(kidsRaw, employeesRaw) {
   let simDataList = [];
+  let employeeIdMap = {}; // Map Adebis IDNR to generated simData id
 
   // Kids (demand)
   for (const kind of kidsRaw || []) {
@@ -42,8 +43,10 @@ export function adebis2simData(kidsRaw, employeesRaw) {
   // Employees (capacity)
   let idCounter = 1;
   for (const emp of employeesRaw || []) {
+    const generatedId = String(100000 + idCounter++);
+    employeeIdMap[emp.IDNR] = generatedId;
     simDataList.push(copyToOriginalData({
-      id: String(100000 + idCounter++), // Ensure unique id for employees, not overlapping with KINDNRs
+      id: generatedId,
       type: 'capacity',
       source: "adebis export",
       name: `Mitarbeiter ${emp.IDNR}`,
@@ -57,18 +60,23 @@ export function adebis2simData(kidsRaw, employeesRaw) {
     }));
   }
 
-  return simDataList;
+  return { simDataList, employeeIdMap };
 }
 
 /**
  * Converts Adebis raw booking data to a normalized bookings list.
  * Each booking will have id, kindId, startdate, enddate, times, rawdata, and originalData.
  */
-export function adebis2bookings(belegungRaw) {
+export function adebis2bookings(belegungRaw, employeeIdMap = {}) {
   const bookings = (belegungRaw || []).map((b, idx) => {
+    let kindId = b.KINDNR;
+    // If this is an employee booking, remap kindId using employeeIdMap
+    if (employeeIdMap && employeeIdMap[kindId]) {
+      kindId = employeeIdMap[kindId];
+    }
     const booking = {
       id: b.IDNR || String(idx + 1),
-      kindId: b.KINDNR,
+      kindId: kindId,
       startdate: convertDDMMYYYYtoYYYYMMDD(b.BELVON),
       enddate: convertDDMMYYYYtoYYYYMMDD(b.BELBIS),
       times: Zeiten2Booking(b.ZEITEN),

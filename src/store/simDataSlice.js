@@ -46,6 +46,10 @@ const simDataSlice = createSlice({
         delete state.dataByScenario[scenarioId][itemId];
       }
     },
+    deleteAllDataForScenario(state, action) {
+      const { scenarioId } = action.payload;
+      delete state.dataByScenario[scenarioId];
+    },
     setOverlay(state, action) {
       const { scenarioId, itemId, overlay } = action.payload;
       if (!state.dataByScenario[scenarioId] || !state.dataByScenario[scenarioId][itemId]) return;
@@ -60,6 +64,7 @@ const simDataSlice = createSlice({
       simDataList.forEach(item => {
         const id = item.id || Date.now();
         if (!Array.isArray(item.absences)) item.absences = [];
+        // Do NOT attach bookings here
         state.dataByScenario[scenarioId][id] = {
           ...item,
           id,
@@ -122,6 +127,7 @@ export const {
   updateDataItem,
   updateDataItemFields,
   deleteDataItem,
+  deleteAllDataForScenario,
   setOverlay,
   importDataItems,
   simDataItemAdd,

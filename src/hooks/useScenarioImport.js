@@ -21,8 +21,8 @@ export function useScenarioImport() {
       const { rawdata } = await extractAdebisData(file, isAnonymized);
 
       // Use parser functions to convert rawdata
-      const simDataList = adebis2simData(rawdata.kidsRaw, rawdata.employeesRaw);
-      const bookingsList = adebis2bookings(rawdata.belegungRaw);
+      const { simDataList, employeeIdMap } = adebis2simData(rawdata.kidsRaw, rawdata.employeesRaw);
+      const bookingsList = adebis2bookings(rawdata.belegungRaw, employeeIdMap);
       const groupDefs = adebis2GroupDefs(rawdata.groupsRaw);
       const qualiDefs = adebis2QualiDefs(rawdata.employeesRaw);
       const groupAssignments = adebis2GroupAssignments(rawdata.grukiRaw);

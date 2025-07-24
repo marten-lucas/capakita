@@ -28,12 +28,8 @@ function GroupDetail({ index }) {
   const groups = item?.groups || [];
   const group = groups?.[index];
 
-  // Use bookings from simBookingSlice if available, fallback to item.bookings
-  const bookingsFromStore = useSelector(state => getBookings(state, selectedScenarioId, selectedItemId));
-  const bookings = React.useMemo(
-    () => (bookingsFromStore && bookingsFromStore.length > 0 ? bookingsFromStore : item?.bookings || []),
-    [bookingsFromStore, item]
-  );
+  // Use bookings from simBookingSlice only
+  const bookings = useSelector(state => getBookings(state, selectedScenarioId, selectedItemId));
 
   // Get original group from item.originalParsedData (from import)
   const originalGroup = item?.originalParsedData?.group?.[index];

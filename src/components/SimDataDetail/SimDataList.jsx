@@ -2,7 +2,9 @@ import React from 'react';
 import { List, ListItemButton, ListItemText, Divider, Box } from '@mui/material';
 import { useSelector, useDispatch } from 'react-redux';
 import { setSelectedItem } from '../../store/simScenarioSlice';
-import { selectDataItemsByScenario } from '../../store/simDataSlice';
+import { selectDataItemsByScenario, deleteDataItem } from '../../store/simDataSlice';
+import DeleteIcon from '@mui/icons-material/Delete';
+import IconButton from '@mui/material/IconButton';
 
 function SimDataList() {
   const dispatch = useDispatch();
@@ -55,6 +57,18 @@ function SimDataList() {
                 }
                 secondaryTypographyProps={{ component: 'div' }}
               />
+              <IconButton
+                edge="end"
+                aria-label="delete"
+                size="small"
+                onClick={e => {
+                  e.stopPropagation();
+                  dispatch(deleteDataItem({ scenarioId: selectedScenarioId, itemId: item.id }));
+                }}
+                sx={{ ml: 1 }}
+              >
+                <DeleteIcon fontSize="small" />
+              </IconButton>
             </ListItemButton>
             <Divider />
           </div>

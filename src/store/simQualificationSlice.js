@@ -67,6 +67,19 @@ const simQualificationSlice = createSlice({
         state.qualificationAssignmentsByScenario[scenarioId].push({ ...assignment, id });
       });
     },
+    deleteAllQualificationAssignmentsForItem(state, action) {
+      const { scenarioId, itemId } = action.payload;
+      if (state.qualificationAssignmentsByScenario[scenarioId]) {
+        state.qualificationAssignmentsByScenario[scenarioId] = state.qualificationAssignmentsByScenario[scenarioId].filter(
+          a => a.dataItemId !== itemId
+        );
+      }
+    },
+    deleteAllQualificationAssignmentsForScenario(state, action) {
+      const { scenarioId } = action.payload;
+      delete state.qualificationAssignmentsByScenario[scenarioId];
+      delete state.qualificationDefsByScenario[scenarioId];
+    },
   },
 });
 

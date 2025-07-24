@@ -56,6 +56,16 @@ const simBookingSlice = createSlice({
         }
       });
     },
+    deleteAllBookingsForItem(state, action) {
+      const { scenarioId, itemId } = action.payload;
+      if (state.bookingsByScenario[scenarioId]) {
+        delete state.bookingsByScenario[scenarioId][itemId];
+      }
+    },
+    deleteAllBookingsForScenario(state, action) {
+      const { scenarioId } = action.payload;
+      delete state.bookingsByScenario[scenarioId];
+    },
   },
 });
 
@@ -64,6 +74,8 @@ export const {
   updateBooking,
   deleteBooking,
   importBookings,
+  deleteAllBookingsForItem,
+  deleteAllBookingsForScenario,
 } = simBookingSlice.actions;
 
 export const getBookings = createSelector(

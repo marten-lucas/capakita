@@ -33,7 +33,16 @@ const simFinancialsSlice = createSlice({
         delete state.financialsByScenario[scenarioId][dataItemId][financialId];
       }
     },
-    // ...existing code...
+    deleteAllFinancialsForItem(state, action) {
+      const { scenarioId, itemId } = action.payload;
+      if (state.financialsByScenario[scenarioId]) {
+        delete state.financialsByScenario[scenarioId][itemId];
+      }
+    },
+    deleteAllFinancialsForScenario(state, action) {
+      const { scenarioId } = action.payload;
+      delete state.financialsByScenario[scenarioId];
+    },
   },
 });
 
@@ -41,7 +50,8 @@ export const {
   addFinancial,
   updateFinancial,
   deleteFinancial,
-  // ...other actions...
+  deleteAllFinancialsForItem,
+  deleteAllFinancialsForScenario,
 } = simFinancialsSlice.actions;
 
 export default simFinancialsSlice.reducer;

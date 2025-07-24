@@ -69,6 +69,22 @@ const simGroupSlice = createSlice({
         state.groupsByScenario[scenarioId][id] = { ...assignment, id, overlays: {} };
       });
     },
+    deleteAllGroupAssignmentsForItem(state, action) {
+      const { scenarioId, itemId } = action.payload;
+      if (state.groupsByScenario[scenarioId]) {
+        Object.keys(state.groupsByScenario[scenarioId]).forEach(groupId => {
+          const group = state.groupsByScenario[scenarioId][groupId];
+          if (group.kindId === itemId) {
+            delete state.groupsByScenario[scenarioId][groupId];
+          }
+        });
+      }
+    },
+    deleteAllGroupAssignmentsForScenario(state, action) {
+      const { scenarioId } = action.payload;
+      delete state.groupsByScenario[scenarioId];
+      delete state.groupDefsByScenario[scenarioId];
+    },
   },
 });
 
@@ -81,6 +97,8 @@ export const {
   deleteGroupDef,
   importGroupDefs,
   importGroupAssignments,
+  deleteAllGroupAssignmentsForItem,
+  deleteAllGroupAssignmentsForScenario,
 } = simGroupSlice.actions;
 
 export default simGroupSlice.reducer;
