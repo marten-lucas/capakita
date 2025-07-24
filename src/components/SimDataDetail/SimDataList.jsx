@@ -1,14 +1,14 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Box, Typography, Stack, Card, CardActionArea, CardContent } from '@mui/material';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
 import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import { useNavigate } from 'react-router-dom';
-import DataImportModal from '../components/modals/DataImportModal';
-import ScenarioLoadDialog from '../components/modals/ScenarioLoadDialog.jsx';
-import { useScenarioImport } from '../hooks/useScenarioImport';
+import DataImportModal from '../modals/DataImportModal';
+import ScenarioLoadDialog from '../modals/ScenarioLoadDialog.jsx';
+import { useScenarioImport } from '../../hooks/useScenarioImport';
 import { useSelector, useDispatch } from 'react-redux';
-import { addScenario, setSelectedScenarioId } from '../store/simScenarioSlice';
+import { addScenario, setSelectedScenarioId } from '../../store/simScenarioSlice';
 
 function WelcomePage() {
   const [importOpen, setImportOpen] = useState(false);
