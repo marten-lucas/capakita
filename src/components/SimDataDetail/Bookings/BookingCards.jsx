@@ -25,14 +25,16 @@ function getBookingHours(times) {
   return `${(totalMinutes / 60).toFixed(1)} h`;
 }
 
+const EMPTY_BOOKINGS = [];
 function BookingCards() {
   // Use selector for bookings of the selected item
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems[selectedScenarioId]);
   const bookings = useSelector(state => {
-    if (!selectedScenarioId || !selectedItemId) return [];
+    if (!selectedScenarioId || !selectedItemId) return EMPTY_BOOKINGS;
     const scenarioBookings = state.simBooking.bookingsByScenario[selectedScenarioId] || {};
-    return Object.values(scenarioBookings[selectedItemId] || {});
+    const itemBookings = scenarioBookings[selectedItemId];
+    return itemBookings ? Object.values(itemBookings) : EMPTY_BOOKINGS;
   });
 
   // Track expanded accordion index

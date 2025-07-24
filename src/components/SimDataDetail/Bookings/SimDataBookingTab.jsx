@@ -6,6 +6,8 @@ import BookingCards from './BookingCards';
 import { useSelector, useDispatch } from 'react-redux';
 import { selectDataItemsByScenario } from '../../../store/simDataSlice';
 
+const EMPTY_BOOKINGS = [];
+
 function SimDataBookingTab() {
   // Get scenario and item selection
   const dispatch = useDispatch();
@@ -20,9 +22,10 @@ function SimDataBookingTab() {
 
   // Use booking slice for bookings
   const bookings = useSelector(state => {
-    if (!selectedScenarioId || !selectedItemId) return [];
+    if (!selectedScenarioId || !selectedItemId) return EMPTY_BOOKINGS;
     const scenarioBookings = state.simBooking.bookingsByScenario[selectedScenarioId] || {};
-    return Object.values(scenarioBookings[selectedItemId] || {});
+    const itemBookings = scenarioBookings[selectedItemId];
+    return itemBookings ? Object.values(itemBookings) : EMPTY_BOOKINGS;
   });
 
 

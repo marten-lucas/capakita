@@ -10,6 +10,7 @@ import DayControl from './BookingDayControl';
 import { selectDataItemsByScenario } from '../../../store/simDataSlice';
 
 // BookingDetail component
+const EMPTY_BOOKINGS = [];
 function BookingDetail({ index }) {
   // Get scenario and item selection
   const dispatch = useDispatch();
@@ -24,9 +25,10 @@ function BookingDetail({ index }) {
 
   // Use booking slice for bookings and actions
   const bookings = useSelector(state => {
-    if (!selectedScenarioId || !selectedItemId) return [];
+    if (!selectedScenarioId || !selectedItemId) return EMPTY_BOOKINGS;
     const scenarioBookings = state.simBooking.bookingsByScenario[selectedScenarioId] || {};
-    return Object.values(scenarioBookings[selectedItemId] || {});
+    const itemBookings = scenarioBookings[selectedItemId];
+    return itemBookings ? Object.values(itemBookings) : EMPTY_BOOKINGS;
   });
   const booking = bookings?.[index];
   const originalBooking = item?.originalParsedData?.booking?.[index];

@@ -4,6 +4,8 @@ const initialState = {
   bookingsByScenario: {},
 };
 
+const EMPTY_BOOKINGS = [];
+
 const simBookingSlice = createSlice({
   name: 'simBooking',
   initialState,
@@ -71,8 +73,9 @@ export const getBookings = createSelector(
     (state, scenarioId, itemId) => itemId
   ],
   (bookingsByScenario, scenarioId, itemId) => {
-    if (!scenarioId || !itemId || !bookingsByScenario[scenarioId]) return [];
-    return Object.values(bookingsByScenario[scenarioId][itemId] || {});
+    if (!scenarioId || !itemId || !bookingsByScenario[scenarioId]) return EMPTY_BOOKINGS;
+    const itemBookings = bookingsByScenario[scenarioId][itemId];
+    return itemBookings ? Object.values(itemBookings) : EMPTY_BOOKINGS;
   }
 );
 
