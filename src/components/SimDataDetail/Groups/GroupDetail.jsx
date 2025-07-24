@@ -9,6 +9,7 @@ import ModMonitor from '../ModMonitor';
 import { useSelector, useDispatch } from 'react-redux';
 import { selectDataItemsByScenario } from '../../../store/simDataSlice';
 import { createSelector } from '@reduxjs/toolkit';
+import { getBookings } from '../../../store/simBookingSlice';
 
 const EMPTY_GROUP_DEFS = [];
 
@@ -26,7 +27,13 @@ function GroupDetail({ index }) {
   // Read groups directly from the item (not from scenario store)
   const groups = item?.groups || [];
   const group = groups?.[index];
-  const bookings = React.useMemo(() => item?.bookings || [], [item]);
+
+  // Use bookings from simBookingSlice if available, fallback to item.bookings
+  const bookingsFromStore = useSelector(state => getBookings(state, selectedScenarioId, selectedItemId));
+  const bookings = React.useMemo(
+    () => (bookingsFromStore && bookingsFromStore.length > 0 ? bookingsFromStore : item?.bookings || []),
+    [bookingsFromStore, item]
+  );
 
   // Get original group from item.originalParsedData (from import)
   const originalGroup = item?.originalParsedData?.group?.[index];
