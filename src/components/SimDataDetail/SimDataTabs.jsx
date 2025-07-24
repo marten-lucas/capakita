@@ -18,38 +18,50 @@ import SimDataGroupsTab from './Groups/SimDataGroupsTab';
 import SimDataFinanceTab from './Financials/SimDataFinanceTab';
 import React, { useState } from 'react';
 import { useSelector } from 'react-redux';
+import { getDataItems } from '../../store/simDataSlice';
+import { getBookings } from '../../store/simBookingSlice';
+import { createSelector } from '@reduxjs/toolkit';
+
+// Memoized selector for financials
+const getFinancials = createSelector(
+  [
+    state => state.simFinancials.financialsByScenario,
+    (state, scenarioId) => scenarioId,
+    (state, scenarioId, itemId) => itemId
+  ],
+  (financialsByScenario, scenarioId, itemId) => {
+    if (!scenarioId || !itemId || !financialsByScenario[scenarioId]) return [];
+    return Object.values(financialsByScenario[scenarioId][itemId] || {});
+  }
+);
 
 function SimDataTabs() {
   const [activeTab, setActiveTab] = useState(0);
 
   // Get selected scenario and item id from Redux
-  const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
-  const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
-  const dataItems = useSelector(state => state.simData.items[selectedScenarioId] || []);
+  const scenarioId = useSelector(state => state.simScenario.selectedScenarioId);
+  const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[scenarioId]);
+
+  // Correct selector for data items:
+  const dataItems = useSelector(state => getDataItems(state, scenarioId));
+
   const selectedItem = dataItems?.find(item => item.id === selectedItemId);
 
   // Get data from all slices for debug
   const simDataItem = selectedItem;
-  const bookings = useSelector(state =>
-    selectedScenarioId && selectedItemId
-      ? (state.simBooking.bookings[selectedScenarioId]?.[selectedItemId] || [])
-      : []
-  );
+  // Correct selector for bookings:
+  const bookings = useSelector(state => getBookings(state, scenarioId, selectedItemId));
   const groupAssignments = useSelector(state =>
-    selectedScenarioId && selectedItemId
-      ? (state.simGroup.groups[selectedScenarioId] || []).filter(g =>
-        g.members && Array.isArray(g.members) && g.members.includes(selectedItemId)
-      )
+    scenarioId
+      ? Object.values(state.simGroup.groupsByScenario?.[scenarioId] || {})
       : []
   );
-  const financials = useSelector(state =>
-    selectedScenarioId && selectedItemId
-      ? (state.simFinancials.financials[selectedScenarioId]?.[selectedItemId] || [])
-      : []
-  );
+  const financials = useSelector(state => getFinancials(state, scenarioId, selectedItemId));
+
+  // Fix qualifications selector to use qualificationDefsByScenario
   const qualifications = useSelector(state =>
-    selectedScenarioId
-      ? (state.simQualification.qualifications[selectedScenarioId] || [])
+    scenarioId
+      ? (state.simQualification.qualificationDefsByScenario?.[scenarioId] || [])
       : []
   );
 

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { Box, Typography, Stack, Card, CardActionArea, CardContent } from '@mui/material';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
 import FolderOpenIcon from '@mui/icons-material/FolderOpen';
@@ -9,7 +9,6 @@ import ScenarioLoadDialog from '../components/modals/ScenarioLoadDialog.jsx';
 import { useScenarioImport } from '../hooks/useScenarioImport';
 import { useSelector, useDispatch } from 'react-redux';
 import { addScenario, setSelectedScenarioId } from '../store/simScenarioSlice';
-import { getDataItems } from '../../store/simDataSlice';
 
 function WelcomePage() {
   const [importOpen, setImportOpen] = useState(false);
@@ -21,12 +20,6 @@ function WelcomePage() {
   const { importScenario } = useScenarioImport();
 
   // Selector für die Daten, memoized
-  const scenarioId = useSelector(state => state?.simScenario?.selectedScenarioId);
-  const data = useSelector(
-    state => scenarioId ? getDataItems(state, scenarioId) : [],
-    [scenarioId]
-  );
-  const memoizedData = useMemo(() => data, [data]);
 
   // Handler für DataImportModal
   const handleImport = async ({ file, isAnonymized }) => {

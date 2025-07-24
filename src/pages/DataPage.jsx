@@ -14,7 +14,7 @@ import SimDataList from '../components/SimDataList';
 import SimDataDetailForm from '../components/SimDataDetail/SimDataDetailForm';
 import { useSelector, useDispatch } from 'react-redux';
 import { setSelectedScenarioId, addScenario, setScenarioSaveDialogOpen, setScenarioSaveDialogPending } from '../store/simScenarioSlice';
-import { simDataItemAdd, getDataItems } from '../store/simDataSlice';
+import { addDataItemAndSelect, getDataItems } from '../store/simDataSlice';
 import ScenarioSaveDialog from '../components/modals/ScenarioSaveDialog';
 import PersonIcon from '@mui/icons-material/Person';
 import ChildCareIcon from '@mui/icons-material/ChildCare';
@@ -31,7 +31,6 @@ function DataPage() {
   const scenarios = useSelector(state => state.simScenario.scenarios);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
   const selectedItem = useSelector(state => state.simData.dataByScenario[selectedScenarioId]?.[selectedItemId]);
-  const scenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const simulationData = useSelector(
     state => {
       const scenarioId = state?.simScenario?.selectedScenarioId;
@@ -60,12 +59,12 @@ function DataPage() {
     {
       icon: <PersonIcon />,
       name: 'Kapazität',
-      onClick: () => dispatch(simDataItemAdd({ scenarioId: selectedScenarioId, item: { type: "capacity", source: "manual entry" } }))
+      onClick: () => dispatch(addDataItemAndSelect({ scenarioId: selectedScenarioId, item: { type: "capacity", source: "manual entry" } }))
     },
     {
       icon: <ChildCareIcon />,
       name: 'Bedarf',
-      onClick: () => dispatch(simDataItemAdd({ scenarioId: selectedScenarioId, item: { type: "demand", source: "manual entry" } }))
+      onClick: () => dispatch(addDataItemAndSelect({ scenarioId: selectedScenarioId, item: { type: "demand", source: "manual entry" } }))
     },
     {
       icon: <LayersIcon />,

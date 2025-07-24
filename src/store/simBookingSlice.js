@@ -1,4 +1,4 @@
-import { createSlice } from '@reduxjs/toolkit';
+import { createSlice, createSelector } from '@reduxjs/toolkit';
 
 const initialState = {
   bookingsByScenario: {},
@@ -54,7 +54,6 @@ const simBookingSlice = createSlice({
         }
       });
     },
-    // ...existing code...
   },
 });
 
@@ -63,7 +62,18 @@ export const {
   updateBooking,
   deleteBooking,
   importBookings,
-  // ...other actions...
 } = simBookingSlice.actions;
+
+export const getBookings = createSelector(
+  [
+    state => state.simBooking.bookingsByScenario,
+    (state, scenarioId) => scenarioId,
+    (state, scenarioId, itemId) => itemId
+  ],
+  (bookingsByScenario, scenarioId, itemId) => {
+    if (!scenarioId || !itemId || !bookingsByScenario[scenarioId]) return [];
+    return Object.values(bookingsByScenario[scenarioId][itemId] || {});
+  }
+);
 
 export default simBookingSlice.reducer;

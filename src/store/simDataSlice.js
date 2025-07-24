@@ -13,7 +13,12 @@ const simDataSlice = createSlice({
       if (!state.dataByScenario[scenarioId]) state.dataByScenario[scenarioId] = {};
       const id = item.id || Date.now();
       if (!Array.isArray(item.absences)) item.absences = [];
-      state.dataByScenario[scenarioId][id] = { ...item, id, overlays: {} };
+      state.dataByScenario[scenarioId][id] = {
+        ...item,
+        id,
+        name: item.name ?? (item.type === 'capacity' ? 'Neue Kapazität' : item.type === 'demand' ? 'Neuer Bedarf' : 'Neuer Eintrag'),
+        overlays: {}
+      };
     },
     updateDataItem(state, action) {
       const { scenarioId, itemId, updates } = action.payload;
@@ -55,7 +60,12 @@ const simDataSlice = createSlice({
       simDataList.forEach(item => {
         const id = item.id || Date.now();
         if (!Array.isArray(item.absences)) item.absences = [];
-        state.dataByScenario[scenarioId][id] = { ...item, id, overlays: {} };
+        state.dataByScenario[scenarioId][id] = {
+          ...item,
+          id,
+          name: item.name ?? (item.type === 'capacity' ? 'Neue Kapazität' : item.type === 'demand' ? 'Neuer Bedarf' : 'Neuer Eintrag'),
+          overlays: {}
+        };
       });
     },
     simDataItemAdd(state, action) {
@@ -63,21 +73,35 @@ const simDataSlice = createSlice({
       if (!state.dataByScenario[scenarioId]) state.dataByScenario[scenarioId] = {};
       const id = item.id || Date.now();
       if (!Array.isArray(item.absences)) item.absences = [];
-      state.dataByScenario[scenarioId][id] = { ...item, id, overlays: {} };
+      state.dataByScenario[scenarioId][id] = {
+        ...item,
+        id,
+        name: item.name ?? (item.type === 'capacity' ? 'Neuer Mitarbeiter' : item.type === 'demand' ? 'Neues Kind' : 'Neuer Eintrag'),
+        overlays: {}
+      };
     },
   },
 });
 
+// Thunk for adding a data item and selecting it
+export const addDataItemAndSelect = ({ scenarioId, item }) => (dispatch, getState) => {
+  const id = item.id || Date.now();
+  dispatch(simDataItemAdd({ scenarioId, item: { ...item, id } }));
+  dispatch({
+    type: 'simScenario/setSelectedItem',
+    payload: id
+  });
+};
+
 // Memoized selector: getDataItems
 export const getDataItems = createSelector(
   [
-    state => state?.simData?.dataByScenario ?? {},
+    state => state.simData.dataByScenario,
     (state, scenarioId) => scenarioId
   ],
   (dataByScenario, scenarioId) => {
     if (!scenarioId || !dataByScenario[scenarioId]) return [];
-    const scenarioData = dataByScenario[scenarioId];
-    return Object.values(scenarioData);
+    return Object.values(dataByScenario[scenarioId]);
   }
 );
 
