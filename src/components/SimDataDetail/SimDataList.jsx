@@ -1,152 +1,65 @@
-import { useState } from 'react';
-import { Box, Typography, Stack, Card, CardActionArea, CardContent } from '@mui/material';
-import FileUploadIcon from '@mui/icons-material/FileUpload';
-import FolderOpenIcon from '@mui/icons-material/FolderOpen';
-import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
-import { useNavigate } from 'react-router-dom';
-import DataImportModal from '../modals/DataImportModal';
-import ScenarioLoadDialog from '../modals/ScenarioLoadDialog.jsx';
-import { useScenarioImport } from '../../hooks/useScenarioImport';
+
+import {
+  Typography, Box, Button
+} from '@mui/material';
+import SimDataTabs from './SimDataTabs';
 import { useSelector, useDispatch } from 'react-redux';
-import { addScenario, setSelectedScenarioId } from '../../store/simScenarioSlice';
+import { deleteDataItem, selectDataItemsByScenario } from '../../store/simDataSlice';
+import React from 'react';
 
-function WelcomePage() {
-  const [importOpen, setImportOpen] = useState(false);
-  const [loadOpen, setLoadOpen] = useState(false);
-  const navigate = useNavigate();
-
+function SimDataDetailForm() {
+  // Get scenarioId and selected item id from Redux store
+  const scenarioId = useSelector(state => state.simScenario.selectedScenarioId);
+  const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[scenarioId]);
+  const dataItemsSelector = React.useMemo(
+    () => (state) => selectDataItemsByScenario(state, scenarioId),
+    [scenarioId]
+  );
+  const dataItems = useSelector(dataItemsSelector);
+  const item = dataItems?.find(i => i.id === selectedItemId);
   const dispatch = useDispatch();
-  const scenarios = useSelector(state => state.simScenario.scenarios);
-  const { importScenario } = useScenarioImport();
 
-  // Selector für die Daten, memoized
-
-  // Handler für DataImportModal
-  const handleImport = async ({ file, isAnonymized }) => {
-    await importScenario({ file, isAnonymized });
-    setImportOpen(false);
-    navigate('/data');
-  };
-
-  // Nach Abschluss immer zu /data navigieren
-  const handleLoadDone = () => {
-    setLoadOpen(false);
-    navigate('/data');
-  };
-
-  // Neues leeres Szenario direkt anlegen und auswählen
-  const handleAddEmptyScenario = () => {
-    const newScenario = {
-      name: 'Neues Szenario',
-      remark: '',
-      confidence: 50,
-      likelihood: 50,
-      baseScenarioId: null
-    };
-    dispatch(addScenario(newScenario));
-    // Setze das neue Szenario als ausgewählt
-    const lastScenario = scenarios[scenarios.length - 1];
-    if (lastScenario) {
-      dispatch(setSelectedScenarioId(lastScenario.id));
-    }
-    navigate('/data');
-  };
+  // Guard: Wenn item nicht gesetzt, Hinweis anzeigen und return
+  if (!item) {
+    return (
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+        <Typography color="text.secondary">
+          Wählen Sie einen Eintrag aus, um Details anzuzeigen.
+        </Typography>
+      </Box>
+    );
+  }
 
   return (
     <Box
-      sx={{
-        minHeight: '80vh',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 4,
-        py: 6,
-      }}
+      bgcolor="background.paper"
+      boxShadow={3}
+      borderRadius={2}
+      p={3}
+      height="90%"
+      display="flex"
+      flexDirection="column"
+      overflow="auto"
     >
-      {/* App Logo */}
-      <Box sx={{ width: '100%', maxWidth: 480, mb: 2 }}>
-        <img
-          src="CapaKita_Visual.svg"
-          alt="CapaKita Logo"
-          style={{
-            width: '100%',
-            height: 'auto',
-            display: 'block',
-            margin: '0 auto',
-          }}
-        />
-      </Box>
-      {/* Claim */}
-      <Typography variant="h3" sx={{ fontWeight: 700, mb: 1, textAlign: 'center', letterSpacing: '.1em' }}>
-        ...was wäre wenn
-      </Typography>
-      {/* Wertversprechen */}
-      <Typography variant="h6" sx={{ maxWidth: "80%", textAlign: 'center', color: 'text.secondary', mb: 0 }}>
-        CapaKita hilft Ihnen, Personalkapazitäten und Betreuungsbedarf in Ihrer Kita einfach und flexibel zu simulieren. Importieren Sie Ihre Daten, spielen Sie verschiedene Szenarien durch und treffen Sie fundierte Entscheidungen für die Zukunft.
-      </Typography>
-      {/* Cards statt Buttons */}
-      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={3} sx={{ mt: 2, width: '100%', justifyContent: 'center' }}>
-        <Card
-          sx={{
-            minWidth: 220,
-            bgcolor: '#e3f2fd',
-            boxShadow: 3,
-            borderRadius: 3,
-            textAlign: 'center'
-          }}
-        >
-          <CardActionArea onClick={() => setImportOpen(true)}>
-            <CardContent>
-              <FileUploadIcon sx={{ fontSize: 56, color: 'primary.main', mb: 1 }} />
-              <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                Adebis-Daten importieren
-              </Typography>
-            </CardContent>
-          </CardActionArea>
-        </Card>
-        <Card
-          sx={{
-            minWidth: 220,
-            bgcolor: '#e8f5e9',
-            boxShadow: 3,
-            borderRadius: 3,
-            textAlign: 'center'
-          }}
-        >
-          <CardActionArea onClick={() => setLoadOpen(true)}>
-            <CardContent>
-              <FolderOpenIcon sx={{ fontSize: 56, color: 'secondary.main', mb: 1 }} />
-              <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                CapaKita-Datei laden,
-              </Typography>
-            </CardContent>
-          </CardActionArea>
-        </Card>
-        <Card
-          sx={{
-            minWidth: 220,
-            bgcolor: '#e8f5e9',
-            boxShadow: 3,
-            borderRadius: 3,
-            textAlign: 'center'
-          }}
-        >
-          <CardActionArea onClick={handleAddEmptyScenario}>
-            <CardContent>
-              <AddCircleOutlineIcon sx={{ fontSize: 56, color: 'success.main', mb: 1 }} />
-              <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                Leeres Szenario anlegen,
-              </Typography>
-            </CardContent>
-          </CardActionArea>
-        </Card>
-      </Stack>
-      {/* Dialoge */}
-      <DataImportModal open={importOpen} onClose={() => setImportOpen(false)} onImport={handleImport} />
-      <ScenarioLoadDialog open={loadOpen} onClose={() => setLoadOpen(false)} onLoaded={handleLoadDone} />
+      <SimDataTabs />
+      {/* Show delete button if manual entry */}
+      {item?.rawdata?.source === 'manual entry' && (
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+          <Button
+            variant="outlined"
+            color="error"
+            size="small"
+            fullWidth
+            sx={{ mt: 2 }}
+            onClick={() => dispatch(deleteDataItem({ scenarioId, itemId: item.id }))}
+          >
+            Eintrag löschen
+          </Button>
+        </Box>
+      )}
     </Box>
   );
 }
 
-export default WelcomePage;
+export default SimDataDetailForm;
+
