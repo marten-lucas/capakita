@@ -4,24 +4,18 @@ import AddIcon from '@mui/icons-material/Add';
 import ModMonitor from '../ModMonitor';
 import BookingCards from './BookingCards';
 import { useSelector, useDispatch } from 'react-redux';
-import { selectDataItemsByScenario } from '../../../store/simDataSlice';
 import { createSelector } from '@reduxjs/toolkit';
 
 const EMPTY_BOOKINGS = [];
 
 function SimDataBookingTab() {
-  // Get scenario and item selection
   const dispatch = useDispatch();
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
-  const dataItemsSelector = React.useMemo(
-    () => (state) => selectDataItemsByScenario(state, selectedScenarioId),
-    [selectedScenarioId]
-  );
-  const dataItems = useSelector(dataItemsSelector);
-  const selectedItem = dataItems?.find(item => String(item.id) === String(selectedItemId));
+  // Get the selected item directly by key
+  const selectedItem = useSelector(state => state.simData.dataByScenario[selectedScenarioId]?.[selectedItemId]);
 
-  // Create memoized selector for bookings
+  // Memoized selector for bookings
   const bookingsSelector = React.useMemo(() => 
     createSelector(
       [
@@ -44,7 +38,6 @@ function SimDataBookingTab() {
 
   // Debug output
   React.useEffect(() => {
-     
     console.log('SimDataBookingTab: selectedScenarioId', selectedScenarioId, 'selectedItemId', selectedItemId, 'selectedItem', selectedItem, 'bookings', bookings);
   }, [selectedScenarioId, selectedItemId, selectedItem, bookings]);
 
@@ -68,8 +61,6 @@ function SimDataBookingTab() {
     });
   };
 
-
-
   if (!selectedItem) return null;
 
   return (
@@ -84,7 +75,7 @@ function SimDataBookingTab() {
           Buchungszeitraum hinzufügen
         </Button>
         <ModMonitor
-          itemId={selectedItem.id}
+          itemId={selectedItemId}
           field="bookings"
           value={JSON.stringify(bookings)}
           originalValue={undefined}
@@ -99,3 +90,4 @@ function SimDataBookingTab() {
 }
 
 export default SimDataBookingTab;
+

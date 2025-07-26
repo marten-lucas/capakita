@@ -1,4 +1,5 @@
 import { convertDDMMYYYYtoYYYYMMDD } from './dateUtils';
+import { createId } from './idUtils';
 
 // Helper to assign unique IDs to all segments in all bookings
 function assignSegmentIdsToBookings(bookings) {
@@ -26,8 +27,9 @@ export function adebis2simData(kidsRaw, employeesRaw) {
 
   // Kids (demand)
   for (const kind of kidsRaw || []) {
+    const newId = createId('simdata');
     simDataList.push({
-      id: String(kind.KINDNR), // UID as string
+      id: newId,
       type: 'demand',
       source: "adebis export",
       name: kind.FNAME || `Kind ${kind.KINDNR}`,
@@ -35,33 +37,32 @@ export function adebis2simData(kidsRaw, employeesRaw) {
       startdate: convertDDMMYYYYtoYYYYMMDD(kind.AUFNDAT),
       enddate: convertDDMMYYYYtoYYYYMMDD(kind.AUSTRDAT),
       dateofbirth: convertDDMMYYYYtoYYYYMMDD(kind.GEBDATUM),
-      groupId: kind.GRUNR || "",
+      groupId: kind.GRUNR ? String(kind.GRUNR) : "",
       rawdata: { ...kind },
       absences: [],
       overlays: {},
-      kindId: String(kind.KINDNR) // keep kindId only for simData
+      adebisId: { id: String(kind.KINDNR), source: "kind" }
     });
   }
 
   // Employees (capacity)
-  let idCounter = 1;
   for (const emp of employeesRaw || []) {
-    const generatedId = String(100000 + idCounter++);
-    employeeIdMap[emp.IDNR] = generatedId;
+    const newId = createId('simdata');
+    employeeIdMap[String(emp.IDNR)] = newId;
     simDataList.push({
-      id: generatedId,
+      id: newId,
       type: 'capacity',
       source: "adebis export",
       name: `Mitarbeiter ${emp.IDNR}`,
       remark: "",
       startdate: convertDDMMYYYYtoYYYYMMDD(emp.BEGINNDAT),
       enddate: convertDDMMYYYYtoYYYYMMDD(emp.ENDDAT),
-      dateofbirth: "", // not available for employees
+      dateofbirth: "",
       groupId: "",
       rawdata: { ...emp },
       absences: [],
-      overlays: {}
-      // no kindId for employees
+      overlays: {},
+      adebisId: { id: String(emp.IDNR), source: "anstell" }
     });
   }
 
@@ -72,21 +73,62 @@ export function adebis2simData(kidsRaw, employeesRaw) {
  * Converts Adebis raw booking data to a normalized bookings list.
  * Each booking will have id, kindId, startdate, enddate, times, rawdata.
  */
-export function adebis2bookings(belegungRaw) {
-  const bookings = (belegungRaw || []).map((b, idx) => {
-    const bookingId = String(b.IDNR || `${Date.now()}${idx}`);
-    const booking = {
+export function adebis2bookings(belegungRaw, employeesRaw) {
+  const belegungResult = belegung2Booking(belegungRaw);
+  const anstellResult = anstell2Booking(employeesRaw);
+
+  // Combine bookings and references
+  return {
+    bookings: [...belegungResult.bookings, ...anstellResult.bookings],
+    bookingReference: [...belegungResult.bookingReference, ...anstellResult.bookingReference]
+  };
+}
+
+function belegung2Booking(belegungRaw) {
+  const bookings = [];
+  const bookingReference = [];
+  (belegungRaw || []).forEach((b) => {
+    const bookingId = createId('booking');
+    bookings.push({
       id: bookingId,
       startdate: convertDDMMYYYYtoYYYYMMDD(b.BELVON),
       enddate: convertDDMMYYYYtoYYYYMMDD(b.BELBIS),
       times: Zeiten2Booking(b.ZEITEN, bookingId),
       rawdata: { ...b },
       overlays: {},
-      // Remove kindId from bookings
-    };
-    return booking;
+      adebisId: { id: String(b.IDNR), source: "belegung" }
+    });
+    bookingReference.push({
+      bookingKey: bookingId,
+      adebisId: { id: String(b.KINDNR), source: "kind" }
+    });
   });
-  return assignSegmentIdsToBookings(bookings);
+  assignSegmentIdsToBookings(bookings);
+  return { bookings, bookingReference };
+}
+
+function anstell2Booking(employeesRaw) {
+  const bookings = [];
+  const bookingReference = [];
+  (employeesRaw || []).forEach((e) => {
+    if (!e.ZEITEN) return;
+    const bookingId = createId('booking');
+    bookings.push({
+      id: bookingId,
+      startdate: convertDDMMYYYYtoYYYYMMDD(e.BEGINNDAT),
+      enddate: convertDDMMYYYYtoYYYYMMDD(e.ENDDAT),
+      times: Zeiten2Booking(e.ZEITEN, bookingId),
+      rawdata: { ...e },
+      overlays: {},
+      adebisId: { id: String(e.IDNR), source: "anstell" }
+    });
+    bookingReference.push({
+      bookingKey: bookingId,
+      adebisId: { id: String(e.IDNR), source: "anstell" }
+    });
+  });
+  assignSegmentIdsToBookings(bookings);
+  return { bookings, bookingReference };
 }
 
 /**
@@ -188,8 +230,8 @@ export function adebis2QualiDefs(employeesRaw) {
 export function adebis2GroupAssignments(grukiRaw) {
   return (grukiRaw || []).map(g => {
     return {
-      kindId: g.KINDNR,
-      groupId: g.GRUNR,
+      kindId: String(g.KINDNR),
+      groupId: String(g.GRUNR),
       start: convertDDMMYYYYtoYYYYMMDD(g.GKVON),
       end: convertDDMMYYYYtoYYYYMMDD(g.GKBIS),
       rawdata: { ...g }
@@ -207,13 +249,13 @@ export function adebis2GroupAssignments(grukiRaw) {
  * @param {Array} employeesRaw - Array of employee objects with at least QUALIFIK and IDNR.
  * @returns {Array} qualiAssignments - Array of { qualification, dataItemId, rawdata, originalData }
  */
-export function adebis2QualiAssignments(employeesRaw) {
+export function adebis2QualiAssignments(employeesRaw, employeeIdMap = {}) {
   return (employeesRaw || [])
     .filter(e => e.QUALIFIK && e.IDNR)
     .map(e => {
       const assignment = {
         qualification: e.QUALIFIK,
-        dataItemId: String(e.IDNR),
+        dataItemId: employeeIdMap[String(e.IDNR)] || String(e.IDNR),
         rawdata: { QUALIFIK: e.QUALIFIK }
       };
       assignment.originalData = { ...assignment };

@@ -1,11 +1,12 @@
 import { createSlice } from '@reduxjs/toolkit';
+import { getItemByAdebisID } from './simDataSlice';
 
 const initialState = {
   scenarios: [],
   selectedScenarioId: null,
   lastImportAnonymized: true,
   selectedItems: {},
-  scenarioSaveDialogPending: false, // Add this if needed
+  scenarioSaveDialogPending: false, 
 };
 
 const simScenarioSlice = createSlice({
@@ -13,7 +14,7 @@ const simScenarioSlice = createSlice({
   initialState,
   reducers: {
     setSelectedScenarioId(state, action) {
-      state.selectedScenarioId = action.payload;
+      state.selectedScenarioId = String(action.payload);
     },
     setLastImportAnonymized(state, action) {
       state.lastImportAnonymized = action.payload;
@@ -23,15 +24,9 @@ const simScenarioSlice = createSlice({
       if (!scenarioId) return;
       state.selectedItems[scenarioId] = action.payload;
     },
-    setScenarioSaveDialogOpen(state, action) {
-      // Implementation for opening the save dialog
-    },
-    setScenarioSaveDialogPending(state, action) {
-      state.scenarioSaveDialogPending = action.payload;
-    },
     addScenario(state, action) {
       // Assign a unique id if not present
-      const now = Date.now();
+      const now = Date.now().toString();
       const scenario = {
         name: action.payload.name || 'Neues Szenario',
         remark: action.payload.remark ?? '',
@@ -39,21 +34,21 @@ const simScenarioSlice = createSlice({
         likelihood: action.payload.likelihood ?? 50,
         desirability: action.payload.desirability ?? 50,
         baseScenarioId: action.payload.baseScenarioId ?? null,
-        id: action.payload.id || now,
-        // ...other fields if needed...
+        id: action.payload.id ? String(action.payload.id) : now,
       };
       state.scenarios.push(scenario);
-      state.selectedScenarioId = scenario.id; // select the new scenario
+      state.selectedScenarioId = scenario.id; 
     },
     updateScenario(state, action) {
       const { scenarioId, updates } = action.payload; // <-- fix: use scenarioId
-      const scenario = state.scenarios.find(s => s.id === scenarioId);
+      const id = String(scenarioId);
+      const scenario = state.scenarios.find(s => String(s.id) === id);
       if (scenario) {
         Object.assign(scenario, updates);
       }
     },
     deleteScenario(state, action) {
-      const id = action.payload;
+      const id = String(action.payload);
       // Collect all descendant scenario ids recursively
       const collectDescendants = (parentId) => {
         let ids = [parentId];
@@ -94,38 +89,6 @@ export const importScenario = ({
     id: scenarioId
   }));
 
-  // Import group definitions
-  if (groupDefs && groupDefs.length > 0) {
-    dispatch({
-      type: 'simGroup/importGroupDefs',
-      payload: { scenarioId, defs: groupDefs }
-    });
-  }
-
-  // Import qualification definitions
-  if (qualiDefs && qualiDefs.length > 0) {
-    dispatch({
-      type: 'simQualification/importQualificationDefs',
-      payload: { scenarioId, defs: qualiDefs }
-    });
-  }
-
-  // Import group assignments
-  if (groupAssignments && groupAssignments.length > 0) {
-    dispatch({
-      type: 'simGroup/importGroupAssignments',
-      payload: { scenarioId, assignments: groupAssignments }
-    });
-  }
-
-  // Import qualification assignments
-  if (qualiAssignments && qualiAssignments.length > 0) {
-    dispatch({
-      type: 'simQualification/importQualificationAssignments',
-      payload: { scenarioId, assignments: qualiAssignments }
-    });
-  }
-
   // Import sim data items (do NOT attach bookings)
   if (simDataList && simDataList.length > 0) {
     dispatch({
@@ -136,12 +99,18 @@ export const importScenario = ({
 
   // Import bookings into simBooking
   if (bookingsList && bookingsList.length > 0) {
-    // Ensure booking.id and booking.kindId are strings and match simData item ids
-    const normalizedBookings = bookingsList.map(b => ({
-      ...b,
-      id: String(b.id),
-      kindId: String(b.kindId)
-    }));
+    // Link bookings to correct dataItem using adebisId
+    const state = getState();
+    const normalizedBookings = bookingsList.map(b => {
+      // Find the correct dataItem by adebisId
+      const dataItem = getItemByAdebisID(state, scenarioId, { id: b.kindAdebisId, source: "kind" });
+      return {
+        ...b,
+        dataItemId: dataItem ? Object.keys(state.simData.dataByScenario[scenarioId]).find(
+          key => state.simData.dataByScenario[scenarioId][key] === dataItem
+        ) : undefined
+      };
+    }).filter(b => b.dataItemId);
     dispatch({
       type: 'simBooking/importBookings',
       payload: { scenarioId, items: normalizedBookings }

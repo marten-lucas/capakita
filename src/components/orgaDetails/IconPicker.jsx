@@ -2,7 +2,7 @@ import React from 'react';
 import { Box } from '@mui/material';
 import EmojiPicker from 'emoji-picker-react';
 
-function IconPicker({ value, onChange, disabled = false }) {
+function IconPicker({ onChange }) {
   const handleEmojiClick = (emojiObject) => {
     onChange(emojiObject.emoji);
   };

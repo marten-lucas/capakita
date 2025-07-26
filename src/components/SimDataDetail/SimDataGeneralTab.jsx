@@ -13,34 +13,22 @@ function SimDataGeneralTab() {
   const dispatch = useDispatch();
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
-  
-  // Use the memoized selector directly
-  const dataItems = useSelector(state => 
-    selectedScenarioId ? selectDataItemsByScenario(state, selectedScenarioId) : []
-  );
-  
-  // Find the selected item
-  const item = React.useMemo(() => {
-    if (!selectedItemId || !dataItems) return null;
-    return dataItems.find(i => i.id === selectedItemId) || null;
-  }, [dataItems, selectedItemId]);
+  // Get the item directly by key
+  const item = useSelector(state => state.simData.dataByScenario[selectedScenarioId]?.[selectedItemId]);
 
-  // Use a static empty array to prevent new references
-  const EMPTY_QUALIFICATIONS = React.useMemo(() => [], []);
-  
   // Qualification definitions with consistent empty array
-  const qualiDefs = useSelector(state => {
-    if (!selectedScenarioId) return EMPTY_QUALIFICATIONS;
-    return state.simQualification.qualificationDefsByScenario[selectedScenarioId] || EMPTY_QUALIFICATIONS;
-  });
+  // const qualiDefs = useSelector(state => {
+  //   if (!selectedScenarioId) return EMPTY_QUALIFICATIONS;
+  //   return state.simQualification.qualificationDefsByScenario[selectedScenarioId] || EMPTY_QUALIFICATIONS;
+  // });
 
   // Qualification assignment with consistent null return
-  const qualificationAssignment = useSelector(state => {
-    if (!item?.id || item?.type !== 'capacity' || !selectedScenarioId) return null;
-    const assignments = state.simQualification.qualificationAssignmentsByScenario[selectedScenarioId];
-    if (!assignments) return null;
-    return assignments.find(a => a.dataItemId === item.id) || null;
-  });
+  // const qualificationAssignment = useSelector(state => {
+  //   if (!item?.id || item?.type !== 'capacity' || !selectedScenarioId) return null;
+  //   const assignments = state.simQualification.qualificationAssignmentsByScenario[selectedScenarioId];
+  //   if (!assignments) return null;
+  //   return assignments.find(a => a.dataItemId === item.id) || null;
+  // });
 
   // Local state for controlled fields
   const [localName, setLocalName] = useState(item?.name ?? '');
@@ -66,10 +54,19 @@ function SimDataGeneralTab() {
   };
 
   // For capacity: derive selected qualification from assignment if present
-  const selectedQualification =
-    item?.type === 'capacity'
-      ? (qualificationAssignment?.qualification ?? '')
-      : (item?.qualification ?? '');
+  // const selectedQualification =
+  //   item?.type === 'capacity'
+  //     ? (qualificationAssignment?.qualification ?? '')
+  //     : (item?.qualification ?? '');
+
+  // Guard: If item is null, show a placeholder and return
+  if (!item) {
+    return (
+      <Box sx={{ p: 2, color: 'text.secondary' }}>
+        Kein Eintrag ausgewählt.
+      </Box>
+    );
+  }
 
   return (
     <Box flex={1} display="flex" flexDirection="column" sx={{ overflowY: 'auto', gap: 0 }}>
@@ -160,69 +157,6 @@ function SimDataGeneralTab() {
         </Box>
       )}
 
-      {/* Qualifikation */}
-      {item.type === 'capacity' && (
-        <Box sx={{ mb: 2 }}>
-          <FormControl component="fieldset">
-            <Typography variant="body2" sx={{ mb: 0.5 }}>Qualifikation</Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              {/* <ModMonitor
-                itemId={item.id}
-                field="qualification"
-                value={item.qualification ?? ''}
-                originalValue={initialQualification}
-                onRestore={() => simDataStore.updateDataItemFields(scenarioId, item.id, { qualification: initialQualification })}
-                title="Qualifikation auf importierten Wert zurücksetzen"
-                confirmMsg="Qualifikation auf importierten Wert zurücksetzen?"
-              /> */}
-            </Box>
-            <RadioGroup
-              row
-              value={selectedQualification}
-              onChange={(e) => {
-                // Update assignment in qualification store
-                if (qualificationAssignment) {
-                  dispatch({
-                    type: 'simQualification/updateQualificationAssignment',
-                    payload: {
-                      scenarioId: selectedScenarioId,
-                      assignmentId: qualificationAssignment.id,
-                      updates: { qualification: e.target.value }
-                    }
-                  });
-                } else {
-                  dispatch({
-                    type: 'simQualification/addQualificationAssignment',
-                    payload: {
-                      scenarioId: selectedScenarioId,
-                      assignment: {
-                        qualification: e.target.value,
-                        rawdata: { QUALIFIK: e.target.value },
-                        dataItemId: item.id
-                      }
-                    }
-                  });
-                }
-              }}
-            >
-              {qualiDefs && qualiDefs.length > 0 ? (
-                qualiDefs.map(q => (
-                  <FormControlLabel
-                    key={q.key}
-                    value={q.key}
-                    control={<Radio />}
-                    label={`${q.name}`}
-                  />
-                ))
-              ) : (
-                <Typography variant="body2" color="text.secondary" sx={{ ml: 2, mt: 1 }}>
-                  Keine Qualifikationsdefinitionen geladen. Bitte Organisation prüfen.
-                </Typography>
-              )}
-            </RadioGroup>
-          </FormControl>
-        </Box>
-      )}
 
       {/* Zeitraum */}
       <Box sx={{ mb: 2 }}>

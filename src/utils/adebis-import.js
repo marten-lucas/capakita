@@ -95,3 +95,5 @@ export async function extractAdebisData(file, isAnonymized) {
         }
     };
 }
+
+// Note: Ensure all downstream parser functions return string IDs for compatibility with slices.

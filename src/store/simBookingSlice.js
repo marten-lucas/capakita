@@ -1,4 +1,5 @@
 import { createSlice, createSelector } from '@reduxjs/toolkit';
+import { createId } from '../utils/idUtils';
 
 const initialState = {
   bookingsByScenario: {},
@@ -13,66 +14,51 @@ const simBookingSlice = createSlice({
     addBooking(state, action) {
       const { scenarioId, dataItemId, booking } = action.payload;
       if (!state.bookingsByScenario[scenarioId]) state.bookingsByScenario[scenarioId] = {};
-      const itemId = String(dataItemId);
-      if (!state.bookingsByScenario[scenarioId][itemId]) state.bookingsByScenario[scenarioId][itemId] = {};
-      const id = String(booking.id || Date.now());
-      state.bookingsByScenario[scenarioId][itemId][id] = {
+      const itemKey = String(dataItemId);
+      if (!state.bookingsByScenario[scenarioId][itemKey]) state.bookingsByScenario[scenarioId][itemKey] = {};
+      const bookingKey = createId('booking');
+      state.bookingsByScenario[scenarioId][itemKey][bookingKey] = {
         ...booking,
-        id,
         overlays: {},
       };
     },
     updateBooking(state, action) {
       const { scenarioId, dataItemId, bookingId, updates } = action.payload;
-      if (!state.bookingsByScenario[scenarioId]?.[dataItemId]?.[bookingId]) return;
-      state.bookingsByScenario[scenarioId][dataItemId][bookingId] = {
-        ...state.bookingsByScenario[scenarioId][dataItemId][bookingId],
+      const itemId = String(dataItemId);
+      if (!state.bookingsByScenario[scenarioId]?.[itemId]?.[bookingId]) return;
+      state.bookingsByScenario[scenarioId][itemId][bookingId] = {
+        ...state.bookingsByScenario[scenarioId][itemId][bookingId],
         ...updates,
-        overlays: {
-          ...state.bookingsByScenario[scenarioId][dataItemId][bookingId].overlays,
-          ...updates.overlays
-        }
+        overlays: updates.overlays
+          ? { ...state.bookingsByScenario[scenarioId][itemId][bookingId].overlays, ...updates.overlays }
+          : state.bookingsByScenario[scenarioId][itemId][bookingId].overlays
       };
     },
     deleteBooking(state, action) {
       const { scenarioId, dataItemId, bookingId } = action.payload;
-      if (state.bookingsByScenario[scenarioId]?.[dataItemId]) {
-        delete state.bookingsByScenario[scenarioId][dataItemId][bookingId];
+      const itemId = String(dataItemId);
+      if (state.bookingsByScenario[scenarioId]?.[itemId]) {
+        delete state.bookingsByScenario[scenarioId][itemId][bookingId];
       }
     },
     importBookings(state, action) {
       const { scenarioId, items } = action.payload;
       if (!state.bookingsByScenario[scenarioId]) state.bookingsByScenario[scenarioId] = {};
       items.forEach(item => {
-        const itemId = String(item.id || Date.now());
-        if (Array.isArray(item.times)) {
-          if (!state.bookingsByScenario[scenarioId][itemId]) state.bookingsByScenario[scenarioId][itemId] = {};
-          const bookingId = String(item.id || Date.now());
-          state.bookingsByScenario[scenarioId][itemId][bookingId] = {
-            ...item,
-            id: bookingId,
-            overlays: {},
-          };
-          return;
-        }
-        const bookingsArr = item.booking || item.bookings;
-        if (Array.isArray(bookingsArr)) {
-          if (!state.bookingsByScenario[scenarioId][itemId]) state.bookingsByScenario[scenarioId][itemId] = {};
-          bookingsArr.forEach((booking) => {
-            const id = String(booking.id || Date.now());
-            state.bookingsByScenario[scenarioId][itemId][id] = {
-              ...booking,
-              id,
-              overlays: {},
-            };
-          });
-        }
+        const itemKey = String(item.dataItemId);
+        if (!state.bookingsByScenario[scenarioId][itemKey]) state.bookingsByScenario[scenarioId][itemKey] = {};
+        const bookingKey = createId('booking');
+        state.bookingsByScenario[scenarioId][itemKey][bookingKey] = {
+          ...item,
+          overlays: {},
+        };
       });
     },
     deleteAllBookingsForItem(state, action) {
       const { scenarioId, itemId } = action.payload;
+      const id = String(itemId);
       if (state.bookingsByScenario[scenarioId]) {
-        delete state.bookingsByScenario[scenarioId][itemId];
+        delete state.bookingsByScenario[scenarioId][id];
       }
     },
     deleteAllBookingsForScenario(state, action) {

@@ -1,4 +1,5 @@
 import { createSlice, createSelector } from '@reduxjs/toolkit';
+import { createId } from '../utils/idUtils';
 
 const initialState = {
   dataByScenario: {},
@@ -11,38 +12,30 @@ const simDataSlice = createSlice({
     addDataItem(state, action) {
       const { scenarioId, item } = action.payload;
       if (!state.dataByScenario[scenarioId]) state.dataByScenario[scenarioId] = {};
-      const id = String(item.id || Date.now());
-      state.dataByScenario[scenarioId][id] = {
-        id,
-        type: item.type || '',
-        source: item.source || 'manual entry',
-        name: item.name || (item.type === 'capacity' ? 'Neue Kapazität' : item.type === 'demand' ? 'Neuer Bedarf' : 'Neuer Eintrag'),
-        remark: item.remark || '',
-        startdate: item.startdate || '',
-        enddate: item.enddate || '',
-        dateofbirth: item.dateofbirth || '',
-        groupId: item.groupId || '',
-        rawdata: item.rawdata || {},
-        absences: Array.isArray(item.absences) ? item.absences : [],
+      const key = createId('simdata');
+      state.dataByScenario[scenarioId][key] = {
+        ...item,
         overlays: item.overlays || {},
-        kindId: item.kindId ? String(item.kindId) : undefined // only for simData
+        absences: Array.isArray(item.absences) ? item.absences : [],
+        // Remove id attribute
       };
     },
     updateDataItem(state, action) {
       const { scenarioId, itemId, updates } = action.payload;
-      if (!state.dataByScenario[scenarioId] || !state.dataByScenario[scenarioId][itemId]) return;
-      state.dataByScenario[scenarioId][itemId] = {
-        ...state.dataByScenario[scenarioId][itemId],
+      const id = String(itemId);
+      if (!state.dataByScenario[scenarioId] || !state.dataByScenario[scenarioId][id]) return;
+      state.dataByScenario[scenarioId][id] = {
+        ...state.dataByScenario[scenarioId][id],
         ...updates,
-        overlays: {
-          ...state.dataByScenario[scenarioId][itemId].overlays,
-          ...updates.overlays
-        }
+        overlays: updates.overlays
+          ? { ...state.dataByScenario[scenarioId][id].overlays, ...updates.overlays }
+          : state.dataByScenario[scenarioId][id].overlays
       };
     },
     updateDataItemFields(state, action) {
       const { scenarioId, itemId, fields } = action.payload;
-      const item = state.dataByScenario[scenarioId]?.[itemId];
+      const id = String(itemId);
+      const item = state.dataByScenario[scenarioId]?.[id];
       if (!item) return;
       Object.entries(fields).forEach(([key, value]) => {
         item[key] = value;
@@ -50,8 +43,9 @@ const simDataSlice = createSlice({
     },
     deleteDataItem(state, action) {
       const { scenarioId, itemId } = action.payload;
+      const id = String(itemId);
       if (state.dataByScenario[scenarioId]) {
-        delete state.dataByScenario[scenarioId][itemId];
+        delete state.dataByScenario[scenarioId][id];
       }
       // Dispatch related delete actions
       // Note: In a reducer, you cannot dispatch other actions directly.
@@ -64,9 +58,10 @@ const simDataSlice = createSlice({
     },
     setOverlay(state, action) {
       const { scenarioId, itemId, overlay } = action.payload;
-      if (!state.dataByScenario[scenarioId] || !state.dataByScenario[scenarioId][itemId]) return;
-      state.dataByScenario[scenarioId][itemId].overlays = {
-        ...state.dataByScenario[scenarioId][itemId].overlays,
+      const id = String(itemId);
+      if (!state.dataByScenario[scenarioId] || !state.dataByScenario[scenarioId][id]) return;
+      state.dataByScenario[scenarioId][id].overlays = {
+        ...state.dataByScenario[scenarioId][id].overlays,
         ...overlay
       };
     },
@@ -74,21 +69,11 @@ const simDataSlice = createSlice({
       const { scenarioId, simDataList } = action.payload;
       if (!state.dataByScenario[scenarioId]) state.dataByScenario[scenarioId] = {};
       simDataList.forEach(item => {
-        const id = String(item.id || Date.now());
-        state.dataByScenario[scenarioId][id] = {
-          id,
-          type: item.type || '',
-          source: item.source || 'adebis export',
-          name: item.name || (item.type === 'capacity' ? 'Neue Kapazität' : item.type === 'demand' ? 'Neuer Bedarf' : 'Neuer Eintrag'),
-          remark: item.remark || '',
-          startdate: item.startdate || '',
-          enddate: item.enddate || '',
-          dateofbirth: item.dateofbirth || '',
-          groupId: item.groupId || '',
-          rawdata: item.rawdata || {},
-          absences: Array.isArray(item.absences) ? item.absences : [],
+        const key = createId('simdata');
+        state.dataByScenario[scenarioId][key] = {
+          ...item,
           overlays: item.overlays || {},
-          kindId: item.kindId ? String(item.kindId) : undefined // only for simData
+          absences: Array.isArray(item.absences) ? item.absences : [],
         };
       });
     },
@@ -149,6 +134,15 @@ export const selectDataItemsByScenarioMemoized = (scenarioId) => createSelector(
     return Object.values(scenarioData);
   }
 );
+
+// Selector: find item by adebisId
+export function getItemByAdebisID(state, scenarioId, adebisId) {
+  const items = state.simData.dataByScenario[scenarioId];
+  if (!items) return null;
+  return Object.values(items).find(
+    item => item.adebisId && item.adebisId.id === adebisId.id && item.adebisId.source === adebisId.source
+  );
+}
 
 export const {
   addDataItem,

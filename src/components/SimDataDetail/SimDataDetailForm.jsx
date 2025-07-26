@@ -4,18 +4,13 @@ import {
 } from '@mui/material';
 import SimDataTabs from './SimDataTabs';
 import { useSelector, useDispatch } from 'react-redux';
-import { deleteDataItem, selectDataItemsByScenario } from '../../store/simDataSlice';
+import { deleteDataItem } from '../../store/simDataSlice';
 
 function SimDataDetailForm() {
   // Get scenarioId and selected item id from Redux store
   const scenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[scenarioId]);
-  const dataItemsSelector = React.useMemo(
-    () => (state) => selectDataItemsByScenario(state, scenarioId),
-    [scenarioId]
-  );
-  const dataItems = useSelector(dataItemsSelector);
-  const item = dataItems?.find(i => i.id === selectedItemId);
+  const item = useSelector(state => state.simData.dataByScenario[scenarioId]?.[selectedItemId]);
   const dispatch = useDispatch();
 
   // Guard: Wenn item nicht gesetzt, Hinweis anzeigen und return
@@ -50,7 +45,7 @@ function SimDataDetailForm() {
             size="small"
             fullWidth
             sx={{ mt: 2 }}
-            onClick={() => dispatch(deleteDataItem({ scenarioId, itemId: item.id }))}
+            onClick={() => dispatch(deleteDataItem({ scenarioId, itemId: selectedItemId }))}
           >
             Eintrag löschen
           </Button>

@@ -1,4 +1,5 @@
 import { createSlice } from '@reduxjs/toolkit';
+import { createId } from '../utils/idUtils';
 
 const initialState = {
   financialsByScenario: {},
@@ -11,32 +12,37 @@ const simFinancialsSlice = createSlice({
     addFinancial(state, action) {
       const { scenarioId, dataItemId, financial } = action.payload;
       if (!state.financialsByScenario[scenarioId]) state.financialsByScenario[scenarioId] = {};
-      if (!state.financialsByScenario[scenarioId][dataItemId]) state.financialsByScenario[scenarioId][dataItemId] = {};
-      const id = financial.id || Date.now();
-      state.financialsByScenario[scenarioId][dataItemId][id] = { ...financial, id, overlays: {} };
+      const itemId = String(dataItemId);
+      if (!state.financialsByScenario[scenarioId][itemId]) state.financialsByScenario[scenarioId][itemId] = {};
+      const key = createId('financial');
+      state.financialsByScenario[scenarioId][itemId][key] = { ...financial, overlays: {} };
     },
     updateFinancial(state, action) {
       const { scenarioId, dataItemId, financialId, updates } = action.payload;
-      if (!state.financialsByScenario[scenarioId]?.[dataItemId]?.[financialId]) return;
-      state.financialsByScenario[scenarioId][dataItemId][financialId] = {
-        ...state.financialsByScenario[scenarioId][dataItemId][financialId],
+      const itemId = String(dataItemId);
+      const id = String(financialId);
+      if (!state.financialsByScenario[scenarioId]?.[itemId]?.[id]) return;
+      state.financialsByScenario[scenarioId][itemId][id] = {
+        ...state.financialsByScenario[scenarioId][itemId][id],
         ...updates,
-        overlays: {
-          ...state.financialsByScenario[scenarioId][dataItemId][financialId].overlays,
-          ...updates.overlays
-        }
+        overlays: updates.overlays
+          ? { ...state.financialsByScenario[scenarioId][itemId][id].overlays, ...updates.overlays }
+          : state.financialsByScenario[scenarioId][itemId][id].overlays
       };
     },
     deleteFinancial(state, action) {
       const { scenarioId, dataItemId, financialId } = action.payload;
-      if (state.financialsByScenario[scenarioId]?.[dataItemId]) {
-        delete state.financialsByScenario[scenarioId][dataItemId][financialId];
+      const itemId = String(dataItemId);
+      const id = String(financialId);
+      if (state.financialsByScenario[scenarioId]?.[itemId]) {
+        delete state.financialsByScenario[scenarioId][itemId][id];
       }
     },
     deleteAllFinancialsForItem(state, action) {
       const { scenarioId, itemId } = action.payload;
+      const id = String(itemId);
       if (state.financialsByScenario[scenarioId]) {
-        delete state.financialsByScenario[scenarioId][itemId];
+        delete state.financialsByScenario[scenarioId][id];
       }
     },
     deleteAllFinancialsForScenario(state, action) {

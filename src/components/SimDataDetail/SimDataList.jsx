@@ -15,7 +15,9 @@ function SimDataList() {
     () => (state) => selectDataItemsByScenario(state, selectedScenarioId),
     [selectedScenarioId]
   );
-  const data = useSelector(dataSelector);
+  const dataByScenario = useSelector(state => state.simData.dataByScenario[selectedScenarioId] || {});
+  const data = Object.entries(dataByScenario).map(([key, item]) => ({ ...item, _key: key }));
+
   // Define colors for demand/capacity
   const DEMAND_COLOR = '#c0d9f3ff';   // blue for children
   const CAPACITY_COLOR = '#a3c7a5ff'; // green for employees
@@ -43,11 +45,11 @@ function SimDataList() {
     >
       {data.map((item) => {
         return (
-          <div key={item.id}>
+          <div key={item._key}>
             <ListItemButton
-              onClick={() => dispatch(setSelectedItem(item.id))}
-              selected={selectedItemId === item.id}
-              sx={selectedItemId === item.id ? { bgcolor: 'action.selected' } : undefined}
+              onClick={() => dispatch(setSelectedItem(item._key))}
+              selected={selectedItemId === item._key}
+              sx={selectedItemId === item._key ? { bgcolor: 'action.selected' } : undefined}
             >
               <ListItemText
                 primary={
@@ -63,7 +65,7 @@ function SimDataList() {
                 size="small"
                 onClick={e => {
                   e.stopPropagation();
-                  dispatch(deleteDataItemThunk({ scenarioId: selectedScenarioId, itemId: item.id }));
+                  dispatch(deleteDataItemThunk({ scenarioId: selectedScenarioId, itemId: item._key }));
                 }}
                 sx={{ ml: 1 }}
               >
