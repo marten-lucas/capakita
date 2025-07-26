@@ -71,7 +71,7 @@ const simScenarioSlice = createSlice({
         state.selectedScenarioId = state.scenarios.length > 0 ? state.scenarios[0].id : null;
       }
     },
-    // ...other reducers (e.g., for importing scenarios)...
+    
   },
 });
 
@@ -126,43 +126,11 @@ export const importScenario = ({
     });
   }
 
-  // Attach originalParsedData to simData items
-  let bookingsByKindId = {};
-  if (bookingsList && bookingsList.length > 0) {
-    bookingsList.forEach(b => {
-      const kindId = String(b.kindId);
-      if (!bookingsByKindId[kindId]) bookingsByKindId[kindId] = [];
-      bookingsByKindId[kindId].push(b);
-    });
-  }
-
-  let groupAssignmentsByKindId = {};
-  if (groupAssignments && groupAssignments.length > 0) {
-    groupAssignments.forEach(g => {
-      const kindId = String(g.kindId);
-      if (!groupAssignmentsByKindId[kindId]) groupAssignmentsByKindId[kindId] = [];
-      groupAssignmentsByKindId[kindId].push(g);
-    });
-  }
-
-  // Prepare simDataList with originalParsedData
-  const simDataListWithOriginal = (simDataList || []).map(item => {
-    const kindId = String(item.id);
-    return {
-      ...item,
-      originalParsedData: {
-        booking: bookingsByKindId[kindId] || [],
-        group: groupAssignmentsByKindId[kindId] || [],
-        // Add more fields if needed
-      }
-    };
-  });
-
   // Import sim data items (do NOT attach bookings)
-  if (simDataListWithOriginal && simDataListWithOriginal.length > 0) {
+  if (simDataList && simDataList.length > 0) {
     dispatch({
       type: 'simData/importDataItems',
-      payload: { scenarioId, simDataList: simDataListWithOriginal }
+      payload: { scenarioId, simDataList }
     });
   }
 
@@ -184,23 +152,10 @@ export const importScenario = ({
   dispatch(setSelectedScenarioId(scenarioId));
 };
 
-// Thunk: delete a simData item and all related data
-export const deleteSimDataItemAndRelated = ({ scenarioId, itemId }) => (dispatch) => {
-  dispatch({ type: 'simData/deleteDataItem', payload: { scenarioId, itemId } });
-  dispatch({ type: 'simBooking/deleteAllBookingsForItem', payload: { scenarioId, itemId } });
-  dispatch({ type: 'simGroup/deleteAllGroupAssignmentsForItem', payload: { scenarioId, itemId } });
-  dispatch({ type: 'simFinancials/deleteAllFinancialsForItem', payload: { scenarioId, itemId } });
-  dispatch({ type: 'simQualification/deleteAllQualificationAssignmentsForItem', payload: { scenarioId, itemId } });
-};
-
 // Thunk: delete a scenario and all related data
-export const deleteScenarioAndRelated = (scenarioId) => (dispatch, getState) => {
-  dispatch(deleteScenario(scenarioId));
+export const deleteScenario = (scenarioId) => (dispatch, getState) => {
+  dispatch(simScenarioSlice.actions.deleteScenario(scenarioId));
   dispatch({ type: 'simData/deleteAllDataForScenario', payload: { scenarioId } });
-  dispatch({ type: 'simBooking/deleteAllBookingsForScenario', payload: { scenarioId } });
-  dispatch({ type: 'simGroup/deleteAllGroupAssignmentsForScenario', payload: { scenarioId } });
-  dispatch({ type: 'simFinancials/deleteAllFinancialsForScenario', payload: { scenarioId } });
-  dispatch({ type: 'simQualification/deleteAllQualificationAssignmentsForScenario', payload: { scenarioId } });
 };
 
 export const {
@@ -209,12 +164,11 @@ export const {
   setSelectedItem,
   setScenarioSaveDialogOpen,
   setScenarioSaveDialogPending,
-  // importScenario, // Remove from exports, now a thunk
   addScenario,
   updateScenario,
-  deleteScenario,
-  // ...other actions...
+  deleteScenario: deleteScenarioReducer,
 } = simScenarioSlice.actions;
 
 export default simScenarioSlice.reducer;
+
 

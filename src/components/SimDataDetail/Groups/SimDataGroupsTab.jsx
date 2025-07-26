@@ -37,7 +37,7 @@ function SimDataGroupsTab() {
             itemId={item.id}
             field="groups"
             value={JSON.stringify(groups)}
-            originalValue={JSON.stringify(item.originalParsedData?.group || [])}
+            originalValue={undefined}
             // onRestore logic can be implemented as needed
             title="Alle Gruppen auf importierte Werte zurücksetzen"
             confirmMsg="Alle Gruppen auf importierten Wert zurücksetzen?"

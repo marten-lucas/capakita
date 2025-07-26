@@ -32,7 +32,7 @@ function GroupDetail({ index }) {
   const bookings = useSelector(state => getBookings(state, selectedScenarioId, selectedItemId));
 
   // Get original group from item.originalParsedData (from import)
-  const originalGroup = item?.originalParsedData?.group?.[index];
+  const originalGroup = undefined;
   const parentItemId = selectedItemId;
 
   // Assign missing segment IDs in an effect, not during render

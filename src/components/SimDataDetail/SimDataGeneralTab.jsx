@@ -198,7 +198,6 @@ function SimDataGeneralTab() {
                       assignment: {
                         qualification: e.target.value,
                         rawdata: { QUALIFIK: e.target.value },
-                        originalData: { qualification: e.target.value, rawdata: { QUALIFIK: e.target.value } },
                         dataItemId: item.id
                       }
                     }

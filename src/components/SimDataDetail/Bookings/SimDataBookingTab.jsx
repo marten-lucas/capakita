@@ -19,7 +19,7 @@ function SimDataBookingTab() {
     [selectedScenarioId]
   );
   const dataItems = useSelector(dataItemsSelector);
-  const selectedItem = dataItems?.find(item => item.id === selectedItemId);
+  const selectedItem = dataItems?.find(item => String(item.id) === String(selectedItemId));
 
   // Create memoized selector for bookings
   const bookingsSelector = React.useMemo(() => 
@@ -42,34 +42,33 @@ function SimDataBookingTab() {
   
   const bookings = useSelector(bookingsSelector);
 
+  // Debug output
+  React.useEffect(() => {
+     
+    console.log('SimDataBookingTab: selectedScenarioId', selectedScenarioId, 'selectedItemId', selectedItemId, 'selectedItem', selectedItem, 'bookings', bookings);
+  }, [selectedScenarioId, selectedItemId, selectedItem, bookings]);
+
   // Handler to add a new booking
   const handleAddBooking = () => {
     if (!selectedScenarioId || !selectedItemId) return;
+    const bookingId = Date.now();
     dispatch({
       type: 'simBooking/addBooking',
       payload: {
         scenarioId: selectedScenarioId,
         dataItemId: selectedItemId,
         booking: {
+          id: bookingId,
           startdate: '',
           enddate: '',
           times: [],
+          rawdata: {}
         }
       }
     });
   };
 
-  // Restore all bookings to original
-  const handleRestoreBooking = (itemId, originalBookings) => {
-    // Implement your restore logic here, e.g. dispatch an action to replace all bookings for the item
-    dispatch({
-      type: 'simBooking/importBookings',
-      payload: {
-        scenarioId: selectedScenarioId,
-        items: [{ id: itemId, booking: originalBookings }]
-      }
-    });
-  };
+
 
   if (!selectedItem) return null;
 
@@ -88,16 +87,13 @@ function SimDataBookingTab() {
           itemId={selectedItem.id}
           field="bookings"
           value={JSON.stringify(bookings)}
-          originalValue={JSON.stringify(selectedItem.originalParsedData?.booking || [])}
-          onRestore={() => {
-            selectedItem.originalParsedData?.booking &&
-              handleRestoreBooking(selectedItem.id, JSON.parse(JSON.stringify(selectedItem.originalParsedData.booking)));
-          }}
+          originalValue={undefined}
+          onRestore={undefined}
           title="Alle Buchungen auf importierte Werte zurücksetzen"
           confirmMsg="Alle Buchungen auf importierten Wert zurücksetzen?"
         />
       </Box>
-      <BookingCards />
+      <BookingCards bookings={bookings} />
     </Box>
   );
 }

@@ -11,13 +11,21 @@ const simDataSlice = createSlice({
     addDataItem(state, action) {
       const { scenarioId, item } = action.payload;
       if (!state.dataByScenario[scenarioId]) state.dataByScenario[scenarioId] = {};
-      const id = item.id || Date.now();
-      if (!Array.isArray(item.absences)) item.absences = [];
+      const id = String(item.id || Date.now());
       state.dataByScenario[scenarioId][id] = {
-        ...item,
         id,
-        name: item.name ?? (item.type === 'capacity' ? 'Neue Kapazität' : item.type === 'demand' ? 'Neuer Bedarf' : 'Neuer Eintrag'),
-        overlays: {}
+        type: item.type || '',
+        source: item.source || 'manual entry',
+        name: item.name || (item.type === 'capacity' ? 'Neue Kapazität' : item.type === 'demand' ? 'Neuer Bedarf' : 'Neuer Eintrag'),
+        remark: item.remark || '',
+        startdate: item.startdate || '',
+        enddate: item.enddate || '',
+        dateofbirth: item.dateofbirth || '',
+        groupId: item.groupId || '',
+        rawdata: item.rawdata || {},
+        absences: Array.isArray(item.absences) ? item.absences : [],
+        overlays: item.overlays || {},
+        kindId: item.kindId ? String(item.kindId) : undefined // only for simData
       };
     },
     updateDataItem(state, action) {
@@ -62,31 +70,47 @@ const simDataSlice = createSlice({
       const { scenarioId, simDataList } = action.payload;
       if (!state.dataByScenario[scenarioId]) state.dataByScenario[scenarioId] = {};
       simDataList.forEach(item => {
-        const id = item.id || Date.now();
-        if (!Array.isArray(item.absences)) item.absences = [];
-        // Do NOT attach bookings here
+        const id = String(item.id || Date.now());
         state.dataByScenario[scenarioId][id] = {
-          ...item,
           id,
-          name: item.name ?? (item.type === 'capacity' ? 'Neue Kapazität' : item.type === 'demand' ? 'Neuer Bedarf' : 'Neuer Eintrag'),
-          overlays: {}
+          type: item.type || '',
+          source: item.source || 'adebis export',
+          name: item.name || (item.type === 'capacity' ? 'Neue Kapazität' : item.type === 'demand' ? 'Neuer Bedarf' : 'Neuer Eintrag'),
+          remark: item.remark || '',
+          startdate: item.startdate || '',
+          enddate: item.enddate || '',
+          dateofbirth: item.dateofbirth || '',
+          groupId: item.groupId || '',
+          rawdata: item.rawdata || {},
+          absences: Array.isArray(item.absences) ? item.absences : [],
+          overlays: item.overlays || {},
+          kindId: item.kindId ? String(item.kindId) : undefined // only for simData
         };
       });
     },
     simDataItemAdd(state, action) {
       const { scenarioId, item } = action.payload;
       if (!state.dataByScenario[scenarioId]) state.dataByScenario[scenarioId] = {};
-      const id = item.id || Date.now();
-      if (!Array.isArray(item.absences)) item.absences = [];
+      const id = String(item.id || Date.now());
       state.dataByScenario[scenarioId][id] = {
-        ...item,
         id,
-        name: item.name ?? (item.type === 'capacity' ? 'Neuer Mitarbeiter' : item.type === 'demand' ? 'Neues Kind' : 'Neuer Eintrag'),
-        overlays: {}
+        type: item.type || '',
+        source: item.source || 'manual entry',
+        name: item.name || (item.type === 'capacity' ? 'Neuer Mitarbeiter' : item.type === 'demand' ? 'Neues Kind' : 'Neuer Eintrag'),
+        remark: item.remark || '',
+        startdate: item.startdate || '',
+        enddate: item.enddate || '',
+        dateofbirth: item.dateofbirth || '',
+        groupId: item.groupId || '',
+        rawdata: item.rawdata || {},
+        absences: Array.isArray(item.absences) ? item.absences : [],
+        overlays: item.overlays || {},
+        kindId: item.kindId ? String(item.kindId) : undefined // only for simData
       };
+      },
     },
-  },
-});
+  });
+
 
 // Thunk for adding a data item and selecting it
 export const addDataItemAndSelect = ({ scenarioId, item }) => (dispatch) => {
@@ -132,5 +156,26 @@ export const {
   importDataItems,
   simDataItemAdd,
 } = simDataSlice.actions;
+
+// Thunk: delete a simData item and all related data
+export const deleteSimDataItem = ({ scenarioId, itemId }) => (dispatch) => {
+  dispatch(deleteDataItem({ scenarioId, itemId }));
+  dispatch({ type: 'simBooking/deleteAllBookingsForItem', payload: { scenarioId, itemId } });
+  dispatch({ type: 'simGroup/deleteAllGroupAssignmentsForItem', payload: { scenarioId, itemId } });
+  dispatch({ type: 'simFinancials/deleteAllFinancialsForItem', payload: { scenarioId, itemId } });
+  dispatch({ type: 'simQualification/deleteAllQualificationAssignmentsForItem', payload: { scenarioId, itemId } });
+};
+
+// Thunk: delete all data items for a scenario and all related data
+export const deleteAllDataForScenarioThunk = (scenarioId) => (dispatch, getState) => {
+  const state = getState();
+  const items = state.simData.dataByScenario[scenarioId];
+  if (items) {
+    Object.keys(items).forEach(itemId => {
+      dispatch(deleteSimDataItem({ scenarioId, itemId }));
+    });
+  }
+  dispatch(deleteAllDataForScenario({ scenarioId }));
+};
 
 export default simDataSlice.reducer;

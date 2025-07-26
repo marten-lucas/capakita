@@ -22,7 +22,10 @@ export function useScenarioImport() {
 
       // Use parser functions to convert rawdata
       const { simDataList, employeeIdMap } = adebis2simData(rawdata.kidsRaw, rawdata.employeesRaw);
-      const bookingsList = adebis2bookings(rawdata.belegungRaw, employeeIdMap);
+      const bookingsList = adebis2bookings(rawdata.belegungRaw).map(b => ({
+        ...b,
+        id: String(b.id)
+      }));
       const groupDefs = adebis2GroupDefs(rawdata.groupsRaw);
       const qualiDefs = adebis2QualiDefs(rawdata.employeesRaw);
       const groupAssignments = adebis2GroupAssignments(rawdata.grukiRaw);

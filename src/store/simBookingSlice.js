@@ -13,9 +13,14 @@ const simBookingSlice = createSlice({
     addBooking(state, action) {
       const { scenarioId, dataItemId, booking } = action.payload;
       if (!state.bookingsByScenario[scenarioId]) state.bookingsByScenario[scenarioId] = {};
-      if (!state.bookingsByScenario[scenarioId][dataItemId]) state.bookingsByScenario[scenarioId][dataItemId] = {};
-      const id = booking.id || Date.now();
-      state.bookingsByScenario[scenarioId][dataItemId][id] = { ...booking, id, overlays: {} };
+      const itemId = String(dataItemId);
+      if (!state.bookingsByScenario[scenarioId][itemId]) state.bookingsByScenario[scenarioId][itemId] = {};
+      const id = String(booking.id || Date.now());
+      state.bookingsByScenario[scenarioId][itemId][id] = {
+        ...booking,
+        id,
+        overlays: {},
+      };
     },
     updateBooking(state, action) {
       const { scenarioId, dataItemId, bookingId, updates } = action.payload;
@@ -39,19 +44,27 @@ const simBookingSlice = createSlice({
       const { scenarioId, items } = action.payload;
       if (!state.bookingsByScenario[scenarioId]) state.bookingsByScenario[scenarioId] = {};
       items.forEach(item => {
-        const itemId = item.id || Date.now();
+        const itemId = String(item.id || Date.now());
         if (Array.isArray(item.times)) {
           if (!state.bookingsByScenario[scenarioId][itemId]) state.bookingsByScenario[scenarioId][itemId] = {};
-          const bookingId = item.id || Date.now();
-          state.bookingsByScenario[scenarioId][itemId][bookingId] = { ...item, id: bookingId, overlays: {} };
+          const bookingId = String(item.id || Date.now());
+          state.bookingsByScenario[scenarioId][itemId][bookingId] = {
+            ...item,
+            id: bookingId,
+            overlays: {},
+          };
           return;
         }
         const bookingsArr = item.booking || item.bookings;
         if (Array.isArray(bookingsArr)) {
           if (!state.bookingsByScenario[scenarioId][itemId]) state.bookingsByScenario[scenarioId][itemId] = {};
           bookingsArr.forEach((booking) => {
-            const id = booking.id || Date.now();
-            state.bookingsByScenario[scenarioId][itemId][id] = { ...booking, id, overlays: {} };
+            const id = String(booking.id || Date.now());
+            state.bookingsByScenario[scenarioId][itemId][id] = {
+              ...booking,
+              id,
+              overlays: {},
+            };
           });
         }
       });

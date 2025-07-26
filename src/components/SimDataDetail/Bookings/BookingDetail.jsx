@@ -45,7 +45,7 @@ function BookingDetail({ index }) {
   
   const bookings = useSelector(bookingsSelector);
   const booking = bookings?.[index];
-  const originalBooking = item?.originalParsedData?.booking?.[index];
+  const originalBooking = undefined;
   const type = item?.type;
   const parentItemId = selectedItemId;
   const isManualEntry = item?.rawdata?.source === 'manual entry';

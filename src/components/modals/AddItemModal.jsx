@@ -33,12 +33,6 @@ function AddItemModal({ open, onClose, onAdd }) {
         booking: [],
         group: []
       },
-      originalParsedData: {
-        startdate: '',
-        enddate: '',
-        booking: [],
-        group: []
-      },
       modifications: [],
       modifiers: {},
       simudata: {}
@@ -47,14 +41,10 @@ function AddItemModal({ open, onClose, onAdd }) {
     // Add specific fields based on item type
     if (itemType === 'demand') {
       newItem.parseddata.geburtsdatum = '';
-      newItem.originalParsedData.geburtsdatum = '';
     } else if (itemType === 'capacity') {
       newItem.parseddata.qualification = '';
       newItem.parseddata.vacation = '';
       newItem.parseddata.worktime = '';
-      newItem.originalParsedData.qualification = '';
-      newItem.originalParsedData.vacation = '';
-      newItem.originalParsedData.worktime = '';
     }
 
     onAdd(newItem);
@@ -105,4 +95,3 @@ function AddItemModal({ open, onClose, onAdd }) {
 }
 
 export default AddItemModal;
- 
