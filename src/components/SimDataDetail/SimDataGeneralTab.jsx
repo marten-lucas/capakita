@@ -6,7 +6,6 @@ import {
 import DeleteIcon from '@mui/icons-material/Delete';
 import ModMonitor from './ModMonitor';
 import { useSelector, useDispatch } from 'react-redux';
-import { selectDataItemsByScenario } from '../../store/simDataSlice';
 
 function SimDataGeneralTab() {
   // Get scenario and item selection
@@ -33,19 +32,27 @@ function SimDataGeneralTab() {
   // Local state for controlled fields
   const [localName, setLocalName] = useState(item?.name ?? '');
   const [localNote, setLocalNote] = useState(item?.remark ?? '');
+  const [localStartDate, setLocalStartDate] = useState(item?.startdate ?? '');
+  const [localEndDate, setLocalEndDate] = useState(item?.enddate ?? '');
+  const [localAbsences, setLocalAbsences] = useState(Array.isArray(item?.absences) ? item.absences : []);
+  const [localDateOfBirth, setLocalDateOfBirth] = useState(item?.dateofbirth ?? '');
 
   // Manual entry check
   const isManualEntry = item?.rawdata?.source === 'manual';
 
   // Sync local state with item
-  useEffect(() => { setLocalName(item?.name ?? ''); }, [item?.name]);
-  useEffect(() => { setLocalNote(item?.remark ?? ''); }, [item?.remark]);
+  useEffect(() => { setLocalName(item?.name ?? ''); }, [item?.name, selectedItemId]);
+  useEffect(() => { setLocalNote(item?.remark ?? ''); }, [item?.remark, selectedItemId]);
+  useEffect(() => { setLocalStartDate(item?.startdate ?? ''); }, [item?.startdate, selectedItemId]);
+  useEffect(() => { setLocalEndDate(item?.enddate ?? ''); }, [item?.enddate, selectedItemId]);
+  useEffect(() => { setLocalAbsences(Array.isArray(item?.absences) ? item.absences : []); }, [item?.absences, selectedItemId]);
+  useEffect(() => { setLocalDateOfBirth(item?.dateofbirth ?? ''); }, [item?.dateofbirth, selectedItemId]);
 
   // Handlers
   const handleDeleteItem = () => {
     dispatch({
       type: 'simData/deleteDataItem',
-      payload: { scenarioId: selectedScenarioId, itemId: item.id }
+      payload: { scenarioId: selectedScenarioId, itemId: selectedItemId } // use store key
     });
     dispatch({
       type: 'simScenario/setSelectedItem',
@@ -94,7 +101,7 @@ function SimDataGeneralTab() {
             if (localName !== item.name) {
               dispatch({
                 type: 'simData/updateDataItemFields',
-                payload: { scenarioId: selectedScenarioId, itemId: item.id, fields: { name: localName } }
+                payload: { scenarioId: selectedScenarioId, itemId: selectedItemId, fields: { name: localName } } // use selectedItemId
               });
             }
           }}
@@ -114,7 +121,7 @@ function SimDataGeneralTab() {
             if (localNote !== item.remark) {
               dispatch({
                 type: 'simData/updateDataItemFields',
-                payload: { scenarioId: selectedScenarioId, itemId: item.id, fields: { remark: localNote } }
+                payload: { scenarioId: selectedScenarioId, itemId: selectedItemId, fields: { remark: localNote } } // use selectedItemId
               });
             }
           }}
@@ -134,12 +141,14 @@ function SimDataGeneralTab() {
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <TextField
               type="date"
-              value={item.dateofbirth ?? ''}
-              onChange={(e) => dispatch({
-                type: 'simData/updateDataItemFields',
-                payload: { scenarioId: selectedScenarioId, itemId: item.id, fields: { dateofbirth: e.target.value } }
-              })}
-              onBlur={() => {}}
+              value={localDateOfBirth}
+              onChange={(e) => {
+                setLocalDateOfBirth(e.target.value);
+                dispatch({
+                  type: 'simData/updateDataItemFields',
+                  payload: { scenarioId: selectedScenarioId, itemId: selectedItemId, fields: { dateofbirth: e.target.value } } // use selectedItemId
+                });
+              }}
               size="small"
               sx={{ width: 355 }}
               InputLabelProps={{ shrink: true }}
@@ -157,7 +166,6 @@ function SimDataGeneralTab() {
         </Box>
       )}
 
-
       {/* Zeitraum */}
       <Box sx={{ mb: 2 }}>
         <Typography variant="body2" sx={{ mt: 1, mb: 1.5}}>Anwesenheit</Typography>
@@ -167,11 +175,14 @@ function SimDataGeneralTab() {
             type="date"
             size="small"
             InputLabelProps={{ shrink: true }}
-            value={item.startdate ?? ''}
-            onChange={(e) => dispatch({
-              type: 'simData/updateDataItemFields',
-              payload: { scenarioId: selectedScenarioId, itemId: item.id, fields: { startdate: e.target.value } }
-            })}
+            value={localStartDate}
+            onChange={(e) => {
+              setLocalStartDate(e.target.value);
+              dispatch({
+                type: 'simData/updateDataItemFields',
+                payload: { scenarioId: selectedScenarioId, itemId: selectedItemId, fields: { startdate: e.target.value } } // use selectedItemId
+              });
+            }}
             sx={{ width: 150 }}
           />
           {/* <ModMonitor
@@ -189,11 +200,14 @@ function SimDataGeneralTab() {
             type="date"
             size="small"
             InputLabelProps={{ shrink: true }}
-            value={item.enddate ?? ''}
-            onChange={(e) => dispatch({
-              type: 'simData/updateDataItemFields',
-              payload: { scenarioId: selectedScenarioId, itemId: item.id, fields: { enddate: e.target.value } }
-            })}
+            value={localEndDate}
+            onChange={(e) => {
+              setLocalEndDate(e.target.value);
+              dispatch({
+                type: 'simData/updateDataItemFields',
+                payload: { scenarioId: selectedScenarioId, itemId: selectedItemId, fields: { enddate: e.target.value } } // use selectedItemId
+              });
+            }}
             sx={{ width: 150 }}
           />
           {/* <ModMonitor
@@ -214,21 +228,22 @@ function SimDataGeneralTab() {
           variant="outlined"
           size="small"
           onClick={() => {
-            const absences = Array.isArray(item?.absences) ? item.absences : [];
+            const absences = Array.isArray(localAbsences) ? localAbsences : [];
             const newAbsence = { start: '', end: '' };
             const newList = [...absences, newAbsence];
+            setLocalAbsences(newList);
             dispatch({
               type: 'simData/updateDataItemFields',
-              payload: { scenarioId: selectedScenarioId, itemId: item.id, fields: { absences: newList } }
+              payload: { scenarioId: selectedScenarioId, itemId: selectedItemId, fields: { absences: newList } } // use selectedItemId
             });
           }}
           sx={{ mb: 1 }}
         >
           Abwesenheit hinzufügen
         </Button>
-        {item?.absences && item.absences.length > 0 && (
+        {localAbsences && localAbsences.length > 0 && (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            {item.absences.map((absence, idx) => {
+            {localAbsences.map((absence, idx) => {
               let workdays = 0;
               if (absence.start && absence.end) {
                 const start = new Date(absence.start);
@@ -248,10 +263,11 @@ function SimDataGeneralTab() {
                     value={absence.start}
                     onChange={(e) => {
                       const newAbsence = { ...absence, start: e.target.value };
-                      const newList = item.absences.map((a, i) => (i === idx ? newAbsence : a));
+                      const newList = localAbsences.map((a, i) => (i === idx ? newAbsence : a));
+                      setLocalAbsences(newList);
                       dispatch({
                         type: 'simData/updateDataItemFields',
-                        payload: { scenarioId: selectedScenarioId, itemId: item.id, fields: { absences: newList } }
+                        payload: { scenarioId: selectedScenarioId, itemId: selectedItemId, fields: { absences: newList } } // use selectedItemId
                       });
                     }}
                     sx={{ width: 130 }}
@@ -266,10 +282,11 @@ function SimDataGeneralTab() {
                     value={absence.end}
                     onChange={(e) => {
                       const newAbsence = { ...absence, end: e.target.value };
-                      const newList = item.absences.map((a, i) => (i === idx ? newAbsence : a));
+                      const newList = localAbsences.map((a, i) => (i === idx ? newAbsence : a));
+                      setLocalAbsences(newList);
                       dispatch({
                         type: 'simData/updateDataItemFields',
-                        payload: { scenarioId: selectedScenarioId, itemId: item.id, fields: { absences: newList } }
+                        payload: { scenarioId: selectedScenarioId, itemId: selectedItemId, fields: { absences: newList } } // use selectedItemId
                       });
                     }}
                     sx={{ width: 130 }}
@@ -283,10 +300,11 @@ function SimDataGeneralTab() {
                     color="error"
                     size="small"
                     onClick={() => {
-                      const newList = item.absences.filter((_, i) => i !== idx);
+                      const newList = localAbsences.filter((_, i) => i !== idx);
+                      setLocalAbsences(newList);
                       dispatch({
                         type: 'simData/updateDataItemFields',
-                        payload: { scenarioId: selectedScenarioId, itemId: item.id, fields: { absences: newList } }
+                        payload: { scenarioId: selectedScenarioId, itemId: selectedItemId, fields: { absences: newList } } // use selectedItemId
                       });
                     }}
                     sx={{ ml: 1 }}

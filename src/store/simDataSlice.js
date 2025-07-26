@@ -34,12 +34,16 @@ const simDataSlice = createSlice({
     },
     updateDataItemFields(state, action) {
       const { scenarioId, itemId, fields } = action.payload;
-      const id = String(itemId);
+      const id = String(itemId); // Always use store key for lookup
       const item = state.dataByScenario[scenarioId]?.[id];
       if (!item) return;
       Object.entries(fields).forEach(([key, value]) => {
         item[key] = value;
       });
+      // If name is changed, also update id if needed (not strictly necessary now)
+      if ('name' in fields) {
+        item.name = fields.name;
+      }
     },
     deleteDataItem(state, action) {
       const { scenarioId, itemId } = action.payload;
@@ -72,6 +76,7 @@ const simDataSlice = createSlice({
         const key = createId('simdata');
         state.dataByScenario[scenarioId][key] = {
           ...item,
+          id: key, // Ensure id matches store key
           overlays: item.overlays || {},
           absences: Array.isArray(item.absences) ? item.absences : [],
         };
