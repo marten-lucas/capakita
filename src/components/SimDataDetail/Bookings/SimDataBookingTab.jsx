@@ -1,5 +1,5 @@
 import React from 'react';
-import { Typography, Box, Button } from '@mui/material';
+import { Box, Button } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import ModMonitor from '../ModMonitor';
 import BookingCards from './BookingCards';
@@ -36,11 +36,7 @@ function SimDataBookingTab() {
   
   const bookings = useSelector(bookingsSelector);
 
-  // Debug output
-  React.useEffect(() => {
-    console.log('SimDataBookingTab: selectedScenarioId', selectedScenarioId, 'selectedItemId', selectedItemId, 'selectedItem', selectedItem, 'bookings', bookings);
-  }, [selectedScenarioId, selectedItemId, selectedItem, bookings]);
-
+  
   // Handler to add a new booking
   const handleAddBooking = () => {
     if (!selectedScenarioId || !selectedItemId) return;
