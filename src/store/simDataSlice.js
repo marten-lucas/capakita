@@ -53,6 +53,10 @@ const simDataSlice = createSlice({
       if (state.dataByScenario[scenarioId]) {
         delete state.dataByScenario[scenarioId][itemId];
       }
+      // Dispatch related delete actions
+      // Note: In a reducer, you cannot dispatch other actions directly.
+      // To handle side effects, you need to use middleware/thunks.
+      // Instead, move this logic to a thunk below.
     },
     deleteAllDataForScenario(state, action) {
       const { scenarioId } = action.payload;
@@ -157,8 +161,8 @@ export const {
   simDataItemAdd,
 } = simDataSlice.actions;
 
-// Thunk: delete a simData item and all related data
-export const deleteSimDataItem = ({ scenarioId, itemId }) => (dispatch) => {
+// Thunk: delete a data item and all related data
+export const deleteDataItemThunk = ({ scenarioId, itemId }) => (dispatch) => {
   dispatch(deleteDataItem({ scenarioId, itemId }));
   dispatch({ type: 'simBooking/deleteAllBookingsForItem', payload: { scenarioId, itemId } });
   dispatch({ type: 'simGroup/deleteAllGroupAssignmentsForItem', payload: { scenarioId, itemId } });
@@ -172,7 +176,7 @@ export const deleteAllDataForScenarioThunk = (scenarioId) => (dispatch, getState
   const items = state.simData.dataByScenario[scenarioId];
   if (items) {
     Object.keys(items).forEach(itemId => {
-      dispatch(deleteSimDataItem({ scenarioId, itemId }));
+      dispatch(deleteDataItemThunk({ scenarioId, itemId }));
     });
   }
   dispatch(deleteAllDataForScenario({ scenarioId }));

@@ -2,7 +2,7 @@ import React from 'react';
 import { List, ListItemButton, ListItemText, Divider, Box } from '@mui/material';
 import { useSelector, useDispatch } from 'react-redux';
 import { setSelectedItem } from '../../store/simScenarioSlice';
-import { selectDataItemsByScenario, deleteDataItem } from '../../store/simDataSlice';
+import { selectDataItemsByScenario, deleteDataItemThunk } from '../../store/simDataSlice';
 import DeleteIcon from '@mui/icons-material/Delete';
 import IconButton from '@mui/material/IconButton';
 
@@ -63,7 +63,7 @@ function SimDataList() {
                 size="small"
                 onClick={e => {
                   e.stopPropagation();
-                  dispatch(deleteDataItem({ scenarioId: selectedScenarioId, itemId: item.id }));
+                  dispatch(deleteDataItemThunk({ scenarioId: selectedScenarioId, itemId: item.id }));
                 }}
                 sx={{ ml: 1 }}
               >
