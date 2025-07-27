@@ -6,7 +6,8 @@ const initialState = {
   selectedScenarioId: null,
   lastImportAnonymized: true,
   selectedItems: {},
-  scenarioSaveDialogPending: false, 
+  scenarioSaveDialogOpen: false,
+  scenarioSaveDialogPending: null, 
 };
 
 const simScenarioSlice = createSlice({
@@ -66,7 +67,12 @@ const simScenarioSlice = createSlice({
         state.selectedScenarioId = state.scenarios.length > 0 ? state.scenarios[0].id : null;
       }
     },
-    
+    setScenarioSaveDialogOpen(state, action) {
+      state.scenarioSaveDialogOpen = action.payload;
+    },
+    setScenarioSaveDialogPending(state, action) {
+      state.scenarioSaveDialogPending = action.payload;
+    },
   },
 });
 

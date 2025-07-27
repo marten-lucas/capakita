@@ -21,30 +21,27 @@ function GroupCards() {
   const dataItems = useSelector(dataItemsSelector);
   const item = dataItems?.find(i => i.id === selectedItemId);
 
-  // Read groups directly from the item (not from scenario store)
-  const groupsByScenario = useSelector(state => state.simGroup.groupsByScenario);
-  const groups = React.useMemo(() => {
+  // Read groups directly from the simGroup store using memoized selector
+  const groups = useSelector(state => {
     if (!selectedScenarioId || !selectedItemId) return [];
-    const scenarioGroups = groupsByScenario[selectedScenarioId] || {};
+    const scenarioGroups = state.simGroup.groupsByScenario[selectedScenarioId] || {};
     const itemGroupsObj = scenarioGroups[selectedItemId] || {};
     return Object.values(itemGroupsObj);
-  }, [groupsByScenario, selectedScenarioId, selectedItemId]);
-  const bookings = item?.bookings || [];
+  });
 
   // Add group logic
   const handleAddGroup = () => {
-    if (!item) return;
+    if (!selectedItemId || !selectedScenarioId) return;
     const newGroup = {
-      kindId: item.id,
+      kindId: selectedItemId,
       groupId: '', // Set default groupId or let user pick
-      name: 'Neue Gruppe',
       start: '',
       end: '',
       overlays: {}
     };
     dispatch(addGroup({
       scenarioId: selectedScenarioId,
-      dataItemId: item.id, // <-- fix: pass dataItemId
+      dataItemId: selectedItemId,
       group: newGroup
     }));
   };
@@ -110,7 +107,7 @@ function GroupCards() {
 
         return (
           <Accordion
-            key={`${group.id}-${bookings.length}`}
+            key={`${group.id}-${groups.length}`}
             expanded={expandedIdx === idx}
             onChange={handleAccordionChange(idx)}
           >

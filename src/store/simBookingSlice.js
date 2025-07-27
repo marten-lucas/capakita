@@ -16,7 +16,7 @@ const simBookingSlice = createSlice({
       if (!state.bookingsByScenario[scenarioId]) state.bookingsByScenario[scenarioId] = {};
       const itemId = String(dataItemId);
       if (!state.bookingsByScenario[scenarioId][itemId]) state.bookingsByScenario[scenarioId][itemId] = {};
-      const bookingKey = createId('booking');
+      const bookingKey = String(booking.id || createId('booking'));
       state.bookingsByScenario[scenarioId][itemId][bookingKey] = {
         ...booking,
         id: bookingKey,
@@ -72,9 +72,10 @@ const simBookingSlice = createSlice({
       items.forEach(item => {
         const itemKey = String(item.dataItemId);
         if (!state.bookingsByScenario[scenarioId][itemKey]) state.bookingsByScenario[scenarioId][itemKey] = {};
-        const bookingKey = createId('booking');
+        const bookingKey = String(item.id || createId('booking'));
         state.bookingsByScenario[scenarioId][itemKey][bookingKey] = {
           ...item,
+          id: bookingKey,
           overlays: {},
         };
       });

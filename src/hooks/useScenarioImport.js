@@ -84,11 +84,11 @@ export function useScenarioImport() {
           }
         });
 
-        // Build mapping from IDNR to store key for employee items
-        const finalEmployeeKeyMap = {};
+        // Build mapping from IDNR to store key for capacity items
+        const capacityKeyMap = {};
         Object.entries(dataByScenario).forEach(([storeKey, item]) => {
-          if (item.type === 'employee' && item.rawdata && item.rawdata.IDNR) {
-            finalEmployeeKeyMap[String(item.rawdata.IDNR)] = storeKey;
+          if (item.type === 'capacity' && item.rawdata && item.rawdata.IDNR) {
+            capacityKeyMap[String(item.rawdata.IDNR)] = storeKey;
           }
         });
 
@@ -109,13 +109,17 @@ export function useScenarioImport() {
           payload: { scenarioId, assignments: groupAssignmentsFinal }
         });
 
-        // Remap qualiAssignments using store ids only
-        const qualiAssignmentsFinal = qualiAssignments
-          .map(a => ({
-            ...a,
-            dataItemId: finalEmployeeKeyMap[String(a.rawdata.QUALIFIK ? a.rawdata.IDNR : '')]
-          }))
-          .filter(a => !!a.dataItemId);
+        // Create qualification assignments for all imported capacity items
+        const qualiAssignmentsFinal = [];
+        Object.entries(dataByScenario).forEach(([storeKey, item]) => {
+          if (item.type === 'capacity' && item.rawdata && item.rawdata.QUALIFIK) {
+            qualiAssignmentsFinal.push({
+              dataItemId: storeKey,
+              qualification: item.rawdata.QUALIFIK,
+              id: `${item.rawdata.QUALIFIK}-${Date.now()}-${Math.random()}`
+            });
+          }
+        });
 
         dispatch({
           type: 'simQualification/importQualificationDefs',

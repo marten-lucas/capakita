@@ -85,9 +85,8 @@ const simDataSlice = createSlice({
     simDataItemAdd(state, action) {
       const { scenarioId, item } = action.payload;
       if (!state.dataByScenario[scenarioId]) state.dataByScenario[scenarioId] = {};
-      const id = String(item.id || Date.now());
+      const id = String(item.id || createId('simdata'));
       state.dataByScenario[scenarioId][id] = {
-        id,
         type: item.type || '',
         source: item.source || 'manual entry',
         name: item.name || (item.type === 'capacity' ? 'Neuer Mitarbeiter' : item.type === 'demand' ? 'Neues Kind' : 'Neuer Eintrag'),
@@ -96,7 +95,7 @@ const simDataSlice = createSlice({
         enddate: item.enddate || '',
         dateofbirth: item.dateofbirth || '',
         groupId: item.groupId || '',
-        rawdata: item.rawdata || {},
+        rawdata: { source: item.source || 'manual entry', ...item.rawdata },
         absences: Array.isArray(item.absences) ? item.absences : [],
         overlays: item.overlays || {},
       };
@@ -107,7 +106,7 @@ const simDataSlice = createSlice({
 
 // Thunk for adding a data item and selecting it
 export const addDataItemAndSelect = ({ scenarioId, item }) => (dispatch) => {
-  const id = item.id || Date.now();
+  const id = String(item.id || createId('simdata'));
   dispatch(simDataItemAdd({ scenarioId, item: { ...item, id } }));
   dispatch({
     type: 'simScenario/setSelectedItem',

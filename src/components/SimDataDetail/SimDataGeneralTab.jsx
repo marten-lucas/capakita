@@ -7,6 +7,33 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import ModMonitor from './ModMonitor';
 import QualificationPicker from './QualificationPicker';
 import { useSelector, useDispatch } from 'react-redux';
+import { createSelector } from '@reduxjs/toolkit';
+
+// Create memoized selectors
+const selectQualificationDefs = createSelector(
+  [
+    state => state.simQualification.qualificationDefsByScenario,
+    (state, scenarioId) => scenarioId
+  ],
+  (qualificationDefsByScenario, scenarioId) => {
+    return qualificationDefsByScenario[scenarioId] || [];
+  }
+);
+
+const selectQualificationAssignments = createSelector(
+  [
+    state => state.simQualification.qualificationAssignmentsByScenario,
+    (state, scenarioId) => scenarioId,
+    (state, scenarioId, itemId) => itemId
+  ],
+  (qualificationAssignmentsByScenario, scenarioId, itemId) => {
+    if (!scenarioId || !itemId) return [];
+    const scenarioAssignments = qualificationAssignmentsByScenario[scenarioId];
+    if (!scenarioAssignments) return [];
+    const itemAssignments = scenarioAssignments[itemId];
+    return itemAssignments ? Object.values(itemAssignments) : [];
+  }
+);
 
 function SimDataGeneralTab() {
   // Get scenario and item selection
@@ -16,15 +43,9 @@ function SimDataGeneralTab() {
   // Get the item directly by key
   const item = useSelector(state => state.simData.dataByScenario[selectedScenarioId]?.[selectedItemId]);
 
-  // Qualification definitions and assignment
-  const qualiDefs = useSelector(state =>
-    state.simQualification.qualificationDefsByScenario[selectedScenarioId] || []
-  );
-  // Get qualification assignments for the selected item as an array
-  const qualiAssignmentsObj = useSelector(state =>
-    state.simQualification.qualificationAssignmentsByScenario?.[selectedScenarioId]?.[selectedItemId] || {}
-  );
-  const qualiAssignments = Object.values(qualiAssignmentsObj);
+  // Use memoized selectors
+  const qualiDefs = useSelector(state => selectQualificationDefs(state, selectedScenarioId));
+  const qualiAssignments = useSelector(state => selectQualificationAssignments(state, selectedScenarioId, selectedItemId));
 
   const assignedQualification = React.useMemo(() => {
     if (!item || item.type !== 'capacity') return '';

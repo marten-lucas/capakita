@@ -99,6 +99,7 @@ function GroupDetail({ index, group }) {
     if (!group) return;
     dispatch(deleteGroup({
       scenarioId: selectedScenarioId,
+      dataItemId: selectedItemId,
       groupId: group.id
     }));
   };
@@ -159,17 +160,17 @@ function GroupDetail({ index, group }) {
     if (mode === 'multiple') {
       const updatedGroup = {
         ...group,
-        id: 'multiple',
+        groupId: 'multiple',
         name: 'Mehrere Gruppen',
         segmentOverrides: group.segmentOverrides || {}
       };
       handleUpdateGroup(updatedGroup);
     } else {
-      const newGroupId = parseInt(mode, 10);
+      const newGroupId = String(mode);
       const newGroupName = allGroupsLookup[newGroupId] || `Gruppe ${newGroupId}`;
       const updatedGroup = {
         ...group,
-        id: newGroupId,
+        groupId: newGroupId,
         name: newGroupName,
         segmentOverrides: undefined
       };
@@ -267,7 +268,7 @@ function GroupDetail({ index, group }) {
         </Box>
         <RadioGroup
           row
-          value={group.id === 'multiple' ? 'multiple' : (group.id ? String(group.id) : '')}
+          value={group.groupId === 'multiple' ? 'multiple' : (group.groupId ? String(group.groupId) : '')}
           onChange={handleGroupModeChange}
         >
           {Object.entries(allGroupsLookup).map(([groupId, groupName]) => (
@@ -288,7 +289,7 @@ function GroupDetail({ index, group }) {
         </RadioGroup>
       </Box>
       {/* Segment Override Section - Only shown when "multiple" is selected */}
-      {group.id === 'multiple' && (
+      {group.groupId === 'multiple' && (
         <Box sx={{ mb: 3 }}>
           <TableContainer component={Paper} variant="outlined">
             <Table size="small">

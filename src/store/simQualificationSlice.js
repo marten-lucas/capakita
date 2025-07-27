@@ -1,5 +1,9 @@
 import { createSlice } from '@reduxjs/toolkit';
 
+// Create stable empty references
+const EMPTY_DEFS = [];
+const EMPTY_ASSIGNMENTS = {};
+
 const initialState = {
   qualificationDefsByScenario: {},
   qualificationAssignmentsByScenario: {}, // { [scenarioId]: { [dataItemId]: { [assignmentId]: assignmentObj } } }
@@ -16,12 +20,24 @@ const simQualificationSlice = createSlice({
     importQualificationAssignments(state, action) {
       const { scenarioId, assignments } = action.payload;
       // Replace all assignments for this scenario
+      if (!state.qualificationAssignmentsByScenario[scenarioId]) {
+        state.qualificationAssignmentsByScenario[scenarioId] = {};
+      }
+      
+      // Clear existing assignments for this scenario
       state.qualificationAssignmentsByScenario[scenarioId] = {};
+      
       assignments.forEach(assignment => {
         const dataItemId = String(assignment.dataItemId);
-        if (!state.qualificationAssignmentsByScenario[scenarioId][dataItemId]) state.qualificationAssignmentsByScenario[scenarioId][dataItemId] = {};
-        const id = assignment.id ? String(assignment.id) : `${assignment.qualification}-${Date.now()}`;
-        state.qualificationAssignmentsByScenario[scenarioId][dataItemId][id] = { ...assignment, id };
+        if (!state.qualificationAssignmentsByScenario[scenarioId][dataItemId]) {
+          state.qualificationAssignmentsByScenario[scenarioId][dataItemId] = {};
+        }
+        const id = assignment.id ? String(assignment.id) : `${assignment.qualification}-${Date.now()}-${Math.random()}`;
+        state.qualificationAssignmentsByScenario[scenarioId][dataItemId][id] = { 
+          ...assignment, 
+          id,
+          dataItemId: dataItemId 
+        };
       });
     },
     addQualificationAssignment(state, action) {

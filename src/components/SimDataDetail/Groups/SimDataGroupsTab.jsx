@@ -10,23 +10,15 @@ function SimDataGroupsTab() {
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
   
-  const dataItemsSelector = React.useMemo(
-    () => (state) => {
-      if (!selectedScenarioId) return [];
-      return selectDataItemsByScenario(state, selectedScenarioId);
-    },
-    [selectedScenarioId]
-  );
-  const dataItems = useSelector(dataItemsSelector);
-  
-  const item = React.useMemo(() => {
-    if (!selectedItemId || !dataItems) return null;
-    return dataItems.find(i => i.id === selectedItemId) || null;
-  }, [dataItems, selectedItemId]);
+  // Get groups from simGroup store instead of item.groups
+  const groups = useSelector(state => {
+    if (!selectedScenarioId || !selectedItemId) return [];
+    const scenarioGroups = state.simGroup.groupsByScenario[selectedScenarioId] || {};
+    const itemGroupsObj = scenarioGroups[selectedItemId] || {};
+    return Object.values(itemGroupsObj);
+  });
 
-  if (!item) return null;
-
-  const groups = item.groups || [];
+  if (!selectedItemId) return null;
 
   return (
     <Box flex={1} display="flex" flexDirection="column" gap={2} sx={{ overflowY: 'auto' }}>
@@ -34,7 +26,7 @@ function SimDataGroupsTab() {
         <Typography variant="h6" sx={{ flex: 1 }}>
           Gruppen:
           <ModMonitor
-            itemId={item.id}
+            itemId={selectedItemId}
             field="groups"
             value={JSON.stringify(groups)}
             originalValue={undefined}

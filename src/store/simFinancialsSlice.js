@@ -14,14 +14,18 @@ const simFinancialsSlice = createSlice({
       if (!state.financialsByScenario[scenarioId]) state.financialsByScenario[scenarioId] = {};
       const itemId = String(dataItemId);
       if (!state.financialsByScenario[scenarioId][itemId]) state.financialsByScenario[scenarioId][itemId] = {};
-      const key = createId('financial');
+      const key = String(financial.id || createId('financial'));
       state.financialsByScenario[scenarioId][itemId][key] = { ...financial, id: key, overlays: {} };
     },
     updateFinancial(state, action) {
       const { scenarioId, dataItemId, financialId, updates } = action.payload;
       const itemId = String(dataItemId);
       const id = String(financialId);
-      if (!state.financialsByScenario[scenarioId]?.[itemId]?.[id]) return;
+      if (!state.financialsByScenario[scenarioId]) state.financialsByScenario[scenarioId] = {};
+      if (!state.financialsByScenario[scenarioId][itemId]) state.financialsByScenario[scenarioId][itemId] = {};
+      if (!state.financialsByScenario[scenarioId][itemId][id]) {
+        state.financialsByScenario[scenarioId][itemId][id] = { id, overlays: {} };
+      }
       state.financialsByScenario[scenarioId][itemId][id] = {
         ...state.financialsByScenario[scenarioId][itemId][id],
         ...updates,
