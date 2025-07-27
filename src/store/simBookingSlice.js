@@ -91,6 +91,9 @@ const simBookingSlice = createSlice({
       const { scenarioId } = action.payload;
       delete state.bookingsByScenario[scenarioId];
     },
+    loadBookingsByScenario(state, action) {
+      state.bookingsByScenario = action.payload || {};
+    },
   },
 });
 
@@ -101,6 +104,7 @@ export const {
   importBookings,
   deleteAllBookingsForItem,
   deleteAllBookingsForScenario,
+  loadBookingsByScenario,
 } = simBookingSlice.actions;
 
 export const getBookings = createSelector(

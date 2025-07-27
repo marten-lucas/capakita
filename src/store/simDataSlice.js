@@ -100,7 +100,10 @@ const simDataSlice = createSlice({
         overlays: item.overlays || {},
       };
       },
-    },
+    loadDataByScenario(state, action) {
+        state.dataByScenario = action.payload || {};
+      },
+    }
   });
 
 
@@ -160,6 +163,7 @@ export const {
   setOverlay,
   importDataItems,
   simDataItemAdd,
+  loadDataByScenario,
 } = simDataSlice.actions;
 
 // Thunk: delete a data item and all related data

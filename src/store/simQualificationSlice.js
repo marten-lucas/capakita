@@ -104,6 +104,12 @@ const simQualificationSlice = createSlice({
       if (!defs) return;
       state.qualificationDefsByScenario[scenarioId] = defs.filter(q => q.key !== qualiKey);
     },
+    loadQualificationDefsByScenario(state, action) {
+      state.qualificationDefsByScenario = action.payload || {};
+    },
+    loadQualificationAssignmentsByScenario(state, action) {
+      state.qualificationAssignmentsByScenario = action.payload || {};
+    },
   },
 });
 
@@ -118,6 +124,8 @@ export const {
   addQualificationDef,
   updateQualificationDef,
   deleteQualificationDef,
+  loadQualificationDefsByScenario,
+  loadQualificationAssignmentsByScenario,
 } = simQualificationSlice.actions;
 
 export default simQualificationSlice.reducer;

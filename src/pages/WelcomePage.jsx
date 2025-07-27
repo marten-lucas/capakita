@@ -5,33 +5,28 @@ import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import { useNavigate } from 'react-router-dom';
 import DataImportModal from '../components/modals/DataImportModal';
-import ScenarioLoadDialog from '../components/modals/ScenarioLoadDialog.jsx';
+import ScenarioLoadDialog from '../components/modals/ScenarioLoadDialog';
 import { useScenarioImport } from '../hooks/useScenarioImport';
 import { useDispatch } from 'react-redux';
-import { addScenario } from '../store/simScenarioSlice';
+import { addScenario, setLoadDialogOpen } from '../store/simScenarioSlice';
 
 function WelcomePage() {
   const [importOpen, setImportOpen] = useState(false);
-  const [loadOpen, setLoadOpen] = useState(false);
   const navigate = useNavigate();
 
   const dispatch = useDispatch();
   const { importScenario } = useScenarioImport();
 
-  // Handler für DataImportModal
   const handleImport = async ({ file, isAnonymized }) => {
     await importScenario({ file, isAnonymized });
     setImportOpen(false);
     navigate('/data');
   };
 
-  // Nach Abschluss immer zu /data navigieren
   const handleLoadDone = () => {
-    setLoadOpen(false);
     navigate('/data');
   };
 
-  // Neues leeres Szenario direkt anlegen und auswählen
   const handleAddEmptyScenario = () => {
     const newScenario = {
       name: 'Neues Szenario',
@@ -106,7 +101,7 @@ function WelcomePage() {
             textAlign: 'center'
           }}
         >
-          <CardActionArea onClick={() => setLoadOpen(true)}>
+          <CardActionArea onClick={() => dispatch(setLoadDialogOpen(true))}>
             <CardContent>
               <FolderOpenIcon sx={{ fontSize: 56, color: 'secondary.main', mb: 1 }} />
               <Typography variant="h6" sx={{ fontWeight: 600 }}>
@@ -136,10 +131,11 @@ function WelcomePage() {
       </Stack>
       {/* Dialoge */}
       <DataImportModal open={importOpen} onClose={() => setImportOpen(false)} onImport={handleImport} />
-      <ScenarioLoadDialog open={loadOpen} onClose={() => setLoadOpen(false)} onLoaded={handleLoadDone} />
+      <ScenarioLoadDialog onLoaded={handleLoadDone} />
     </Box>
   );
 }
 
 export default WelcomePage;
+
 

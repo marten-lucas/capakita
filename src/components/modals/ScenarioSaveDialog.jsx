@@ -10,39 +10,53 @@ import IconButton from '@mui/material/IconButton';
 import InputAdornment from '@mui/material/InputAdornment';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
+import { useSaveLoad } from '../../hooks/useSaveLoad';
+import { useSelector, useDispatch } from 'react-redux';
+import { setSaveDialogOpen } from '../../store/simScenarioSlice';
 
-function ScenarioSaveDialog({ open, onClose, onSave }) {
+function ScenarioSaveDialog() {
+  const dispatch = useDispatch();
+  const open = useSelector(state => state.simScenario.saveDialogOpen);
+  const { saveData } = useSaveLoad();
   const [pwValue, setPwValue] = useState('');
   const [pwValue2, setPwValue2] = useState('');
   const [pwError, setPwError] = useState('');
   const [showPw, setShowPw] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
-  const handleSubmit = () => {
-    if (!pwValue) {
-      setPwError('Bitte Passwort eingeben.');
-      return;
-    }
+  const handleSubmit = async () => {
     if (pwValue !== pwValue2) {
       setPwError('Passwörter stimmen nicht überein.');
       return;
     }
-    setPwError('');
-    onSave(pwValue);
-    setPwValue('');
-    setPwValue2('');
+
+    setIsSaving(true);
+    const result = await saveData(pwValue);
+    
+    if (result.success) {
+      setPwValue('');
+      setPwValue2('');
+      setPwError('');
+      setShowPw(false);
+      dispatch(setSaveDialogOpen(false));
+    } else {
+      setPwError(result.error);
+    }
+    setIsSaving(false);
   };
 
   const handleClose = () => {
+    if (isSaving) return;
     setPwValue('');
     setPwValue2('');
     setPwError('');
     setShowPw(false);
-    onClose();
+    dispatch(setSaveDialogOpen(false));
   };
 
   return (
     <Dialog open={open} onClose={handleClose}>
-      <DialogTitle>Passwort zum Speichern</DialogTitle>
+      <DialogTitle>Szenarien speichern</DialogTitle>
       <DialogContent>
         <TextField
           autoFocus
@@ -52,6 +66,7 @@ function ScenarioSaveDialog({ open, onClose, onSave }) {
           fullWidth
           value={pwValue}
           onChange={e => setPwValue(e.target.value)}
+          disabled={isSaving}
           InputProps={{
             endAdornment: (
               <InputAdornment position="end">
@@ -59,6 +74,7 @@ function ScenarioSaveDialog({ open, onClose, onSave }) {
                   aria-label="Passwort anzeigen"
                   onClick={() => setShowPw(s => !s)}
                   edge="end"
+                  disabled={isSaving}
                 >
                   {showPw ? <VisibilityOff /> : <Visibility />}
                 </IconButton>
@@ -73,6 +89,7 @@ function ScenarioSaveDialog({ open, onClose, onSave }) {
           fullWidth
           value={pwValue2}
           onChange={e => setPwValue2(e.target.value)}
+          disabled={isSaving}
           sx={{ mt: 2 }}
         />
         {pwError && (
@@ -80,11 +97,17 @@ function ScenarioSaveDialog({ open, onClose, onSave }) {
             {pwError}
           </Typography>
         )}
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+          Das Passwort muss mindestens 8 Zeichen lang sein und Groß- und Kleinbuchstaben, 
+          Zahlen sowie Sonderzeichen enthalten.
+        </Typography>
       </DialogContent>
       <DialogActions>
-        <Button onClick={handleClose}>Abbrechen</Button>
-        <Button onClick={handleSubmit} variant="contained">
-          OK
+        <Button onClick={handleClose} disabled={isSaving}>
+          Abbrechen
+        </Button>
+        <Button onClick={handleSubmit} variant="contained" disabled={isSaving}>
+          {isSaving ? 'Speichere...' : 'Speichern'}
         </Button>
       </DialogActions>
     </Dialog>

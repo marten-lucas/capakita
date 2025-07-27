@@ -5,8 +5,8 @@ const initialState = {
   scenarios: [],
   selectedScenarioId: null,
   selectedItems: {},
-  scenarioSaveDialogOpen: false,
-  scenarioSaveDialogPending: null, 
+  saveDialogOpen: false,
+  loadDialogOpen: false,
 };
 
 const simScenarioSlice = createSlice({
@@ -67,11 +67,14 @@ const simScenarioSlice = createSlice({
         state.selectedScenarioId = state.scenarios.length > 0 ? state.scenarios[0].id : null;
       }
     },
-    setScenarioSaveDialogOpen(state, action) {
-      state.scenarioSaveDialogOpen = action.payload;
+    setSaveDialogOpen(state, action) {
+      state.saveDialogOpen = action.payload;
     },
-    setScenarioSaveDialogPending(state, action) {
-      state.scenarioSaveDialogPending = action.payload;
+    setLoadDialogOpen(state, action) {
+      state.loadDialogOpen = action.payload;
+    },
+    setScenarios(state, action) {
+      state.scenarios = action.payload;
     },
   },
 });
@@ -140,11 +143,12 @@ export const deleteScenario = (scenarioId) => (dispatch) => {
 export const {
   setSelectedScenarioId,
   setSelectedItem,
-  setScenarioSaveDialogOpen,
-  setScenarioSaveDialogPending,
   addScenario,
   updateScenario,
   deleteScenario: deleteScenarioReducer,
+  setScenarios,
+  setSaveDialogOpen,
+  setLoadDialogOpen,
 } = simScenarioSlice.actions;
 
 export default simScenarioSlice.reducer;

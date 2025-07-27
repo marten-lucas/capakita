@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import WeeklyChart from '../components/SimDataCharts/WeeklyChart'
 import MidtermChart from '../components/SimDataCharts/MidtermChart'
 import { useSelector, useDispatch } from 'react-redux';
-import { setSelectedScenarioId, setScenarioSaveDialogOpen, setScenarioSaveDialogPending } from '../store/simScenarioSlice';
+import { setSelectedScenarioId } from '../store/simScenarioSlice';
 import React from 'react'
 import ScenarioSaveDialog from '../components/modals/ScenarioSaveDialog'
 import ChartFilterForm from '../components/SimDataCharts/ChartFilterForm'
@@ -16,10 +16,6 @@ function VisuPage() {
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const scenarios = useSelector(state => state.simScenario.scenarios);
   const dispatch = useDispatch();
-
-  // Use store for dialog state
-  const scenarioSaveDialogOpen = useSelector(state => state.simScenario.scenarioSaveDialogOpen);
-  const scenarioSaveDialogPending = useSelector(state => state.simScenario.scenarioSaveDialogPending);
 
   // Find the selected scenario object
   const selectedScenario = scenarios.find(s => s.id === selectedScenarioId);
@@ -77,19 +73,6 @@ function VisuPage() {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#f0f2f5' }}>
-      {/* Scenario Save Dialog */}
-      <ScenarioSaveDialog
-        open={scenarioSaveDialogOpen}
-        onClose={() => { dispatch(setScenarioSaveDialogOpen(false)); dispatch(setScenarioSaveDialogPending(null)); }}
-        onSave={(password) => {
-          if (scenarioSaveDialogPending) {
-            scenarioSaveDialogPending(password);
-            dispatch(setScenarioSaveDialogOpen(false));
-            dispatch(setScenarioSaveDialogPending(null));
-          }
-        }}
-      />
-
       {/* Chart Filter Form added here */}
       <Box sx={{ px: 3, pt: 2 }}>
         <ChartFilterForm showStichtag simulationData={simulationData} />

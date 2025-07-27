@@ -9,13 +9,16 @@ import {
   Button, 
 } from '@mui/material';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
+import SaveIcon from '@mui/icons-material/Save';
+import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 import DataImportModal from '../components/modals/DataImportModal';
 import SimDataList from '../components/SimDataDetail/SimDataList';
 import SimDataDetailForm from '../components/SimDataDetail/SimDataDetailForm';
 import { useSelector, useDispatch } from 'react-redux';
-import { setSelectedScenarioId, addScenario, setScenarioSaveDialogOpen, setScenarioSaveDialogPending } from '../store/simScenarioSlice';
+import { setSelectedScenarioId, addScenario, isSaveAllowed, setSaveDialogOpen, setLoadDialogOpen } from '../store/simScenarioSlice';
 import { addDataItemAndSelect, selectDataItemsByScenario } from '../store/simDataSlice';
 import ScenarioSaveDialog from '../components/modals/ScenarioSaveDialog';
+import ScenarioLoadDialog from '../components/modals/ScenarioLoadDialog';
 import PersonIcon from '@mui/icons-material/Person';
 import ChildCareIcon from '@mui/icons-material/ChildCare';
 import LayersIcon from '@mui/icons-material/Layers';
@@ -25,8 +28,7 @@ function DataPage() {
   const [modalOpen, setModalOpen] = useState(false);
 
   const dispatch = useDispatch();
-  const scenarioSaveDialogOpen = useSelector(state => state.simScenario.scenarioSaveDialogOpen);
-  const scenarioSaveDialogPending = useSelector(state => state.simScenario.scenarioSaveDialogPending);
+  const isSaveAllowedValue = useSelector(isSaveAllowed);
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const scenarios = useSelector(state => state.simScenario.scenarios);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
@@ -39,10 +41,13 @@ function DataPage() {
 
   const { importScenario } = useScenarioImport();
 
-
   const handleImport = async ({ file, isAnonymized }) => {
     await importScenario({ file, isAnonymized });
     setModalOpen(false);
+  };
+
+  const handleLoadDone = () => {
+    // Dialog will be closed by the component itself
   };
 
   const handleOpenModal = () => {
@@ -81,6 +86,17 @@ function DataPage() {
       icon: <FileUploadIcon />,
       name: 'Import',
       onClick: handleOpenModal
+    },
+    {
+      icon: <SaveIcon />,
+      name: 'Speichern',
+      onClick: () => dispatch(setSaveDialogOpen(true)),
+      disabled: !isSaveAllowedValue
+    },
+    {
+      icon: <FolderOpenIcon />,
+      name: 'Laden',
+      onClick: () => dispatch(setLoadDialogOpen(true))
     }
   ];
 
@@ -158,17 +174,8 @@ function DataPage() {
         onClose={handleCloseModal}
         onImport={handleImport}
       />
-      <ScenarioSaveDialog
-        open={scenarioSaveDialogOpen}
-        onClose={() => { dispatch(setScenarioSaveDialogOpen(false)); dispatch(setScenarioSaveDialogPending(null)); }}
-        onSave={(password) => {
-          if (scenarioSaveDialogPending) {
-            scenarioSaveDialogPending(password);
-            dispatch(setScenarioSaveDialogOpen(false));
-            dispatch(setScenarioSaveDialogPending(null));
-          }
-        }}
-      />
+      <ScenarioSaveDialog />
+      <ScenarioLoadDialog onLoaded={handleLoadDone} />
       <Box sx={{ flex: 1, display: 'flex', flexDirection: 'row', pt: 0 }}>
         <>
           <Box sx={{ width: 320, flexShrink: 0, borderRight: 1, borderColor: 'divider', bgcolor: 'background.paper', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>

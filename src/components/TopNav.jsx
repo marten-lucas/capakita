@@ -7,7 +7,7 @@ import Container from '@mui/material/Container'
 import Button from '@mui/material/Button'
 import { NavLink } from 'react-router-dom'
 import { useSelector, useDispatch } from 'react-redux';
-import { setScenarioSaveDialogOpen, setScenarioSaveDialogPending, isSaveAllowed } from '../store/simScenarioSlice';
+import { isSaveAllowed, setSaveDialogOpen, setLoadDialogOpen } from '../store/simScenarioSlice';
 import StorageIcon from '@mui/icons-material/Storage'
 import BarChartIcon from '@mui/icons-material/BarChart'
 import SettingsIcon from '@mui/icons-material/Settings'
@@ -16,7 +16,10 @@ import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import IconButton from '@mui/material/IconButton';
 import ScenarioSaveDialog from './modals/ScenarioSaveDialog';
-import CryptoJS from 'crypto-js';
+import DataImportModal from './modals/DataImportModal';
+import FileUploadIcon from '@mui/icons-material/FileUpload';
+import FolderOpenIcon from '@mui/icons-material/FolderOpen';
+import SaveIcon from '@mui/icons-material/Save';
 
 const pages = [
   { label: 'Szenarien & Daten', path: '/data', icon: <StorageIcon sx={{ mr: 1 }} /> },
@@ -26,19 +29,11 @@ const pages = [
 
 function TopNav() {
   const dispatch = useDispatch();
-  // Use selector function for isSaveAllowed
   const isSaveAllowedValue = useSelector(isSaveAllowed);
   const scenarios = useSelector(state => state.simScenario.scenarios);
-  const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
 
-  // State for menu anchor
   const [anchorEl, setAnchorEl] = React.useState(null);
-
-  // Use store for dialog state
-  const scenarioSaveDialogOpen = useSelector(state => state.simScenario.scenarioSaveDialogOpen);
-  const scenarioSaveDialogPending = useSelector(state => state.simScenario.scenarioSaveDialogPending);
-
-  const chartData = useSelector(state => state.chart);
+  const [importDialogOpen, setImportDialogOpen] = React.useState(false);
 
   const handleMenuOpen = (event) => {
     setAnchorEl(event.currentTarget);
@@ -48,34 +43,17 @@ function TopNav() {
   };
 
   const handleSaveClick = () => {
-    dispatch(setScenarioSaveDialogPending(() => (password) => {
-      const simState = {
-        scenarios,
-        selectedScenarioId,
-      };
-      const data = {
-        ...simState,
-        chartStore: {
-          stichtag: chartData.stichtag,
-          selectedGroups: chartData.selectedGroups,
-          selectedQualifications: chartData.selectedQualifications,
-          midtermTimeDimension: chartData.midtermTimeDimension,
-          midtermSelectedGroups: chartData.midtermSelectedGroups,
-          midtermSelectedQualifications: chartData.midtermSelectedQualifications
-        }
-      };
+    dispatch(setSaveDialogOpen(true));
+    handleMenuClose();
+  };
 
-      const json = JSON.stringify(data, null, 2);
-      const ciphertext = CryptoJS.AES.encrypt(json, password).toString();
+  const handleLoadClick = () => {
+    dispatch(setLoadDialogOpen(true));
+    handleMenuClose();
+  };
 
-      const blob = new Blob([ciphertext], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'kiga-simulator-data.enc';
-      a.click();
-      URL.revokeObjectURL(url);
-    }));
+  const handleImportClick = () => {
+    setImportDialogOpen(true);
     handleMenuClose();
   };
 
@@ -154,25 +132,29 @@ function TopNav() {
               open={Boolean(anchorEl)}
               onClose={handleMenuClose}
             >
+              <MenuItem onClick={handleImportClick}>
+                <FileUploadIcon sx={{ mr: 1 }} />
+                Importieren
+              </MenuItem>
+              <MenuItem onClick={handleLoadClick}>
+                <FolderOpenIcon sx={{ mr: 1 }} />
+                Laden
+              </MenuItem>
               <MenuItem
                 onClick={handleSaveClick}
                 disabled={!isSaveAllowedValue}
               >
-                💾 Szenarien speichern
+                <SaveIcon sx={{ mr: 1 }} />
+                Szenarien speichern
               </MenuItem>
               {/* ...add more menu items here if needed... */}
             </Menu>
-            <ScenarioSaveDialog
-              open={scenarioSaveDialogOpen}
-              onClose={() => { dispatch(setScenarioSaveDialogOpen(false)); dispatch(setScenarioSaveDialogPending(null)); }}
-              onSave={(password) => {
-                if (scenarioSaveDialogPending) {
-                  scenarioSaveDialogPending(password);
-                  dispatch(setScenarioSaveDialogOpen(false));
-                  dispatch(setScenarioSaveDialogPending(null));
-                }
-              }}
+            <DataImportModal
+              open={importDialogOpen}
+              onClose={() => setImportDialogOpen(false)}
+              onImport={() => setImportDialogOpen(false)}
             />
+            <ScenarioSaveDialog />
           </Box>
         </Toolbar>
       </Container>

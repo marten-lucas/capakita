@@ -98,6 +98,12 @@ const simGroupSlice = createSlice({
       delete state.groupsByScenario[scenarioId];
       delete state.groupDefsByScenario[scenarioId];
     },
+    loadGroupsByScenario(state, action) {
+      state.groupsByScenario = action.payload || {};
+    },
+    loadGroupDefsByScenario(state, action) {
+      state.groupDefsByScenario = action.payload || {};
+    },
   },
 });
 
@@ -112,6 +118,8 @@ export const {
   importGroupAssignments,
   deleteAllGroupAssignmentsForItem,
   deleteAllGroupAssignmentsForScenario,
+  loadGroupsByScenario,
+  loadGroupDefsByScenario,
 } = simGroupSlice.actions;
 
 export default simGroupSlice.reducer;
