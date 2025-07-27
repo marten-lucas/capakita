@@ -7,9 +7,7 @@ import {
   adebis2bookings,
   adebis2GroupDefs,
   adebis2QualiDefs,
-  adebis2GroupAssignments,
-  adebis2QualiAssignments
-} from '../utils/adebis-parser';
+  adebis2GroupAssignments} from '../utils/adebis-parser';
 import { getItemByAdebisID } from '../store/simDataSlice';
 
 // Minimal scenario import hook using the new adebis-import
@@ -42,12 +40,11 @@ export function useScenarioImport() {
         groupsRaw = groupsRaw.filter(grp => allowedGroupIds.has(String(grp.GRUNR)));
       }
 
-      const { simDataList, employeeIdMap } = adebis2simData(kidsRaw, employeesRaw);
+      const { simDataList } = adebis2simData(kidsRaw, employeesRaw);
       const { bookings, bookingReference } = adebis2bookings(belegungRaw, employeesRaw);
       const groupDefs = adebis2GroupDefs(groupsRaw);
       const qualiDefs = adebis2QualiDefs(employeesRaw);
       const groupAssignments = adebis2GroupAssignments(grukiRaw);
-      const qualiAssignments = adebis2QualiAssignments(employeesRaw, employeeIdMap);
 
       // Scenario settings
       const scenarioName = isAnonymized ? 'Importiertes Szenario (anonymisiert)' : 'Importiertes Szenario';

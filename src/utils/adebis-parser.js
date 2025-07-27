@@ -23,7 +23,6 @@ function assignSegmentIdsToBookings(bookings) {
 // Converts Adebis raw kids and employees data to a normalized simDataList
 export function adebis2simData(kidsRaw, employeesRaw) {
   let simDataList = [];
-  let employeeIdMap = {};
 
   // Kids (demand)
   for (const kind of kidsRaw || []) {
@@ -48,7 +47,6 @@ export function adebis2simData(kidsRaw, employeesRaw) {
   // Employees (capacity)
   for (const emp of employeesRaw || []) {
     const newId = createId('simdata');
-    employeeIdMap[String(emp.IDNR)] = newId;
     simDataList.push({
       id: newId,
       type: 'capacity',
@@ -66,7 +64,7 @@ export function adebis2simData(kidsRaw, employeesRaw) {
     });
   }
 
-  return { simDataList, employeeIdMap };
+  return { simDataList };
 }
 
 /**

@@ -182,7 +182,7 @@ function SimDataGeneralTab() {
 
       {/* Zeitraum */}
       <Box sx={{ mb: 2 }}>
-        <Typography variant="body2" sx={{ mt: 1, mb: 1.5}}>Anwesenheit</Typography>
+        <Typography variant="body2" sx={{ mt: 1, mb: 1.5 }}>Anwesenheit</Typography>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <TextField
             label="von"
@@ -235,8 +235,21 @@ function SimDataGeneralTab() {
           /> */}
         </Box>
       </Box>
+      
+      {/* Qualification Picker for capacity items */}
+      {item.type === 'capacity' && qualiDefs.length > 0 && (
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="body2" sx={{ mb: 0.5 }}>Qualifikation</Typography>
+          <QualificationPicker
+            qualificationDefs={qualiDefs}
+            value={assignedQualification}
+            onChange={handleQualificationChange}
+          />
+        </Box>
+      )}
 
       {/* Abwesenheiten */}
+
       <Box sx={{ mt: 4, mb: 2 }}>
         <Button
           variant="outlined"
@@ -332,17 +345,7 @@ function SimDataGeneralTab() {
         )}
       </Box>
 
-      {/* Qualification Picker for capacity items */}
-      {item.type === 'capacity' && qualiDefs.length > 0 && (
-        <Box sx={{ mb: 2 }}>
-          <Typography variant="body2" sx={{ mb: 0.5 }}>Qualifikation</Typography>
-          <QualificationPicker
-            qualificationDefs={qualiDefs}
-            value={assignedQualification}
-            onChange={handleQualificationChange}
-          />
-        </Box>
-      )}
+
     </Box>
   );
 }
