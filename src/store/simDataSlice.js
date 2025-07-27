@@ -99,7 +99,6 @@ const simDataSlice = createSlice({
         rawdata: item.rawdata || {},
         absences: Array.isArray(item.absences) ? item.absences : [],
         overlays: item.overlays || {},
-        kindId: item.kindId ? String(item.kindId) : undefined // only for simData
       };
       },
     },

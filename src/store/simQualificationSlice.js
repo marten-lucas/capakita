@@ -2,7 +2,7 @@ import { createSlice } from '@reduxjs/toolkit';
 
 const initialState = {
   qualificationDefsByScenario: {},
-  qualificationAssignmentsByScenario: {},
+  qualificationAssignmentsByScenario: {}, // { [scenarioId]: { [dataItemId]: { [assignmentId]: assignmentObj } } }
 };
 
 const simQualificationSlice = createSlice({
@@ -15,13 +15,19 @@ const simQualificationSlice = createSlice({
     },
     importQualificationAssignments(state, action) {
       const { scenarioId, assignments } = action.payload;
-      state.qualificationAssignmentsByScenario[scenarioId] = assignments;
+      if (!state.qualificationAssignmentsByScenario[scenarioId]) state.qualificationAssignmentsByScenario[scenarioId] = {};
+      assignments.forEach(assignment => {
+        const dataItemId = assignment.dataItemId;
+        if (!state.qualificationAssignmentsByScenario[scenarioId][dataItemId]) state.qualificationAssignmentsByScenario[scenarioId][dataItemId] = {};
+        const id = assignment.id ? String(assignment.id) : `${assignment.qualification}-${Date.now()}`;
+        state.qualificationAssignmentsByScenario[scenarioId][dataItemId][id] = { ...assignment, id };
+      });
     },
     deleteAllQualificationAssignmentsForItem(state, action) {
       const { scenarioId, itemId } = action.payload;
-      const assignments = state.qualificationAssignmentsByScenario[scenarioId];
-      if (!assignments) return;
-      state.qualificationAssignmentsByScenario[scenarioId] = assignments.filter(a => String(a.dataItemId) !== String(itemId));
+      if (state.qualificationAssignmentsByScenario[scenarioId]) {
+        delete state.qualificationAssignmentsByScenario[scenarioId][String(itemId)];
+      }
     },
     deleteAllQualificationAssignmentsForScenario(state, action) {
       const { scenarioId } = action.payload;

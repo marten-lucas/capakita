@@ -20,9 +20,12 @@ function SimDataGeneralTab() {
   const qualiDefs = useSelector(state =>
     state.simQualification.qualificationDefsByScenario[selectedScenarioId] || []
   );
-  const qualiAssignments = useSelector(state =>
-    state.simQualification.qualificationAssignmentsByScenario[selectedScenarioId] || []
+  // Get qualification assignments for the selected item as an array
+  const qualiAssignmentsObj = useSelector(state =>
+    state.simQualification.qualificationAssignmentsByScenario?.[selectedScenarioId]?.[selectedItemId] || {}
   );
+  const qualiAssignments = Object.values(qualiAssignmentsObj);
+
   const assignedQualification = React.useMemo(() => {
     if (!item || item.type !== 'capacity') return '';
     const assignment = qualiAssignments.find(a => String(a.dataItemId) === String(selectedItemId));

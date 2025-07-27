@@ -69,7 +69,7 @@ export function adebis2simData(kidsRaw, employeesRaw) {
 
 /**
  * Converts Adebis raw booking data to a normalized bookings list.
- * Each booking will have id, kindId, startdate, enddate, times, rawdata.
+ * Each booking will have id,  startdate, enddate, times, rawdata.
  */
 export function adebis2bookings(belegungRaw, employeesRaw) {
   const belegungResult = belegung2Booking(belegungRaw);
@@ -222,41 +222,53 @@ export function adebis2QualiDefs(employeesRaw) {
 
 /**
  * Converts Adebis grukiRaw to group assignments, with rawdata.
+ * Returns both assignments and assignmentReference for mapping.
  * @param {Array} grukiRaw - Array of group assignment objects with at least KINDNR, GRUNR, GKVON, GKBIS.
- * @returns {Array} groupAssignments - Array of { kindId, groupId, start, end, rawdata }
+ * @returns {Object} { groupAssignments, groupAssignmentReference }
  */
 export function adebis2GroupAssignments(grukiRaw) {
-  return (grukiRaw || []).map(g => {
-    return {
-      kindId: String(g.KINDNR),
+  const groupAssignments = [];
+  const groupAssignmentReference = [];
+  (grukiRaw || []).forEach(g => {
+    const assignmentKey = `${g.KINDNR}-${g.GRUNR}-${g.GKVON}-${g.GKBIS}`;
+    groupAssignments.push({
       groupId: String(g.GRUNR),
       start: convertDDMMYYYYtoYYYYMMDD(g.GKVON),
       end: convertDDMMYYYYtoYYYYMMDD(g.GKBIS),
       rawdata: { ...g }
-    };
+    });
+    groupAssignmentReference.push({
+      assignmentKey,
+      adebisId: { id: String(g.KINDNR), source: "kind" }
+    });
   });
+  return { groupAssignments, groupAssignmentReference };
 }
 
 /**
- * Converts Adebis employeesRaw to qualification assignments, with rawdata.
+ * Converts Adebis employeesRaw to qualification assignments, with rawdata and reference.
+ * Returns both assignments and assignmentReference for mapping.
  * @param {Array} employeesRaw - Array of employee objects with at least QUALIFIK and IDNR.
- * @returns {Array} qualiAssignments - Array of { qualification, dataItemId, rawdata }
- */
-/**
- * Converts Adebis employeesRaw to qualification assignments, with rawdata and originalData.
- * @param {Array} employeesRaw - Array of employee objects with at least QUALIFIK and IDNR.
- * @returns {Array} qualiAssignments - Array of { qualification, dataItemId, rawdata, originalData }
+ * @returns {Object} { qualiAssignments, qualiAssignmentReference }
  */
 export function adebis2QualiAssignments(employeesRaw, employeeIdMap = {}) {
-  return (employeesRaw || [])
+  const qualiAssignments = [];
+  const qualiAssignmentReference = [];
+  (employeesRaw || [])
     .filter(e => e.QUALIFIK && e.IDNR)
-    .map(e => {
+    .forEach(e => {
+      const assignmentKey = `${e.IDNR}-${e.QUALIFIK}`;
       const assignment = {
         qualification: e.QUALIFIK,
         dataItemId: employeeIdMap[String(e.IDNR)] || String(e.IDNR),
         rawdata: { QUALIFIK: e.QUALIFIK }
       };
       assignment.originalData = { ...assignment };
-      return assignment;
+      qualiAssignments.push(assignment);
+      qualiAssignmentReference.push({
+        assignmentKey,
+        adebisId: { id: String(e.IDNR), source: "anstell" }
+      });
     });
+  return { qualiAssignments, qualiAssignmentReference };
 }

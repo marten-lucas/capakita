@@ -7,6 +7,7 @@ import React from 'react';
 import GroupDetail from './GroupDetail';
 import { useSelector, useDispatch } from 'react-redux';
 import { selectDataItemsByScenario } from '../../../store/simDataSlice';
+import { addGroup } from '../../../store/simGroupSlice';
 
 function GroupCards() {
   // Get scenario and item selection
@@ -21,28 +22,30 @@ function GroupCards() {
   const item = dataItems?.find(i => i.id === selectedItemId);
 
   // Read groups directly from the item (not from scenario store)
-  const groups = React.useMemo(() => item?.groups || [], [item]);
+  const groupsByScenario = useSelector(state => state.simGroup.groupsByScenario);
+  const groups = React.useMemo(() => {
+    if (!selectedScenarioId || !selectedItemId) return [];
+    const scenarioGroups = groupsByScenario[selectedScenarioId] || {};
+    const itemGroupsObj = scenarioGroups[selectedItemId] || {};
+    return Object.values(itemGroupsObj);
+  }, [groupsByScenario, selectedScenarioId, selectedItemId]);
   const bookings = item?.bookings || [];
 
   // Add group logic
   const handleAddGroup = () => {
     if (!item) return;
     const newGroup = {
-      id: Date.now().toString(),
+      kindId: item.id,
+      groupId: '', // Set default groupId or let user pick
       name: 'Neue Gruppe',
       start: '',
       end: '',
-      // Add other default fields as needed
+      overlays: {}
     };
-    const updatedGroups = [...groups, newGroup];
-    dispatch({
-      type: 'simData/updateDataItem',
-      payload: {
-        scenarioId: selectedScenarioId,
-        itemId: item.id,
-        updates: { groups: updatedGroups }
-      }
-    });
+    dispatch(addGroup({
+      scenarioId: selectedScenarioId,
+      group: newGroup
+    }));
   };
 
   // Track expanded accordion index
@@ -106,7 +109,7 @@ function GroupCards() {
 
         return (
           <Accordion
-            key={`${idx}-${bookings.length}`}
+            key={`${group.id}-${bookings.length}`}
             expanded={expandedIdx === idx}
             onChange={handleAccordionChange(idx)}
           >
@@ -116,7 +119,7 @@ function GroupCards() {
               </Typography>
             </AccordionSummary>
             <AccordionDetails>
-              <GroupDetail index={idx} />
+              <GroupDetail index={idx} group={group} />
             </AccordionDetails>
           </Accordion>
         );

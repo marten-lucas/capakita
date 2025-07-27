@@ -7,7 +7,8 @@ import {
   adebis2bookings,
   adebis2GroupDefs,
   adebis2QualiDefs,
-  adebis2GroupAssignments} from '../utils/adebis-parser';
+  adebis2GroupAssignments,
+  adebis2QualiAssignments } from '../utils/adebis-parser';
 import { getItemByAdebisID } from '../store/simDataSlice';
 
 // Minimal scenario import hook using the new adebis-import
@@ -44,7 +45,8 @@ export function useScenarioImport() {
       const { bookings, bookingReference } = adebis2bookings(belegungRaw, employeesRaw);
       const groupDefs = adebis2GroupDefs(groupsRaw);
       const qualiDefs = adebis2QualiDefs(employeesRaw);
-      const groupAssignmentsRaw = adebis2GroupAssignments(grukiRaw);
+      const { groupAssignments } = adebis2GroupAssignments(grukiRaw);
+      const { qualiAssignments } = adebis2QualiAssignments(employeesRaw);
 
       // Scenario settings
       const scenarioName = isAnonymized ? 'Importiertes Szenario (anonymisiert)' : 'Importiertes Szenario';
@@ -90,11 +92,11 @@ export function useScenarioImport() {
           }
         });
 
-        // Remap groupAssignments to use store keys
-        const groupAssignmentsFinal = (groupAssignmentsRaw || [])
+        // Remap groupAssignments using store ids only
+        const groupAssignmentsFinal = groupAssignments
           .map(a => ({
             ...a,
-            kindId: kindKeyMap[String(a.kindId)],
+            kindId: kindKeyMap[String(a.rawdata.KINDNR)]
           }))
           .filter(a => !!a.kindId);
 
@@ -107,13 +109,11 @@ export function useScenarioImport() {
           payload: { scenarioId, assignments: groupAssignmentsFinal }
         });
 
-        // Rebuild qualiAssignments using the final mapping
-        const qualiAssignmentsFinal = (employeesRaw || [])
-          .filter(e => e.QUALIFIK && e.IDNR)
-          .map(e => ({
-            qualification: e.QUALIFIK,
-            dataItemId: finalEmployeeKeyMap[String(e.IDNR)],
-            rawdata: { QUALIFIK: e.QUALIFIK }
+        // Remap qualiAssignments using store ids only
+        const qualiAssignmentsFinal = qualiAssignments
+          .map(a => ({
+            ...a,
+            dataItemId: finalEmployeeKeyMap[String(a.rawdata.QUALIFIK ? a.rawdata.IDNR : '')]
           }))
           .filter(a => !!a.dataItemId);
 

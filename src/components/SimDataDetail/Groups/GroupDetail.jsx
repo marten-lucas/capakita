@@ -10,10 +10,11 @@ import { useSelector, useDispatch } from 'react-redux';
 import { selectDataItemsByScenario } from '../../../store/simDataSlice';
 import { createSelector } from '@reduxjs/toolkit';
 import { getBookings } from '../../../store/simBookingSlice';
+import { updateGroup, deleteGroup } from '../../../store/simGroupSlice';
 
 const EMPTY_GROUP_DEFS = [];
 
-function GroupDetail({ index }) {
+function GroupDetail({ index, group }) {
   const dispatch = useDispatch();
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
@@ -23,10 +24,6 @@ function GroupDetail({ index }) {
   );
   const dataItems = useSelector(dataItemsSelector);
   const item = dataItems?.find(i => i.id === selectedItemId);
-
-  // Read groups directly from the item (not from scenario store)
-  const groups = item?.groups || [];
-  const group = groups?.[index];
 
   // Use bookings from simBookingSlice only
   const bookings = useSelector(state => getBookings(state, selectedScenarioId, selectedItemId));
@@ -88,30 +85,21 @@ function GroupDetail({ index }) {
 
   // Handler to update group in store
   const handleUpdateGroup = (updatedGroup) => {
-    if (!groups || !group) return;
-    const updatedGroups = groups.map((g, idx) => (idx === index ? updatedGroup : g));
-    dispatch({
-      type: 'simData/updateDataItem',
-      payload: {
-        scenarioId: selectedScenarioId,
-        itemId: selectedItemId,
-        updates: { groups: updatedGroups }
-      }
-    });
+    if (!group) return;
+    dispatch(updateGroup({
+      scenarioId: selectedScenarioId,
+      groupId: group.id,
+      updates: updatedGroup
+    }));
   };
 
   // Handler to delete group in store
   const handleDeleteGroup = () => {
-    if (!groups || !group) return;
-    const updatedGroups = groups.filter((_, idx) => idx !== index);
-    dispatch({
-      type: 'simData/updateDataItem',
-      payload: {
-        scenarioId: selectedScenarioId,
-        itemId: selectedItemId,
-        updates: { groups: updatedGroups }
-      }
-    });
+    if (!group) return;
+    dispatch(deleteGroup({
+      scenarioId: selectedScenarioId,
+      groupId: group.id
+    }));
   };
 
   const handleDateChange = (field, value) => {
@@ -355,4 +343,3 @@ function GroupDetail({ index }) {
 }
 
 export default GroupDetail;
-
