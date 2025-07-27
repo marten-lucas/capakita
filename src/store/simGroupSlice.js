@@ -2,7 +2,7 @@ import { createSlice } from '@reduxjs/toolkit';
 import { createId } from '../utils/idUtils';
 
 const initialState = {
-  groupsByScenario: {}, // { [scenarioId]: { [kindId]: { [groupId]: groupAssignment } } }
+  groupsByScenario: {}, // { [scenarioId]: { [dataItemId]: { [assignmentId]: groupAssignment } } }
   groupDefsByScenario: {},
 };
 
@@ -11,39 +11,39 @@ const simGroupSlice = createSlice({
   initialState,
   reducers: {
     addGroup(state, action) {
-      const { scenarioId, group } = action.payload;
+      const { scenarioId, dataItemId, group } = action.payload;
       if (!state.groupsByScenario[scenarioId]) state.groupsByScenario[scenarioId] = {};
-      if (!state.groupsByScenario[scenarioId][group.kindId]) state.groupsByScenario[scenarioId][group.kindId] = {};
+      const itemId = String(dataItemId);
+      if (!state.groupsByScenario[scenarioId][itemId]) state.groupsByScenario[scenarioId][itemId] = {};
       const key = createId('group');
-      state.groupsByScenario[scenarioId][group.kindId][key] = { ...group, id: key, overlays: {} };
+      state.groupsByScenario[scenarioId][itemId][key] = { ...group, id: key, overlays: {} };
     },
     updateGroup(state, action) {
-      const { scenarioId, groupId, updates } = action.payload;
-      // Find the group by scenarioId and groupId
-      const scenarioGroups = state.groupsByScenario[scenarioId];
-      if (!scenarioGroups) return;
-      for (const kindId in scenarioGroups) {
-        if (scenarioGroups[kindId][groupId]) {
-          scenarioGroups[kindId][groupId] = {
-            ...scenarioGroups[kindId][groupId],
-            ...updates,
-            overlays: updates.overlays
-              ? { ...scenarioGroups[kindId][groupId].overlays, ...updates.overlays }
-              : scenarioGroups[kindId][groupId].overlays
-          };
-          break;
-        }
+      const { scenarioId, dataItemId, groupId, updates } = action.payload;
+      const itemId = String(dataItemId);
+      const id = String(groupId);
+      if (!state.groupsByScenario[scenarioId]) state.groupsByScenario[scenarioId] = {};
+      if (!state.groupsByScenario[scenarioId][itemId]) state.groupsByScenario[scenarioId][itemId] = {};
+      if (!state.groupsByScenario[scenarioId][itemId][id]) {
+        state.groupsByScenario[scenarioId][itemId][id] = {
+          id,
+          overlays: {},
+        };
       }
+      state.groupsByScenario[scenarioId][itemId][id] = {
+        ...state.groupsByScenario[scenarioId][itemId][id],
+        ...updates,
+        overlays: updates.overlays
+          ? { ...state.groupsByScenario[scenarioId][itemId][id].overlays, ...updates.overlays }
+          : state.groupsByScenario[scenarioId][itemId][id].overlays
+      };
     },
     deleteGroup(state, action) {
-      const { scenarioId, groupId } = action.payload;
-      const scenarioGroups = state.groupsByScenario[scenarioId];
-      if (!scenarioGroups) return;
-      for (const kindId in scenarioGroups) {
-        if (scenarioGroups[kindId][groupId]) {
-          delete scenarioGroups[kindId][groupId];
-          break;
-        }
+      const { scenarioId, dataItemId, groupId } = action.payload;
+      const itemId = String(dataItemId);
+      const id = String(groupId);
+      if (state.groupsByScenario[scenarioId]?.[itemId]) {
+        delete state.groupsByScenario[scenarioId][itemId][id];
       }
     },
     addGroupDef(state, action) {
@@ -80,16 +80,17 @@ const simGroupSlice = createSlice({
       const { scenarioId, assignments } = action.payload;
       if (!state.groupsByScenario[scenarioId]) state.groupsByScenario[scenarioId] = {};
       assignments.forEach(assignment => {
-        const kindId = assignment.kindId;
-        if (!state.groupsByScenario[scenarioId][kindId]) state.groupsByScenario[scenarioId][kindId] = {};
+        const dataItemId = String(assignment.kindId);
+        if (!state.groupsByScenario[scenarioId][dataItemId]) state.groupsByScenario[scenarioId][dataItemId] = {};
         const id = assignment.id ? String(assignment.id) : createId('group');
-        state.groupsByScenario[scenarioId][kindId][id] = { ...assignment, id, overlays: {} };
+        state.groupsByScenario[scenarioId][dataItemId][id] = { ...assignment, id, overlays: {} };
       });
     },
     deleteAllGroupAssignmentsForItem(state, action) {
       const { scenarioId, itemId } = action.payload;
+      const id = String(itemId);
       if (state.groupsByScenario[scenarioId]) {
-        delete state.groupsByScenario[scenarioId][String(itemId)];
+        delete state.groupsByScenario[scenarioId][id];
       }
     },
     deleteAllGroupAssignmentsForScenario(state, action) {

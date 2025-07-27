@@ -14,31 +14,56 @@ const simBookingSlice = createSlice({
     addBooking(state, action) {
       const { scenarioId, dataItemId, booking } = action.payload;
       if (!state.bookingsByScenario[scenarioId]) state.bookingsByScenario[scenarioId] = {};
-      const itemKey = String(dataItemId);
-      if (!state.bookingsByScenario[scenarioId][itemKey]) state.bookingsByScenario[scenarioId][itemKey] = {};
+      const itemId = String(dataItemId);
+      if (!state.bookingsByScenario[scenarioId][itemId]) state.bookingsByScenario[scenarioId][itemId] = {};
       const bookingKey = createId('booking');
-      state.bookingsByScenario[scenarioId][itemKey][bookingKey] = {
+      state.bookingsByScenario[scenarioId][itemId][bookingKey] = {
         ...booking,
+        id: bookingKey,
         overlays: {},
       };
     },
     updateBooking(state, action) {
       const { scenarioId, dataItemId, bookingId, updates } = action.payload;
       const itemId = String(dataItemId);
-      if (!state.bookingsByScenario[scenarioId]?.[itemId]?.[bookingId]) return;
-      state.bookingsByScenario[scenarioId][itemId][bookingId] = {
-        ...state.bookingsByScenario[scenarioId][itemId][bookingId],
+      const id = String(bookingId);
+      
+      // Ensure the nested structure exists
+      if (!state.bookingsByScenario[scenarioId]) {
+        state.bookingsByScenario[scenarioId] = {};
+      }
+      if (!state.bookingsByScenario[scenarioId][itemId]) {
+        state.bookingsByScenario[scenarioId][itemId] = {};
+      }
+      
+      // Check if booking exists, if not create it
+      if (!state.bookingsByScenario[scenarioId][itemId][id]) {
+        // Create new booking if it doesn't exist
+        state.bookingsByScenario[scenarioId][itemId][id] = {
+          id,
+          startdate: '',
+          enddate: '',
+          times: [],
+          rawdata: {},
+          overlays: {}
+        };
+      }
+      
+      // Update the booking
+      state.bookingsByScenario[scenarioId][itemId][id] = {
+        ...state.bookingsByScenario[scenarioId][itemId][id],
         ...updates,
         overlays: updates.overlays
-          ? { ...state.bookingsByScenario[scenarioId][itemId][bookingId].overlays, ...updates.overlays }
-          : state.bookingsByScenario[scenarioId][itemId][bookingId].overlays
+          ? { ...state.bookingsByScenario[scenarioId][itemId][id].overlays, ...updates.overlays }
+          : state.bookingsByScenario[scenarioId][itemId][id].overlays
       };
     },
     deleteBooking(state, action) {
       const { scenarioId, dataItemId, bookingId } = action.payload;
       const itemId = String(dataItemId);
+      const id = String(bookingId);
       if (state.bookingsByScenario[scenarioId]?.[itemId]) {
-        delete state.bookingsByScenario[scenarioId][itemId][bookingId];
+        delete state.bookingsByScenario[scenarioId][itemId][id];
       }
     },
     importBookings(state, action) {

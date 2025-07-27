@@ -15,18 +15,52 @@ const simQualificationSlice = createSlice({
     },
     importQualificationAssignments(state, action) {
       const { scenarioId, assignments } = action.payload;
-      if (!state.qualificationAssignmentsByScenario[scenarioId]) state.qualificationAssignmentsByScenario[scenarioId] = {};
+      // Replace all assignments for this scenario
+      state.qualificationAssignmentsByScenario[scenarioId] = {};
       assignments.forEach(assignment => {
-        const dataItemId = assignment.dataItemId;
+        const dataItemId = String(assignment.dataItemId);
         if (!state.qualificationAssignmentsByScenario[scenarioId][dataItemId]) state.qualificationAssignmentsByScenario[scenarioId][dataItemId] = {};
         const id = assignment.id ? String(assignment.id) : `${assignment.qualification}-${Date.now()}`;
         state.qualificationAssignmentsByScenario[scenarioId][dataItemId][id] = { ...assignment, id };
       });
     },
+    addQualificationAssignment(state, action) {
+      const { scenarioId, dataItemId, assignment } = action.payload;
+      if (!state.qualificationAssignmentsByScenario[scenarioId]) state.qualificationAssignmentsByScenario[scenarioId] = {};
+      const itemId = String(dataItemId);
+      if (!state.qualificationAssignmentsByScenario[scenarioId][itemId]) state.qualificationAssignmentsByScenario[scenarioId][itemId] = {};
+      const id = assignment.id ? String(assignment.id) : `${assignment.qualification}-${Date.now()}`;
+      state.qualificationAssignmentsByScenario[scenarioId][itemId][id] = { ...assignment, id };
+    },
+    updateQualificationAssignment(state, action) {
+      const { scenarioId, dataItemId, assignmentId, updates } = action.payload;
+      const itemId = String(dataItemId);
+      const id = String(assignmentId);
+      if (!state.qualificationAssignmentsByScenario[scenarioId]) state.qualificationAssignmentsByScenario[scenarioId] = {};
+      if (!state.qualificationAssignmentsByScenario[scenarioId][itemId]) state.qualificationAssignmentsByScenario[scenarioId][itemId] = {};
+      if (!state.qualificationAssignmentsByScenario[scenarioId][itemId][id]) {
+        state.qualificationAssignmentsByScenario[scenarioId][itemId][id] = {
+          id,
+        };
+      }
+      state.qualificationAssignmentsByScenario[scenarioId][itemId][id] = {
+        ...state.qualificationAssignmentsByScenario[scenarioId][itemId][id],
+        ...updates
+      };
+    },
+    deleteQualificationAssignment(state, action) {
+      const { scenarioId, dataItemId, assignmentId } = action.payload;
+      const itemId = String(dataItemId);
+      const id = String(assignmentId);
+      if (state.qualificationAssignmentsByScenario[scenarioId]?.[itemId]) {
+        delete state.qualificationAssignmentsByScenario[scenarioId][itemId][id];
+      }
+    },
     deleteAllQualificationAssignmentsForItem(state, action) {
       const { scenarioId, itemId } = action.payload;
+      const id = String(itemId);
       if (state.qualificationAssignmentsByScenario[scenarioId]) {
-        delete state.qualificationAssignmentsByScenario[scenarioId][String(itemId)];
+        delete state.qualificationAssignmentsByScenario[scenarioId][id];
       }
     },
     deleteAllQualificationAssignmentsForScenario(state, action) {
@@ -60,6 +94,9 @@ const simQualificationSlice = createSlice({
 export const {
   importQualificationDefs,
   importQualificationAssignments,
+  addQualificationAssignment,
+  updateQualificationAssignment,
+  deleteQualificationAssignment,
   deleteAllQualificationAssignmentsForItem,
   deleteAllQualificationAssignmentsForScenario,
   addQualificationDef,

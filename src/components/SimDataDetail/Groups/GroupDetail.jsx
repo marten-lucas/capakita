@@ -88,6 +88,7 @@ function GroupDetail({ index, group }) {
     if (!group) return;
     dispatch(updateGroup({
       scenarioId: selectedScenarioId,
+      dataItemId: selectedItemId, // <-- add this!
       groupId: group.id,
       updates: updatedGroup
     }));

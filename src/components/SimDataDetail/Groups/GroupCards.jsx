@@ -44,6 +44,7 @@ function GroupCards() {
     };
     dispatch(addGroup({
       scenarioId: selectedScenarioId,
+      dataItemId: item.id, // <-- fix: pass dataItemId
       group: newGroup
     }));
   };
