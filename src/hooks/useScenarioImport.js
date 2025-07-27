@@ -74,9 +74,19 @@ export function useScenarioImport() {
           bookingsList: [] // We'll handle bookings below
         }));
 
-        // Now link bookings to correct dataItemId using bookingReference
+        // Import qualification defs and assignments
         const state = getState();
         const scenarioId = state.simScenario.selectedScenarioId;
+        dispatch({
+          type: 'simQualification/importQualificationDefs',
+          payload: { scenarioId, defs: qualiDefs }
+        });
+        dispatch({
+          type: 'simQualification/importQualificationAssignments',
+          payload: { scenarioId, assignments: qualiAssignments }
+        });
+
+        // Now link bookings to correct dataItemId using bookingReference
         const bookingsWithDataItemId = bookings.map(booking => {
           const ref = bookingReference.find(r => r.bookingKey === booking.id);
           if (!ref) return null;

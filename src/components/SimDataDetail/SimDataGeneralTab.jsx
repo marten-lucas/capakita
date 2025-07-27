@@ -5,6 +5,7 @@ import {
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ModMonitor from './ModMonitor';
+import QualificationPicker from './QualificationPicker';
 import { useSelector, useDispatch } from 'react-redux';
 
 function SimDataGeneralTab() {
@@ -15,19 +16,18 @@ function SimDataGeneralTab() {
   // Get the item directly by key
   const item = useSelector(state => state.simData.dataByScenario[selectedScenarioId]?.[selectedItemId]);
 
-  // Qualification definitions with consistent empty array
-  // const qualiDefs = useSelector(state => {
-  //   if (!selectedScenarioId) return EMPTY_QUALIFICATIONS;
-  //   return state.simQualification.qualificationDefsByScenario[selectedScenarioId] || EMPTY_QUALIFICATIONS;
-  // });
-
-  // Qualification assignment with consistent null return
-  // const qualificationAssignment = useSelector(state => {
-  //   if (!item?.id || item?.type !== 'capacity' || !selectedScenarioId) return null;
-  //   const assignments = state.simQualification.qualificationAssignmentsByScenario[selectedScenarioId];
-  //   if (!assignments) return null;
-  //   return assignments.find(a => a.dataItemId === item.id) || null;
-  // });
+  // Qualification definitions and assignment
+  const qualiDefs = useSelector(state =>
+    state.simQualification.qualificationDefsByScenario[selectedScenarioId] || []
+  );
+  const qualiAssignments = useSelector(state =>
+    state.simQualification.qualificationAssignmentsByScenario[selectedScenarioId] || []
+  );
+  const assignedQualification = React.useMemo(() => {
+    if (!item || item.type !== 'capacity') return '';
+    const assignment = qualiAssignments.find(a => String(a.dataItemId) === String(selectedItemId));
+    return assignment ? assignment.qualification : '';
+  }, [qualiAssignments, item, selectedItemId]);
 
   // Local state for controlled fields
   const [localName, setLocalName] = useState(item?.name ?? '');
@@ -65,6 +65,20 @@ function SimDataGeneralTab() {
   //   item?.type === 'capacity'
   //     ? (qualificationAssignment?.qualification ?? '')
   //     : (item?.qualification ?? '');
+
+  // Handler for qualification change
+  const handleQualificationChange = (newKey) => {
+    // Update assignment in store
+    dispatch({
+      type: 'simQualification/importQualificationAssignments',
+      payload: {
+        scenarioId: selectedScenarioId,
+        assignments: qualiAssignments
+          .filter(a => String(a.dataItemId) !== String(selectedItemId))
+          .concat([{ dataItemId: selectedItemId, qualification: newKey }])
+      }
+    });
+  };
 
   // Guard: If item is null, show a placeholder and return
   if (!item) {
@@ -317,6 +331,18 @@ function SimDataGeneralTab() {
           </Box>
         )}
       </Box>
+
+      {/* Qualification Picker for capacity items */}
+      {item.type === 'capacity' && qualiDefs.length > 0 && (
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="body2" sx={{ mb: 0.5 }}>Qualifikation</Typography>
+          <QualificationPicker
+            qualificationDefs={qualiDefs}
+            value={assignedQualification}
+            onChange={handleQualificationChange}
+          />
+        </Box>
+      )}
     </Box>
   );
 }

@@ -2,7 +2,7 @@ import React from 'react';
 import { List, ListItemButton, ListItemText, Divider, Box } from '@mui/material';
 import { useSelector, useDispatch } from 'react-redux';
 import { setSelectedItem } from '../../store/simScenarioSlice';
-import { selectDataItemsByScenario, deleteDataItemThunk } from '../../store/simDataSlice';
+import { deleteDataItemThunk } from '../../store/simDataSlice';
 import DeleteIcon from '@mui/icons-material/Delete';
 import IconButton from '@mui/material/IconButton';
 
@@ -11,10 +11,6 @@ function SimDataList() {
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
 
-  const dataSelector = React.useMemo(
-    () => (state) => selectDataItemsByScenario(state, selectedScenarioId),
-    [selectedScenarioId]
-  );
   const dataByScenario = useSelector(state => state.simData.dataByScenario[selectedScenarioId] || {});
   const data = Object.entries(dataByScenario).map(([key, item]) => ({ ...item, _key: key }));
 
