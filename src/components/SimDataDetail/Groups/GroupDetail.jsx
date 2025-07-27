@@ -4,7 +4,7 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper
 } from '@mui/material';
 import React, { useMemo, useEffect } from 'react';
-import { convertYYYYMMDDtoDDMMYYYY, convertDDMMYYYYtoYYYYMMDD } from '../../../utils/dateUtils';
+import { convertYYYYMMDDtoDDMMYYYY, convertDDMMYYYYtoYYYYMMDD, isValidDateString } from '../../../utils/dateUtils';
 import ModMonitor from '../ModMonitor';
 import { useSelector, useDispatch } from 'react-redux';
 import { selectDataItemsByScenario } from '../../../store/simDataSlice';
@@ -105,7 +105,8 @@ function GroupDetail({ index, group }) {
   };
 
   const handleDateChange = (field, value) => {
-    const updatedGroup = { ...group, [field]: convertYYYYMMDDtoDDMMYYYY(value) };
+    // value from date picker is always YYYY-MM-DD, store as such
+    const updatedGroup = { ...group, [field]: value };
     handleUpdateGroup(updatedGroup);
   };
 
@@ -189,6 +190,16 @@ function GroupDetail({ index, group }) {
     handleUpdateGroup(updatedGroup);
   };
 
+  // Helper to ensure date is valid for date picker
+  const getDatePickerValue = (dateStr) => {
+    if (!dateStr) return '';
+    // Accept YYYY-MM-DD only
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+    // Accept DD.MM.YYYY and convert
+    if (/^\d{2}\.\d{2}\.\d{4}$/.test(dateStr)) return convertDDMMYYYYtoYYYYMMDD(dateStr);
+    return '';
+  };
+
   if (!group) return null;
 
   return (
@@ -221,7 +232,7 @@ function GroupDetail({ index, group }) {
           type="date"
           size="small"
           InputLabelProps={{ shrink: true }}
-          value={convertDDMMYYYYtoYYYYMMDD(group.start)}
+          value={getDatePickerValue(group.start)}
           onChange={(e) => handleDateChange('start', e.target.value)}
         />
         <ModMonitor
@@ -239,7 +250,7 @@ function GroupDetail({ index, group }) {
           type="date"
           size="small"
           InputLabelProps={{ shrink: true }}
-          value={convertDDMMYYYYtoYYYYMMDD(group.end)}
+          value={getDatePickerValue(group.end)}
           onChange={(e) => handleDateChange('end', e.target.value)}
         />
         <ModMonitor

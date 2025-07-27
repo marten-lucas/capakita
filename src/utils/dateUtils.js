@@ -47,3 +47,8 @@ export function isFutureOrEmptyDate(dateString) {
   now.setHours(0, 0, 0, 0);
   return date >= now;
 }
+
+// Check if a string is a valid YYYY-MM-DD date
+export function isValidDateString(str) {
+  return typeof str === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(str);
+}

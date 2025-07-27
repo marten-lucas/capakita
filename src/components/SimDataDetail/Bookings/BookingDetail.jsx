@@ -2,7 +2,7 @@ import React from 'react';
 import {
   Typography, Box, Button, Divider, TextField, Switch, Slider,
 } from '@mui/material';
-import { convertYYYYMMDDtoDDMMYYYY, convertDDMMYYYYtoYYYYMMDD } from '../../../utils/dateUtils';
+import { convertYYYYMMDDtoDDMMYYYY, convertDDMMYYYYtoYYYYMMDD, isValidDateString } from '../../../utils/dateUtils';
 import { valueToTime } from '../../../utils/timeUtils';
 import ModMonitor from '../ModMonitor';
 import { useSelector, useDispatch } from 'react-redux';
@@ -140,9 +140,10 @@ function BookingDetail({ index }) {
   };
 
   const handleDateChange = (field, value) => {
+    // value from date picker is always YYYY-MM-DD, store as such
     const updatedBooking = {
       ...booking,
-      [field]: convertYYYYMMDDtoDDMMYYYY(value),
+      [field]: value,
     };
     handleUpdateBooking(updatedBooking);
   };
@@ -230,6 +231,14 @@ function BookingDetail({ index }) {
     });
   };
 
+  // Helper to ensure date is valid for date picker
+  const getDatePickerValue = (dateStr) => {
+    if (!dateStr) return '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+    if (/^\d{2}\.\d{2}\.\d{4}$/.test(dateStr)) return convertDDMMYYYYtoYYYYMMDD(dateStr);
+    return '';
+  };
+
   if (!booking) return null;
 
   return (
@@ -243,7 +252,7 @@ function BookingDetail({ index }) {
             type="date"
             size="small"
             InputLabelProps={{ shrink: true }}
-            value={convertDDMMYYYYtoYYYYMMDD(booking.startdate)}
+            value={getDatePickerValue(booking.startdate)}
             onChange={(e) => handleDateChange('startdate', e.target.value)}
           />
           <ModMonitor
@@ -261,7 +270,7 @@ function BookingDetail({ index }) {
             type="date"
             size="small"
             InputLabelProps={{ shrink: true }}
-            value={convertDDMMYYYYtoYYYYMMDD(booking.enddate)}
+            value={getDatePickerValue(booking.enddate)}
             onChange={(e) => handleDateChange('enddate', e.target.value)}
           />
           <ModMonitor

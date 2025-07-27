@@ -33,9 +33,9 @@ export function adebis2simData(kidsRaw, employeesRaw) {
       source: "adebis export",
       name: kind.FNAME || `Kind ${kind.KINDNR}`,
       remark: "",
-      startdate: convertDDMMYYYYtoYYYYMMDD(kind.AUFNDAT),
-      enddate: convertDDMMYYYYtoYYYYMMDD(kind.AUSTRDAT),
-      dateofbirth: convertDDMMYYYYtoYYYYMMDD(kind.GEBDATUM),
+      startdate: convertDDMMYYYYtoYYYYMMDD(kind.AUFNDAT) || '',
+      enddate: convertDDMMYYYYtoYYYYMMDD(kind.AUSTRDAT) || '',
+      dateofbirth: convertDDMMYYYYtoYYYYMMDD(kind.GEBDATUM) || '',
       groupId: kind.GRUNR ? String(kind.GRUNR) : "",
       rawdata: { ...kind },
       absences: [],
@@ -53,8 +53,8 @@ export function adebis2simData(kidsRaw, employeesRaw) {
       source: "adebis export",
       name: `Mitarbeiter ${emp.IDNR}`,
       remark: "",
-      startdate: convertDDMMYYYYtoYYYYMMDD(emp.BEGINNDAT),
-      enddate: convertDDMMYYYYtoYYYYMMDD(emp.ENDDAT),
+      startdate: convertDDMMYYYYtoYYYYMMDD(emp.BEGINNDAT) || '',
+      enddate: convertDDMMYYYYtoYYYYMMDD(emp.ENDDAT) || '',
       dateofbirth: "",
       groupId: "",
       rawdata: { ...emp },
@@ -89,8 +89,8 @@ function belegung2Booking(belegungRaw) {
     const bookingId = createId('booking');
     bookings.push({
       id: bookingId,
-      startdate: convertDDMMYYYYtoYYYYMMDD(b.BELVON),
-      enddate: convertDDMMYYYYtoYYYYMMDD(b.BELBIS),
+      startdate: convertDDMMYYYYtoYYYYMMDD(b.BELVON) || '',
+      enddate: convertDDMMYYYYtoYYYYMMDD(b.BELBIS) || '',
       times: Zeiten2Booking(b.ZEITEN, bookingId),
       rawdata: { ...b },
       overlays: {},
@@ -113,8 +113,8 @@ function anstell2Booking(employeesRaw) {
     const bookingId = createId('booking');
     bookings.push({
       id: bookingId,
-      startdate: convertDDMMYYYYtoYYYYMMDD(e.BEGINNDAT),
-      enddate: convertDDMMYYYYtoYYYYMMDD(e.ENDDAT),
+      startdate: convertDDMMYYYYtoYYYYMMDD(e.BEGINNDAT) || '',
+      enddate: convertDDMMYYYYtoYYYYMMDD(e.ENDDAT) || '',
       times: Zeiten2Booking(e.ZEITEN, bookingId),
       rawdata: { ...e },
       overlays: {},
@@ -233,8 +233,8 @@ export function adebis2GroupAssignments(grukiRaw) {
     const assignmentKey = `${g.KINDNR}-${g.GRUNR}-${g.GKVON}-${g.GKBIS}`;
     groupAssignments.push({
       groupId: String(g.GRUNR),
-      start: convertDDMMYYYYtoYYYYMMDD(g.GKVON),
-      end: convertDDMMYYYYtoYYYYMMDD(g.GKBIS),
+      start: convertDDMMYYYYtoYYYYMMDD(g.GKVON) || '',
+      end: convertDDMMYYYYtoYYYYMMDD(g.GKBIS) || '',
       rawdata: { ...g }
     });
     groupAssignmentReference.push({
