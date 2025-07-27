@@ -2,7 +2,7 @@ import React from 'react';
 import {
   Typography, Box, Button, Divider, TextField, Switch, Slider,
 } from '@mui/material';
-import { convertYYYYMMDDtoDDMMYYYY, convertDDMMYYYYtoYYYYMMDD, isValidDateString } from '../../../utils/dateUtils';
+import { convertDDMMYYYYtoYYYYMMDD } from '../../../utils/dateUtils';
 import { valueToTime } from '../../../utils/timeUtils';
 import ModMonitor from '../ModMonitor';
 import { useSelector, useDispatch } from 'react-redux';

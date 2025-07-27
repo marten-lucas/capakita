@@ -3,7 +3,6 @@ import { Typography, Box } from '@mui/material';
 import ModMonitor from '../ModMonitor';
 import GroupCards from './GroupCards';
 import { useSelector } from 'react-redux';
-import { selectDataItemsByScenario } from '../../../store/simDataSlice';
 
 function SimDataGroupsTab() {
   // Get scenario and item selection

@@ -79,10 +79,6 @@ const simScenarioSlice = createSlice({
 // Thunk for importing a scenario and all related data
 export const importScenario = ({
   scenarioSettings,
-  groupDefs,
-  qualiDefs,
-  groupAssignments,
-  qualiAssignments,
   simDataList,
   bookingsList
 }) => async (dispatch, getState) => {
@@ -128,7 +124,7 @@ export const importScenario = ({
 };
 
 // Thunk: delete a scenario and all related data
-export const deleteScenario = (scenarioId) => (dispatch, getState) => {
+export const deleteScenario = (scenarioId) => (dispatch) => {
   dispatch(simScenarioSlice.actions.deleteScenario(scenarioId));
   dispatch({ type: 'simData/deleteAllDataForScenario', payload: { scenarioId } });
 };

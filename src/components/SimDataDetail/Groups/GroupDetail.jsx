@@ -4,10 +4,9 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper
 } from '@mui/material';
 import React, { useMemo, useEffect } from 'react';
-import { convertYYYYMMDDtoDDMMYYYY, convertDDMMYYYYtoYYYYMMDD, isValidDateString } from '../../../utils/dateUtils';
+import { convertDDMMYYYYtoYYYYMMDD } from '../../../utils/dateUtils';
 import ModMonitor from '../ModMonitor';
 import { useSelector, useDispatch } from 'react-redux';
-import { selectDataItemsByScenario } from '../../../store/simDataSlice';
 import { createSelector } from '@reduxjs/toolkit';
 import { getBookings } from '../../../store/simBookingSlice';
 import { updateGroup, deleteGroup } from '../../../store/simGroupSlice';
@@ -18,12 +17,7 @@ function GroupDetail({ index, group }) {
   const dispatch = useDispatch();
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
-  const dataItemsSelector = React.useMemo(
-    () => (state) => selectDataItemsByScenario(state, selectedScenarioId),
-    [selectedScenarioId]
-  );
-  const dataItems = useSelector(dataItemsSelector);
-  const item = dataItems?.find(i => i.id === selectedItemId);
+ 
 
   // Use bookings from simBookingSlice only
   const bookings = useSelector(state => getBookings(state, selectedScenarioId, selectedItemId));

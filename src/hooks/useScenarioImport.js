@@ -8,7 +8,8 @@ import {
   adebis2GroupDefs,
   adebis2QualiDefs,
   adebis2GroupAssignments,
-  adebis2QualiAssignments } from '../utils/adebis-parser';
+  adebis2QualiAssignments
+} from '../utils/adebis-parser';
 import { getItemByAdebisID } from '../store/simDataSlice';
 
 // Minimal scenario import hook using the new adebis-import
@@ -46,7 +47,6 @@ export function useScenarioImport() {
       const groupDefs = adebis2GroupDefs(groupsRaw);
       const qualiDefs = adebis2QualiDefs(employeesRaw);
       const { groupAssignments } = adebis2GroupAssignments(grukiRaw);
-      const { qualiAssignments } = adebis2QualiAssignments(employeesRaw);
 
       // Scenario settings
       const scenarioName = isAnonymized ? 'Importiertes Szenario (anonymisiert)' : 'Importiertes Szenario';
@@ -110,16 +110,7 @@ export function useScenarioImport() {
         });
 
         // Create qualification assignments for all imported capacity items
-        const qualiAssignmentsFinal = [];
-        Object.entries(dataByScenario).forEach(([storeKey, item]) => {
-          if (item.type === 'capacity' && item.rawdata && item.rawdata.QUALIFIK) {
-            qualiAssignmentsFinal.push({
-              dataItemId: storeKey,
-              qualification: item.rawdata.QUALIFIK,
-              id: `${item.rawdata.QUALIFIK}-${Date.now()}-${Math.random()}`
-            });
-          }
-        });
+        const qualiAssignmentsFinal = adebis2QualiAssignments(dataByScenario);
 
         dispatch({
           type: 'simQualification/importQualificationDefs',

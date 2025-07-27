@@ -245,30 +245,23 @@ export function adebis2GroupAssignments(grukiRaw) {
   return { groupAssignments, groupAssignmentReference };
 }
 
+
+
 /**
- * Converts Adebis employeesRaw to qualification assignments, with rawdata and reference.
- * Returns both assignments and assignmentReference for mapping.
- * @param {Array} employeesRaw - Array of employee objects with at least QUALIFIK and IDNR.
- * @returns {Object} { qualiAssignments, qualiAssignmentReference }
+ * Generates qualification assignments for all capacity items in dataByScenario.
+ * @param {Object} dataByScenario - The scenario data keyed by storeKey.
+ * @returns {Array} qualiAssignmentsFinal - Array of qualification assignment objects.
  */
-export function adebis2QualiAssignments(employeesRaw, employeeIdMap = {}) {
-  const qualiAssignments = [];
-  const qualiAssignmentReference = [];
-  (employeesRaw || [])
-    .filter(e => e.QUALIFIK && e.IDNR)
-    .forEach(e => {
-      const assignmentKey = `${e.IDNR}-${e.QUALIFIK}`;
-      const assignment = {
-        qualification: e.QUALIFIK,
-        dataItemId: employeeIdMap[String(e.IDNR)] || String(e.IDNR),
-        rawdata: { QUALIFIK: e.QUALIFIK }
-      };
-      assignment.originalData = { ...assignment };
-      qualiAssignments.push(assignment);
-      qualiAssignmentReference.push({
-        assignmentKey,
-        adebisId: { id: String(e.IDNR), source: "anstell" }
+export function adebis2QualiAssignments(dataByScenario) {
+  const qualiAssignmentsFinal = [];
+  Object.entries(dataByScenario).forEach(([storeKey, item]) => {
+    if (item.type === 'capacity' && item.rawdata && item.rawdata.QUALIFIK) {
+      qualiAssignmentsFinal.push({
+        dataItemId: storeKey,
+        qualification: item.rawdata.QUALIFIK,
+        id: `${item.rawdata.QUALIFIK}-${Date.now()}-${Math.random()}`
       });
-    });
-  return { qualiAssignments, qualiAssignmentReference };
+    }
+  });
+  return qualiAssignmentsFinal;
 }

@@ -6,7 +6,6 @@ import AddIcon from '@mui/icons-material/Add';
 import React from 'react';
 import GroupDetail from './GroupDetail';
 import { useSelector, useDispatch } from 'react-redux';
-import { selectDataItemsByScenario } from '../../../store/simDataSlice';
 import { addGroup } from '../../../store/simGroupSlice';
 
 function GroupCards() {
@@ -14,12 +13,7 @@ function GroupCards() {
   const dispatch = useDispatch();
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
-  const dataItemsSelector = React.useMemo(
-    () => (state) => selectDataItemsByScenario(state, selectedScenarioId),
-    [selectedScenarioId]
-  );
-  const dataItems = useSelector(dataItemsSelector);
-  const item = dataItems?.find(i => i.id === selectedItemId);
+  
 
   // Read groups directly from the simGroup store using memoized selector
   const groups = useSelector(state => {
