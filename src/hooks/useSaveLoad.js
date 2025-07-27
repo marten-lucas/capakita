@@ -130,7 +130,7 @@ export function useSaveLoad() {
 
         // Load selected items
         if (data.selectedItems) {
-          Object.entries(data.selectedItems).forEach(([scenarioId, itemId]) => {
+          Object.entries(data.selectedItems).forEach(([, itemId]) => {
             dispatch(setSelectedItem(itemId));
           });
         } else {
@@ -138,13 +138,13 @@ export function useSaveLoad() {
         }
 
         return { success: true };
-      } catch (decryptError) {
+      } catch {
         return {
           success: false,
           error: 'Falsches Passwort oder beschädigte Datei.'
         };
       }
-    } catch (error) {
+    } catch {
       return {
         success: false,
         error: 'Fehler beim Laden der Datei.'
