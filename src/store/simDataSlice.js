@@ -130,11 +130,15 @@ export const selectDataItemsByScenario = createSelector(
 // Create a consistent empty array reference to avoid creating new arrays
 const EMPTY_ARRAY = [];
 
-export const selectDataItemsByScenarioMemoized = (scenarioId) => createSelector(
-  [state => state.simData.dataByScenario[scenarioId]],
-  (scenarioData) => {
-    if (!scenarioData) return EMPTY_ARRAY;
-    return Object.values(scenarioData);
+// Memoized selector for data items by scenario
+export const selectDataItemsByScenarioMemoized = createSelector(
+  [
+    state => state.simScenario.selectedScenarioId,
+    state => state.simData.dataByScenario
+  ],
+  (selectedScenarioId, dataByScenario) => {
+    if (!selectedScenarioId || !dataByScenario[selectedScenarioId]) return EMPTY_ARRAY;
+    return Object.values(dataByScenario[selectedScenarioId]);
   }
 );
 

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { List, ListItemButton, ListItemText, Divider, Box } from '@mui/material';
 import { useSelector, useDispatch } from 'react-redux';
 import { setSelectedItem } from '../../store/simScenarioSlice';
@@ -6,13 +6,23 @@ import { deleteDataItemThunk } from '../../store/simDataSlice';
 import DeleteIcon from '@mui/icons-material/Delete';
 import IconButton from '@mui/material/IconButton';
 
+// Use a constant for empty object to avoid new reference on each render
+const EMPTY_OBJECT = {};
+
 function SimDataList() {
   const dispatch = useDispatch();
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
 
-  const dataByScenario = useSelector(state => state.simData.dataByScenario[selectedScenarioId] || {});
-  const data = Object.entries(dataByScenario).map(([key, item]) => ({ ...item, _key: key }));
+  // Fix: always return same reference for empty object
+  const dataByScenario = useSelector(
+    state => state.simData.dataByScenario[selectedScenarioId] || EMPTY_OBJECT
+  );
+
+  const data = useMemo(
+    () => Object.entries(dataByScenario).map(([key, item]) => ({ ...item, _key: key })),
+    [dataByScenario]
+  );
 
   // Define colors for demand/capacity
   const DEMAND_COLOR = '#c0d9f3ff';   // blue for children

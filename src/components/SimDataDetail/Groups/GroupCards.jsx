@@ -6,7 +6,27 @@ import AddIcon from '@mui/icons-material/Add';
 import React from 'react';
 import GroupDetail from './GroupDetail';
 import { useSelector, useDispatch } from 'react-redux';
+import { createSelector } from '@reduxjs/toolkit';
 import { addGroup } from '../../../store/simGroupSlice';
+
+const EMPTY_ARRAY = [];
+
+// Memoized selector to prevent unnecessary re-renders
+const selectGroups = createSelector(
+  [
+    (state) => state.simGroup.groupsByScenario,
+    (state, selectedScenarioId) => selectedScenarioId,
+    (state, selectedScenarioId, selectedItemId) => selectedItemId
+  ],
+  (groupsByScenario, selectedScenarioId, selectedItemId) => {
+    if (!selectedScenarioId || !selectedItemId) return EMPTY_ARRAY;
+    const scenarioGroups = groupsByScenario[selectedScenarioId];
+    if (!scenarioGroups) return EMPTY_ARRAY;
+    const itemGroupsObj = scenarioGroups[selectedItemId];
+    if (!itemGroupsObj) return EMPTY_ARRAY;
+    return Object.values(itemGroupsObj);
+  }
+);
 
 function GroupCards() {
   // Get scenario and item selection
@@ -14,14 +34,10 @@ function GroupCards() {
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
   
-
-  // Read groups directly from the simGroup store using memoized selector
-  const groups = useSelector(state => {
-    if (!selectedScenarioId || !selectedItemId) return [];
-    const scenarioGroups = state.simGroup.groupsByScenario[selectedScenarioId] || {};
-    const itemGroupsObj = scenarioGroups[selectedItemId] || {};
-    return Object.values(itemGroupsObj);
-  });
+  // Use memoized selector for groups
+  const groups = useSelector(state => 
+    selectGroups(state, selectedScenarioId, selectedItemId)
+  );
 
   // Add group logic
   const handleAddGroup = () => {

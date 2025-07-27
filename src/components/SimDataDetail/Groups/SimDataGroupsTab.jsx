@@ -4,18 +4,17 @@ import ModMonitor from '../ModMonitor';
 import GroupCards from './GroupCards';
 import { useSelector } from 'react-redux';
 
+const EMPTY_ARRAY = [];
+
 function SimDataGroupsTab() {
   // Get scenario and item selection
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
   
   // Get groups from simGroup store instead of item.groups
-  const groups = useSelector(state => {
-    if (!selectedScenarioId || !selectedItemId) return [];
-    const scenarioGroups = state.simGroup.groupsByScenario[selectedScenarioId] || {};
-    const itemGroupsObj = scenarioGroups[selectedItemId] || {};
-    return Object.values(itemGroupsObj);
-  });
+  const groups = useSelector(
+    state => state.simGroup.groupsByScenario[selectedScenarioId] || EMPTY_ARRAY
+  );
 
   if (!selectedItemId) return null;
 
