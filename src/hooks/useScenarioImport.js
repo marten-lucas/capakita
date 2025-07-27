@@ -44,7 +44,7 @@ export function useScenarioImport() {
       const { bookings, bookingReference } = adebis2bookings(belegungRaw, employeesRaw);
       const groupDefs = adebis2GroupDefs(groupsRaw);
       const qualiDefs = adebis2QualiDefs(employeesRaw);
-      const groupAssignments = adebis2GroupAssignments(grukiRaw);
+      const groupAssignmentsRaw = adebis2GroupAssignments(grukiRaw);
 
       // Scenario settings
       const scenarioName = isAnonymized ? 'Importiertes Szenario (anonymisiert)' : 'Importiertes Szenario';
@@ -62,10 +62,10 @@ export function useScenarioImport() {
       await dispatch(async (dispatch, getState) => {
         await dispatch(importScenario({
           scenarioSettings,
-          groupDefs,
+          groupDefs: [], // don't import groupDefs here
           qualiDefs,
-          groupAssignments,
-          qualiAssignments: [], // don't import assignments yet
+          groupAssignments: [], // don't import assignments yet
+          qualiAssignments: [],
           simDataList,
           bookingsList: []
         }));
@@ -74,12 +74,37 @@ export function useScenarioImport() {
         const scenarioId = state.simScenario.selectedScenarioId;
         const dataByScenario = state.simData.dataByScenario[scenarioId];
 
-        // Build a fresh mapping from external employee IDNR to store key after import
+        // Build mapping from KINDNR to store key for demand items
+        const kindKeyMap = {};
+        Object.entries(dataByScenario).forEach(([storeKey, item]) => {
+          if (item.type === 'demand' && item.rawdata && item.rawdata.KINDNR) {
+            kindKeyMap[String(item.rawdata.KINDNR)] = storeKey;
+          }
+        });
+
+        // Build mapping from IDNR to store key for employee items
         const finalEmployeeKeyMap = {};
         Object.entries(dataByScenario).forEach(([storeKey, item]) => {
-          if (item.type === 'capacity' && item.rawdata && item.rawdata.IDNR) {
+          if (item.type === 'employee' && item.rawdata && item.rawdata.IDNR) {
             finalEmployeeKeyMap[String(item.rawdata.IDNR)] = storeKey;
           }
+        });
+
+        // Remap groupAssignments to use store keys
+        const groupAssignmentsFinal = (groupAssignmentsRaw || [])
+          .map(a => ({
+            ...a,
+            kindId: kindKeyMap[String(a.kindId)],
+          }))
+          .filter(a => !!a.kindId);
+
+        dispatch({
+          type: 'simGroup/importGroupDefs',
+          payload: { scenarioId, defs: groupDefs }
+        });
+        dispatch({
+          type: 'simGroup/importGroupAssignments',
+          payload: { scenarioId, assignments: groupAssignmentsFinal }
         });
 
         // Rebuild qualiAssignments using the final mapping
