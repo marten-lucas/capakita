@@ -4,7 +4,6 @@ import { getItemByAdebisID } from './simDataSlice';
 const initialState = {
   scenarios: [],
   selectedScenarioId: null,
-  lastImportAnonymized: true,
   selectedItems: {},
   scenarioSaveDialogOpen: false,
   scenarioSaveDialogPending: null, 
@@ -17,9 +16,6 @@ const simScenarioSlice = createSlice({
     setSelectedScenarioId(state, action) {
       state.selectedScenarioId = String(action.payload);
     },
-    setLastImportAnonymized(state, action) {
-      state.lastImportAnonymized = action.payload;
-    },
     setSelectedItem(state, action) {
       const scenarioId = state.selectedScenarioId;
       if (!scenarioId) return;
@@ -28,6 +24,7 @@ const simScenarioSlice = createSlice({
     addScenario(state, action) {
       // Assign a unique id if not present
       const now = Date.now().toString();
+      // Use all properties from payload, fallback to defaults if missing
       const scenario = {
         name: action.payload.name || 'Neues Szenario',
         remark: action.payload.remark ?? '',
@@ -36,6 +33,9 @@ const simScenarioSlice = createSlice({
         desirability: action.payload.desirability ?? 50,
         baseScenarioId: action.payload.baseScenarioId ?? null,
         id: action.payload.id ? String(action.payload.id) : now,
+        imported: action.payload.imported ?? false, // ensure default for manual add
+        importedAnonymized: action.payload.importedAnonymized ?? false, // ensure default for manual add
+        ...action.payload // <-- merge all other properties from payload
       };
       state.scenarios.push(scenario);
       state.selectedScenarioId = scenario.id; 
@@ -75,6 +75,14 @@ const simScenarioSlice = createSlice({
     },
   },
 });
+
+// Selector: isSaveAllowed = false if any scenario is imported and not anonymized
+export const isSaveAllowed = (state) => {
+  // False if any scenario is imported and not anonymized
+  return !state.simScenario.scenarios.some(
+    s => s.imported === true && s.importedAnonymized === false
+  );
+};
 
 // Thunk for importing a scenario and all related data
 export const importScenario = ({
@@ -131,7 +139,6 @@ export const deleteScenario = (scenarioId) => (dispatch) => {
 
 export const {
   setSelectedScenarioId,
-  setLastImportAnonymized,
   setSelectedItem,
   setScenarioSaveDialogOpen,
   setScenarioSaveDialogPending,
@@ -141,5 +148,6 @@ export const {
 } = simScenarioSlice.actions;
 
 export default simScenarioSlice.reducer;
+
 
 

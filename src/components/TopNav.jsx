@@ -7,7 +7,7 @@ import Container from '@mui/material/Container'
 import Button from '@mui/material/Button'
 import { NavLink } from 'react-router-dom'
 import { useSelector, useDispatch } from 'react-redux';
-import { setScenarioSaveDialogOpen, setScenarioSaveDialogPending } from '../store/simScenarioSlice';
+import { setScenarioSaveDialogOpen, setScenarioSaveDialogPending, isSaveAllowed } from '../store/simScenarioSlice';
 import StorageIcon from '@mui/icons-material/Storage'
 import BarChartIcon from '@mui/icons-material/BarChart'
 import SettingsIcon from '@mui/icons-material/Settings'
@@ -26,7 +26,8 @@ const pages = [
 
 function TopNav() {
   const dispatch = useDispatch();
-  const isSaveAllowed = useSelector(state => state.simScenario.isSaveAllowed);
+  // Use selector function for isSaveAllowed
+  const isSaveAllowedValue = useSelector(isSaveAllowed);
   const scenarios = useSelector(state => state.simScenario.scenarios);
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
 
@@ -155,7 +156,7 @@ function TopNav() {
             >
               <MenuItem
                 onClick={handleSaveClick}
-                disabled={!isSaveAllowed}
+                disabled={!isSaveAllowedValue}
               >
                 💾 Szenarien speichern
               </MenuItem>

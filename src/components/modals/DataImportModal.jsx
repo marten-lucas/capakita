@@ -9,8 +9,6 @@ import {
   Stack,
 } from '@mui/material';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
-import { useDispatch } from 'react-redux';
-import { setLastImportAnonymized } from '../../store/simScenarioSlice';
 
 const modalStyle = {
   position: 'absolute',
@@ -27,7 +25,6 @@ const modalStyle = {
 function DatenImportModal({ open, onClose, onImport }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [isAnonymized, setIsAnonymized] = useState(true);
-  const dispatch = useDispatch();
 
   useEffect(() => {
     if (open) {
@@ -54,7 +51,6 @@ function DatenImportModal({ open, onClose, onImport }) {
 
   const handleImportClick = () => {
     if (selectedFile) {
-      dispatch(setLastImportAnonymized(isAnonymized)); // Track checkbox state
       onImport({ file: selectedFile, isAnonymized });
       // Do not call handleInternalClose here, let parent close after import
     }
