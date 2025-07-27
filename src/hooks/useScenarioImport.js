@@ -42,12 +42,12 @@ export function useScenarioImport() {
         groupsRaw = groupsRaw.filter(grp => allowedGroupIds.has(String(grp.GRUNR)));
       }
 
-      const { simDataList } = adebis2simData(kidsRaw, employeesRaw);
+      const { simDataList, employeeIdMap } = adebis2simData(kidsRaw, employeesRaw);
       const { bookings, bookingReference } = adebis2bookings(belegungRaw, employeesRaw);
       const groupDefs = adebis2GroupDefs(groupsRaw);
       const qualiDefs = adebis2QualiDefs(employeesRaw);
       const groupAssignments = adebis2GroupAssignments(grukiRaw);
-      const qualiAssignments = adebis2QualiAssignments(employeesRaw);
+      const qualiAssignments = adebis2QualiAssignments(employeesRaw, employeeIdMap);
 
       // Scenario settings
       const scenarioName = isAnonymized ? 'Importiertes Szenario (anonymisiert)' : 'Importiertes Szenario';
@@ -63,27 +63,45 @@ export function useScenarioImport() {
 
       // Dispatch the importScenario thunk/action
       await dispatch(async (dispatch, getState) => {
-        // Add scenario and simData first
         await dispatch(importScenario({
           scenarioSettings,
           groupDefs,
           qualiDefs,
           groupAssignments,
-          qualiAssignments,
+          qualiAssignments: [], // don't import assignments yet
           simDataList,
-          bookingsList: [] // We'll handle bookings below
+          bookingsList: []
         }));
 
-        // Import qualification defs and assignments
         const state = getState();
         const scenarioId = state.simScenario.selectedScenarioId;
+        const dataByScenario = state.simData.dataByScenario[scenarioId];
+
+        // Build a fresh mapping from external employee IDNR to store key after import
+        const finalEmployeeKeyMap = {};
+        Object.entries(dataByScenario).forEach(([storeKey, item]) => {
+          if (item.type === 'capacity' && item.rawdata && item.rawdata.IDNR) {
+            finalEmployeeKeyMap[String(item.rawdata.IDNR)] = storeKey;
+          }
+        });
+
+        // Rebuild qualiAssignments using the final mapping
+        const qualiAssignmentsFinal = (employeesRaw || [])
+          .filter(e => e.QUALIFIK && e.IDNR)
+          .map(e => ({
+            qualification: e.QUALIFIK,
+            dataItemId: finalEmployeeKeyMap[String(e.IDNR)],
+            rawdata: { QUALIFIK: e.QUALIFIK }
+          }))
+          .filter(a => !!a.dataItemId);
+
         dispatch({
           type: 'simQualification/importQualificationDefs',
           payload: { scenarioId, defs: qualiDefs }
         });
         dispatch({
           type: 'simQualification/importQualificationAssignments',
-          payload: { scenarioId, assignments: qualiAssignments }
+          payload: { scenarioId, assignments: qualiAssignmentsFinal }
         });
 
         // Now link bookings to correct dataItemId using bookingReference
