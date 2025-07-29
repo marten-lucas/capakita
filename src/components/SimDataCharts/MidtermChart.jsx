@@ -3,11 +3,10 @@ import HighchartsReact from 'highcharts-react-official';
 import Highcharts from 'highcharts';
 import { useSelector, useDispatch } from 'react-redux';
 import {
-  setMidtermTimeDimension,
-  setMidtermSelectedGroups,
-  setMidtermSelectedQualifications,
-  updateAvailableGroups,
-  updateAvailableQualifications
+  setTimedimension,
+  setFilterGroups,
+  setFilterQualifications,
+  ensureScenario
 } from '../../store/chartSlice';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
@@ -17,32 +16,31 @@ import Checkbox from '@mui/material/Checkbox';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 
-export default function MidtermChart({ hideFilters = false, scenario }) {
+// Accept scenarioId as prop or derive from scenario
+export default function MidtermChart({ hideFilters = false, scenario, scenarioId: propScenarioId }) {
   const dispatch = useDispatch();
+
+  // Determine scenarioId
+  const scenarioId = propScenarioId || scenario?.id || useSelector(state => state.simScenario.selectedScenarioId);
 
   // Always use the scenario prop's simulation data for charting
   const simulationData = useMemo(() => {
     if (scenario) {
-      // If you have a selector for effective simulation data, use it here
       return scenario.simulationData ?? [];
     }
     return [];
   }, [scenario]);
 
   // Use qualifications from qualification slice
-  const scenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const qualifications = useSelector(state => state.simQualification.qualificationDefsByScenario[scenarioId] || []);
   const groupDefs = useSelector(state => state.simGroup.groupDefsByScenario[scenarioId] || []);
   const qualiDefs = qualifications;
 
-  // Chart store
-  const midtermTimeDimension = useSelector(state => state.chart.midtermTimeDimension);
-  const midtermSelectedGroups = useSelector(state => state.chart.midtermSelectedGroups);
-  const midtermSelectedQualifications = useSelector(state => state.chart.midtermSelectedQualifications);
-
-  // If you have a selector for calculateMidtermChartData, use it here. Otherwise, pass as prop or import.
-  // For now, assume it's a prop or utility function.
-  // const calculateMidtermChartData = ...existing code...
+  // Chart state (per scenario)
+  const chartState = useSelector(state => state.chart[scenarioId] || {});
+  const midtermTimeDimension = chartState.timedimension || 'month';
+  const midtermSelectedGroups = chartState.filter?.Groups || [];
+  const midtermSelectedQualifications = chartState.filter?.Qualifications || [];
 
   const hasNoGroup = useMemo(() => (
     simulationData.some(item =>
@@ -51,43 +49,32 @@ export default function MidtermChart({ hideFilters = false, scenario }) {
     )
   ), [simulationData]);
 
-  // Compute allGroupNames and allQualificationNames without dispatch
   const allGroupNames = useMemo(() => {
     return hasNoGroup ? [...groupDefs.map(g => g.id), '0'] : groupDefs.map(g => g.id);
   }, [groupDefs, hasNoGroup]);
 
-  const qualificationKeys = useMemo(() => {
-    return qualiDefs.map(q => q.key);
-  }, [qualiDefs]);
+  const qualificationKeys = useMemo(() => qualiDefs.map(q => q.key), [qualiDefs]);
+  const allQualificationNames = useMemo(() => qualificationKeys, [qualificationKeys]);
 
-  const allQualificationNames = useMemo(() => {
-    return qualificationKeys;
-  }, [qualificationKeys]);
-
-  // Move dispatches to useEffect so they don't run during render
+  // Ensure scenario chart state exists
   useEffect(() => {
-    dispatch(updateAvailableGroups(allGroupNames));
-  }, [allGroupNames, dispatch]);
-
-  useEffect(() => {
-    dispatch(updateAvailableQualifications(qualificationKeys));
-  }, [qualificationKeys, dispatch]);
+    if (scenarioId) dispatch(ensureScenario(scenarioId));
+  }, [dispatch, scenarioId]);
 
   // Initialize selections if empty
   useEffect(() => {
     if (midtermSelectedGroups.length === 0 && allGroupNames.length > 0) {
-      dispatch(setMidtermSelectedGroups(allGroupNames));
+      dispatch(setFilterGroups({ scenarioId, groups: allGroupNames }));
     }
-  }, [allGroupNames, midtermSelectedGroups.length, dispatch]);
+  }, [allGroupNames, midtermSelectedGroups.length, dispatch, scenarioId]);
 
   useEffect(() => {
     if (midtermSelectedQualifications.length === 0 && allQualificationNames.length > 0) {
-      dispatch(setMidtermSelectedQualifications(allQualificationNames));
+      dispatch(setFilterQualifications({ scenarioId, qualifications: allQualificationNames }));
     }
-  }, [allQualificationNames, midtermSelectedQualifications.length, dispatch]);
+  }, [allQualificationNames, midtermSelectedQualifications.length, dispatch, scenarioId]);
 
   // Stable reference for chart data calculation
-  // Replace with your selector or utility function
   const getChartData = useCallback((midtermTimeDimension, midtermSelectedGroups, midtermSelectedQualifications) => {
     // ...existing code...
     // calculateMidtermChartData(simulationData, midtermTimeDimension, midtermSelectedGroups, midtermSelectedQualifications)
@@ -239,14 +226,14 @@ export default function MidtermChart({ hideFilters = false, scenario }) {
               exclusive
               onChange={(e, newDimension) => {
                 if (newDimension !== null) {
-                  dispatch(setMidtermTimeDimension(newDimension));
+                  dispatch(setTimedimension({ scenarioId, timedimension: newDimension }));
                 }
               }}
               size="small"
             >
-              <ToggleButton value="Wochen">Wochen</ToggleButton>
-              <ToggleButton value="Monate">Monate</ToggleButton>
-              <ToggleButton value="Jahre">Jahre</ToggleButton>
+              <ToggleButton value="week">Wochen</ToggleButton>
+              <ToggleButton value="month">Monate</ToggleButton>
+              <ToggleButton value="year">Jahre</ToggleButton>
             </ToggleButtonGroup>
           </Box>
           
@@ -267,7 +254,7 @@ export default function MidtermChart({ hideFilters = false, scenario }) {
                           const newGroups = midtermSelectedGroups.includes(groupId)
                             ? midtermSelectedGroups.filter(g => g !== groupId)
                             : [...midtermSelectedGroups, groupId];
-                          dispatch(setMidtermSelectedGroups(newGroups));
+                          dispatch(setFilterGroups({ scenarioId, groups: newGroups }));
                         }}
                       />
                     }
@@ -294,7 +281,7 @@ export default function MidtermChart({ hideFilters = false, scenario }) {
                           const newQualifications = midtermSelectedQualifications.includes(qualification)
                             ? midtermSelectedQualifications.filter(q => q !== qualification)
                             : [...midtermSelectedQualifications, qualification];
-                          dispatch(setMidtermSelectedQualifications(newQualifications));
+                          dispatch(setFilterQualifications({ scenarioId, qualifications: newQualifications }));
                         }}
                       />
                     }
@@ -311,9 +298,7 @@ export default function MidtermChart({ hideFilters = false, scenario }) {
       <Box sx={{ flex: 1, minHeight: 0 }}>
         <HighchartsReact highcharts={Highcharts} options={midtermOptions} />
       </Box>
-
-     
     </Box>
   );
 }
-                       
+      

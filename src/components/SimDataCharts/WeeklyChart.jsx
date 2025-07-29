@@ -5,15 +5,17 @@ import { useSelector } from 'react-redux';
 import Box from '@mui/material/Box';
 
 
-export default function WeeklyChart({ scenario }) {
-  const chartSelectedScenarioId = useSelector(state => state.chart.weeklySelectedScenarioId);
+export default function WeeklyChart({ scenario, scenarioId: propScenarioId }) {
+  // Determine scenarioId
+  const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
+  const scenarioId = propScenarioId || scenario?.id || selectedScenarioId;
   const scenarios = useSelector(state => state.simScenario.scenarios);
 
   // Get effective simulationData for selected scenario (overlay-aware)
   const simulationData = useMemo(() => {
     let scenarioToUse = scenario;
     if (!scenarioToUse) {
-      scenarioToUse = scenarios.find(s => s.id === chartSelectedScenarioId);
+      scenarioToUse = scenarios.find(s => s.id === scenarioId);
     }
     if (!scenarioToUse) return [];
     if (!scenarioToUse.baseScenarioId) {
@@ -22,13 +24,14 @@ export default function WeeklyChart({ scenario }) {
     // If you have a selector or utility for overlay data, use it here
     // return computeOverlayData(scenarioToUse);
     return scenarioToUse.simulationData ?? [];
-  }, [scenario, scenarios, chartSelectedScenarioId]);
+  }, [scenario, scenarios, scenarioId]);
 
-  // Get current filters from chartSlice
-  const stichtag = useSelector(state => state.chart.stichtag);
-  const selectedGroups = useSelector(state => state.chart.selectedGroups);
-  const selectedQualifications = useSelector(state => state.chart.selectedQualifications);
-  const categories = useSelector(state => state.chart.categories);
+  // Get current filters from chartSlice (per scenario)
+  const chartState = useSelector(state => state.chart[scenarioId] || {});
+  const stichtag = chartState.referenceDate || '';
+  const selectedGroups = chartState.filter?.Groups || [];
+  const selectedQualifications = chartState.filter?.Qualifications || [];
+  const categories = chartState.chartData?.weekly?.categories || [];
   // If you have selectors for calculateChartData and getNamesForSegment, use them here
   // For now, assume they are utility functions or props
 

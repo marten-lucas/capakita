@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import CryptoJS from 'crypto-js';
 import { validatePassword } from '../utils/saveLoadUtils';
 import { setScenarios, setSelectedScenarioId, setSelectedItem } from '../store/simScenarioSlice';
-import { setStichtag, setSelectedGroups, setSelectedQualifications, setWeeklySelectedScenarioId, setMidtermSelectedScenarioId, setMidtermTimeDimension, setMidtermSelectedGroups, setMidtermSelectedQualifications, setChartToggles } from '../store/chartSlice';
+
 
 export function useSaveLoad() {
   const dispatch = useDispatch();
@@ -36,17 +36,7 @@ export function useSaveLoad() {
         qualificationDefsByScenario: simQualification.qualificationDefsByScenario,
         qualificationAssignmentsByScenario: simQualification.qualificationAssignmentsByScenario,
         financialsByScenario: simFinancials.financialsByScenario,
-        chartStore: {
-          stichtag: chart.stichtag,
-          selectedGroups: chart.selectedGroups,
-          selectedQualifications: chart.selectedQualifications,
-          weeklySelectedScenarioId: chart.weeklySelectedScenarioId,
-          midtermSelectedScenarioId: chart.midtermSelectedScenarioId,
-          midtermTimeDimension: chart.midtermTimeDimension,
-          midtermSelectedGroups: chart.midtermSelectedGroups,
-          midtermSelectedQualifications: chart.midtermSelectedQualifications,
-          chartToggles: chart.chartToggles,
-        }
+        chartStore: chart // Save the whole chart state object
       };
 
       const json = JSON.stringify(saveData);
@@ -132,15 +122,7 @@ export function useSaveLoad() {
 
         // Load chart store
         if (data.chartStore) {
-          if (data.chartStore.stichtag) dispatch(setStichtag(data.chartStore.stichtag));
-          if (data.chartStore.selectedGroups) dispatch(setSelectedGroups(data.chartStore.selectedGroups));
-          if (data.chartStore.selectedQualifications) dispatch(setSelectedQualifications(data.chartStore.selectedQualifications));
-          if (data.chartStore.weeklySelectedScenarioId) dispatch(setWeeklySelectedScenarioId(data.chartStore.weeklySelectedScenarioId));
-          if (data.chartStore.midtermSelectedScenarioId) dispatch(setMidtermSelectedScenarioId(data.chartStore.midtermSelectedScenarioId));
-          if (data.chartStore.midtermTimeDimension) dispatch(setMidtermTimeDimension(data.chartStore.midtermTimeDimension));
-          if (data.chartStore.midtermSelectedGroups) dispatch(setMidtermSelectedGroups(data.chartStore.midtermSelectedGroups));
-          if (data.chartStore.midtermSelectedQualifications) dispatch(setMidtermSelectedQualifications(data.chartStore.midtermSelectedQualifications));
-          if (data.chartStore.chartToggles) dispatch(setChartToggles(data.chartStore.chartToggles));
+          dispatch({ type: 'chart/reset', payload: data.chartStore }); // You may need to implement a 'reset' action in chartSlice
         }
 
         // Load selected items

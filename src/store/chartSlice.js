@@ -1,85 +1,89 @@
 import { createSlice } from '@reduxjs/toolkit';
 import { generateTimeSegments } from '../utils/chartUtils';
 
+// Helper for initial chart state per scenario
+function getInitialChartState() {
+  return {
+    referenceDate: new Date().toISOString().slice(0, 10),
+    timedimension: 'month',
+    chartToggles: ['weekly', 'midterm'],
+    filter: {
+      Groups: [],
+      Qualifications: [],
+    },
+    chartData: {
+      weekly: {
+        categories: generateTimeSegments(),
+      },
+      midterm: {
+        categories: [],
+      }
+    }
+  };
+}
+
 const initialState = {
-  stichtag: new Date().toISOString().slice(0, 10),
-  selectedGroups: [],
-  selectedQualifications: [],
-  categories: generateTimeSegments(),
-  availableGroups: [],
-  availableQualifications: [],
-  midtermTimeDimension: 'Wochen',
-  midtermSelectedGroups: [],
-  midtermSelectedQualifications: [],
-  weeklySelectedScenarioId: null,
-  midtermSelectedScenarioId: null,
-  chartToggles: ['weekly', 'midterm'],
+  // scenarioId: chartState
 };
 
 const chartSlice = createSlice({
   name: 'chart',
   initialState,
   reducers: {
-    setStichtag(state, action) {
-      state.stichtag = action.payload;
-    },
-    setSelectedGroups(state, action) {
-      state.selectedGroups = action.payload;
-    },
-    setSelectedQualifications(state, action) {
-      state.selectedQualifications = action.payload;
-    },
-    setWeeklySelectedScenarioId(state, action) {
-      state.weeklySelectedScenarioId = action.payload;
-    },
-    setMidtermSelectedScenarioId(state, action) {
-      state.midtermSelectedScenarioId = action.payload;
-    },
-    setMidtermTimeDimension(state, action) {
-      state.midtermTimeDimension = action.payload;
-    },
-    setMidtermSelectedGroups(state, action) {
-      state.midtermSelectedGroups = action.payload;
-    },
-    setMidtermSelectedQualifications(state, action) {
-      state.midtermSelectedQualifications = action.payload;
-    },
-    updateAvailableGroups(state, action) {
-      const groupsCopy = [...action.payload];
-      const currentGroupsString = JSON.stringify(groupsCopy.sort());
-      const availableGroupsString = JSON.stringify([...state.availableGroups].sort());
-      if (currentGroupsString !== availableGroupsString) {
-        state.availableGroups = groupsCopy;
-        state.selectedGroups = groupsCopy;
+    // Ensure scenario state exists
+    ensureScenario(state, action) {
+      const scenarioId = action.payload;
+      if (!state[scenarioId]) {
+        state[scenarioId] = getInitialChartState();
       }
     },
-    updateAvailableQualifications(state, action) {
-      const qualificationsCopy = [...action.payload];
-      const currentQualificationsString = JSON.stringify(qualificationsCopy.sort());
-      const availableQualificationsString = JSON.stringify([...state.availableQualifications].sort());
-      if (currentQualificationsString !== availableQualificationsString) {
-        state.availableQualifications = qualificationsCopy;
-        state.selectedQualifications = qualificationsCopy;
-      }
+    setReferenceDate(state, action) {
+      const { scenarioId, date } = action.payload;
+      if (!state[scenarioId]) state[scenarioId] = getInitialChartState();
+      state[scenarioId].referenceDate = date;
+    },
+    setTimedimension(state, action) {
+      const { scenarioId, timedimension } = action.payload;
+      if (!state[scenarioId]) state[scenarioId] = getInitialChartState();
+      state[scenarioId].timedimension = timedimension;
     },
     setChartToggles(state, action) {
-      state.chartToggles = action.payload;
+      const { scenarioId, toggles } = action.payload;
+      if (!state[scenarioId]) state[scenarioId] = getInitialChartState();
+      state[scenarioId].chartToggles = toggles;
     },
+    setFilterGroups(state, action) {
+      const { scenarioId, groups } = action.payload;
+      if (!state[scenarioId]) state[scenarioId] = getInitialChartState();
+      state[scenarioId].filter.Groups = groups;
+    },
+    setFilterQualifications(state, action) {
+      const { scenarioId, qualifications } = action.payload;
+      if (!state[scenarioId]) state[scenarioId] = getInitialChartState();
+      state[scenarioId].filter.Qualifications = qualifications;
+    },
+    setChartData(state, action) {
+      const { scenarioId, chartType, data } = action.payload;
+      if (!state[scenarioId]) state[scenarioId] = getInitialChartState();
+      state[scenarioId].chartData[chartType] = data;
+    },
+    // Optionally, add a reset for a scenario
+    resetScenarioChart(state, action) {
+      const scenarioId = action.payload;
+      state[scenarioId] = getInitialChartState();
+    }
   },
 });
 
 export const {
-  setStichtag,
-  setSelectedGroups,
-  setSelectedQualifications,
-  setWeeklySelectedScenarioId,
-  setMidtermSelectedScenarioId,
-  setMidtermTimeDimension,
-  setMidtermSelectedGroups,
-  setMidtermSelectedQualifications,
-  updateAvailableGroups,
-  updateAvailableQualifications,
+  ensureScenario,
+  setReferenceDate,
+  setTimedimension,
   setChartToggles,
+  setFilterGroups,
+  setFilterQualifications,
+  setChartData,
+  resetScenarioChart,
 } = chartSlice.actions;
 
 export default chartSlice.reducer;

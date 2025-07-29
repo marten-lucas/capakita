@@ -17,14 +17,11 @@ function VisuPage() {
   const scenarios = useSelector(state => state.simScenario.scenarios);
   const dispatch = useDispatch();
 
-  // Find the selected scenario object
-  const selectedScenario = scenarios.find(s => s.id === selectedScenarioId);
-
-  // Get simulationData for ChartFilterForm
-  const simulationData = selectedScenario?.simulationData || [];
-
-  // Use chartToggles from store
-  const chartToggles = useSelector(state => state.chart.chartToggles);
+  // Use chartToggles from store (per scenario, fallback to [])
+  const chartToggles = useSelector(state => {
+    const scenarioChart = state.chart[selectedScenarioId];
+    return scenarioChart?.chartToggles || [];
+  });
 
   // Check if selected scenario still exists, if not select the first available one
   React.useEffect(() => {
@@ -75,18 +72,18 @@ function VisuPage() {
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#f0f2f5' }}>
       {/* Chart Filter Form added here */}
       <Box sx={{ px: 3, pt: 2 }}>
-        <ChartFilterForm showStichtag simulationData={simulationData} />
+        <ChartFilterForm showStichtag scenarioId={selectedScenarioId} />
       </Box>
 
       <Box sx={{ flex: 1, p: 3, display: 'flex', flexDirection: 'column', gap: 3, overflow: 'auto' }}>
-        {chartToggles.includes('weekly') && (
+        {/* {chartToggles.includes('weekly') && (
           <Box sx={{ minHeight: '400px' }}>
             <Typography variant="h6" sx={{ mb: 2, color: 'text.secondary' }}>
               Weekly Chart
             </Typography>
             <WeeklyChart hideFilters scenario={selectedScenario} />
           </Box>
-        )}
+        )} */}
         {/* {chartToggles.includes('midterm') && (
           <Box sx={{ minHeight: '400px' }}>
             <Typography variant="h6" sx={{ mb: 2, color: 'text.secondary' }}>
