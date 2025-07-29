@@ -462,3 +462,22 @@ export function findApplicableAvrData(dateStr) {
     return date >= from && date <= to;
   });
 }
+
+// Minimal stub for calculateChartData if not implemented yet
+export function calculateChartData(simulationData, stichtag, selectedGroups, selectedQualifications) {
+  // TODO: Replace with real implementation
+  return {
+    bedarf: [],
+    kapazitaet: [],
+    baykibigAnstellungsschluessel: [],
+    maxKapazitaet: 10,
+    maxAnstellungsschluessel: 10,
+    maxFachkraftquote: 100,
+  };
+}
+
+// Minimal stub for getNamesForSegment if not implemented yet
+export function getNamesForSegment(simulationData, index, seriesName) {
+  // TODO: Replace with real implementation
+  return [];
+}

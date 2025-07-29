@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import {
   Box,
   Paper,
@@ -36,86 +36,6 @@ const MenuProps = {
     },
   },
 };
-
-// --- Use the extractDatesOfInterest function from the example ---
-function extractDatesOfInterest(simulationData) {
-  const dateChanges = new Map();
-  const today = new Date().toISOString().split('T')[0];
-
-  const addChange = (date, type, name) => {
-    if (!dateChanges.has(date)) {
-      dateChanges.set(date, { date, changes: [] });
-    }
-    dateChanges.get(date).changes.push({ type, name });
-  };
-
-  const addDayToDate = (dateStr) => {
-    const date = new Date(dateStr);
-    date.setDate(date.getDate() + 1);
-    return date.toISOString().split('T')[0];
-  };
-
-  simulationData?.forEach(item => {
-    const itemType = item.type === 'demand' ? 'Kind' : 'Mitarbeiter';
-
-    // Item start/end dates
-    if (item.parseddata?.startdate) {
-      const startDate = item.parseddata.startdate.split('.').reverse().join('-');
-      addChange(startDate, `Neu: ${itemType}`, item.name);
-    }
-    if (item.parseddata?.enddate) {
-      const endDate = item.parseddata.enddate.split('.').reverse().join('-');
-      const effectiveEndDate = addDayToDate(endDate);
-      addChange(effectiveEndDate, `Verabschiedung: ${itemType}`, item.name);
-    }
-
-    // Group start/end dates
-    if (item.parseddata?.group) {
-      item.parseddata.group.forEach(group => {
-        if (group.start) {
-          const groupStart = group.start.split('.').reverse().join('-');
-          addChange(groupStart, `Gruppenwechsel: ${itemType}`, `${item.name} → ${group.name}`);
-        }
-        if (group.end) {
-          const groupEnd = group.end.split('.').reverse().join('-');
-          const effectiveGroupEnd = addDayToDate(groupEnd);
-          addChange(effectiveGroupEnd, `Gruppenwechsel: ${itemType}`, `${item.name} verlässt ${group.name}`);
-        }
-      });
-    }
-
-    // Booking start/end dates
-    if (item.parseddata?.booking) {
-      item.parseddata.booking.forEach(booking => {
-        if (booking.startdate) {
-          const bookingStart = booking.startdate.split('.').reverse().join('-');
-          addChange(bookingStart, `Buchungsänderung: ${itemType}`, `${item.name} neue Zeiten`);
-        }
-        if (booking.enddate) {
-          const bookingEnd = booking.enddate.split('.').reverse().join('-');
-          const effectiveBookingEnd = addDayToDate(bookingEnd);
-          addChange(effectiveBookingEnd, `Buchungsänderung: ${itemType}`, `${item.name} Zeiten enden`);
-        }
-      });
-    }
-
-    // Pause start/end dates
-    if (item.parseddata?.paused?.enabled) {
-      if (item.parseddata.paused.start) {
-        addChange(item.parseddata.paused.start, `Pause: ${itemType}`, `${item.name} beginnt Pause`);
-      }
-      if (item.parseddata.paused.end) {
-        const effectivePauseEnd = addDayToDate(item.parseddata.paused.end);
-        addChange(effectivePauseEnd, `Pause: ${itemType}`, `${item.name} beendet Pause`);
-      }
-    }
-  });
-
-  // Filter future dates and sort
-  return Array.from(dateChanges.values())
-    .filter(item => item.date > today)
-    .sort((a, b) => a.date.localeCompare(b.date));
-}
 
 function ChartFilterForm({ showStichtag = false, simulationData }) {
   const dispatch = useDispatch();
@@ -212,15 +132,9 @@ function ChartFilterForm({ showStichtag = false, simulationData }) {
     dispatch(setChartToggles(newToggles));
   };
 
-  // Dates of Interest for weekly chart
-  const datesOfInterest = useMemo(() => {
-    if (!showWeekly || !simulationData) return [];
-    return extractDatesOfInterest(simulationData);
-  }, [showWeekly, simulationData]);
-
   // Determine if second row is needed
   const showSecondRow =
-    (showWeekly && (showStichtag || datesOfInterest.length > 0)) ||
+    (showWeekly && showStichtag) ||
     showMidterm;
 
   return (
@@ -299,7 +213,7 @@ function ChartFilterForm({ showStichtag = false, simulationData }) {
           </Select>
         </FormControl>
       </Box>
-      {/* Second row: Stichtag, Dates of Interest, Zeitdimension */}
+      {/* Second row: Stichtag, Zeitdimension */}
       {showSecondRow && (
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center' }}>
           {/* Stichtag - only for Weekly and if selected */}
@@ -315,63 +229,6 @@ function ChartFilterForm({ showStichtag = false, simulationData }) {
                 }}
                 size="small"
               />
-            </FormControl>
-          )}
-          {/* Dates of Interest selector (with InputLabel, single row) */}
-          {showWeekly && showStichtag && datesOfInterest.length > 0 && (
-            <FormControl size="small" sx={{ minWidth: 240 }}>
-              <InputLabel id="dates-of-interest-label">Dates of Interest</InputLabel>
-              <Select
-                labelId="dates-of-interest-label"
-                label="Dates of Interest"
-                displayEmpty
-                value={datesOfInterest.find(item => item.date === stichtag)?.date || ""}
-                onChange={(e) => dispatch(setStichtag(e.target.value))}
-                renderValue={selected => {
-                  if (!selected) return <span style={{ color: '#888' }}>Dates of Interest</span>;
-                  const item = datesOfInterest.find(i => i.date === selected);
-                  if (!item) return <span style={{ color: '#888' }}>Dates of Interest</span>;
-                  const changesSummary = item.changes.reduce((acc, change) => {
-                    const key = change.type.split(':')[0];
-                    acc[key] = (acc[key] || 0) + 1;
-                    return acc;
-                  }, {});
-                  const summaryText = Object.entries(changesSummary)
-                    .map(([type, count]) => `${count} ${type}${count > 1 ? (type === 'Neu' ? 'e' : type === 'Verabschiedung' ? 'en' : '') : ''}`)
-                    .join(', ');
-                  return (
-                    <span>
-                      {new Date(item.date).toLocaleDateString('de-DE')}
-                      {summaryText ? ` – ${summaryText}` : ''}
-                    </span>
-                  );
-                }}
-              >
-                {datesOfInterest.map(item => {
-                  const changesSummary = item.changes.reduce((acc, change) => {
-                    const key = change.type.split(':')[0];
-                    acc[key] = (acc[key] || 0) + 1;
-                    return acc;
-                  }, {});
-                  const summaryText = Object.entries(changesSummary)
-                    .map(([type, count]) => `${count} ${type}${count > 1 ? (type === 'Neu' ? 'e' : type === 'Verabschiedung' ? 'en' : '') : ''}`)
-                    .join(', ');
-                  return (
-                    <MenuItem key={item.date} value={item.date}>
-                      <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 1 }}>
-                        <span style={{ fontWeight: 500 }}>
-                          {new Date(item.date).toLocaleDateString('de-DE')}
-                        </span>
-                        {summaryText && (
-                          <span style={{ fontSize: '0.9em', color: '#888' }}>
-                            {summaryText}
-                          </span>
-                        )}
-                      </Box>
-                    </MenuItem>
-                  );
-                })}
-              </Select>
             </FormControl>
           )}
           {/* Zeitdimension - only for Midterm */}
@@ -397,4 +254,4 @@ function ChartFilterForm({ showStichtag = false, simulationData }) {
 }
 
 export default ChartFilterForm;
-
+        

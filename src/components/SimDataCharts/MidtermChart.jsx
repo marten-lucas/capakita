@@ -51,19 +51,26 @@ export default function MidtermChart({ hideFilters = false, scenario }) {
     )
   ), [simulationData]);
 
+  // Compute allGroupNames and allQualificationNames without dispatch
   const allGroupNames = useMemo(() => {
-    const groupsList = hasNoGroup ? [...groupDefs.map(g => g.id), '0'] : groupDefs.map(g => g.id);
-    dispatch(updateAvailableGroups(groupsList));
-    return groupsList;
-  }, [groupDefs, hasNoGroup, dispatch]);
+    return hasNoGroup ? [...groupDefs.map(g => g.id), '0'] : groupDefs.map(g => g.id);
+  }, [groupDefs, hasNoGroup]);
 
   const qualificationKeys = useMemo(() => {
     return qualiDefs.map(q => q.key);
   }, [qualiDefs]);
 
   const allQualificationNames = useMemo(() => {
-    dispatch(updateAvailableQualifications(qualificationKeys));
     return qualificationKeys;
+  }, [qualificationKeys]);
+
+  // Move dispatches to useEffect so they don't run during render
+  useEffect(() => {
+    dispatch(updateAvailableGroups(allGroupNames));
+  }, [allGroupNames, dispatch]);
+
+  useEffect(() => {
+    dispatch(updateAvailableQualifications(qualificationKeys));
   }, [qualificationKeys, dispatch]);
 
   // Initialize selections if empty
@@ -92,46 +99,25 @@ export default function MidtermChart({ hideFilters = false, scenario }) {
     return getChartData(midtermTimeDimension, midtermSelectedGroups, midtermSelectedQualifications);
   }, [getChartData, midtermTimeDimension, midtermSelectedGroups, midtermSelectedQualifications]);
 
-  // Add console log to verify group and qualification filters
-  React.useEffect(() => {
-    if (
-      chartData &&
-      Array.isArray(chartData.categories) &&
-      chartData.categories.length === 0
-    ) {
-      console.warn('MidtermChart: chartData is empty. Inputs:', {
-        simulationData,
-        midtermTimeDimension,
-        midtermSelectedGroups,
-        midtermSelectedQualifications
-      });
-      // Log unique values for group and qualification in simulationData for debugging
-      const groupNamesSet = new Set();
-      const qualificationSet = new Set();
-      simulationData.forEach(item => {
-        // Groups
-        if (item.parseddata?.group && Array.isArray(item.parseddata.group)) {
-          item.parseddata.group.forEach(g => {
-            if (g.name) groupNamesSet.add(g.name);
-          });
-        } else if (!item.parseddata?.group || item.parseddata.group.length === 0) {
-          groupNamesSet.add('keine Gruppe');
-        }
-        // Qualifications
-        if (item.type === 'capacity') {
-          const q = item.parseddata?.qualification;
-          if (q) qualificationSet.add(q);
-        }
-      });
+  // Defensive: Provide fallback empty structure if chartData is undefined/null
+  const safeChartData = useMemo(() => (
+    chartData || {
+      bedarf: [],
+      kapazitaet: [],
+      baykibigAnstellungsschluessel: [],
+      maxKapazitaet: 0,
+      maxAnstellungsschluessel: 0,
+      maxFachkraftquote: 100,
+      categories: [],
     }
-  }, [chartData, simulationData, midtermTimeDimension, midtermSelectedGroups, midtermSelectedQualifications]);
+  ), [chartData]);
 
   // Chart options
   const midtermOptions = useMemo(() => ({
     chart: { type: 'column' },
     title: { text: `Midterm Simulation - ${midtermTimeDimension}` },
     xAxis: { 
-      categories: chartData.categories,
+      categories: safeChartData.categories,
       title: { text: 'Zeitraum' }
     },
     yAxis: [
@@ -146,7 +132,7 @@ export default function MidtermChart({ hideFilters = false, scenario }) {
       { // Secondary: Kapazität
         title: { text: 'Kapazität (Stunden)' },
         min: 0,
-        max: chartData.maxKapazitaet,
+        max: safeChartData.maxKapazitaet,
         tickInterval: null,
         opposite: false,
         gridLineWidth: 1
@@ -154,7 +140,7 @@ export default function MidtermChart({ hideFilters = false, scenario }) {
       { // Tertiary: BayKiBig Anstellungsschlüssel
         title: { text: 'BayKiBig Anstellungsschlüssel (Nenner)' },
         min: 0,
-        max: chartData.maxAnstellungsschluessel,
+        max: safeChartData.maxAnstellungsschluessel,
         tickInterval: null,
         opposite: true,
         gridLineWidth: 0
@@ -162,7 +148,7 @@ export default function MidtermChart({ hideFilters = false, scenario }) {
       { // Quaternary: Fachkraftquote
         title: { text: 'Fachkraftquote (%)' },
         min: 0,
-        max: chartData.maxFachkraftquote,
+        max: safeChartData.maxFachkraftquote,
         tickInterval: 10,
         opposite: true,
         gridLineWidth: 0
@@ -172,7 +158,7 @@ export default function MidtermChart({ hideFilters = false, scenario }) {
       {
         name: 'Bedarf',
         type: 'area',
-        data: chartData.bedarf,
+        data: safeChartData.bedarf,
         yAxis: 0,
         color: 'rgba(124,181,236,0.8)',
         fillOpacity: 0.6,
@@ -181,7 +167,7 @@ export default function MidtermChart({ hideFilters = false, scenario }) {
       {
         name: 'Kapazität',
         type: 'area',
-        data: chartData.kapazitaet,
+        data: safeChartData.kapazitaet,
         yAxis: 1,
         color: '#90ed7d',
         fillOpacity: 0.6,
@@ -190,7 +176,7 @@ export default function MidtermChart({ hideFilters = false, scenario }) {
       {
         name: 'BayKiBig Anstellungsschlüssel',
         type: 'line',
-        data: chartData.baykibigAnstellungsschluessel?.map(item => {
+        data: safeChartData.baykibigAnstellungsschluessel?.map(item => {
           if (!item || item.totalBookingHours === 0) return 0;
           return item.totalStaffHours > 0 ? item.totalBookingHours / item.totalStaffHours : 0;
         }),
@@ -201,7 +187,7 @@ export default function MidtermChart({ hideFilters = false, scenario }) {
       {
         name: 'BayKiBig Fachkraftquote',
         type: 'line',
-        data: chartData.baykibigAnstellungsschluessel?.map(item => {
+        data: safeChartData.baykibigAnstellungsschluessel?.map(item => {
           return item?.fachkraftQuotePercent || 0;
         }),
         yAxis: 3,
@@ -217,7 +203,7 @@ export default function MidtermChart({ hideFilters = false, scenario }) {
         let s = `<b>${this.x}</b><br/>`;
         this.points.forEach(point => {
           if (point.series.name.includes('BayKiBig')) {
-            const baykibigData = chartData.baykibigAnstellungsschluessel[point.point.index];
+            const baykibigData = safeChartData.baykibigAnstellungsschluessel[point.point.index];
             if (baykibigData) {
               if (point.series.name.includes('Anstellungsschlüssel')) {
                 const schluessel = baykibigData.totalStaffHours > 0 ? baykibigData.totalBookingHours / baykibigData.totalStaffHours : 0;
@@ -238,7 +224,7 @@ export default function MidtermChart({ hideFilters = false, scenario }) {
         return s;
       }
     }
-  }), [chartData, midtermTimeDimension]);
+  }), [safeChartData, midtermTimeDimension]);
 
   // Filter Form
   return (
@@ -330,5 +316,4 @@ export default function MidtermChart({ hideFilters = false, scenario }) {
     </Box>
   );
 }
-
-
+                       
