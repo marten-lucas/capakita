@@ -133,6 +133,14 @@ function SimDataGeneralTab() {
     });
   };
 
+  // Get base assignment for this item (for overlay revert logic)
+  const baseAssignments = useSelector(state =>
+    baseScenario?.id && state.simQualification.qualificationAssignmentsByScenario[baseScenario.id]?.[selectedItemId]
+      ? Object.values(state.simQualification.qualificationAssignmentsByScenario[baseScenario.id][selectedItemId])
+      : []
+  );
+  const baseAssignment = baseAssignments[0]; // assuming one assignment per item
+
   // Handler for qualification change
   const handleQualificationChange = (newKey) => {
     const existingAssignment = qualiAssignments.find(
@@ -140,16 +148,24 @@ function SimDataGeneralTab() {
     );
 
     if (isBasedScenario) {
-      // For based scenarios, create or update an overlay
-      dispatch({
-        type: 'simOverlay/setQualificationDefOverlay',
-        payload: {
-          scenarioId: selectedScenarioId,
-          overlayData: qualiAssignments
-            .filter((a) => String(a.dataItemId) !== String(selectedItemId))
-            .concat([{ dataItemId: selectedItemId, qualification: newKey }]),
-        },
-      });
+      if (baseAssignment && baseAssignment.qualification === newKey) {
+        // Remove overlay if newKey matches base
+        dispatch({
+          type: 'simOverlay/removeQualificationDefOverlay',
+          payload: { scenarioId: selectedScenarioId }
+        });
+      } else {
+        // Set overlay if different from base
+        dispatch({
+          type: 'simOverlay/setQualificationDefOverlay',
+          payload: {
+            scenarioId: selectedScenarioId,
+            overlayData: qualiAssignments
+              .filter((a) => String(a.dataItemId) !== String(selectedItemId))
+              .concat([{ dataItemId: selectedItemId, qualification: newKey }]),
+          },
+        });
+      }
     } else if (existingAssignment) {
       // For base scenarios, update the qualification assignment
       dispatch({
@@ -423,3 +439,4 @@ function SimDataGeneralTab() {
 }
 
 export default SimDataGeneralTab;
+
