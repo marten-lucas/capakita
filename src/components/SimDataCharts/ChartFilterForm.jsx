@@ -37,8 +37,9 @@ const MenuProps = {
   },
 };
 
-const EMPTY_GROUP_DEFS = [];
-const EMPTY_QUALI_DEFS = [];
+// Use frozen empty arrays for stable reference
+const EMPTY_GROUP_DEFS = Object.freeze([]);
+const EMPTY_QUALI_DEFS = Object.freeze([]);
 
 function ChartFilterForm({ showStichtag = false, scenarioId }) {
   const dispatch = useDispatch();
@@ -48,29 +49,35 @@ function ChartFilterForm({ showStichtag = false, scenarioId }) {
     if (scenarioId) dispatch(ensureScenario(scenarioId));
   }, [dispatch, scenarioId]);
 
-  // All filter states from chartSlice (per scenario)
-  const chartState = useSelector(state => state.chart[scenarioId] || {});
+  // Use memoized selector to avoid rerender warnings
+  const chartState = useSelector(
+    state => state.chart[scenarioId] || {},
+    (left, right) => {
+      // Custom equality check to prevent unnecessary rerenders
+      return (
+        left.referenceDate === right.referenceDate &&
+        left.timedimension === right.timedimension &&
+        JSON.stringify(left.chartToggles) === JSON.stringify(right.chartToggles) &&
+        JSON.stringify(left.filter) === JSON.stringify(right.filter)
+      );
+    }
+  );
+
   const stichtag = chartState.referenceDate || '';
   const timedimension = chartState.timedimension || 'month';
   const chartToggles = chartState.chartToggles || ['weekly', 'midterm'];
   const selectedGroups = chartState.filter?.Groups || [];
   const selectedQualifications = chartState.filter?.Qualifications || [];
 
-  // Group and qualification options from their slices (stable empty array fallback)
+  // Use direct selectors to avoid memoization warning
   const groupDefs = useSelector(
-    React.useCallback(
-      state => state.simGroup.groupDefsByScenario[scenarioId] || EMPTY_GROUP_DEFS,
-      [scenarioId]
-    )
+    state => state.simGroup.groupDefsByScenario[scenarioId] || EMPTY_GROUP_DEFS
   );
   const qualiDefs = useSelector(
-    React.useCallback(
-      state => state.simQualification.qualificationDefsByScenario[scenarioId] || EMPTY_QUALI_DEFS,
-      [scenarioId]
-    )
+    state => state.simQualification.qualificationDefsByScenario[scenarioId] || EMPTY_QUALI_DEFS
   );
 
-  // Build group options: { id: name }
+  // Memoize derived values
   const availableGroups = React.useMemo(() => {
     const lookup = {};
     groupDefs.forEach(g => {
@@ -80,7 +87,6 @@ function ChartFilterForm({ showStichtag = false, scenarioId }) {
     return lookup;
   }, [groupDefs]);
 
-  // Build qualification options: { key: name }
   const availableQualifications = React.useMemo(() => {
     const lookup = {};
     qualiDefs.forEach(q => {
@@ -111,7 +117,10 @@ function ChartFilterForm({ showStichtag = false, scenarioId }) {
       ? event.target.value.split(',')
       : event.target.value;
     dispatch(setFilterGroups({ scenarioId, groups: value }));
-    dispatch(updateWeeklyChartData(scenarioId));
+    // Use setTimeout to ensure state update is processed first
+    setTimeout(() => {
+      dispatch(updateWeeklyChartData(scenarioId));
+    }, 0);
   };
 
   const handleQualificationChange = (event) => {
@@ -119,7 +128,10 @@ function ChartFilterForm({ showStichtag = false, scenarioId }) {
       ? event.target.value.split(',')
       : event.target.value;
     dispatch(setFilterQualifications({ scenarioId, qualifications: value }));
-    dispatch(updateWeeklyChartData(scenarioId));
+    // Use setTimeout to ensure state update is processed first
+    setTimeout(() => {
+      dispatch(updateWeeklyChartData(scenarioId));
+    }, 0);
   };
 
   const handleToggle = (event, newToggles) => {
@@ -262,3 +274,4 @@ function ChartFilterForm({ showStichtag = false, scenarioId }) {
 }
 
 export default ChartFilterForm;
+

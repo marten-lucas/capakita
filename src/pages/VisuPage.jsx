@@ -19,11 +19,14 @@ function VisuPage() {
   const scenarios = useSelector(state => state.simScenario.scenarios);
   const dispatch = useDispatch();
 
-  // Use chartToggles from store (per scenario, fallback to stable empty array)
-  const chartToggles = useSelector(state => {
-    const scenarioChart = state.chart[selectedScenarioId];
-    return scenarioChart?.chartToggles || EMPTY_TOGGLES;
-  });
+  // Use memoized selector for chartToggles to prevent rerenders
+  const chartToggles = useSelector(
+    state => {
+      const scenarioChart = state.chart[selectedScenarioId];
+      return scenarioChart?.chartToggles || EMPTY_TOGGLES;
+    },
+    (left, right) => JSON.stringify(left) === JSON.stringify(right)
+  );
 
   // Check if selected scenario still exists, if not select the first available one
   React.useEffect(() => {

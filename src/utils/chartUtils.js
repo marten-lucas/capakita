@@ -16,7 +16,8 @@ export function generateTimeSegments() {
       segments.push(`${days[d]} ${hour}:${min}`);
     }
   }
-  return segments;
+  // Ensure we return a new mutable array every time
+  return [...segments];
 }
 
 export function calculateChartData(
@@ -29,9 +30,7 @@ export function calculateChartData(
     groupDefs,
     qualificationAssignmentsByScenario,
     overlaysByScenario,
-    scenarioId,
-    includeNoGroupAssignment = false,
-    includeNoQualiAssignment = false
+    scenarioId
   }
 ) {
   // ...use the passed-in data for calculations...
@@ -45,9 +44,7 @@ export function calculateChartData(
     scenarioId,
     referenceDate,
     selectedGroups,
-    selectedQualifications,
-    includeNoGroupAssignment,
-    includeNoQualiAssignment
+    selectedQualifications
   });
 
   const categories = generateTimeSegments();
@@ -56,16 +53,17 @@ export function calculateChartData(
   const care_ratio = [];
   const expert_ratio = [];
 
+  // Return completely new objects and arrays to prevent any mutation issues
   return {
-    categories,
-    demand,
-    maxdemand: Math.max(...demand),
-    capacity,
-    maxcapacity: Math.max(...capacity),
-    care_ratio,
-    max_care_ratio: Math.max(...care_ratio),
-    expert_ratio,
-    maxexpert_ratio: Math.max(...expert_ratio),
+    categories: [...categories],
+    demand: [...demand],
+    maxdemand: Math.max(...demand, 0),
+    capacity: [...capacity],
+    maxcapacity: Math.max(...capacity, 0),
+    care_ratio: [...care_ratio],
+    max_care_ratio: Math.max(...care_ratio, 0),
+    expert_ratio: [...expert_ratio],
+    maxexpert_ratio: Math.max(...expert_ratio, 0),
   };
 }
 
@@ -73,7 +71,7 @@ export function calculateChartData(
  * Overlay-aware booking filter.
  * Returns { demand: [...], capacity: [...] }
  * Now also checks simData presence (startdate/enddate) and absences.
- * Supports includeNoGroupAssignment/includeNoQualiAssignment flags.
+ * Supports __NO_GROUP__ and __NO_QUALI__ in filter arrays.
  */
 export function filterBookings({
   bookingsByScenario,
@@ -83,9 +81,7 @@ export function filterBookings({
   scenarioId,
   referenceDate,
   selectedGroups,
-  selectedQualifications,
-  includeNoGroupAssignment = false,
-  includeNoQualiAssignment = false
+  selectedQualifications
 }) {
   const demand = [];
   const capacity = [];
@@ -153,7 +149,7 @@ export function filterBookings({
       groupMatch = true;
     } else if (Array.isArray(groupId) && groupId.some(g => selectedGroups.includes(g))) {
       groupMatch = true;
-    } else if (includeNoGroupAssignment && (!groupId || groupId === '')) {
+    } else if (selectedGroups.includes('__NO_GROUP__') && (!groupId || groupId === '')) {
       groupMatch = true;
     }
 
@@ -179,7 +175,7 @@ export function filterBookings({
         qualiMatch = true;
       } else if (qualiKeys.some(q => selectedQualifications.includes(q))) {
         qualiMatch = true;
-      } else if (includeNoQualiAssignment && qualiKeys.length === 0) {
+      } else if (selectedQualifications.includes('__NO_QUALI__') && qualiKeys.length === 0) {
         qualiMatch = true;
       }
 
@@ -203,7 +199,12 @@ export function filterBookings({
 export function generateBookingDataSeries(referenceDate, filteredBookings, categories) {
   // categories: e.g. ["Mo 7:00", "Mo 7:30", ...]
   // Always return a new array, not a reference to a constant or reused array
-  const series = Array.from({ length: categories.length }, () => 0);
+  const series = new Array(categories.length).fill(0);
+
+  // If categories is empty, still return a new array (not a shared constant)
+  if (!categories || categories.length === 0) {
+    return [];
+  }
 
   // Helper: parse category to day and time
   function parseCategory(cat) {
@@ -236,7 +237,8 @@ export function generateBookingDataSeries(referenceDate, filteredBookings, categ
     series[idx] = count;
   });
 
-  return series;
+  // Always return a new array (never a reference to a constant)
+  return series.map(val => val); // Create a new array with copied values
 }
 
 export function generateWeeklyChartTooltip(points, x) {
@@ -245,4 +247,26 @@ export function generateWeeklyChartTooltip(points, x) {
     s += `<span style="color:${point.color}">\u25CF</span> <b>${point.series.name}:</b> ${point.y}<br/>`;
   });
   return s;
+}
+
+// Helper function to ensure chart data arrays are mutable
+export function cloneChartData(chartData) {
+  if (!chartData || typeof chartData !== 'object') {
+    return chartData;
+  }
+
+  const cloned = {};
+  for (const [key, value] of Object.entries(chartData)) {
+    if (Array.isArray(value)) {
+      // Deep clone arrays to ensure they're mutable
+      cloned[key] = value.map(item => 
+        typeof item === 'object' && item !== null ? { ...item } : item
+      );
+    } else if (typeof value === 'object' && value !== null) {
+      cloned[key] = { ...value };
+    } else {
+      cloned[key] = value;
+    }
+  }
+  return cloned;
 }

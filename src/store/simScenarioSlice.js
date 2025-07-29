@@ -152,6 +152,7 @@ export const deleteScenario = (scenarioId) => (dispatch) => {
   dispatch(simScenarioSlice.actions.deleteScenario(scenarioId));
   dispatch({ type: 'simData/deleteAllDataForScenario', payload: { scenarioId } });
   dispatch({ type: 'simOverlay/deleteAllOverlaysForScenario', payload: { scenarioId } });
+  dispatch({ type: 'chart/deleteScenarioChart', payload: scenarioId });
 };
 
 export const {

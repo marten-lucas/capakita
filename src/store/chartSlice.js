@@ -10,21 +10,18 @@ function getInitialChartState() {
     filter: {
       Groups: [],
       Qualifications: [],
-      includeNoGroupAssignment: false,
-      includeNoQualiAssignment: false,
     },
     chartData: {
       weekly: {
-        categories: generateTimeSegments(),
+        categories: [],
         demand: [],
-        maxdemand:"",
+        maxdemand: "",
         capacity: [],
         maxcapacity: "",
         care_ratio: [],
         max_care_ratio: "",
         expert_ratio: [],
         maxexpert_ratio: "100"
-        
       },
       midterm: {
         categories: [],
@@ -66,13 +63,11 @@ const chartSlice = createSlice({
       const { scenarioId, groups } = action.payload;
       if (!state[scenarioId]) state[scenarioId] = getInitialChartState();
       state[scenarioId].filter.Groups = groups;
-      state[scenarioId].filter.includeNoGroupAssignment = groups.includes('__NO_GROUP__');
     },
     setFilterQualifications(state, action) {
       const { scenarioId, qualifications } = action.payload;
       if (!state[scenarioId]) state[scenarioId] = getInitialChartState();
       state[scenarioId].filter.Qualifications = qualifications;
-      state[scenarioId].filter.includeNoQualiAssignment = qualifications.includes('__NO_QUALI__');
     },
     setChartData(state, action) {
       const { scenarioId, chartType, data } = action.payload;
@@ -83,8 +78,20 @@ const chartSlice = createSlice({
     resetScenarioChart(state, action) {
       const scenarioId = action.payload;
       state[scenarioId] = getInitialChartState();
+    },
+    // Add cleanup reducer for deleted scenarios
+    deleteScenarioChart(state, action) {
+      const scenarioId = action.payload;
+      delete state[scenarioId];
     }
   },
+  extraReducers: (builder) => {
+    // Listen to scenario deletion from other slices
+    builder.addCase('simScenario/deleteScenario', (state, action) => {
+      const scenarioId = String(action.payload);
+      delete state[scenarioId];
+    });
+  }
 });
 
 // Thunk to update weekly chart data for a scenario
@@ -92,14 +99,8 @@ export const updateWeeklyChartData = (scenarioId) => (dispatch, getState) => {
   const state = getState();
   const chartState = state.chart[scenarioId] || {};
   const referenceDate = chartState.referenceDate || '';
-  const selectedGroups = chartState.filter?.Groups || [];
-  const selectedQualifications = chartState.filter?.Qualifications || [];
-  const includeNoGroupAssignment = chartState.filter?.includeNoGroupAssignment || false;
-  const includeNoQualiAssignment = chartState.filter?.includeNoQualiAssignment || false;
-
-  // Detect "Keine Gruppenzuweisung" and "Keine Qualifikation" flags
-  // const includeNoGroupAssignment = selectedGroups.includes('__NO_GROUP__');
-  // const includeNoQualiAssignment = selectedQualifications.includes('__NO_QUALI__');
+  const selectedGroups = [...(chartState.filter?.Groups || [])];
+  const selectedQualifications = [...(chartState.filter?.Qualifications || [])];
 
   // Gather all required data from state
   const bookingsByScenario = state.simBooking.bookingsByScenario;
@@ -119,26 +120,27 @@ export const updateWeeklyChartData = (scenarioId) => (dispatch, getState) => {
       groupDefs,
       qualificationAssignmentsByScenario,
       overlaysByScenario,
-      scenarioId,
-      includeNoGroupAssignment,
-      includeNoQualiAssignment
+      scenarioId
     }
   );
+
+  // Ensure all arrays are deeply cloned and completely mutable
+  const clonedData = {
+    categories: chartData.categories ? [...chartData.categories] : [],
+    demand: chartData.demand ? chartData.demand.map(val => typeof val === 'number' ? val : 0) : [],
+    maxdemand: chartData.maxdemand || "",
+    capacity: chartData.capacity ? chartData.capacity.map(val => typeof val === 'number' ? val : 0) : [],
+    maxcapacity: chartData.maxcapacity || "",
+    care_ratio: chartData.care_ratio ? chartData.care_ratio.map(val => typeof val === 'number' ? val : 0) : [],
+    max_care_ratio: chartData.max_care_ratio || "",
+    expert_ratio: chartData.expert_ratio ? chartData.expert_ratio.map(val => typeof val === 'number' ? val : 0) : [],
+    maxexpert_ratio: chartData.maxexpert_ratio || "100"
+  };
 
   dispatch(setChartData({
     scenarioId,
     chartType: 'weekly',
-    data: {
-      categories: chartData.categories,
-      demand: chartData.demand,
-      maxdemand: chartData.maxdemand,
-      capacity: chartData.capacity,
-      maxcapacity: chartData.maxcapacity,
-      care_ratio: chartData.care_ratio,
-      max_care_ratio: chartData.max_care_ratio,
-      expert_ratio: chartData.expert_ratio,
-      maxexpert_ratio: chartData.maxexpert_ratio
-    }
+    data: clonedData
   }));
 };
 
@@ -151,6 +153,7 @@ export const {
   setFilterQualifications,
   setChartData,
   resetScenarioChart,
+  deleteScenarioChart,
 } = chartSlice.actions;
 
 export default chartSlice.reducer;
