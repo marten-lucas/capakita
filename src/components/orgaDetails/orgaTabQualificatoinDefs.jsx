@@ -19,13 +19,16 @@ import { useOverlayData } from '../../hooks/useOverlayData';
 const getQualiDefs = createSelector(
   [
     state => state.simQualification.qualificationDefsByScenario,
-    (state, scenarioId, baseScenarioId) => ({ scenarioId, baseScenarioId })
+    (state, scenarioId) => scenarioId,
+    (state, scenarioId, baseScenarioId) => baseScenarioId
   ],
-  (qualificationDefsByScenario, { scenarioId, baseScenarioId }) => {
+  (qualificationDefsByScenario, scenarioId, baseScenarioId) => {
     const currentDefs = qualificationDefsByScenario[scenarioId] || [];
     const baseDefs = baseScenarioId ? (qualificationDefsByScenario[baseScenarioId] || []) : [];
-    
-    // Merge base and current, with current taking precedence for same keys
+
+    if (!baseDefs.length) return currentDefs;
+    if (!currentDefs.length) return baseDefs;
+
     const merged = [...baseDefs];
     currentDefs.forEach(currentDef => {
       const existingIndex = merged.findIndex(def => def.key === currentDef.key);
@@ -35,7 +38,7 @@ const getQualiDefs = createSelector(
         merged.push(currentDef); // Add new definition
       }
     });
-    
+
     return merged;
   }
 );

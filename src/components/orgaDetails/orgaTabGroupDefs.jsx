@@ -16,13 +16,17 @@ import { useOverlayData } from '../../hooks/useOverlayData';
 const getGroupDefs = createSelector(
   [
     state => state.simGroup.groupDefsByScenario,
-    (state, scenarioId, baseScenarioId) => ({ scenarioId, baseScenarioId })
+    (state, scenarioId) => scenarioId,
+    (state, scenarioId, baseScenarioId) => baseScenarioId
   ],
-  (groupDefsByScenario, { scenarioId, baseScenarioId }) => {
+  (groupDefsByScenario, scenarioId, baseScenarioId) => {
     const currentDefs = groupDefsByScenario[scenarioId] || [];
     const baseDefs = baseScenarioId ? (groupDefsByScenario[baseScenarioId] || []) : [];
-    
+
     // Merge base and current, with current taking precedence for same IDs
+    if (!baseDefs.length) return currentDefs;
+    if (!currentDefs.length) return baseDefs;
+
     const merged = [...baseDefs];
     currentDefs.forEach(currentDef => {
       const existingIndex = merged.findIndex(def => def.id === currentDef.id);
@@ -32,7 +36,7 @@ const getGroupDefs = createSelector(
         merged.push(currentDef); // Add new definition
       }
     });
-    
+
     return merged;
   }
 );

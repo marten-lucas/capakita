@@ -25,6 +25,7 @@ import {
   setMidtermSelectedQualifications,
   setChartToggles
 } from '../../store/chartSlice';
+import { createSelector } from '@reduxjs/toolkit';
 
 const ITEM_HEIGHT = 48;
 const ITEM_PADDING_TOP = 8;
@@ -36,6 +37,23 @@ const MenuProps = {
     },
   },
 };
+
+// Memoized selectors for groupDefs and qualiDefs
+const selectGroupDefs = createSelector(
+  [
+    state => state.simScenario.selectedScenarioId,
+    state => state.simGroup.groupDefsByScenario
+  ],
+  (scenarioId, groupDefsByScenario) => groupDefsByScenario[scenarioId] || []
+);
+
+const selectQualiDefs = createSelector(
+  [
+    state => state.simScenario.selectedScenarioId,
+    state => state.simQualification.qualificationDefsByScenario
+  ],
+  (scenarioId, qualificationDefsByScenario) => qualificationDefsByScenario[scenarioId] || []
+);
 
 function ChartFilterForm({ showStichtag = false, simulationData }) {
   const dispatch = useDispatch();
@@ -54,14 +72,8 @@ function ChartFilterForm({ showStichtag = false, simulationData }) {
   const chartToggles = useSelector(state => state.chart.chartToggles);
 
   // Get available groups/qualifications from scenario
-  const groupDefs = useSelector(state => {
-    const scenarioId = state.simScenario.selectedScenarioId;
-    return state.simGroup.groupDefsByScenario[scenarioId] || [];
-  });
-  const qualiDefs = useSelector(state => {
-    const scenarioId = state.simScenario.selectedScenarioId;
-    return state.simQualification.qualificationDefsByScenario[scenarioId] || [];
-  });
+  const groupDefs = useSelector(selectGroupDefs);
+  const qualiDefs = useSelector(selectQualiDefs);
   // Build availableGroups lookup { id: name }
   const availableGroups = React.useMemo(() => {
     const lookup = {};
@@ -136,6 +148,12 @@ function ChartFilterForm({ showStichtag = false, simulationData }) {
   const showSecondRow =
     (showWeekly && showStichtag) ||
     showMidterm;
+
+  // Ensure midtermTimeDimension is always a valid value for the Select
+  const validTimeDimensions = ['week', 'month', 'quarter', 'year'];
+  const safeMidtermTimeDimension = validTimeDimensions.includes(midtermTimeDimension)
+    ? midtermTimeDimension
+    : 'week';
 
   return (
     <Paper sx={{ p: 3, mb: 2 }}>
@@ -236,7 +254,7 @@ function ChartFilterForm({ showStichtag = false, simulationData }) {
             <FormControl sx={{ minWidth: 150 }} size="small">
               <InputLabel>Zeitdimension</InputLabel>
               <Select
-                value={midtermTimeDimension}
+                value={safeMidtermTimeDimension}
                 onChange={(e) => dispatch(setMidtermTimeDimension(e.target.value))}
                 label="Zeitdimension"
               >
@@ -254,4 +272,3 @@ function ChartFilterForm({ showStichtag = false, simulationData }) {
 }
 
 export default ChartFilterForm;
-        

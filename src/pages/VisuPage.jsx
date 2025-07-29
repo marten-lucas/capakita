@@ -42,11 +42,11 @@ function VisuPage() {
   if (!scenarios || scenarios.length === 0) {
     return (
       <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#f0f2f5' }}>
-        <Paper 
-          sx={{ 
+        <Paper
+          sx={{
             m: 'auto',
-            p: 4, 
-            textAlign: 'center', 
+            p: 4,
+            textAlign: 'center',
             bgcolor: '#f5f5f5',
             border: '2px dashed #ccc',
             maxWidth: 480
@@ -58,8 +58,8 @@ function VisuPage() {
           <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
             Um die Simulation zu starten, müssen Sie zuerst Daten importieren.
           </Typography>
-          <Button 
-            variant="contained" 
+          <Button
+            variant="contained"
             startIcon={<FileUploadIcon />}
             onClick={() => navigate('/data')}
             size="large"
@@ -77,7 +77,7 @@ function VisuPage() {
       <Box sx={{ px: 3, pt: 2 }}>
         <ChartFilterForm showStichtag simulationData={simulationData} />
       </Box>
-      
+
       <Box sx={{ flex: 1, p: 3, display: 'flex', flexDirection: 'column', gap: 3, overflow: 'auto' }}>
         {chartToggles.includes('weekly') && (
           <Box sx={{ minHeight: '400px' }}>
@@ -87,14 +87,14 @@ function VisuPage() {
             <WeeklyChart hideFilters scenario={selectedScenario} />
           </Box>
         )}
-        {chartToggles.includes('midterm') && (
+        {/* {chartToggles.includes('midterm') && (
           <Box sx={{ minHeight: '400px' }}>
             <Typography variant="h6" sx={{ mb: 2, color: 'text.secondary' }}>
               Midterm Chart
             </Typography>
             <MidtermChart hideFilters scenario={selectedScenario} />
           </Box>
-        )}
+        )} */}
         {chartToggles.length === 0 && (
           <Paper sx={{ p: 4, textAlign: 'center', bgcolor: '#f5f5f5' }}>
             <Typography variant="h6" color="text.secondary">

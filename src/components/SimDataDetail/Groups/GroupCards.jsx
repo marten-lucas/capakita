@@ -17,19 +17,20 @@ const selectGroups = createSelector(
   [
     state => state.simGroup.groupsByScenario,
     state => state.simOverlay.overlaysByScenario,
-    (state, selectedScenarioId, baseScenarioId) => ({ selectedScenarioId, baseScenarioId }),
+    (state, selectedScenarioId) => selectedScenarioId,
+    (state, selectedScenarioId, baseScenarioId) => baseScenarioId,
     (state, selectedScenarioId, baseScenarioId, selectedItemId) => selectedItemId
   ],
-  (groupsByScenario, overlaysByScenario, { selectedScenarioId, baseScenarioId }, selectedItemId) => {
+  (groupsByScenario, overlaysByScenario, selectedScenarioId, baseScenarioId, selectedItemId) => {
     if (!selectedScenarioId || !selectedItemId) return EMPTY_ARRAY;
 
     // Overlay support for based scenarios: merge overlays over base by groupId
-    const overlayGroupsObj = overlaysByScenario[selectedScenarioId]?.groupassignments?.[selectedItemId] || {};
-    const overlayGroupsArr = Object.values(overlayGroupsObj);
+    const overlayGroupsObj = overlaysByScenario[selectedScenarioId]?.groupassignments?.[selectedItemId];
+    const overlayGroupsArr = overlayGroupsObj ? Object.values(overlayGroupsObj) : EMPTY_ARRAY;
 
     if (baseScenarioId) {
-      const baseGroupsObj = groupsByScenario[baseScenarioId]?.[selectedItemId] || {};
-      const baseArr = Object.values(baseGroupsObj);
+      const baseGroupsObj = groupsByScenario[baseScenarioId]?.[selectedItemId];
+      const baseArr = baseGroupsObj ? Object.values(baseGroupsObj) : EMPTY_ARRAY;
 
       // Merge overlays over base by groupId
       const merged = [...baseArr];
@@ -56,12 +57,10 @@ function GroupCards() {
   const dispatch = useDispatch();
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
-  
-  // Use overlay hook to get base scenario info
   const { baseScenario, isBasedScenario } = useOverlayData();
-  
+
   // Use overlay-aware selector for groups
-  const groups = useSelector(state => 
+  const groups = useSelector(state =>
     selectGroups(state, selectedScenarioId, baseScenario?.id, selectedItemId)
   );
 

@@ -3,7 +3,6 @@ import HighchartsReact from 'highcharts-react-official';
 import Highcharts from 'highcharts';
 import { useSelector } from 'react-redux';
 import Box from '@mui/material/Box';
-import { calculateChartData, getNamesForSegment } from '../../utils/chartUtils';
 
 
 export default function WeeklyChart({ scenario }) {
@@ -211,6 +210,7 @@ export default function WeeklyChart({ scenario }) {
   return (
     <Box sx={{ flex: 1, p: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       {/* ChartFilterForm removed; now rendered in DataPage */}
+      {/* Chart */}
       <Box sx={{ flex: 1, minHeight: 0 }}>
         <HighchartsReact highcharts={Highcharts} options={weeklyOptions} />
       </Box>

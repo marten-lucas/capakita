@@ -16,9 +16,10 @@ import { updateDataItemThunk } from '../../store/simDataSlice';
 const selectQualificationDefs = createSelector(
   [
     state => state.simQualification.qualificationDefsByScenario,
-    (state, scenarioId, baseScenarioId) => ({ scenarioId, baseScenarioId })
+    (state, scenarioId) => scenarioId,
+    (state, scenarioId, baseScenarioId) => baseScenarioId
   ],
-  (qualificationDefsByScenario, { scenarioId, baseScenarioId }) => {
+  (qualificationDefsByScenario, scenarioId, baseScenarioId) => {
     const currentDefs = qualificationDefsByScenario[scenarioId] || [];
     const baseDefs = baseScenarioId ? (qualificationDefsByScenario[baseScenarioId] || []) : [];
     
@@ -41,10 +42,11 @@ const selectQualificationAssignments = createSelector(
   [
     state => state.simQualification.qualificationAssignmentsByScenario,
     state => state.simOverlay.overlaysByScenario,
-    (state, scenarioId, baseScenarioId) => ({ scenarioId, baseScenarioId }),
+    (state, scenarioId) => scenarioId,
+    (state, scenarioId, baseScenarioId) => baseScenarioId,
     (state, scenarioId, baseScenarioId, itemId) => itemId
   ],
-  (qualificationAssignmentsByScenario, overlaysByScenario, { scenarioId, baseScenarioId }, itemId) => {
+  (qualificationAssignmentsByScenario, overlaysByScenario, scenarioId, baseScenarioId, itemId) => {
     if (!scenarioId || !itemId) return [];
 
     // Overlay support for based scenarios
@@ -71,6 +73,22 @@ const selectQualificationAssignments = createSelector(
     }
 
     return [];
+  }
+);
+
+const selectBaseAssignments = createSelector(
+  [
+    state => state.simQualification.qualificationAssignmentsByScenario,
+    (state, baseScenarioId) => baseScenarioId,
+    (state, baseScenarioId, selectedItemId) => selectedItemId
+  ],
+  (qualificationAssignmentsByScenario, baseScenarioId, selectedItemId) => {
+    if (!baseScenarioId || !selectedItemId) return [];
+    
+    const baseScenarioAssignments = qualificationAssignmentsByScenario[baseScenarioId];
+    if (!baseScenarioAssignments || !baseScenarioAssignments[selectedItemId]) return [];
+    
+    return Object.values(baseScenarioAssignments[selectedItemId]);
   }
 );
 
@@ -134,11 +152,7 @@ function SimDataGeneralTab() {
   };
 
   // Get base assignment for this item (for overlay revert logic)
-  const baseAssignments = useSelector(state =>
-    baseScenario?.id && state.simQualification.qualificationAssignmentsByScenario[baseScenario.id]?.[selectedItemId]
-      ? Object.values(state.simQualification.qualificationAssignmentsByScenario[baseScenario.id][selectedItemId])
-      : []
-  );
+  const baseAssignments = useSelector(state => selectBaseAssignments(state, baseScenario?.id, selectedItemId));
   const baseAssignment = baseAssignments[0]; // assuming one assignment per item
 
   // Handler for qualification change
