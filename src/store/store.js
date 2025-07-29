@@ -5,6 +5,7 @@ import simBookingReducer from './simBookingSlice';
 import simGroupReducer from './simGroupSlice';
 import simQualificationReducer from './simQualificationSlice';
 import simFinancialsReducer from './simFinancialsSlice';
+import simOverlayReducer from './simOverlaySlice';
 import chartReducer from './chartSlice';
 
 const store = configureStore({
@@ -15,6 +16,7 @@ const store = configureStore({
     simGroup: simGroupReducer,
     simQualification: simQualificationReducer,
     simFinancials: simFinancialsReducer,
+    simOverlay: simOverlayReducer,
     chart: chartReducer,
   },
 });

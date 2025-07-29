@@ -5,12 +5,17 @@ import {
 import SimDataTabs from './SimDataTabs';
 import { useSelector, useDispatch } from 'react-redux';
 import { deleteDataItem } from '../../store/simDataSlice';
+import { useOverlayData } from '../../hooks/useOverlayData';
 
 function SimDataDetailForm() {
   // Get scenarioId and selected item id from Redux store
   const scenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[scenarioId]);
-  const item = useSelector(state => state.simData.dataByScenario[scenarioId]?.[selectedItemId]);
+  
+  // Use overlay hook to get effective data
+  const { getEffectiveDataItem } = useOverlayData();
+  const item = getEffectiveDataItem(selectedItemId);
+  
   const dispatch = useDispatch();
 
   // Guard: Wenn item nicht gesetzt, Hinweis anzeigen und return

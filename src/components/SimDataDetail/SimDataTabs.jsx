@@ -1,7 +1,6 @@
 import {
   Typography,
   Box,
-
   Tabs,
   Tab
 } from '@mui/material';
@@ -11,17 +10,14 @@ import PersonIcon from '@mui/icons-material/Person';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import GroupIcon from '@mui/icons-material/Group';
 import EuroIcon from '@mui/icons-material/Euro';
-import BugReportIcon from '@mui/icons-material/BugReport'; // Add icon for debug tab
+import BugReportIcon from '@mui/icons-material/BugReport';
 import SimDataGeneralTab from './SimDataGeneralTab';
 import SimDataBookingTab from './Bookings/SimDataBookingTab';
 import SimDataGroupsTab from './Groups/SimDataGroupsTab';
 import SimDataFinanceTab from './Financials/SimDataFinanceTab';
 import React, { useState } from 'react';
 import { useSelector } from 'react-redux';
-
-
-
-
+import { useOverlayData } from '../../hooks/useOverlayData';
 
 function SimDataTabs() {
   const [activeTab, setActiveTab] = useState(0);
@@ -30,11 +26,12 @@ function SimDataTabs() {
   const scenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[scenarioId]);
 
-  
+  // Use overlay hook to get effective data
+  const { getEffectiveDataItem } = useOverlayData();
+  const item = getEffectiveDataItem(selectedItemId);
 
-  
-  // Guard: Wenn item nicht gesetzt, Hinweis anzeigen und return
-  if (!selectedItemId) {
+  // Guard: If no item selected or no effective item found
+  if (!selectedItemId || !item) {
     return (
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
         <Typography color="text.secondary">
@@ -54,7 +51,7 @@ function SimDataTabs() {
       >
         <Tab icon={<PersonIcon />} label="Allgemein" />
         <Tab icon={<AccessTimeIcon />} label="Zeiten" />
-         <Tab icon={<GroupIcon />} label="Gruppen" />
+        <Tab icon={<GroupIcon />} label="Gruppen" />
         {/*<Tab icon={<EuroIcon />} label="Finanzen" /> */}
       </Tabs>
       {activeTab === 0 && (
@@ -72,7 +69,6 @@ function SimDataTabs() {
           item={item}
         />
       )} */}
-
     </Box>
   );
 }

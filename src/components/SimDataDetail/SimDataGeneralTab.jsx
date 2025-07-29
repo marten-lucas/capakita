@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import {
   Typography, Box, TextField, Button,
-  FormControl, RadioGroup, FormControlLabel, Radio
+  FormControl, RadioGroup, FormControlLabel, Radio, Chip
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
+import RestoreIcon from '@mui/icons-material/Restore';
 import ModMonitor from './ModMonitor';
 import QualificationPicker from './QualificationPicker';
 import { useSelector, useDispatch } from 'react-redux';
 import { createSelector } from '@reduxjs/toolkit';
+import { useOverlayData } from '../../hooks/useOverlayData';
 
 // Create memoized selectors
 const selectQualificationDefs = createSelector(
@@ -40,8 +42,19 @@ function SimDataGeneralTab() {
   const dispatch = useDispatch();
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
-  // Get the item directly by key
-  const item = useSelector(state => state.simData.dataByScenario[selectedScenarioId]?.[selectedItemId]);
+  
+  // Use overlay hook
+  const { 
+    isBasedScenario, 
+    getEffectiveDataItem, 
+    updateDataItem, 
+    hasOverlay, 
+    revertToBase,
+    baseScenario 
+  } = useOverlayData();
+  
+  // Get effective item data (overlay if exists, otherwise base/direct data)
+  const item = getEffectiveDataItem(selectedItemId);
 
   // Use memoized selectors
   const qualiDefs = useSelector(state => selectQualificationDefs(state, selectedScenarioId));
@@ -76,19 +89,13 @@ function SimDataGeneralTab() {
   const handleDeleteItem = () => {
     dispatch({
       type: 'simData/deleteDataItem',
-      payload: { scenarioId: selectedScenarioId, itemId: selectedItemId } // use store key
+      payload: { scenarioId: selectedScenarioId, itemId: selectedItemId }
     });
     dispatch({
       type: 'simScenario/setSelectedItem',
       payload: null
     });
   };
-
-  // For capacity: derive selected qualification from assignment if present
-  // const selectedQualification =
-  //   item?.type === 'capacity'
-  //     ? (qualificationAssignment?.qualification ?? '')
-  //     : (item?.qualification ?? '');
 
   // Handler for qualification change
   const handleQualificationChange = (newKey) => {
@@ -104,6 +111,13 @@ function SimDataGeneralTab() {
     });
   };
 
+  // Handle revert to base for overlay scenarios
+  const handleRevertToBase = () => {
+    if (isBasedScenario && hasOverlay(selectedItemId)) {
+      revertToBase(selectedItemId);
+    }
+  };
+
   // Guard: If item is null, show a placeholder and return
   if (!item) {
     return (
@@ -115,6 +129,34 @@ function SimDataGeneralTab() {
 
   return (
     <Box flex={1} display="flex" flexDirection="column" sx={{ overflowY: 'auto', gap: 0 }}>
+      {/* Show overlay indicator and revert button for based scenarios */}
+      {isBasedScenario && (
+        <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Typography variant="body2" color="text.secondary">
+            Basiert auf: {baseScenario?.name || 'Unbekannt'}
+          </Typography>
+          {hasOverlay(selectedItemId) && (
+            <>
+              <Chip 
+                label="Geändert" 
+                size="small" 
+                color="warning" 
+                variant="outlined"
+              />
+              <Button
+                size="small"
+                startIcon={<RestoreIcon />}
+                onClick={handleRevertToBase}
+                variant="outlined"
+                color="secondary"
+              >
+                Auf Basis zurücksetzen
+              </Button>
+            </>
+          )}
+        </Box>
+      )}
+
       {isManualEntry && (
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
           <Button
@@ -137,10 +179,7 @@ function SimDataGeneralTab() {
           onChange={(e) => setLocalName(e.target.value)}
           onBlur={() => {
             if (localName !== item.name) {
-              dispatch({
-                type: 'simData/updateDataItemFields',
-                payload: { scenarioId: selectedScenarioId, itemId: selectedItemId, fields: { name: localName } } // use selectedItemId
-              });
+              updateDataItem(selectedItemId, { name: localName });
             }
           }}
           size="small"
@@ -157,10 +196,7 @@ function SimDataGeneralTab() {
           onChange={(e) => setLocalNote(e.target.value)}
           onBlur={() => {
             if (localNote !== item.remark) {
-              dispatch({
-                type: 'simData/updateDataItemFields',
-                payload: { scenarioId: selectedScenarioId, itemId: selectedItemId, fields: { remark: localNote } } // use selectedItemId
-              });
+              updateDataItem(selectedItemId, { remark: localNote });
             }
           }}
           size="small"
@@ -182,24 +218,12 @@ function SimDataGeneralTab() {
               value={localDateOfBirth}
               onChange={(e) => {
                 setLocalDateOfBirth(e.target.value);
-                dispatch({
-                  type: 'simData/updateDataItemFields',
-                  payload: { scenarioId: selectedScenarioId, itemId: selectedItemId, fields: { dateofbirth: e.target.value } } // use selectedItemId
-                });
+                updateDataItem(selectedItemId, { dateofbirth: e.target.value });
               }}
               size="small"
               sx={{ width: 355 }}
               InputLabelProps={{ shrink: true }}
             />
-            {/* <ModMonitor
-              itemId={item.id}
-              field="dateofbirth"
-              value={item.dateofbirth ?? ''}
-              originalValue={initialDateOfBirth}
-              onRestore={() => simDataStore.updateDataItemFields(scenarioId, item.id, { dateofbirth: initialDateOfBirth })}
-              title="Geburtsdatum auf importierten Wert zurücksetzen"
-              confirmMsg="Geburtsdatum auf importierten Wert zurücksetzen?"
-            /> */}
           </Box>
         </Box>
       )}
@@ -216,22 +240,10 @@ function SimDataGeneralTab() {
             value={localStartDate}
             onChange={(e) => {
               setLocalStartDate(e.target.value);
-              dispatch({
-                type: 'simData/updateDataItemFields',
-                payload: { scenarioId: selectedScenarioId, itemId: selectedItemId, fields: { startdate: e.target.value } } // use selectedItemId
-              });
+              updateDataItem(selectedItemId, { startdate: e.target.value });
             }}
             sx={{ width: 150 }}
           />
-          {/* <ModMonitor
-            itemId={item.id}
-            field="startdate"
-            value={item.startdate ?? ''}
-            originalValue={initialStartDate}
-            onRestore={() => simDataStore.updateDataItemFields(scenarioId, item.id, { startdate: initialStartDate })}
-            title="Startdatum auf importierten Wert zurücksetzen"
-            confirmMsg="Startdatum auf importierten Wert zurücksetzen?"
-          /> */}
           <Typography variant="body2" sx={{ minWidth: 24, textAlign: 'center' }}>bis</Typography>
           <TextField
             label="bis"
@@ -241,22 +253,10 @@ function SimDataGeneralTab() {
             value={localEndDate}
             onChange={(e) => {
               setLocalEndDate(e.target.value);
-              dispatch({
-                type: 'simData/updateDataItemFields',
-                payload: { scenarioId: selectedScenarioId, itemId: selectedItemId, fields: { enddate: e.target.value } } // use selectedItemId
-              });
+              updateDataItem(selectedItemId, { enddate: e.target.value });
             }}
             sx={{ width: 150 }}
           />
-          {/* <ModMonitor
-            itemId={item.id}
-            field="enddate"
-            value={item.enddate ?? ''}
-            originalValue={initialEndDate}
-            onRestore={() => simDataStore.updateDataItemFields(scenarioId, item.id, { enddate: initialEndDate })}
-            title="Enddatum auf importierten Wert zurücksetzen"
-            confirmMsg="Enddatum auf importierten Wert zurücksetzen?"
-          /> */}
         </Box>
       </Box>
       
@@ -273,7 +273,6 @@ function SimDataGeneralTab() {
       )}
 
       {/* Abwesenheiten */}
-
       <Box sx={{ mt: 4, mb: 2 }}>
         <Button
           variant="outlined"
@@ -283,10 +282,7 @@ function SimDataGeneralTab() {
             const newAbsence = { start: '', end: '' };
             const newList = [...absences, newAbsence];
             setLocalAbsences(newList);
-            dispatch({
-              type: 'simData/updateDataItemFields',
-              payload: { scenarioId: selectedScenarioId, itemId: selectedItemId, fields: { absences: newList } } // use selectedItemId
-            });
+            updateDataItem(selectedItemId, { absences: newList });
           }}
           sx={{ mb: 1 }}
         >
@@ -316,10 +312,7 @@ function SimDataGeneralTab() {
                       const newAbsence = { ...absence, start: e.target.value };
                       const newList = localAbsences.map((a, i) => (i === idx ? newAbsence : a));
                       setLocalAbsences(newList);
-                      dispatch({
-                        type: 'simData/updateDataItemFields',
-                        payload: { scenarioId: selectedScenarioId, itemId: selectedItemId, fields: { absences: newList } } // use selectedItemId
-                      });
+                      updateDataItem(selectedItemId, { absences: newList });
                     }}
                     sx={{ width: 130 }}
                     inputProps={{ min: new Date().toISOString().split('T')[0] }}
@@ -335,10 +328,7 @@ function SimDataGeneralTab() {
                       const newAbsence = { ...absence, end: e.target.value };
                       const newList = localAbsences.map((a, i) => (i === idx ? newAbsence : a));
                       setLocalAbsences(newList);
-                      dispatch({
-                        type: 'simData/updateDataItemFields',
-                        payload: { scenarioId: selectedScenarioId, itemId: selectedItemId, fields: { absences: newList } } // use selectedItemId
-                      });
+                      updateDataItem(selectedItemId, { absences: newList });
                     }}
                     sx={{ width: 130 }}
                     inputProps={{ min: new Date().toISOString().split('T')[0] }}
@@ -353,10 +343,7 @@ function SimDataGeneralTab() {
                     onClick={() => {
                       const newList = localAbsences.filter((_, i) => i !== idx);
                       setLocalAbsences(newList);
-                      dispatch({
-                        type: 'simData/updateDataItemFields',
-                        payload: { scenarioId: selectedScenarioId, itemId: selectedItemId, fields: { absences: newList } } // use selectedItemId
-                      });
+                      updateDataItem(selectedItemId, { absences: newList });
                     }}
                     sx={{ ml: 1 }}
                   >
@@ -368,8 +355,6 @@ function SimDataGeneralTab() {
           </Box>
         )}
       </Box>
-
-
     </Box>
   );
 }

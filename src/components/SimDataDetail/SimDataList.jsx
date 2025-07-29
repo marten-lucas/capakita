@@ -1,8 +1,9 @@
 import React, { useMemo } from 'react';
-import { List, ListItemButton, ListItemText, Divider, Box } from '@mui/material';
+import { List, ListItemButton, ListItemText, Divider, Box, Chip } from '@mui/material';
 import { useSelector, useDispatch } from 'react-redux';
 import { setSelectedItem } from '../../store/simScenarioSlice';
 import { deleteDataItemThunk } from '../../store/simDataSlice';
+import { useOverlayData } from '../../hooks/useOverlayData';
 import DeleteIcon from '@mui/icons-material/Delete';
 import IconButton from '@mui/material/IconButton';
 
@@ -14,14 +15,13 @@ function SimDataList() {
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
 
-  // Fix: always return same reference for empty object
-  const dataByScenario = useSelector(
-    state => state.simData.dataByScenario[selectedScenarioId] || EMPTY_OBJECT
-  );
+  // Use overlay hook to get effective data
+  const { getEffectiveDataItems, hasOverlay, isBasedScenario } = useOverlayData();
+  const effectiveDataItems = getEffectiveDataItems();
 
   const data = useMemo(
-    () => Object.entries(dataByScenario).map(([key, item]) => ({ ...item, _key: key })),
-    [dataByScenario]
+    () => Object.entries(effectiveDataItems).map(([key, item]) => ({ ...item, _key: key })),
+    [effectiveDataItems]
   );
 
   // Define colors for demand/capacity
@@ -37,6 +37,7 @@ function SimDataList() {
       </Box>
     );
   }
+  
   return (
     <List
       sx={{
@@ -50,6 +51,8 @@ function SimDataList() {
       }}
     >
       {data.map((item) => {
+        const itemHasOverlay = isBasedScenario && hasOverlay(item._key);
+        
         return (
           <div key={item._key}>
             <ListItemButton
@@ -61,6 +64,15 @@ function SimDataList() {
                 primary={
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <span>{item.name}</span>
+                    {itemHasOverlay && (
+                      <Chip 
+                        label="Geändert" 
+                        size="small" 
+                        color="warning" 
+                        variant="outlined"
+                        sx={{ fontSize: '0.6rem', height: 20 }}
+                      />
+                    )}
                   </Box>
                 }
                 secondaryTypographyProps={{ component: 'div' }}

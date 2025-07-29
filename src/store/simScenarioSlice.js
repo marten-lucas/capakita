@@ -37,6 +37,19 @@ const simScenarioSlice = createSlice({
         importedAnonymized: action.payload.importedAnonymized ?? false, // ensure default for manual add
         ...action.payload // <-- merge all other properties from payload
       };
+      
+      // Make name unique if requested
+      if (action.payload.makeNameUnique) {
+        const existingNames = state.scenarios.map(s => s.name);
+        let counter = 1;
+        let uniqueName = scenario.name;
+        while (existingNames.includes(uniqueName)) {
+          uniqueName = `${scenario.name} (${counter})`;
+          counter++;
+        }
+        scenario.name = uniqueName;
+      }
+      
       state.scenarios.push(scenario);
       state.selectedScenarioId = scenario.id; 
     },
@@ -138,6 +151,7 @@ export const importScenario = ({
 export const deleteScenario = (scenarioId) => (dispatch) => {
   dispatch(simScenarioSlice.actions.deleteScenario(scenarioId));
   dispatch({ type: 'simData/deleteAllDataForScenario', payload: { scenarioId } });
+  dispatch({ type: 'simOverlay/deleteAllOverlaysForScenario', payload: { scenarioId } });
 };
 
 export const {

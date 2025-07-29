@@ -23,6 +23,7 @@ import PersonIcon from '@mui/icons-material/Person';
 import ChildCareIcon from '@mui/icons-material/ChildCare';
 import LayersIcon from '@mui/icons-material/Layers';
 import { useScenarioImport } from '../hooks/useScenarioImport';
+import { useOverlayData } from '../hooks/useOverlayData';
 
 function DataPage() {
   const [modalOpen, setModalOpen] = useState(false);
@@ -32,12 +33,14 @@ function DataPage() {
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const scenarios = useSelector(state => state.simScenario.scenarios);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
-  const selectedItem = useSelector(state => state.simData.dataByScenario[selectedScenarioId]?.[selectedItemId]);
   
-  // Simplified selector usage without unnecessary memoization
-  const simulationData = useSelector(state => {
-    return selectedScenarioId ? selectDataItemsByScenario(state, selectedScenarioId) : [];
-  });
+  // Use overlay hook to get effective data
+  const { getEffectiveDataItems, getEffectiveDataItem } = useOverlayData();
+  const effectiveDataItems = getEffectiveDataItems();
+  const selectedItem = getEffectiveDataItem(selectedItemId);
+  
+  // Convert effective data items to array for checking length
+  const simulationData = Object.values(effectiveDataItems || {});
 
   const { importScenario } = useScenarioImport();
 
