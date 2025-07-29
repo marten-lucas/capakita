@@ -82,6 +82,11 @@ const simOverlaySlice = createSlice({
       if (!state.overlaysByScenario[scenarioId]) {
         state.overlaysByScenario[scenarioId] = {};
       }
+      if (!state.overlaysByScenario[scenarioId].qualificationDefs) {
+        state.overlaysByScenario[scenarioId].qualificationDefs = [];
+      }
+
+      // Merge or replace the overlay data
       state.overlaysByScenario[scenarioId].qualificationDefs = overlayData;
     },
     removeQualificationDefOverlay(state, action) {

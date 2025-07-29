@@ -42,27 +42,47 @@ const simQualificationSlice = createSlice({
     },
     addQualificationAssignment(state, action) {
       const { scenarioId, dataItemId, assignment } = action.payload;
-      if (!state.qualificationAssignmentsByScenario[scenarioId]) state.qualificationAssignmentsByScenario[scenarioId] = {};
+      if (!state.qualificationAssignmentsByScenario[scenarioId]) {
+        state.qualificationAssignmentsByScenario[scenarioId] = {};
+      }
       const itemId = String(dataItemId);
-      if (!state.qualificationAssignmentsByScenario[scenarioId][itemId]) state.qualificationAssignmentsByScenario[scenarioId][itemId] = {};
-      const id = assignment.id ? String(assignment.id) : `${assignment.qualification}-${Date.now()}`;
-      state.qualificationAssignmentsByScenario[scenarioId][itemId][id] = { ...assignment, id };
+      if (!state.qualificationAssignmentsByScenario[scenarioId][itemId]) {
+        state.qualificationAssignmentsByScenario[scenarioId][itemId] = {};
+      }
+
+      // Prevent duplicate qualifications
+      const existingAssignment = Object.values(
+        state.qualificationAssignmentsByScenario[scenarioId][itemId]
+      ).find((a) => a.qualification === assignment.qualification);
+
+      if (existingAssignment) {
+        return; // Do nothing if the qualification already exists
+      }
+
+      const id = assignment.id
+        ? String(assignment.id)
+        : `${assignment.qualification}-${Date.now()}-${Math.random()}`;
+      state.qualificationAssignmentsByScenario[scenarioId][itemId][id] = {
+        ...assignment,
+        id,
+        dataItemId: itemId, // Ensure dataItemId is included
+      };
     },
     updateQualificationAssignment(state, action) {
       const { scenarioId, dataItemId, assignmentId, updates } = action.payload;
       const itemId = String(dataItemId);
       const id = String(assignmentId);
-      if (!state.qualificationAssignmentsByScenario[scenarioId]) state.qualificationAssignmentsByScenario[scenarioId] = {};
-      if (!state.qualificationAssignmentsByScenario[scenarioId][itemId]) state.qualificationAssignmentsByScenario[scenarioId][itemId] = {};
-      if (!state.qualificationAssignmentsByScenario[scenarioId][itemId][id]) {
+
+      if (!state.qualificationAssignmentsByScenario[scenarioId]) return;
+      if (!state.qualificationAssignmentsByScenario[scenarioId][itemId]) return;
+
+      const existingAssignment = state.qualificationAssignmentsByScenario[scenarioId][itemId][id];
+      if (existingAssignment) {
         state.qualificationAssignmentsByScenario[scenarioId][itemId][id] = {
-          id,
+          ...existingAssignment,
+          ...updates,
         };
       }
-      state.qualificationAssignmentsByScenario[scenarioId][itemId][id] = {
-        ...state.qualificationAssignmentsByScenario[scenarioId][itemId][id],
-        ...updates
-      };
     },
     deleteQualificationAssignment(state, action) {
       const { scenarioId, dataItemId, assignmentId } = action.payload;

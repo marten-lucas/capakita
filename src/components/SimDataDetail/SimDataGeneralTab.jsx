@@ -39,18 +39,28 @@ const selectQualificationDefs = createSelector(
 const selectQualificationAssignments = createSelector(
   [
     state => state.simQualification.qualificationAssignmentsByScenario,
+    state => state.simOverlay.overlaysByScenario,
     (state, scenarioId, baseScenarioId) => ({ scenarioId, baseScenarioId }),
     (state, scenarioId, baseScenarioId, itemId) => itemId
   ],
-  (qualificationAssignmentsByScenario, { scenarioId, baseScenarioId }, itemId) => {
+  (qualificationAssignmentsByScenario, overlaysByScenario, { scenarioId, baseScenarioId }, itemId) => {
     if (!scenarioId || !itemId) return [];
-    
+
+    // Overlay support for based scenarios
+    const overlayAssignments = overlaysByScenario[scenarioId]?.qualificationDefs || [];
+
+    // If overlay exists for this item, use it
+    const overlayForItem = overlayAssignments.find(a => String(a.dataItemId) === String(itemId));
+    if (overlayForItem) {
+      return [overlayForItem];
+    }
+
     // Try current scenario first
     const currentScenarioAssignments = qualificationAssignmentsByScenario[scenarioId];
     if (currentScenarioAssignments && currentScenarioAssignments[itemId]) {
       return Object.values(currentScenarioAssignments[itemId]);
     }
-    
+
     // If no assignments in current scenario and we have a base scenario, try base
     if (baseScenarioId) {
       const baseScenarioAssignments = qualificationAssignmentsByScenario[baseScenarioId];
@@ -58,7 +68,7 @@ const selectQualificationAssignments = createSelector(
         return Object.values(baseScenarioAssignments[itemId]);
       }
     }
-    
+
     return [];
   }
 );
@@ -125,16 +135,43 @@ function SimDataGeneralTab() {
 
   // Handler for qualification change
   const handleQualificationChange = (newKey) => {
-    // Update assignment in store
-    dispatch({
-      type: 'simQualification/importQualificationAssignments',
-      payload: {
-        scenarioId: selectedScenarioId,
-        assignments: qualiAssignments
-          .filter(a => String(a.dataItemId) !== String(selectedItemId))
-          .concat([{ dataItemId: selectedItemId, qualification: newKey }])
-      }
-    });
+    const existingAssignment = qualiAssignments.find(
+      (a) => String(a.dataItemId) === String(selectedItemId)
+    );
+
+    if (isBasedScenario) {
+      // For based scenarios, create or update an overlay
+      dispatch({
+        type: 'simOverlay/setQualificationDefOverlay',
+        payload: {
+          scenarioId: selectedScenarioId,
+          overlayData: qualiAssignments
+            .filter((a) => String(a.dataItemId) !== String(selectedItemId))
+            .concat([{ dataItemId: selectedItemId, qualification: newKey }]),
+        },
+      });
+    } else if (existingAssignment) {
+      // For base scenarios, update the qualification assignment
+      dispatch({
+        type: 'simQualification/updateQualificationAssignment',
+        payload: {
+          scenarioId: selectedScenarioId,
+          dataItemId: selectedItemId,
+          assignmentId: existingAssignment.id,
+          updates: { qualification: newKey },
+        },
+      });
+    } else {
+      // For base scenarios, add the qualification assignment
+      dispatch({
+        type: 'simQualification/addQualificationAssignment',
+        payload: {
+          scenarioId: selectedScenarioId,
+          dataItemId: selectedItemId,
+          assignment: { qualification: newKey, dataItemId: selectedItemId },
+        },
+      });
+    }
   };
 
   // Handle revert to base for overlay scenarios

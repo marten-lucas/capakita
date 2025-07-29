@@ -106,6 +106,14 @@ export function useOverlayData() {
     dispatch(removeDataItemOverlay({ scenarioId: selectedScenarioId, itemId }));
   }, [selectedScenarioId, selectedScenario, dispatch]);
 
+  // Function to check if a qualification assignment has an overlay
+  const hasQualificationOverlay = useCallback((itemId) => {
+    if (!selectedScenarioId || !selectedScenario?.baseScenarioId) return false;
+    return !!overlaysByScenario[selectedScenarioId]?.qualificationDefs?.find(
+      (assignment) => assignment.dataItemId === itemId
+    );
+  }, [selectedScenarioId, selectedScenario, overlaysByScenario]);
+
   return {
     selectedScenario,
     baseScenario,
@@ -115,5 +123,6 @@ export function useOverlayData() {
     updateDataItem,
     hasOverlay,
     revertToBase,
+    hasQualificationOverlay,
   };
 }
