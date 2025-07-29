@@ -21,7 +21,6 @@ function BookingDetail({ index }) {
     const scenario = state.simScenario.scenarios.find(s => s.id === selectedScenarioId);
     return scenario?.baseScenarioId || null;
   });
-  const overlaysByScenario = useSelector(state => state.simOverlay.overlaysByScenario);
 
   // Use overlay hook to get effective data
   const { getEffectiveDataItem } = useOverlayData();

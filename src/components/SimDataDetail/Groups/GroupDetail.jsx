@@ -9,7 +9,7 @@ import ModMonitor from '../ModMonitor';
 import { useSelector, useDispatch } from 'react-redux';
 import { createSelector } from '@reduxjs/toolkit';
 import { getBookings } from '../../../store/simBookingSlice';
-import { updateGroup, deleteGroup } from '../../../store/simGroupSlice';
+import { deleteGroup } from '../../../store/simGroupSlice';
 import { useOverlayData } from '../../../hooks/useOverlayData';
 
 const EMPTY_GROUP_DEFS = [];

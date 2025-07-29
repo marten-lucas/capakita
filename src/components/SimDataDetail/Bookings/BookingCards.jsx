@@ -5,7 +5,6 @@ import BookingDetail from './BookingDetail';
 import { useSelector } from 'react-redux';
 import { consolidateBookingSummary } from '../../../utils/bookingUtils';
 import { createSelector } from '@reduxjs/toolkit';
-import { useOverlayData } from '../../../hooks/useOverlayData';
 
 
 // Hilfsfunktion analog zu SimDataList
@@ -36,7 +35,6 @@ function BookingCards() {
     const scenario = state.simScenario.scenarios.find(s => s.id === selectedScenarioId);
     return scenario?.baseScenarioId || null;
   });
-  const overlaysByScenario = useSelector(state => state.simOverlay.overlaysByScenario);
 
   // Memoized selector for bookings with overlay support
   const bookingsSelector = React.useMemo(() =>
