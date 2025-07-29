@@ -17,49 +17,112 @@ function BookingDetail({ index }) {
   const dispatch = useDispatch();
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
-  
+  const baseScenarioId = useSelector(state => {
+    const scenario = state.simScenario.scenarios.find(s => s.id === selectedScenarioId);
+    return scenario?.baseScenarioId || null;
+  });
+  const overlaysByScenario = useSelector(state => state.simOverlay.overlaysByScenario);
+
   // Use overlay hook to get effective data
   const { getEffectiveDataItem } = useOverlayData();
   const item = getEffectiveDataItem(selectedItemId);
 
-  // Create memoized selector for bookings
-  const bookingsSelector = React.useMemo(() => 
+  // Overlay-aware selector for bookings
+  const bookingsSelector = React.useMemo(() =>
     createSelector(
       [
         state => state.simBooking.bookingsByScenario,
+        state => state.simOverlay.overlaysByScenario,
         () => selectedScenarioId,
+        () => baseScenarioId,
         () => selectedItemId
       ],
-      (bookingsByScenario, scenarioId, itemId) => {
+      (bookingsByScenario, overlaysByScenario, scenarioId, baseScenarioId, itemId) => {
         if (!scenarioId || !itemId) return EMPTY_BOOKINGS;
+
+        // Overlay support for based scenarios
+        const overlayBookings = overlaysByScenario[scenarioId]?.bookings?.[itemId];
+        if (overlayBookings) {
+          return Object.values(overlayBookings);
+        }
+
+        // Try current scenario first
         const scenarioBookings = bookingsByScenario[scenarioId];
-        if (!scenarioBookings) return EMPTY_BOOKINGS;
-        const itemBookings = scenarioBookings[itemId];
-        return itemBookings ? Object.values(itemBookings) : EMPTY_BOOKINGS;
+        if (scenarioBookings && scenarioBookings[itemId]) {
+          return Object.values(scenarioBookings[itemId]);
+        }
+
+        // If no bookings in current scenario and we have a base scenario, try base
+        if (baseScenarioId) {
+          const baseScenarioBookings = bookingsByScenario[baseScenarioId];
+          if (baseScenarioBookings && baseScenarioBookings[itemId]) {
+            return Object.values(baseScenarioBookings[itemId]);
+          }
+        }
+
+        return EMPTY_BOOKINGS;
       }
     ),
-    [selectedScenarioId, selectedItemId]
+    [selectedScenarioId, baseScenarioId, selectedItemId]
   );
-  
+
   const bookings = useSelector(bookingsSelector);
   const booking = bookings?.[index];
+
+  // Get base booking for overlay comparison
+  const baseBooking = useSelector(state => {
+    if (!baseScenarioId || !selectedItemId || !booking?.id) return undefined;
+    const baseBookings = state.simBooking.bookingsByScenario[baseScenarioId]?.[selectedItemId];
+    return baseBookings ? baseBookings[booking.id] : undefined;
+  });
+
   const originalBooking = undefined;
   const type = item?.type;
   const parentItemId = selectedItemId;
   const isManualEntry = item?.rawdata?.source === 'manual entry';
 
-  // Helper to update the booking in the store
+  // Helper to update the booking in the store or overlay
   const handleUpdateBooking = (updatedBooking) => {
     if (!selectedScenarioId || !selectedItemId || !booking?.id) return;
-    dispatch({
-      type: 'simBooking/updateBooking',
-      payload: {
-        scenarioId: selectedScenarioId,
-        dataItemId: selectedItemId,
-        bookingId: booking.id,
-        updates: updatedBooking
+
+    // If in a based scenario, use overlays
+    if (baseScenarioId) {
+      // Compare with base booking
+      const isIdenticalToBase = baseBooking && JSON.stringify(updatedBooking) === JSON.stringify(baseBooking);
+      if (isIdenticalToBase) {
+        // Remove overlay if matches base
+        dispatch({
+          type: 'simOverlay/removeBookingOverlay',
+          payload: {
+            scenarioId: selectedScenarioId,
+            itemId: selectedItemId,
+            bookingId: booking.id
+          }
+        });
+      } else {
+        // Set overlay if different from base
+        dispatch({
+          type: 'simOverlay/setBookingOverlay',
+          payload: {
+            scenarioId: selectedScenarioId,
+            itemId: selectedItemId,
+            bookingId: booking.id,
+            overlayData: updatedBooking
+          }
+        });
       }
-    });
+    } else {
+      // Regular scenario - update directly in simBooking
+      dispatch({
+        type: 'simBooking/updateBooking',
+        payload: {
+          scenarioId: selectedScenarioId,
+          dataItemId: selectedItemId,
+          bookingId: booking.id,
+          updates: updatedBooking
+        }
+      });
+    }
   };
 
   const handleDayToggle = (dayAbbr, isEnabled) => {

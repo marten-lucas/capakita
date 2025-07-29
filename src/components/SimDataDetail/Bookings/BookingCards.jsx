@@ -5,6 +5,7 @@ import BookingDetail from './BookingDetail';
 import { useSelector } from 'react-redux';
 import { consolidateBookingSummary } from '../../../utils/bookingUtils';
 import { createSelector } from '@reduxjs/toolkit';
+import { useOverlayData } from '../../../hooks/useOverlayData';
 
 
 // Hilfsfunktion analog zu SimDataList
@@ -31,26 +32,51 @@ function BookingCards() {
   // Use selector for bookings of the selected item
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems[selectedScenarioId]);
-  
-  // Create memoized selector for bookings
-  const bookingsSelector = React.useMemo(() => 
+  const baseScenarioId = useSelector(state => {
+    const scenario = state.simScenario.scenarios.find(s => s.id === selectedScenarioId);
+    return scenario?.baseScenarioId || null;
+  });
+  const overlaysByScenario = useSelector(state => state.simOverlay.overlaysByScenario);
+
+  // Memoized selector for bookings with overlay support
+  const bookingsSelector = React.useMemo(() =>
     createSelector(
       [
         state => state.simBooking.bookingsByScenario,
+        state => state.simOverlay.overlaysByScenario,
         () => selectedScenarioId,
+        () => baseScenarioId,
         () => selectedItemId
       ],
-      (bookingsByScenario, scenarioId, itemId) => {
+      (bookingsByScenario, overlaysByScenario, scenarioId, baseScenarioId, itemId) => {
         if (!scenarioId || !itemId) return EMPTY_BOOKINGS;
+
+        // Overlay support for based scenarios
+        const overlayBookings = overlaysByScenario[scenarioId]?.bookings?.[itemId];
+        if (overlayBookings) {
+          return Object.values(overlayBookings);
+        }
+
+        // Try current scenario first
         const scenarioBookings = bookingsByScenario[scenarioId];
-        if (!scenarioBookings) return EMPTY_BOOKINGS;
-        const itemBookings = scenarioBookings[itemId];
-        return itemBookings ? Object.values(itemBookings) : EMPTY_BOOKINGS;
+        if (scenarioBookings && scenarioBookings[itemId]) {
+          return Object.values(scenarioBookings[itemId]);
+        }
+
+        // If no bookings in current scenario and we have a base scenario, try base
+        if (baseScenarioId) {
+          const baseScenarioBookings = bookingsByScenario[baseScenarioId];
+          if (baseScenarioBookings && baseScenarioBookings[itemId]) {
+            return Object.values(baseScenarioBookings[itemId]);
+          }
+        }
+
+        return EMPTY_BOOKINGS;
       }
     ),
-    [selectedScenarioId, selectedItemId]
+    [selectedScenarioId, baseScenarioId, selectedItemId]
   );
-  
+
   const bookings = useSelector(bookingsSelector);
 
   // Track expanded accordion index
