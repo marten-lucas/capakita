@@ -103,6 +103,22 @@ const simGroupSlice = createSlice({
   },
 });
 
+// Thunk for deleting a group assignment, overlay-aware
+export const deleteGroupThunk = ({ scenarioId, dataItemId, groupId }) => (dispatch, getState) => {
+  const state = getState();
+  const scenario = state.simScenario.scenarios.find(s => s.id === scenarioId);
+  const isBasedScenario = !!scenario?.baseScenarioId;
+  const overlay = state.simOverlay.overlaysByScenario?.[scenarioId]?.groupassignments?.[dataItemId]?.[groupId];
+  if (isBasedScenario && overlay) {
+    dispatch({
+      type: 'simOverlay/removeGroupAssignmentOverlay',
+      payload: { scenarioId, itemId: dataItemId, groupId }
+    });
+  } else {
+    dispatch(simGroupSlice.actions.deleteGroup({ scenarioId, dataItemId, groupId }));
+  }
+};
+
 export const {
   addGroup,
   updateGroup,

@@ -9,6 +9,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import DayControl from './BookingDayControl';
 import { createSelector } from '@reduxjs/toolkit';
 import { useOverlayData } from '../../../hooks/useOverlayData';
+import { deleteBookingThunk } from '../../../store/simBookingSlice';
 
 // BookingDetail component
 const EMPTY_BOOKINGS = [];
@@ -283,14 +284,11 @@ function BookingDetail({ index }) {
   // Handler for deleting a booking
   const handleDeleteBooking = () => {
     if (!selectedScenarioId || !selectedItemId || !booking?.id) return;
-    dispatch({
-      type: 'simBooking/deleteBooking',
-      payload: {
-        scenarioId: selectedScenarioId,
-        dataItemId: selectedItemId,
-        bookingId: booking.id
-      }
-    });
+    dispatch(deleteBookingThunk({
+      scenarioId: selectedScenarioId,
+      dataItemId: selectedItemId,
+      bookingId: booking.id
+    }));
   };
 
   // Helper to ensure date is valid for date picker

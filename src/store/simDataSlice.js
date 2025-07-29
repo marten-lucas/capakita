@@ -221,13 +221,24 @@ export const {
   loadDataByScenario,
 } = simDataSlice.actions;
 
-// Thunk: delete a data item and all related data
-export const deleteDataItemThunk = ({ scenarioId, itemId }) => (dispatch) => {
-  dispatch(deleteDataItem({ scenarioId, itemId }));
+// Thunk: delete a data item and all related data (overlay-aware)
+export const deleteDataItemThunk = ({ scenarioId, itemId }) => (dispatch, getState) => {
+  const state = getState();
+  const scenario = state.simScenario.scenarios.find(s => s.id === scenarioId);
+  const isBasedScenario = !!scenario?.baseScenarioId;
+  const overlay = state.simOverlay.overlaysByScenario?.[scenarioId]?.dataItems?.[itemId];
+  if (isBasedScenario && overlay) {
+    dispatch({
+      type: 'simOverlay/removeDataItemOverlay',
+      payload: { scenarioId, itemId }
+    });
+  } else {
+    dispatch(deleteDataItem({ scenarioId, itemId }));
+  }
   dispatch({ type: 'simBooking/deleteAllBookingsForItem', payload: { scenarioId, itemId } });
   dispatch({ type: 'simGroup/deleteAllGroupAssignmentsForItem', payload: { scenarioId, itemId } });
   dispatch({ type: 'simFinancials/deleteAllFinancialsForItem', payload: { scenarioId, itemId } });
-  dispatch({ type: 'simQualification/deleteAllQualificationAssignmentsForItem', payload: { scenarioId, itemId } }); // <-- add this
+  dispatch({ type: 'simQualification/deleteAllQualificationAssignmentsForItem', payload: { scenarioId, itemId } });
 };
 
 // Thunk: delete all data items for a scenario and all related data

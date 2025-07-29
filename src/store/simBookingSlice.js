@@ -147,6 +147,22 @@ export const updateBookingThunk = ({ scenarioId, dataItemId, bookingId, updates 
   }
 };
 
+// Thunk for deleting a booking, overlay-aware
+export const deleteBookingThunk = ({ scenarioId, dataItemId, bookingId }) => (dispatch, getState) => {
+  const state = getState();
+  const scenario = state.simScenario.scenarios.find(s => s.id === scenarioId);
+  const isBasedScenario = !!scenario?.baseScenarioId;
+  const overlay = state.simOverlay.overlaysByScenario?.[scenarioId]?.bookings?.[dataItemId]?.[bookingId];
+  if (isBasedScenario && overlay) {
+    dispatch({
+      type: 'simOverlay/removeBookingOverlay',
+      payload: { scenarioId, itemId: dataItemId, bookingId }
+    });
+  } else {
+    dispatch(simBookingSlice.actions.deleteBooking({ scenarioId, dataItemId, bookingId }));
+  }
+};
+
 export const {
   addBooking,
   updateBooking,

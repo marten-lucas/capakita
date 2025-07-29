@@ -9,7 +9,7 @@ import ModMonitor from '../ModMonitor';
 import { useSelector, useDispatch } from 'react-redux';
 import { createSelector } from '@reduxjs/toolkit';
 import { getBookings } from '../../../store/simBookingSlice';
-import { deleteGroup } from '../../../store/simGroupSlice';
+import { deleteGroupThunk } from '../../../store/simGroupSlice';
 import { useOverlayData } from '../../../hooks/useOverlayData';
 
 const EMPTY_GROUP_DEFS = [];
@@ -143,7 +143,7 @@ function GroupDetail({ index, group }) {
   // Handler to delete group in store
   const handleDeleteGroup = () => {
     if (!group) return;
-    dispatch(deleteGroup({
+    dispatch(deleteGroupThunk({
       scenarioId: selectedScenarioId,
       dataItemId: selectedItemId,
       groupId: group.id
