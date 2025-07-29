@@ -7,7 +7,14 @@ import { setStichtag, setSelectedGroups, setSelectedQualifications, setWeeklySel
 
 export function useSaveLoad() {
   const dispatch = useDispatch();
-  const state = useSelector(state => state);
+  // Only select the slices needed for saveData
+  const simScenario = useSelector(state => state.simScenario);
+  const simData = useSelector(state => state.simData);
+  const simBooking = useSelector(state => state.simBooking);
+  const simGroup = useSelector(state => state.simGroup);
+  const simQualification = useSelector(state => state.simQualification);
+  const simFinancials = useSelector(state => state.simFinancials);
+  const chart = useSelector(state => state.chart);
 
   const saveData = useCallback(async (password) => {
     try {
@@ -20,25 +27,25 @@ export function useSaveLoad() {
       }
 
       const saveData = {
-        scenarios: state.simScenario.scenarios,
-        selectedScenarioId: state.simScenario.selectedScenarioId,
-        dataByScenario: state.simData.dataByScenario,
-        bookingsByScenario: state.simBooking.bookingsByScenario,
-        groupsByScenario: state.simGroup.groupsByScenario,
-        groupDefsByScenario: state.simGroup.groupDefsByScenario,
-        qualificationDefsByScenario: state.simQualification.qualificationDefsByScenario,
-        qualificationAssignmentsByScenario: state.simQualification.qualificationAssignmentsByScenario,
-        financialsByScenario: state.simFinancials.financialsByScenario,
+        scenarios: simScenario.scenarios,
+        selectedScenarioId: simScenario.selectedScenarioId,
+        dataByScenario: simData.dataByScenario,
+        bookingsByScenario: simBooking.bookingsByScenario,
+        groupsByScenario: simGroup.groupsByScenario,
+        groupDefsByScenario: simGroup.groupDefsByScenario,
+        qualificationDefsByScenario: simQualification.qualificationDefsByScenario,
+        qualificationAssignmentsByScenario: simQualification.qualificationAssignmentsByScenario,
+        financialsByScenario: simFinancials.financialsByScenario,
         chartStore: {
-          stichtag: state.chart.stichtag,
-          selectedGroups: state.chart.selectedGroups,
-          selectedQualifications: state.chart.selectedQualifications,
-          weeklySelectedScenarioId: state.chart.weeklySelectedScenarioId,
-          midtermSelectedScenarioId: state.chart.midtermSelectedScenarioId,
-          midtermTimeDimension: state.chart.midtermTimeDimension,
-          midtermSelectedGroups: state.chart.midtermSelectedGroups,
-          midtermSelectedQualifications: state.chart.midtermSelectedQualifications,
-          chartToggles: state.chart.chartToggles,
+          stichtag: chart.stichtag,
+          selectedGroups: chart.selectedGroups,
+          selectedQualifications: chart.selectedQualifications,
+          weeklySelectedScenarioId: chart.weeklySelectedScenarioId,
+          midtermSelectedScenarioId: chart.midtermSelectedScenarioId,
+          midtermTimeDimension: chart.midtermTimeDimension,
+          midtermSelectedGroups: chart.midtermSelectedGroups,
+          midtermSelectedQualifications: chart.midtermSelectedQualifications,
+          chartToggles: chart.chartToggles,
         }
       };
 
@@ -46,7 +53,7 @@ export function useSaveLoad() {
       const ciphertext = CryptoJS.AES.encrypt(json, password).toString();
       
       // Filename template: {datetime}-{scenarioname}.cap.capakita
-      const scenarioName = state.simScenario.scenarios.find(s => s.id === state.simScenario.selectedScenarioId)?.name || 'Unbenannt';
+      const scenarioName = simScenario.scenarios.find(s => s.id === simScenario.selectedScenarioId)?.name || 'Unbenannt';
       const now = new Date();
       const datetime = now.toISOString().replace(/[:.]/g, '-').slice(0, 19); // e.g. 2024-06-13T12-34-56-789
       const safeName = scenarioName.replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -69,7 +76,15 @@ export function useSaveLoad() {
         error: 'Fehler beim Speichern der Daten.'
       };
     }
-  }, [state]);
+  }, [
+    simScenario,
+    simData,
+    simBooking,
+    simGroup,
+    simQualification,
+    simFinancials,
+    chart
+  ]);
 
   const loadData = useCallback(async (file, password) => {
     try {
