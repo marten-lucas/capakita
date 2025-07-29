@@ -23,24 +23,28 @@ const selectGroups = createSelector(
   (groupsByScenario, overlaysByScenario, { selectedScenarioId, baseScenarioId }, selectedItemId) => {
     if (!selectedScenarioId || !selectedItemId) return EMPTY_ARRAY;
 
-    // Overlay support for based scenarios
-    const overlayGroups = overlaysByScenario[selectedScenarioId]?.groupassignments?.[selectedItemId];
-    if (overlayGroups) {
-      return Object.values(overlayGroups);
+    // Overlay support for based scenarios: merge overlays over base by groupId
+    const overlayGroupsObj = overlaysByScenario[selectedScenarioId]?.groupassignments?.[selectedItemId] || {};
+    const overlayGroupsArr = Object.values(overlayGroupsObj);
+
+    if (baseScenarioId) {
+      const baseGroupsObj = groupsByScenario[baseScenarioId]?.[selectedItemId] || {};
+      const baseArr = Object.values(baseGroupsObj);
+
+      // Merge overlays over base by groupId
+      const merged = [...baseArr];
+      overlayGroupsArr.forEach(overlay => {
+        const idx = merged.findIndex(g => String(g.id) === String(overlay.id));
+        if (idx >= 0) merged[idx] = overlay;
+        else merged.push(overlay);
+      });
+      return merged;
     }
 
     // Try current scenario first
     const currentScenarioGroups = groupsByScenario[selectedScenarioId];
     if (currentScenarioGroups && currentScenarioGroups[selectedItemId]) {
       return Object.values(currentScenarioGroups[selectedItemId]);
-    }
-
-    // If no groups in current scenario and we have a base scenario, try base
-    if (baseScenarioId) {
-      const baseScenarioGroups = groupsByScenario[baseScenarioId];
-      if (baseScenarioGroups && baseScenarioGroups[selectedItemId]) {
-        return Object.values(baseScenarioGroups[selectedItemId]);
-      }
     }
 
     return EMPTY_ARRAY;

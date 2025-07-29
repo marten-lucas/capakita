@@ -1,6 +1,5 @@
 import { createSlice, createSelector } from '@reduxjs/toolkit';
 import { createId } from '../utils/idUtils';
-import { useSelector } from 'react-redux';
 
 const initialState = {
   bookingsByScenario: {},

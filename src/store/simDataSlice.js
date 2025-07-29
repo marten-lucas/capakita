@@ -99,6 +99,22 @@ export const addDataItemAndSelect = ({ scenarioId, item }) => (dispatch, getStat
   const scenario = state.simScenario.scenarios.find(s => s.id === scenarioId);
   const isBasedScenario = !!scenario?.baseScenarioId;
   const id = String(item.id || createId('simdata'));
+  // Set default name logic
+  const defaultName =
+    item.name ||
+    (item.type === 'capacity'
+      ? 'Neuer Mitarbeiter'
+      : item.type === 'demand'
+      ? 'Neues Kind'
+      : 'Neuer Eintrag');
+  const overlayItem = {
+    ...item,
+    id,
+    name: defaultName,
+    absences: Array.isArray(item.absences) ? item.absences : [],
+    source: item.source || 'manual entry',
+    rawdata: { source: item.source || 'manual entry', ...item.rawdata }
+  };
   if (isBasedScenario) {
     // Overlay: set data item overlay
     dispatch({
@@ -106,7 +122,7 @@ export const addDataItemAndSelect = ({ scenarioId, item }) => (dispatch, getStat
       payload: {
         scenarioId,
         itemId: id,
-        overlayData: { ...item, id }
+        overlayData: overlayItem
       }
     });
     dispatch({
@@ -114,7 +130,7 @@ export const addDataItemAndSelect = ({ scenarioId, item }) => (dispatch, getStat
       payload: id
     });
   } else {
-    dispatch(simDataItemAdd({ scenarioId, item: { ...item, id } }));
+    dispatch(simDataItemAdd({ scenarioId, item: overlayItem }));
     dispatch({
       type: 'simScenario/setSelectedItem',
       payload: id
@@ -128,10 +144,12 @@ export const updateDataItemThunk = ({ scenarioId, itemId, updates }) => (dispatc
   const scenario = state.simScenario.scenarios.find(s => s.id === scenarioId);
   const isBasedScenario = !!scenario?.baseScenarioId;
   if (isBasedScenario) {
-    // Get base item
+    // Get current overlay if it exists, else use base item
+    const overlay = state.simOverlay.overlaysByScenario?.[scenarioId]?.dataItems?.[itemId];
     const baseScenarioId = scenario.baseScenarioId;
     const baseItem = state.simData.dataByScenario[baseScenarioId]?.[itemId];
-    const updatedItem = { ...baseItem, ...updates, id: itemId };
+    const prev = overlay || baseItem || {};
+    const updatedItem = { ...prev, ...updates, id: itemId };
     const isIdenticalToBase = baseItem && JSON.stringify(updatedItem) === JSON.stringify(baseItem);
     if (isIdenticalToBase) {
       // Remove overlay if matches base
@@ -154,8 +172,6 @@ export const updateDataItemThunk = ({ scenarioId, itemId, updates }) => (dispatc
     dispatch(updateDataItem({ scenarioId, itemId, updates }));
   }
 };
-
-// ...existing code...
 
 export const selectDataItemsByScenario = createSelector(
   [

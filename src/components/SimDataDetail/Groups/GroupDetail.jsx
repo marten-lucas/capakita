@@ -22,25 +22,6 @@ function GroupDetail({ index, group }) {
   const baseScenarioId = baseScenario?.id;
 
   // Overlay-aware selector for group assignments (merged base + overlay)
-  const groupAssignments = useSelector(state => {
-    const overlays = state.simOverlay.overlaysByScenario[selectedScenarioId]?.groupassignments?.[selectedItemId] || {};
-    const overlaysArr = Object.values(overlays);
-    if (isBasedScenario && baseScenarioId) {
-      const baseGroupsObj = state.simGroup.groupsByScenario[baseScenarioId]?.[selectedItemId] || {};
-      const baseArr = Object.values(baseGroupsObj);
-      // Merge overlays over base by id
-      const merged = [...baseArr];
-      overlaysArr.forEach(overlay => {
-        const idx = merged.findIndex(g => g.id === overlay.id);
-        if (idx >= 0) merged[idx] = overlay;
-        else merged.push(overlay);
-      });
-      return merged;
-    } else {
-      const currGroupsObj = state.simGroup.groupsByScenario[selectedScenarioId]?.[selectedItemId] || {};
-      return Object.values(currGroupsObj);
-    }
-  });
 
   // Use bookings from simBookingSlice - check both current and base scenario
   const bookings = useSelector(state => {
@@ -158,28 +139,6 @@ function GroupDetail({ index, group }) {
   };
 
   // Handler to add a new group assignment (for based scenarios, create overlay)
-  const handleAddGroup = (newGroup) => {
-    if (isBasedScenario) {
-      dispatch({
-        type: 'simOverlay/setGroupAssignmentOverlay',
-        payload: {
-          scenarioId: selectedScenarioId,
-          itemId: selectedItemId,
-          groupId: newGroup.id,
-          overlayData: newGroup
-        }
-      });
-    } else {
-      dispatch({
-        type: 'simGroup/addGroup',
-        payload: {
-          scenarioId: selectedScenarioId,
-          dataItemId: selectedItemId,
-          group: newGroup
-        }
-      });
-    }
-  };
 
   // Handler to delete group in store
   const handleDeleteGroup = () => {
