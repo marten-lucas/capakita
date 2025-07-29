@@ -18,9 +18,15 @@ function GroupDetail({ index, group }) {
   const dispatch = useDispatch();
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
- 
-  // Use overlay hook to get effective data
   const { baseScenario, isBasedScenario } = useOverlayData();
+  const baseScenarioId = baseScenario?.id;
+
+  // Overlay-aware selector for base group assignments
+  const baseGroups = useSelector(state => {
+    if (!baseScenarioId || !selectedItemId || !group?.id) return undefined;
+    const baseGroupsObj = state.simGroup.groupsByScenario[baseScenarioId]?.[selectedItemId];
+    return baseGroupsObj ? Object.values(baseGroupsObj) : undefined;
+  });
 
   // Use bookings from simBookingSlice - check both current and base scenario
   const bookings = useSelector(state => {
@@ -93,12 +99,45 @@ function GroupDetail({ index, group }) {
   // Handler to update group in store
   const handleUpdateGroup = (updatedGroup) => {
     if (!group) return;
-    dispatch(updateGroup({
-      scenarioId: selectedScenarioId,
-      dataItemId: selectedItemId, // <-- add this!
-      groupId: group.id,
-      updates: updatedGroup
-    }));
+
+    if (isBasedScenario) {
+      // Compare with base group assignments
+      const baseGroup = baseGroups?.find(g => g.id === group.id);
+      const isIdenticalToBase = baseGroup && JSON.stringify(updatedGroup) === JSON.stringify(baseGroup);
+      if (isIdenticalToBase) {
+        // Remove overlay if matches base
+        dispatch({
+          type: 'simOverlay/removeGroupAssignmentOverlay',
+          payload: {
+            scenarioId: selectedScenarioId,
+            itemId: selectedItemId,
+            groupId: group.id
+          }
+        });
+      } else {
+        // Set overlay if different from base
+        dispatch({
+          type: 'simOverlay/setGroupAssignmentOverlay',
+          payload: {
+            scenarioId: selectedScenarioId,
+            itemId: selectedItemId,
+            groupId: group.id,
+            overlayData: updatedGroup
+          }
+        });
+      }
+    } else {
+      // Regular scenario - update directly in simGroup
+      dispatch({
+        type: 'simGroup/updateGroup',
+        payload: {
+          scenarioId: selectedScenarioId,
+          dataItemId: selectedItemId,
+          groupId: group.id,
+          updates: updatedGroup
+        }
+      });
+    }
   };
 
   // Handler to delete group in store

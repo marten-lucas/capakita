@@ -12,32 +12,37 @@ import { useOverlayData } from '../../../hooks/useOverlayData';
 
 const EMPTY_ARRAY = [];
 
-// Memoized selector to prevent unnecessary re-renders
+// Overlay-aware selector for group assignments
 const selectGroups = createSelector(
   [
-    (state) => state.simGroup.groupsByScenario,
+    state => state.simGroup.groupsByScenario,
+    state => state.simOverlay.overlaysByScenario,
     (state, selectedScenarioId, baseScenarioId) => ({ selectedScenarioId, baseScenarioId }),
     (state, selectedScenarioId, baseScenarioId, selectedItemId) => selectedItemId
   ],
-  (groupsByScenario, { selectedScenarioId, baseScenarioId }, selectedItemId) => {
+  (groupsByScenario, overlaysByScenario, { selectedScenarioId, baseScenarioId }, selectedItemId) => {
     if (!selectedScenarioId || !selectedItemId) return EMPTY_ARRAY;
-    
+
+    // Overlay support for based scenarios
+    const overlayGroups = overlaysByScenario[selectedScenarioId]?.groupassignments?.[selectedItemId];
+    if (overlayGroups) {
+      return Object.values(overlayGroups);
+    }
+
     // Try current scenario first
     const currentScenarioGroups = groupsByScenario[selectedScenarioId];
     if (currentScenarioGroups && currentScenarioGroups[selectedItemId]) {
-      const itemGroupsObj = currentScenarioGroups[selectedItemId];
-      return Object.values(itemGroupsObj);
+      return Object.values(currentScenarioGroups[selectedItemId]);
     }
-    
+
     // If no groups in current scenario and we have a base scenario, try base
     if (baseScenarioId) {
       const baseScenarioGroups = groupsByScenario[baseScenarioId];
       if (baseScenarioGroups && baseScenarioGroups[selectedItemId]) {
-        const itemGroupsObj = baseScenarioGroups[selectedItemId];
-        return Object.values(itemGroupsObj);
+        return Object.values(baseScenarioGroups[selectedItemId]);
       }
     }
-    
+
     return EMPTY_ARRAY;
   }
 );
@@ -51,7 +56,7 @@ function GroupCards() {
   // Use overlay hook to get base scenario info
   const { baseScenario } = useOverlayData();
   
-  // Use memoized selector for groups
+  // Use overlay-aware selector for groups
   const groups = useSelector(state => 
     selectGroups(state, selectedScenarioId, baseScenario?.id, selectedItemId)
   );

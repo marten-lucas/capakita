@@ -105,6 +105,41 @@ const simOverlaySlice = createSlice({
     loadOverlaysByScenario(state, action) {
       state.overlaysByScenario = action.payload || {};
     },
+    setGroupAssignmentOverlay(state, action) {
+      const { scenarioId, itemId, groupId, overlayData } = action.payload;
+      if (!state.overlaysByScenario[scenarioId]) {
+        state.overlaysByScenario[scenarioId] = {};
+      }
+      if (!state.overlaysByScenario[scenarioId].groupassignments) {
+        state.overlaysByScenario[scenarioId].groupassignments = {};
+      }
+      if (!state.overlaysByScenario[scenarioId].groupassignments[itemId]) {
+        state.overlaysByScenario[scenarioId].groupassignments[itemId] = {};
+      }
+      state.overlaysByScenario[scenarioId].groupassignments[itemId][groupId] = overlayData;
+    },
+    removeGroupAssignmentOverlay(state, action) {
+      const { scenarioId, itemId, groupId } = action.payload;
+      if (
+        state.overlaysByScenario[scenarioId]?.groupassignments?.[itemId]?.[groupId]
+      ) {
+        delete state.overlaysByScenario[scenarioId].groupassignments[itemId][groupId];
+        // Clean up empty structures
+        if (
+          Object.keys(state.overlaysByScenario[scenarioId].groupassignments[itemId]).length === 0
+        ) {
+          delete state.overlaysByScenario[scenarioId].groupassignments[itemId];
+          if (
+            Object.keys(state.overlaysByScenario[scenarioId].groupassignments).length === 0
+          ) {
+            delete state.overlaysByScenario[scenarioId].groupassignments;
+            if (Object.keys(state.overlaysByScenario[scenarioId]).length === 0) {
+              delete state.overlaysByScenario[scenarioId];
+            }
+          }
+        }
+      }
+    },
   },
 });
 
@@ -119,6 +154,8 @@ export const {
   removeQualificationDefOverlay,
   deleteAllOverlaysForScenario,
   loadOverlaysByScenario,
+  setGroupAssignmentOverlay,
+  removeGroupAssignmentOverlay,
 } = simOverlaySlice.actions;
 
 export default simOverlaySlice.reducer;

@@ -5,8 +5,6 @@ import GroupCards from './GroupCards';
 import { useSelector } from 'react-redux';
 import { useOverlayData } from '../../../hooks/useOverlayData';
 
-const EMPTY_ARRAY = [];
-
 function SimDataGroupsTab() {
   // Get scenario and item selection
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
@@ -15,11 +13,6 @@ function SimDataGroupsTab() {
   // Use overlay hook to get effective data
   const { getEffectiveDataItem } = useOverlayData();
   const item = getEffectiveDataItem(selectedItemId);
-  
-  // Get groups from simGroup store instead of item.groups
-  const groups = useSelector(
-    state => state.simGroup.groupsByScenario[selectedScenarioId] || EMPTY_ARRAY
-  );
 
   if (!selectedItemId || !item) return null;
 
@@ -31,7 +24,7 @@ function SimDataGroupsTab() {
           <ModMonitor
             itemId={selectedItemId}
             field="groups"
-            value={JSON.stringify(groups)}
+            value={undefined}
             originalValue={undefined}
             // onRestore logic can be implemented as needed
             title="Alle Gruppen auf importierte Werte zurücksetzen"
@@ -45,3 +38,4 @@ function SimDataGroupsTab() {
 }
 
 export default SimDataGroupsTab;
+
