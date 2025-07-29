@@ -109,6 +109,14 @@ function OrgaTabQualificationDefs() {
     handleCloseDialog();
   };
 
+  // Add this handler for Enter key
+  const handleDialogKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSave();
+    }
+  };
+
   const handleDelete = (qualification) => {
     if (window.confirm(`Möchten Sie die Qualifikation "${qualification.name}" wirklich löschen?`)) {
       // Always delete from current scenario
@@ -190,6 +198,7 @@ function OrgaTabQualificationDefs() {
               error={!!error && !form.key}
               helperText={error && !form.key ? error : ''}
               autoFocus
+              onKeyDown={handleDialogKeyDown}
             />
             <TextField
               label="Anzeigename"
@@ -198,6 +207,7 @@ function OrgaTabQualificationDefs() {
               fullWidth
               error={!!error && !form.name}
               helperText={error && !form.name ? error : ''}
+              onKeyDown={handleDialogKeyDown}
             />
           </Box>
         </DialogContent>

@@ -97,16 +97,22 @@ function OrgaTabGroupDefs() {
       return;
     }
     if (editingGroup) {
-      // Always update in current scenario
       dispatch(updateGroupDef({ scenarioId: selectedScenarioId, groupId: editingGroup.id, updates: groupForm }));
     } else {
-      // Always add to current scenario
       dispatch(addGroupDef({
         scenarioId: selectedScenarioId,
         groupDef: { ...groupForm, id: Date.now().toString() }
       }));
     }
     handleCloseDialog();
+  };
+
+  // Add this handler for Enter key
+  const handleDialogKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSaveGroup();
+    }
   };
 
   const handleDeleteGroup = (group) => {
@@ -215,12 +221,13 @@ function OrgaTabGroupDefs() {
                 error={!!error}
                 helperText={error}
                 autoFocus
+                onKeyDown={handleDialogKeyDown}
               />
             </Box>
             <Typography variant="body2" sx={{ mb: 1 }}>Icon auswählen:</Typography>
             <IconPicker
               value={groupForm.icon}
-              onChange={(icon) => setGroupForm({ ...groupForm, icon })}
+              onChange={(icon) => setGroupForm(form => ({ ...form, icon }))}
             />
           </Box>
         </DialogContent>
