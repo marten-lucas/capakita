@@ -167,6 +167,10 @@ function ChartFilterForm({ showStichtag = false, scenarioId }) {
 
   const handleDateChange = (e) => {
     dispatch(setReferenceDate({ scenarioId, date: e.target.value }));
+    // Ensure chart data is updated after reference date changes
+    setTimeout(() => {
+      dispatch(updateWeeklyChartData(scenarioId));
+    }, 0);
   };
 
   const handleTimedimensionChange = (e) => {

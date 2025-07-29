@@ -27,8 +27,7 @@ export function calculateChartData(
   {
     bookingsByScenario,
     dataByScenario,
-    groupDefs,
-    groupsByScenario, // <-- add this
+    groupsByScenario, 
     qualificationAssignmentsByScenario,
     overlaysByScenario,
     scenarioId
