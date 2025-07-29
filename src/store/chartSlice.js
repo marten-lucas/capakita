@@ -1,5 +1,5 @@
 import { createSlice } from '@reduxjs/toolkit';
-import { generateTimeSegments, calculateChartData } from '../utils/chartUtils';
+import { calculateChartData } from '../utils/chartUtils';
 
 // Helper for initial chart state per scenario
 function getInitialChartState() {

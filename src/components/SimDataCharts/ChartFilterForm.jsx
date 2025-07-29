@@ -96,20 +96,47 @@ function ChartFilterForm({ showStichtag = false, scenarioId }) {
     return lookup;
   }, [qualiDefs]);
 
-  // Ensure all real group/quali options are selected by default (not __NO_GROUP__/__NO_QUALI__)
-  React.useEffect(() => {
-    const allGroupIds = Object.keys(availableGroups).filter(id => id !== '__NO_GROUP__');
-    if (allGroupIds.length > 0 && selectedGroups.length === 0) {
-      dispatch(setFilterGroups({ scenarioId, groups: allGroupIds }));
-    }
-  }, [availableGroups, scenarioId, dispatch, selectedGroups.length]);
+  // Fix: Only auto-select on first mount, not on every update
+  const didInitGroups = React.useRef(false);
+  const didInitQualis = React.useRef(false);
 
   React.useEffect(() => {
-    const allQualiKeys = Object.keys(availableQualifications).filter(key => key !== '__NO_QUALI__');
-    if (allQualiKeys.length > 0 && selectedQualifications.length === 0) {
-      dispatch(setFilterQualifications({ scenarioId, qualifications: allQualiKeys }));
+    if (!didInitGroups.current) {
+      const realGroupIds = groupDefs.map(g => g.id);
+      const allGroupIds = realGroupIds.length > 0
+        ? [...realGroupIds, '__NO_GROUP__']
+        : ['__NO_GROUP__'];
+      if (
+        allGroupIds.length > 0 &&
+        (selectedGroups.length === 0 ||
+          selectedGroups.length !== allGroupIds.length ||
+          !allGroupIds.every(id => selectedGroups.includes(id)))
+      ) {
+        dispatch(setFilterGroups({ scenarioId, groups: allGroupIds }));
+      }
+      didInitGroups.current = true;
     }
-  }, [availableQualifications, scenarioId, dispatch, selectedQualifications.length]);
+    // eslint-disable-next-line
+  }, [groupDefs, scenarioId, dispatch]);
+
+  React.useEffect(() => {
+    if (!didInitQualis.current) {
+      const realQualiKeys = qualiDefs.map(q => q.key);
+      const allQualiKeys = realQualiKeys.length > 0
+        ? [...realQualiKeys, '__NO_QUALI__']
+        : ['__NO_QUALI__'];
+      if (
+        allQualiKeys.length > 0 &&
+        (selectedQualifications.length === 0 ||
+          selectedQualifications.length !== allQualiKeys.length ||
+          !allQualiKeys.every(key => selectedQualifications.includes(key)))
+      ) {
+        dispatch(setFilterQualifications({ scenarioId, qualifications: allQualiKeys }));
+      }
+      didInitQualis.current = true;
+    }
+    // eslint-disable-next-line
+  }, [qualiDefs, scenarioId, dispatch]);
 
   // Handlers: update chartSlice state and update chart data
   const handleGroupChange = (event) => {
