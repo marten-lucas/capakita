@@ -96,16 +96,16 @@ function ChartFilterForm({ showStichtag = false, scenarioId }) {
     return lookup;
   }, [qualiDefs]);
 
-  // Ensure all options are selected by default when available options change
+  // Ensure all real group/quali options are selected by default (not __NO_GROUP__/__NO_QUALI__)
   React.useEffect(() => {
-    const allGroupIds = Object.keys(availableGroups);
+    const allGroupIds = Object.keys(availableGroups).filter(id => id !== '__NO_GROUP__');
     if (allGroupIds.length > 0 && selectedGroups.length === 0) {
       dispatch(setFilterGroups({ scenarioId, groups: allGroupIds }));
     }
   }, [availableGroups, scenarioId, dispatch, selectedGroups.length]);
 
   React.useEffect(() => {
-    const allQualiKeys = Object.keys(availableQualifications);
+    const allQualiKeys = Object.keys(availableQualifications).filter(key => key !== '__NO_QUALI__');
     if (allQualiKeys.length > 0 && selectedQualifications.length === 0) {
       dispatch(setFilterQualifications({ scenarioId, qualifications: allQualiKeys }));
     }

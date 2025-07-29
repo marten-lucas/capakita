@@ -28,6 +28,7 @@ export function calculateChartData(
     bookingsByScenario,
     dataByScenario,
     groupDefs,
+    groupsByScenario, // <-- add this
     qualificationAssignmentsByScenario,
     overlaysByScenario,
     scenarioId
@@ -38,13 +39,13 @@ export function calculateChartData(
   const { demand: filteredDemandBookings, capacity: filteredCapacityBookings } = filterBookings({
     bookingsByScenario,
     dataByScenario,
-    groupDefs,
     qualificationAssignmentsByScenario,
     overlaysByScenario,
     scenarioId,
     referenceDate,
     selectedGroups,
-    selectedQualifications
+    selectedQualifications,
+    groupsByScenario // <-- pass this
   });
 
   const categories = generateTimeSegments();
@@ -81,7 +82,8 @@ export function filterBookings({
   scenarioId,
   referenceDate,
   selectedGroups,
-  selectedQualifications
+  selectedQualifications,
+  groupsByScenario // Pass groupsByScenario for resolving group assignments
 }) {
   const demand = [];
   const capacity = [];
@@ -89,6 +91,7 @@ export function filterBookings({
   const dataItems = dataByScenario[scenarioId] || {};
   const overlays = overlaysByScenario[scenarioId] || {};
   const qualificationAssignments = qualificationAssignmentsByScenario[scenarioId] || {};
+  const groupAssignments = groupsByScenario?.[scenarioId] || {}; // Ensure groupsByScenario is defined
 
   // Helper: get overlayed data item if exists
   function getOverlayedDataItem(itemId) {
@@ -131,11 +134,24 @@ export function filterBookings({
     });
   }
 
+  // Helper: resolve groupId from group assignments
+  function resolveGroupId(itemId, date) {
+    const assignments = groupAssignments[itemId] || {};
+    const activeAssignment = Object.values(assignments).find(assignment => {
+      const startOk = !assignment.start || assignment.start <= date;
+      const endOk = !assignment.end || assignment.end >= date;
+      return startOk && endOk;
+    });
+    return activeAssignment?.groupId || null;
+  }
+
   Object.entries(dataItems).forEach(([itemId]) => {
     const overlayedItem = getOverlayedDataItem(itemId);
     if (!overlayedItem) return;
     const type = overlayedItem.type;
-    const groupId = overlayedItem.groupId || overlayedItem.group || null;
+
+    // Resolve groupId from group assignments or fallback to item groupId
+    const groupId = resolveGroupId(itemId, referenceDate) || overlayedItem.groupId || null;
 
     // Check presence and absence
     if (!isDataItemPresent(overlayedItem, referenceDate)) return;

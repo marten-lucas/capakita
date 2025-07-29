@@ -106,6 +106,7 @@ export const updateWeeklyChartData = (scenarioId) => (dispatch, getState) => {
   const bookingsByScenario = state.simBooking.bookingsByScenario;
   const dataByScenario = state.simData.dataByScenario;
   const groupDefs = state.simGroup.groupDefsByScenario;
+  const groupsByScenario = state.simGroup.groupsByScenario; // <-- add this
   const qualificationAssignmentsByScenario = state.simQualification.qualificationAssignmentsByScenario;
   const overlaysByScenario = state.simOverlay.overlaysByScenario;
 
@@ -118,6 +119,7 @@ export const updateWeeklyChartData = (scenarioId) => (dispatch, getState) => {
       bookingsByScenario,
       dataByScenario,
       groupDefs,
+      groupsByScenario, // <-- pass this
       qualificationAssignmentsByScenario,
       overlaysByScenario,
       scenarioId
