@@ -29,7 +29,9 @@ export function calculateChartData(
     groupDefs,
     qualificationAssignmentsByScenario,
     overlaysByScenario,
-    scenarioId
+    scenarioId,
+    includeNoGroupAssignment = false,
+    includeNoQualiAssignment = false
   }
 ) {
   // ...use the passed-in data for calculations...
@@ -43,7 +45,9 @@ export function calculateChartData(
     scenarioId,
     referenceDate,
     selectedGroups,
-    selectedQualifications
+    selectedQualifications,
+    includeNoGroupAssignment,
+    includeNoQualiAssignment
   });
 
   const categories = generateTimeSegments();
@@ -65,18 +69,11 @@ export function calculateChartData(
   };
 }
 
-export function generateWeeklyChartTooltip(points, x) {
-  let s = `<b>${x}</b><br/>`;
-  points.forEach(point => {
-    s += `<span style="color:${point.color}">\u25CF</span> <b>${point.series.name}:</b> ${point.y}<br/>`;
-  });
-  return s;
-}
-
 /**
  * Overlay-aware booking filter.
  * Returns { demand: [...], capacity: [...] }
  * Now also checks simData presence (startdate/enddate) and absences.
+ * Supports includeNoGroupAssignment/includeNoQualiAssignment flags.
  */
 export function filterBookings({
   bookingsByScenario,
@@ -86,7 +83,9 @@ export function filterBookings({
   scenarioId,
   referenceDate,
   selectedGroups,
-  selectedQualifications
+  selectedQualifications,
+  includeNoGroupAssignment = false,
+  includeNoQualiAssignment = false
 }) {
   const demand = [];
   const capacity = [];
@@ -114,7 +113,6 @@ export function filterBookings({
 
   // Helper: check if booking is active at referenceDate
   function isActiveAt(booking, date) {
-    // Null/empty startdate: since forever; null/empty enddate: indefinitely
     const startOk = !booking.startdate || booking.startdate <= date;
     const endOk = !booking.enddate || booking.enddate >= date;
     return startOk && endOk;
@@ -137,8 +135,7 @@ export function filterBookings({
     });
   }
 
-  // Iterate all data items
-  Object.entries(dataItems).forEach(([itemId, item]) => {
+  Object.entries(dataItems).forEach(([itemId]) => {
     const overlayedItem = getOverlayedDataItem(itemId);
     if (!overlayedItem) return;
     const type = overlayedItem.type;
@@ -155,6 +152,8 @@ export function filterBookings({
     } else if (groupId && selectedGroups.includes(groupId)) {
       groupMatch = true;
     } else if (Array.isArray(groupId) && groupId.some(g => selectedGroups.includes(g))) {
+      groupMatch = true;
+    } else if (includeNoGroupAssignment && (!groupId || groupId === '')) {
       groupMatch = true;
     }
 
@@ -174,8 +173,15 @@ export function filterBookings({
     if (type === 'capacity' && groupMatch) {
       const qualiAssignments = Object.values(getOverlayedQualifications(itemId));
       const qualiKeys = qualiAssignments.map(a => a.qualification);
-      let qualiMatch = selectedQualifications.length === 0 ||
-        qualiKeys.some(q => selectedQualifications.includes(q));
+
+      let qualiMatch = false;
+      if (selectedQualifications.length === 0) {
+        qualiMatch = true;
+      } else if (qualiKeys.some(q => selectedQualifications.includes(q))) {
+        qualiMatch = true;
+      } else if (includeNoQualiAssignment && qualiKeys.length === 0) {
+        qualiMatch = true;
+      }
 
       if (qualiMatch) {
         itemBookings.forEach(booking => {
@@ -231,4 +237,12 @@ export function generateBookingDataSeries(referenceDate, filteredBookings, categ
   });
 
   return series;
+}
+
+export function generateWeeklyChartTooltip(points, x) {
+  let s = `<b>${x}</b><br/>`;
+  points.forEach(point => {
+    s += `<span style="color:${point.color}">\u25CF</span> <b>${point.series.name}:</b> ${point.y}<br/>`;
+  });
+  return s;
 }

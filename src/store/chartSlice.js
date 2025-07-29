@@ -10,6 +10,8 @@ function getInitialChartState() {
     filter: {
       Groups: [],
       Qualifications: [],
+      includeNoGroupAssignment: false,
+      includeNoQualiAssignment: false,
     },
     chartData: {
       weekly: {
@@ -64,11 +66,13 @@ const chartSlice = createSlice({
       const { scenarioId, groups } = action.payload;
       if (!state[scenarioId]) state[scenarioId] = getInitialChartState();
       state[scenarioId].filter.Groups = groups;
+      state[scenarioId].filter.includeNoGroupAssignment = groups.includes('__NO_GROUP__');
     },
     setFilterQualifications(state, action) {
       const { scenarioId, qualifications } = action.payload;
       if (!state[scenarioId]) state[scenarioId] = getInitialChartState();
       state[scenarioId].filter.Qualifications = qualifications;
+      state[scenarioId].filter.includeNoQualiAssignment = qualifications.includes('__NO_QUALI__');
     },
     setChartData(state, action) {
       const { scenarioId, chartType, data } = action.payload;
@@ -90,6 +94,12 @@ export const updateWeeklyChartData = (scenarioId) => (dispatch, getState) => {
   const referenceDate = chartState.referenceDate || '';
   const selectedGroups = chartState.filter?.Groups || [];
   const selectedQualifications = chartState.filter?.Qualifications || [];
+  const includeNoGroupAssignment = chartState.filter?.includeNoGroupAssignment || false;
+  const includeNoQualiAssignment = chartState.filter?.includeNoQualiAssignment || false;
+
+  // Detect "Keine Gruppenzuweisung" and "Keine Qualifikation" flags
+  // const includeNoGroupAssignment = selectedGroups.includes('__NO_GROUP__');
+  // const includeNoQualiAssignment = selectedQualifications.includes('__NO_QUALI__');
 
   // Gather all required data from state
   const bookingsByScenario = state.simBooking.bookingsByScenario;
@@ -109,7 +119,9 @@ export const updateWeeklyChartData = (scenarioId) => (dispatch, getState) => {
       groupDefs,
       qualificationAssignmentsByScenario,
       overlaysByScenario,
-      scenarioId
+      scenarioId,
+      includeNoGroupAssignment,
+      includeNoQualiAssignment
     }
   );
 

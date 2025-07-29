@@ -25,7 +25,6 @@ import {
   ensureScenario,
   updateWeeklyChartData
 } from '../../store/chartSlice';
-import { createSelector } from '@reduxjs/toolkit';
 
 const ITEM_HEIGHT = 48;
 const ITEM_PADDING_TOP = 8;
@@ -38,22 +37,8 @@ const MenuProps = {
   },
 };
 
-// Selectors for groupDefs and qualiDefs from their respective slices
-const selectGroupDefs = createSelector(
-  [
-    state => state.simScenario.selectedScenarioId,
-    state => state.simGroup.groupDefsByScenario
-  ],
-  (scenarioId, groupDefsByScenario) => groupDefsByScenario[scenarioId] || []
-);
-
-const selectQualiDefs = createSelector(
-  [
-    state => state.simScenario.selectedScenarioId,
-    state => state.simQualification.qualificationDefsByScenario
-  ],
-  (scenarioId, qualificationDefsByScenario) => qualificationDefsByScenario[scenarioId] || []
-);
+const EMPTY_GROUP_DEFS = [];
+const EMPTY_QUALI_DEFS = [];
 
 function ChartFilterForm({ showStichtag = false, scenarioId }) {
   const dispatch = useDispatch();
@@ -71,9 +56,19 @@ function ChartFilterForm({ showStichtag = false, scenarioId }) {
   const selectedGroups = chartState.filter?.Groups || [];
   const selectedQualifications = chartState.filter?.Qualifications || [];
 
-  // Group and qualification options from their slices
-  const groupDefs = useSelector(selectGroupDefs);
-  const qualiDefs = useSelector(selectQualiDefs);
+  // Group and qualification options from their slices (stable empty array fallback)
+  const groupDefs = useSelector(
+    React.useCallback(
+      state => state.simGroup.groupDefsByScenario[scenarioId] || EMPTY_GROUP_DEFS,
+      [scenarioId]
+    )
+  );
+  const qualiDefs = useSelector(
+    React.useCallback(
+      state => state.simQualification.qualificationDefsByScenario[scenarioId] || EMPTY_QUALI_DEFS,
+      [scenarioId]
+    )
+  );
 
   // Build group options: { id: name }
   const availableGroups = React.useMemo(() => {
@@ -81,6 +76,7 @@ function ChartFilterForm({ showStichtag = false, scenarioId }) {
     groupDefs.forEach(g => {
       lookup[g.id] = g.name;
     });
+    lookup['__NO_GROUP__'] = 'Keine Gruppenzuweisung';
     return lookup;
   }, [groupDefs]);
 
@@ -90,6 +86,7 @@ function ChartFilterForm({ showStichtag = false, scenarioId }) {
     qualiDefs.forEach(q => {
       lookup[q.key] = q.name;
     });
+    lookup['__NO_QUALI__'] = 'Keine Qualifikation';
     return lookup;
   }, [qualiDefs]);
 
@@ -99,16 +96,14 @@ function ChartFilterForm({ showStichtag = false, scenarioId }) {
     if (allGroupIds.length > 0 && selectedGroups.length === 0) {
       dispatch(setFilterGroups({ scenarioId, groups: allGroupIds }));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [availableGroups, scenarioId]);
+  }, [availableGroups, scenarioId, dispatch, selectedGroups.length]);
 
   React.useEffect(() => {
     const allQualiKeys = Object.keys(availableQualifications);
     if (allQualiKeys.length > 0 && selectedQualifications.length === 0) {
       dispatch(setFilterQualifications({ scenarioId, qualifications: allQualiKeys }));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [availableQualifications, scenarioId]);
+  }, [availableQualifications, scenarioId, dispatch, selectedQualifications.length]);
 
   // Handlers: update chartSlice state and update chart data
   const handleGroupChange = (event) => {
