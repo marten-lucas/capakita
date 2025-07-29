@@ -16,7 +16,7 @@ const simGroupSlice = createSlice({
       const itemId = String(dataItemId);
       if (!state.groupsByScenario[scenarioId][itemId]) state.groupsByScenario[scenarioId][itemId] = {};
       const key = createId('group');
-      state.groupsByScenario[scenarioId][itemId][key] = { ...group, id: key, overlays: {} };
+      state.groupsByScenario[scenarioId][itemId][key] = { ...group, id: key };
     },
     updateGroup(state, action) {
       const { scenarioId, dataItemId, groupId, updates } = action.payload;
@@ -27,15 +27,11 @@ const simGroupSlice = createSlice({
       if (!state.groupsByScenario[scenarioId][itemId][id]) {
         state.groupsByScenario[scenarioId][itemId][id] = {
           id,
-          overlays: {},
         };
       }
       state.groupsByScenario[scenarioId][itemId][id] = {
         ...state.groupsByScenario[scenarioId][itemId][id],
-        ...updates,
-        overlays: updates.overlays
-          ? { ...state.groupsByScenario[scenarioId][itemId][id].overlays, ...updates.overlays }
-          : state.groupsByScenario[scenarioId][itemId][id].overlays
+        ...updates
       };
     },
     deleteGroup(state, action) {
@@ -83,7 +79,7 @@ const simGroupSlice = createSlice({
         const dataItemId = String(assignment.kindId);
         if (!state.groupsByScenario[scenarioId][dataItemId]) state.groupsByScenario[scenarioId][dataItemId] = {};
         const id = assignment.id ? String(assignment.id) : createId('group');
-        state.groupsByScenario[scenarioId][dataItemId][id] = { ...assignment, id, overlays: {} };
+        state.groupsByScenario[scenarioId][dataItemId][id] = { ...assignment, id,  };
       });
     },
     deleteAllGroupAssignmentsForItem(state, action) {

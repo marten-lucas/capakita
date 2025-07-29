@@ -19,15 +19,14 @@ const simBookingSlice = createSlice({
       const bookingKey = String(booking.id || createId('booking'));
       state.bookingsByScenario[scenarioId][itemId][bookingKey] = {
         ...booking,
-        id: bookingKey,
-        overlays: {},
+        id: bookingKey
       };
     },
     updateBooking(state, action) {
       const { scenarioId, dataItemId, bookingId, updates } = action.payload;
       const itemId = String(dataItemId);
       const id = String(bookingId);
-      
+
       // Ensure the nested structure exists
       if (!state.bookingsByScenario[scenarioId]) {
         state.bookingsByScenario[scenarioId] = {};
@@ -35,7 +34,7 @@ const simBookingSlice = createSlice({
       if (!state.bookingsByScenario[scenarioId][itemId]) {
         state.bookingsByScenario[scenarioId][itemId] = {};
       }
-      
+
       // Check if booking exists, if not create it
       if (!state.bookingsByScenario[scenarioId][itemId][id]) {
         // Create new booking if it doesn't exist
@@ -45,17 +44,14 @@ const simBookingSlice = createSlice({
           enddate: '',
           times: [],
           rawdata: {},
-          overlays: {}
         };
       }
-      
+
       // Update the booking
       state.bookingsByScenario[scenarioId][itemId][id] = {
         ...state.bookingsByScenario[scenarioId][itemId][id],
         ...updates,
-        overlays: updates.overlays
-          ? { ...state.bookingsByScenario[scenarioId][itemId][id].overlays, ...updates.overlays }
-          : state.bookingsByScenario[scenarioId][itemId][id].overlays
+      
       };
     },
     deleteBooking(state, action) {
@@ -76,7 +72,6 @@ const simBookingSlice = createSlice({
         state.bookingsByScenario[scenarioId][itemKey][bookingKey] = {
           ...item,
           id: bookingKey,
-          overlays: {},
         };
       });
     },

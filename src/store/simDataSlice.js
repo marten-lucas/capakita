@@ -15,7 +15,6 @@ const simDataSlice = createSlice({
       const key = createId('simdata');
       state.dataByScenario[scenarioId][key] = {
         ...item,
-        overlays: item.overlays || {},
         absences: Array.isArray(item.absences) ? item.absences : [],
         // Remove id attribute
       };
@@ -26,10 +25,8 @@ const simDataSlice = createSlice({
       if (!state.dataByScenario[scenarioId] || !state.dataByScenario[scenarioId][id]) return;
       state.dataByScenario[scenarioId][id] = {
         ...state.dataByScenario[scenarioId][id],
-        ...updates,
-        overlays: updates.overlays
-          ? { ...state.dataByScenario[scenarioId][id].overlays, ...updates.overlays }
-          : state.dataByScenario[scenarioId][id].overlays
+        ...updates
+
       };
     },
     updateDataItemFields(state, action) {
@@ -60,15 +57,6 @@ const simDataSlice = createSlice({
       const { scenarioId } = action.payload;
       delete state.dataByScenario[scenarioId];
     },
-    setOverlay(state, action) {
-      const { scenarioId, itemId, overlay } = action.payload;
-      const id = String(itemId);
-      if (!state.dataByScenario[scenarioId] || !state.dataByScenario[scenarioId][id]) return;
-      state.dataByScenario[scenarioId][id].overlays = {
-        ...state.dataByScenario[scenarioId][id].overlays,
-        ...overlay
-      };
-    },
     importDataItems(state, action) {
       const { scenarioId, simDataList } = action.payload;
       if (!state.dataByScenario[scenarioId]) state.dataByScenario[scenarioId] = {};
@@ -77,7 +65,6 @@ const simDataSlice = createSlice({
         state.dataByScenario[scenarioId][key] = {
           ...item,
           id: key, // Ensure id matches store key
-          overlays: item.overlays || {},
           absences: Array.isArray(item.absences) ? item.absences : [],
         };
       });
@@ -96,8 +83,7 @@ const simDataSlice = createSlice({
         dateofbirth: item.dateofbirth || '',
         groupId: item.groupId || '',
         rawdata: { source: item.source || 'manual entry', ...item.rawdata },
-        absences: Array.isArray(item.absences) ? item.absences : [],
-        overlays: item.overlays || {},
+        absences: Array.isArray(item.absences) ? item.absences : []
       };
       },
     loadDataByScenario(state, action) {
@@ -160,7 +146,6 @@ export const {
   updateDataItemFields,
   deleteDataItem,
   deleteAllDataForScenario,
-  setOverlay,
   importDataItems,
   simDataItemAdd,
   loadDataByScenario,

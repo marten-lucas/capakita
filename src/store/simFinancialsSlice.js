@@ -15,7 +15,7 @@ const simFinancialsSlice = createSlice({
       const itemId = String(dataItemId);
       if (!state.financialsByScenario[scenarioId][itemId]) state.financialsByScenario[scenarioId][itemId] = {};
       const key = String(financial.id || createId('financial'));
-      state.financialsByScenario[scenarioId][itemId][key] = { ...financial, id: key, overlays: {} };
+      state.financialsByScenario[scenarioId][itemId][key] = { ...financial, id: key,  };
     },
     updateFinancial(state, action) {
       const { scenarioId, dataItemId, financialId, updates } = action.payload;
@@ -24,14 +24,11 @@ const simFinancialsSlice = createSlice({
       if (!state.financialsByScenario[scenarioId]) state.financialsByScenario[scenarioId] = {};
       if (!state.financialsByScenario[scenarioId][itemId]) state.financialsByScenario[scenarioId][itemId] = {};
       if (!state.financialsByScenario[scenarioId][itemId][id]) {
-        state.financialsByScenario[scenarioId][itemId][id] = { id, overlays: {} };
+        state.financialsByScenario[scenarioId][itemId][id] = { id,  };
       }
       state.financialsByScenario[scenarioId][itemId][id] = {
         ...state.financialsByScenario[scenarioId][itemId][id],
-        ...updates,
-        overlays: updates.overlays
-          ? { ...state.financialsByScenario[scenarioId][itemId][id].overlays, ...updates.overlays }
-          : state.financialsByScenario[scenarioId][itemId][id].overlays
+        ...updates
       };
     },
     deleteFinancial(state, action) {

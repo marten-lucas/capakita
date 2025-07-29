@@ -47,7 +47,6 @@ function GroupCards() {
       groupId: '', // Set default groupId or let user pick
       start: '',
       end: '',
-      overlays: {}
     };
     dispatch(addGroup({
       scenarioId: selectedScenarioId,

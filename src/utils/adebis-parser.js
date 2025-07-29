@@ -39,7 +39,6 @@ export function adebis2simData(kidsRaw, employeesRaw) {
       groupId: kind.GRUNR ? String(kind.GRUNR) : "",
       rawdata: { ...kind },
       absences: [],
-      overlays: {},
       adebisId: { id: String(kind.KINDNR), source: "kind" }
     });
   }
@@ -59,7 +58,6 @@ export function adebis2simData(kidsRaw, employeesRaw) {
       groupId: "",
       rawdata: { ...emp },
       absences: [],
-      overlays: {},
       adebisId: { id: String(emp.IDNR), source: "anstell" }
     });
   }
@@ -93,7 +91,6 @@ function belegung2Booking(belegungRaw) {
       enddate: convertDDMMYYYYtoYYYYMMDD(b.BELBIS) || '',
       times: Zeiten2Booking(b.ZEITEN, bookingId),
       rawdata: { ...b },
-      overlays: {},
       adebisId: { id: String(b.IDNR), source: "belegung" }
     });
     bookingReference.push({
@@ -117,7 +114,6 @@ function anstell2Booking(employeesRaw) {
       enddate: convertDDMMYYYYtoYYYYMMDD(e.ENDDAT) || '',
       times: Zeiten2Booking(e.ZEITEN, bookingId),
       rawdata: { ...e },
-      overlays: {},
       adebisId: { id: String(e.IDNR), source: "anstell" }
     });
     bookingReference.push({
