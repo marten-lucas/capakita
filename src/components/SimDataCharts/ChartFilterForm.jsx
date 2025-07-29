@@ -22,7 +22,8 @@ import {
   setChartToggles,
   setFilterGroups,
   setFilterQualifications,
-  ensureScenario
+  ensureScenario,
+  updateWeeklyChartData
 } from '../../store/chartSlice';
 import { createSelector } from '@reduxjs/toolkit';
 
@@ -109,12 +110,13 @@ function ChartFilterForm({ showStichtag = false, scenarioId }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [availableQualifications, scenarioId]);
 
-  // Handlers: update chartSlice state
+  // Handlers: update chartSlice state and update chart data
   const handleGroupChange = (event) => {
     const value = typeof event.target.value === 'string'
       ? event.target.value.split(',')
       : event.target.value;
     dispatch(setFilterGroups({ scenarioId, groups: value }));
+    dispatch(updateWeeklyChartData(scenarioId));
   };
 
   const handleQualificationChange = (event) => {
@@ -122,6 +124,7 @@ function ChartFilterForm({ showStichtag = false, scenarioId }) {
       ? event.target.value.split(',')
       : event.target.value;
     dispatch(setFilterQualifications({ scenarioId, qualifications: value }));
+    dispatch(updateWeeklyChartData(scenarioId));
   };
 
   const handleToggle = (event, newToggles) => {

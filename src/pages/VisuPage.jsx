@@ -76,14 +76,14 @@ function VisuPage() {
       </Box>
 
       <Box sx={{ flex: 1, p: 3, display: 'flex', flexDirection: 'column', gap: 3, overflow: 'auto' }}>
-        {/* {chartToggles.includes('weekly') && (
+        {chartToggles.includes('weekly') && (
           <Box sx={{ minHeight: '400px' }}>
             <Typography variant="h6" sx={{ mb: 2, color: 'text.secondary' }}>
               Weekly Chart
             </Typography>
-            <WeeklyChart hideFilters scenario={selectedScenario} />
+            <WeeklyChart  />
           </Box>
-        )} */}
+        )}
         {/* {chartToggles.includes('midterm') && (
           <Box sx={{ minHeight: '400px' }}>
             <Typography variant="h6" sx={{ mb: 2, color: 'text.secondary' }}>

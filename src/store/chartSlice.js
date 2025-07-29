@@ -1,5 +1,5 @@
 import { createSlice } from '@reduxjs/toolkit';
-import { generateTimeSegments } from '../utils/chartUtils';
+import { generateTimeSegments, calculateChartData } from '../utils/chartUtils';
 
 // Helper for initial chart state per scenario
 function getInitialChartState() {
@@ -14,6 +14,15 @@ function getInitialChartState() {
     chartData: {
       weekly: {
         categories: generateTimeSegments(),
+        demand: [],
+        maxdemand:"",
+        capacity: [],
+        maxcapacity: "",
+        care_ratio: [],
+        max_care_ratio: "",
+        expert_ratio: [],
+        maxexpert_ratio: "100"
+        
       },
       midterm: {
         categories: [],
@@ -23,7 +32,6 @@ function getInitialChartState() {
 }
 
 const initialState = {
-  // scenarioId: chartState
 };
 
 const chartSlice = createSlice({
@@ -74,6 +82,53 @@ const chartSlice = createSlice({
     }
   },
 });
+
+// Thunk to update weekly chart data for a scenario
+export const updateWeeklyChartData = (scenarioId) => (dispatch, getState) => {
+  const state = getState();
+  const chartState = state.chart[scenarioId] || {};
+  const referenceDate = chartState.referenceDate || '';
+  const selectedGroups = chartState.filter?.Groups || [];
+  const selectedQualifications = chartState.filter?.Qualifications || [];
+
+  // Gather all required data from state
+  const bookingsByScenario = state.simBooking.bookingsByScenario;
+  const dataByScenario = state.simData.dataByScenario;
+  const groupDefs = state.simGroup.groupDefsByScenario;
+  const qualificationAssignmentsByScenario = state.simQualification.qualificationAssignmentsByScenario;
+  const overlaysByScenario = state.simOverlay.overlaysByScenario;
+
+  // Compute chart data using new structure
+  const chartData = calculateChartData(
+    referenceDate,
+    selectedGroups,
+    selectedQualifications,
+    {
+      bookingsByScenario,
+      dataByScenario,
+      groupDefs,
+      qualificationAssignmentsByScenario,
+      overlaysByScenario,
+      scenarioId
+    }
+  );
+
+  dispatch(setChartData({
+    scenarioId,
+    chartType: 'weekly',
+    data: {
+      categories: chartData.categories,
+      demand: chartData.demand,
+      maxdemand: chartData.maxdemand,
+      capacity: chartData.capacity,
+      maxcapacity: chartData.maxcapacity,
+      care_ratio: chartData.care_ratio,
+      max_care_ratio: chartData.max_care_ratio,
+      expert_ratio: chartData.expert_ratio,
+      maxexpert_ratio: chartData.maxexpert_ratio
+    }
+  }));
+};
 
 export const {
   ensureScenario,
