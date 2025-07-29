@@ -21,11 +21,25 @@ function GroupDetail({ index, group }) {
   const { baseScenario, isBasedScenario } = useOverlayData();
   const baseScenarioId = baseScenario?.id;
 
-  // Overlay-aware selector for base group assignments
-  const baseGroups = useSelector(state => {
-    if (!baseScenarioId || !selectedItemId || !group?.id) return undefined;
-    const baseGroupsObj = state.simGroup.groupsByScenario[baseScenarioId]?.[selectedItemId];
-    return baseGroupsObj ? Object.values(baseGroupsObj) : undefined;
+  // Overlay-aware selector for group assignments (merged base + overlay)
+  const groupAssignments = useSelector(state => {
+    const overlays = state.simOverlay.overlaysByScenario[selectedScenarioId]?.groupassignments?.[selectedItemId] || {};
+    const overlaysArr = Object.values(overlays);
+    if (isBasedScenario && baseScenarioId) {
+      const baseGroupsObj = state.simGroup.groupsByScenario[baseScenarioId]?.[selectedItemId] || {};
+      const baseArr = Object.values(baseGroupsObj);
+      // Merge overlays over base by id
+      const merged = [...baseArr];
+      overlaysArr.forEach(overlay => {
+        const idx = merged.findIndex(g => g.id === overlay.id);
+        if (idx >= 0) merged[idx] = overlay;
+        else merged.push(overlay);
+      });
+      return merged;
+    } else {
+      const currGroupsObj = state.simGroup.groupsByScenario[selectedScenarioId]?.[selectedItemId] || {};
+      return Object.values(currGroupsObj);
+    }
   });
 
   // Use bookings from simBookingSlice - check both current and base scenario
@@ -102,7 +116,10 @@ function GroupDetail({ index, group }) {
 
     if (isBasedScenario) {
       // Compare with base group assignments
-      const baseGroup = baseGroups?.find(g => g.id === group.id);
+      const baseGroupsObj = baseScenarioId
+        ? (window.store?.getState()?.simGroup.groupsByScenario[baseScenarioId]?.[selectedItemId] || {})
+        : {};
+      const baseGroup = Object.values(baseGroupsObj).find(g => g.id === group.id);
       const isIdenticalToBase = baseGroup && JSON.stringify(updatedGroup) === JSON.stringify(baseGroup);
       if (isIdenticalToBase) {
         // Remove overlay if matches base
@@ -135,6 +152,30 @@ function GroupDetail({ index, group }) {
           dataItemId: selectedItemId,
           groupId: group.id,
           updates: updatedGroup
+        }
+      });
+    }
+  };
+
+  // Handler to add a new group assignment (for based scenarios, create overlay)
+  const handleAddGroup = (newGroup) => {
+    if (isBasedScenario) {
+      dispatch({
+        type: 'simOverlay/setGroupAssignmentOverlay',
+        payload: {
+          scenarioId: selectedScenarioId,
+          itemId: selectedItemId,
+          groupId: newGroup.id,
+          overlayData: newGroup
+        }
+      });
+    } else {
+      dispatch({
+        type: 'simGroup/addGroup',
+        payload: {
+          scenarioId: selectedScenarioId,
+          dataItemId: selectedItemId,
+          group: newGroup
         }
       });
     }

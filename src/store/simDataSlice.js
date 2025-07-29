@@ -93,15 +93,69 @@ const simDataSlice = createSlice({
   });
 
 
-// Thunk for adding a data item and selecting it
-export const addDataItemAndSelect = ({ scenarioId, item }) => (dispatch) => {
+// Thunk for adding a data item and selecting it (overlay-aware)
+export const addDataItemAndSelect = ({ scenarioId, item }) => (dispatch, getState) => {
+  const state = getState();
+  const scenario = state.simScenario.scenarios.find(s => s.id === scenarioId);
+  const isBasedScenario = !!scenario?.baseScenarioId;
   const id = String(item.id || createId('simdata'));
-  dispatch(simDataItemAdd({ scenarioId, item: { ...item, id } }));
-  dispatch({
-    type: 'simScenario/setSelectedItem',
-    payload: id
-  });
+  if (isBasedScenario) {
+    // Overlay: set data item overlay
+    dispatch({
+      type: 'simOverlay/setDataItemOverlay',
+      payload: {
+        scenarioId,
+        itemId: id,
+        overlayData: { ...item, id }
+      }
+    });
+    dispatch({
+      type: 'simScenario/setSelectedItem',
+      payload: id
+    });
+  } else {
+    dispatch(simDataItemAdd({ scenarioId, item: { ...item, id } }));
+    dispatch({
+      type: 'simScenario/setSelectedItem',
+      payload: id
+    });
+  }
 };
+
+// Thunk for updating a data item (overlay-aware)
+export const updateDataItemThunk = ({ scenarioId, itemId, updates }) => (dispatch, getState) => {
+  const state = getState();
+  const scenario = state.simScenario.scenarios.find(s => s.id === scenarioId);
+  const isBasedScenario = !!scenario?.baseScenarioId;
+  if (isBasedScenario) {
+    // Get base item
+    const baseScenarioId = scenario.baseScenarioId;
+    const baseItem = state.simData.dataByScenario[baseScenarioId]?.[itemId];
+    const updatedItem = { ...baseItem, ...updates, id: itemId };
+    const isIdenticalToBase = baseItem && JSON.stringify(updatedItem) === JSON.stringify(baseItem);
+    if (isIdenticalToBase) {
+      // Remove overlay if matches base
+      dispatch({
+        type: 'simOverlay/removeDataItemOverlay',
+        payload: { scenarioId, itemId }
+      });
+    } else {
+      // Set overlay if different from base
+      dispatch({
+        type: 'simOverlay/setDataItemOverlay',
+        payload: {
+          scenarioId,
+          itemId,
+          overlayData: updatedItem
+        }
+      });
+    }
+  } else {
+    dispatch(updateDataItem({ scenarioId, itemId, updates }));
+  }
+};
+
+// ...existing code...
 
 export const selectDataItemsByScenario = createSelector(
   [

@@ -1,5 +1,6 @@
 import { createSlice, createSelector } from '@reduxjs/toolkit';
 import { createId } from '../utils/idUtils';
+import { useSelector } from 'react-redux';
 
 const initialState = {
   bookingsByScenario: {},
@@ -91,6 +92,61 @@ const simBookingSlice = createSlice({
     },
   },
 });
+
+// Thunk for adding a booking, overlay-aware
+export const addBookingThunk = ({ scenarioId, dataItemId, booking }) => (dispatch, getState) => {
+  const state = getState();
+  const scenario = state.simScenario.scenarios.find(s => s.id === scenarioId);
+  const isBasedScenario = !!scenario?.baseScenarioId;
+  if (isBasedScenario) {
+    // Overlay: set booking overlay
+    dispatch({
+      type: 'simOverlay/setBookingOverlay',
+      payload: {
+        scenarioId,
+        itemId: dataItemId,
+        bookingId: booking.id,
+        overlayData: booking
+      }
+    });
+  } else {
+    dispatch(simBookingSlice.actions.addBooking({ scenarioId, dataItemId, booking }));
+  }
+};
+
+// Thunk for updating a booking, overlay-aware
+export const updateBookingThunk = ({ scenarioId, dataItemId, bookingId, updates }) => (dispatch, getState) => {
+  const state = getState();
+  const scenario = state.simScenario.scenarios.find(s => s.id === scenarioId);
+  const isBasedScenario = !!scenario?.baseScenarioId;
+  if (isBasedScenario) {
+    // Get base booking
+    const baseScenarioId = scenario.baseScenarioId;
+    const baseBooking = state.simBooking.bookingsByScenario[baseScenarioId]?.[dataItemId]?.[bookingId];
+    const updatedBooking = { ...baseBooking, ...updates, id: bookingId };
+    const isIdenticalToBase = baseBooking && JSON.stringify(updatedBooking) === JSON.stringify(baseBooking);
+    if (isIdenticalToBase) {
+      // Remove overlay if matches base
+      dispatch({
+        type: 'simOverlay/removeBookingOverlay',
+        payload: { scenarioId, itemId: dataItemId, bookingId }
+      });
+    } else {
+      // Set overlay if different from base
+      dispatch({
+        type: 'simOverlay/setBookingOverlay',
+        payload: {
+          scenarioId,
+          itemId: dataItemId,
+          bookingId,
+          overlayData: updatedBooking
+        }
+      });
+    }
+  } else {
+    dispatch(simBookingSlice.actions.updateBooking({ scenarioId, dataItemId, bookingId, updates }));
+  }
+};
 
 export const {
   addBooking,

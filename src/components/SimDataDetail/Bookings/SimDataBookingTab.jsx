@@ -6,6 +6,7 @@ import BookingCards from './BookingCards';
 import { useSelector, useDispatch } from 'react-redux';
 import { useOverlayData } from '../../../hooks/useOverlayData';
 import { createSelector } from '@reduxjs/toolkit';
+import { addBookingThunk } from '../../../store/simBookingSlice';
 
 const EMPTY_BOOKINGS = [];
 
@@ -22,7 +23,7 @@ function SimDataBookingTab() {
   const { getEffectiveDataItem } = useOverlayData();
   const selectedItem = getEffectiveDataItem(selectedItemId);
 
-  // Memoized selector for bookings with overlay support
+  // Memoized selector for bookings with overlay support (merged overlays over base)
   const bookingsSelector = React.useMemo(() =>
     createSelector(
       [
@@ -35,24 +36,26 @@ function SimDataBookingTab() {
       (bookingsByScenario, overlaysByScenario, scenarioId, baseScenarioId, itemId) => {
         if (!scenarioId || !itemId) return EMPTY_BOOKINGS;
 
-        // Overlay support for based scenarios
-        const overlayBookings = overlaysByScenario[scenarioId]?.bookings?.[itemId];
-        if (overlayBookings) {
-          return Object.values(overlayBookings);
+        const overlayObj = overlaysByScenario[scenarioId]?.bookings?.[itemId] || {};
+        const overlayArr = Object.values(overlayObj);
+
+        if (baseScenarioId) {
+          const baseObj = bookingsByScenario[baseScenarioId]?.[itemId] || {};
+          const baseArr = Object.values(baseObj);
+          // Merge overlays over base by id
+          const merged = [...baseArr];
+          overlayArr.forEach(overlay => {
+            const idx = merged.findIndex(b => b.id === overlay.id);
+            if (idx >= 0) merged[idx] = overlay;
+            else merged.push(overlay);
+          });
+          return merged;
         }
 
         // Try current scenario first
         const scenarioBookings = bookingsByScenario[scenarioId];
         if (scenarioBookings && scenarioBookings[itemId]) {
           return Object.values(scenarioBookings[itemId]);
-        }
-
-        // If no bookings in current scenario and we have a base scenario, try base
-        if (baseScenarioId) {
-          const baseScenarioBookings = bookingsByScenario[baseScenarioId];
-          if (baseScenarioBookings && baseScenarioBookings[itemId]) {
-            return Object.values(baseScenarioBookings[itemId]);
-          }
         }
 
         return EMPTY_BOOKINGS;
@@ -67,20 +70,17 @@ function SimDataBookingTab() {
   const handleAddBooking = () => {
     if (!selectedScenarioId || !selectedItemId) return;
     const bookingId = Date.now();
-    dispatch({
-      type: 'simBooking/addBooking',
-      payload: {
-        scenarioId: selectedScenarioId,
-        dataItemId: selectedItemId,
-        booking: {
-          id: bookingId,
-          startdate: '',
-          enddate: '',
-          times: [],
-          rawdata: {}
-        }
+    dispatch(addBookingThunk({
+      scenarioId: selectedScenarioId,
+      dataItemId: selectedItemId,
+      booking: {
+        id: bookingId,
+        startdate: '',
+        enddate: '',
+        times: [],
+        rawdata: {}
       }
-    });
+    }));
   };
 
   if (!selectedItem) return null;
@@ -112,4 +112,5 @@ function SimDataBookingTab() {
 }
 
 export default SimDataBookingTab;
+
 

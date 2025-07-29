@@ -10,6 +10,7 @@ import QualificationPicker from './QualificationPicker';
 import { useSelector, useDispatch } from 'react-redux';
 import { createSelector } from '@reduxjs/toolkit';
 import { useOverlayData } from '../../hooks/useOverlayData';
+import { updateDataItemThunk } from '../../store/simDataSlice';
 
 // Create memoized selectors
 const selectQualificationDefs = createSelector(
@@ -83,7 +84,6 @@ function SimDataGeneralTab() {
   const { 
     isBasedScenario, 
     getEffectiveDataItem, 
-    updateDataItem, 
     hasOverlay, 
     revertToBase,
     baseScenario 
@@ -197,6 +197,15 @@ function SimDataGeneralTab() {
     }
   };
 
+  // Replace updateDataItem with overlay-aware thunk
+  const handleUpdateDataItem = (updates) => {
+    dispatch(updateDataItemThunk({
+      scenarioId: selectedScenarioId,
+      itemId: selectedItemId,
+      updates
+    }));
+  };
+
   // Guard: If item is null, show a placeholder and return
   if (!item) {
     return (
@@ -258,7 +267,7 @@ function SimDataGeneralTab() {
           onChange={(e) => setLocalName(e.target.value)}
           onBlur={() => {
             if (localName !== item.name) {
-              updateDataItem(selectedItemId, { name: localName });
+              handleUpdateDataItem({ name: localName });
             }
           }}
           size="small"
@@ -275,7 +284,7 @@ function SimDataGeneralTab() {
           onChange={(e) => setLocalNote(e.target.value)}
           onBlur={() => {
             if (localNote !== item.remark) {
-              updateDataItem(selectedItemId, { remark: localNote });
+              handleUpdateDataItem({ remark: localNote });
             }
           }}
           size="small"
@@ -297,7 +306,7 @@ function SimDataGeneralTab() {
               value={localDateOfBirth}
               onChange={(e) => {
                 setLocalDateOfBirth(e.target.value);
-                updateDataItem(selectedItemId, { dateofbirth: e.target.value });
+                handleUpdateDataItem({ dateofbirth: e.target.value });
               }}
               size="small"
               sx={{ width: 355 }}
@@ -319,7 +328,7 @@ function SimDataGeneralTab() {
             value={localStartDate}
             onChange={(e) => {
               setLocalStartDate(e.target.value);
-              updateDataItem(selectedItemId, { startdate: e.target.value });
+              handleUpdateDataItem({ startdate: e.target.value });
             }}
             sx={{ width: 150 }}
           />
@@ -332,7 +341,7 @@ function SimDataGeneralTab() {
             value={localEndDate}
             onChange={(e) => {
               setLocalEndDate(e.target.value);
-              updateDataItem(selectedItemId, { enddate: e.target.value });
+              handleUpdateDataItem({ enddate: e.target.value });
             }}
             sx={{ width: 150 }}
           />
@@ -361,7 +370,7 @@ function SimDataGeneralTab() {
             const newAbsence = { start: '', end: '' };
             const newList = [...absences, newAbsence];
             setLocalAbsences(newList);
-            updateDataItem(selectedItemId, { absences: newList });
+            handleUpdateDataItem({ absences: newList });
           }}
           sx={{ mb: 1 }}
         >
@@ -391,7 +400,7 @@ function SimDataGeneralTab() {
                       const newAbsence = { ...absence, start: e.target.value };
                       const newList = localAbsences.map((a, i) => (i === idx ? newAbsence : a));
                       setLocalAbsences(newList);
-                      updateDataItem(selectedItemId, { absences: newList });
+                      handleUpdateDataItem({ absences: newList });
                     }}
                     sx={{ width: 130 }}
                     inputProps={{ min: new Date().toISOString().split('T')[0] }}
@@ -407,7 +416,7 @@ function SimDataGeneralTab() {
                       const newAbsence = { ...absence, end: e.target.value };
                       const newList = localAbsences.map((a, i) => (i === idx ? newAbsence : a));
                       setLocalAbsences(newList);
-                      updateDataItem(selectedItemId, { absences: newList });
+                      handleUpdateDataItem({ absences: newList });
                     }}
                     sx={{ width: 130 }}
                     inputProps={{ min: new Date().toISOString().split('T')[0] }}
@@ -422,7 +431,7 @@ function SimDataGeneralTab() {
                     onClick={() => {
                       const newList = localAbsences.filter((_, i) => i !== idx);
                       setLocalAbsences(newList);
-                      updateDataItem(selectedItemId, { absences: newList });
+                      handleUpdateDataItem({ absences: newList });
                     }}
                     sx={{ ml: 1 }}
                   >

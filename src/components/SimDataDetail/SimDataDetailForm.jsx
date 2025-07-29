@@ -4,7 +4,7 @@ import {
 } from '@mui/material';
 import SimDataTabs from './SimDataTabs';
 import { useSelector, useDispatch } from 'react-redux';
-import { deleteDataItem } from '../../store/simDataSlice';
+import { deleteDataItemThunk } from '../../store/simDataSlice';
 import { useOverlayData } from '../../hooks/useOverlayData';
 
 function SimDataDetailForm() {
@@ -50,7 +50,7 @@ function SimDataDetailForm() {
             size="small"
             fullWidth
             sx={{ mt: 2 }}
-            onClick={() => dispatch(deleteDataItem({ scenarioId, itemId: selectedItemId }))}
+            onClick={() => dispatch(deleteDataItemThunk({ scenarioId, itemId: selectedItemId }))}
           >
             Eintrag löschen
           </Button>

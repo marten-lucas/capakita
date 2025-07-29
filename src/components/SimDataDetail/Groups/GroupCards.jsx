@@ -54,7 +54,7 @@ function GroupCards() {
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
   
   // Use overlay hook to get base scenario info
-  const { baseScenario } = useOverlayData();
+  const { baseScenario, isBasedScenario } = useOverlayData();
   
   // Use overlay-aware selector for groups
   const groups = useSelector(state => 
@@ -70,11 +70,24 @@ function GroupCards() {
       start: '',
       end: '',
     };
-    dispatch(addGroup({
-      scenarioId: selectedScenarioId,
-      dataItemId: selectedItemId,
-      group: newGroup
-    }));
+    if (isBasedScenario) {
+      // Overlay: set group assignment overlay
+      dispatch({
+        type: 'simOverlay/setGroupAssignmentOverlay',
+        payload: {
+          scenarioId: selectedScenarioId,
+          itemId: selectedItemId,
+          groupId: newGroup.groupId || Date.now().toString(),
+          overlayData: { ...newGroup, id: newGroup.groupId || Date.now().toString() }
+        }
+      });
+    } else {
+      dispatch(addGroup({
+        scenarioId: selectedScenarioId,
+        dataItemId: selectedItemId,
+        group: newGroup
+      }));
+    }
   };
 
   // Track expanded accordion index
