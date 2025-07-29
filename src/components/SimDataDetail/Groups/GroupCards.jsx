@@ -8,6 +8,7 @@ import GroupDetail from './GroupDetail';
 import { useSelector, useDispatch } from 'react-redux';
 import { createSelector } from '@reduxjs/toolkit';
 import { addGroup } from '../../../store/simGroupSlice';
+import { useOverlayData } from '../../../hooks/useOverlayData';
 
 const EMPTY_ARRAY = [];
 
@@ -15,16 +16,29 @@ const EMPTY_ARRAY = [];
 const selectGroups = createSelector(
   [
     (state) => state.simGroup.groupsByScenario,
-    (state, selectedScenarioId) => selectedScenarioId,
-    (state, selectedScenarioId, selectedItemId) => selectedItemId
+    (state, selectedScenarioId, baseScenarioId) => ({ selectedScenarioId, baseScenarioId }),
+    (state, selectedScenarioId, baseScenarioId, selectedItemId) => selectedItemId
   ],
-  (groupsByScenario, selectedScenarioId, selectedItemId) => {
+  (groupsByScenario, { selectedScenarioId, baseScenarioId }, selectedItemId) => {
     if (!selectedScenarioId || !selectedItemId) return EMPTY_ARRAY;
-    const scenarioGroups = groupsByScenario[selectedScenarioId];
-    if (!scenarioGroups) return EMPTY_ARRAY;
-    const itemGroupsObj = scenarioGroups[selectedItemId];
-    if (!itemGroupsObj) return EMPTY_ARRAY;
-    return Object.values(itemGroupsObj);
+    
+    // Try current scenario first
+    const currentScenarioGroups = groupsByScenario[selectedScenarioId];
+    if (currentScenarioGroups && currentScenarioGroups[selectedItemId]) {
+      const itemGroupsObj = currentScenarioGroups[selectedItemId];
+      return Object.values(itemGroupsObj);
+    }
+    
+    // If no groups in current scenario and we have a base scenario, try base
+    if (baseScenarioId) {
+      const baseScenarioGroups = groupsByScenario[baseScenarioId];
+      if (baseScenarioGroups && baseScenarioGroups[selectedItemId]) {
+        const itemGroupsObj = baseScenarioGroups[selectedItemId];
+        return Object.values(itemGroupsObj);
+      }
+    }
+    
+    return EMPTY_ARRAY;
   }
 );
 
@@ -34,9 +48,12 @@ function GroupCards() {
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
   
+  // Use overlay hook to get base scenario info
+  const { baseScenario } = useOverlayData();
+  
   // Use memoized selector for groups
   const groups = useSelector(state => 
-    selectGroups(state, selectedScenarioId, selectedItemId)
+    selectGroups(state, selectedScenarioId, baseScenario?.id, selectedItemId)
   );
 
   // Add group logic

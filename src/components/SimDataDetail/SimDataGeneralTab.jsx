@@ -15,25 +15,51 @@ import { useOverlayData } from '../../hooks/useOverlayData';
 const selectQualificationDefs = createSelector(
   [
     state => state.simQualification.qualificationDefsByScenario,
-    (state, scenarioId) => scenarioId
+    (state, scenarioId, baseScenarioId) => ({ scenarioId, baseScenarioId })
   ],
-  (qualificationDefsByScenario, scenarioId) => {
-    return qualificationDefsByScenario[scenarioId] || [];
+  (qualificationDefsByScenario, { scenarioId, baseScenarioId }) => {
+    const currentDefs = qualificationDefsByScenario[scenarioId] || [];
+    const baseDefs = baseScenarioId ? (qualificationDefsByScenario[baseScenarioId] || []) : [];
+    
+    // Merge base and current
+    const merged = [...baseDefs];
+    currentDefs.forEach(currentDef => {
+      const existingIndex = merged.findIndex(def => def.key === currentDef.key);
+      if (existingIndex >= 0) {
+        merged[existingIndex] = currentDef;
+      } else {
+        merged.push(currentDef);
+      }
+    });
+    
+    return merged;
   }
 );
 
 const selectQualificationAssignments = createSelector(
   [
     state => state.simQualification.qualificationAssignmentsByScenario,
-    (state, scenarioId) => scenarioId,
-    (state, scenarioId, itemId) => itemId
+    (state, scenarioId, baseScenarioId) => ({ scenarioId, baseScenarioId }),
+    (state, scenarioId, baseScenarioId, itemId) => itemId
   ],
-  (qualificationAssignmentsByScenario, scenarioId, itemId) => {
+  (qualificationAssignmentsByScenario, { scenarioId, baseScenarioId }, itemId) => {
     if (!scenarioId || !itemId) return [];
-    const scenarioAssignments = qualificationAssignmentsByScenario[scenarioId];
-    if (!scenarioAssignments) return [];
-    const itemAssignments = scenarioAssignments[itemId];
-    return itemAssignments ? Object.values(itemAssignments) : [];
+    
+    // Try current scenario first
+    const currentScenarioAssignments = qualificationAssignmentsByScenario[scenarioId];
+    if (currentScenarioAssignments && currentScenarioAssignments[itemId]) {
+      return Object.values(currentScenarioAssignments[itemId]);
+    }
+    
+    // If no assignments in current scenario and we have a base scenario, try base
+    if (baseScenarioId) {
+      const baseScenarioAssignments = qualificationAssignmentsByScenario[baseScenarioId];
+      if (baseScenarioAssignments && baseScenarioAssignments[itemId]) {
+        return Object.values(baseScenarioAssignments[itemId]);
+      }
+    }
+    
+    return [];
   }
 );
 
@@ -56,9 +82,9 @@ function SimDataGeneralTab() {
   // Get effective item data (overlay if exists, otherwise base/direct data)
   const item = getEffectiveDataItem(selectedItemId);
 
-  // Use memoized selectors
-  const qualiDefs = useSelector(state => selectQualificationDefs(state, selectedScenarioId));
-  const qualiAssignments = useSelector(state => selectQualificationAssignments(state, selectedScenarioId, selectedItemId));
+  // Use memoized selectors with base scenario support
+  const qualiDefs = useSelector(state => selectQualificationDefs(state, selectedScenarioId, baseScenario?.id));
+  const qualiAssignments = useSelector(state => selectQualificationAssignments(state, selectedScenarioId, baseScenario?.id, selectedItemId));
 
   const assignedQualification = React.useMemo(() => {
     if (!item || item.type !== 'capacity') return '';

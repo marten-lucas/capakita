@@ -10,6 +10,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { createSelector } from '@reduxjs/toolkit';
 import { getBookings } from '../../../store/simBookingSlice';
 import { updateGroup, deleteGroup } from '../../../store/simGroupSlice';
+import { useOverlayData } from '../../../hooks/useOverlayData';
 
 const EMPTY_GROUP_DEFS = [];
 
@@ -18,9 +19,21 @@ function GroupDetail({ index, group }) {
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
  
+  // Use overlay hook to get effective data
+  const { baseScenario, isBasedScenario } = useOverlayData();
 
-  // Use bookings from simBookingSlice only
-  const bookings = useSelector(state => getBookings(state, selectedScenarioId, selectedItemId));
+  // Use bookings from simBookingSlice - check both current and base scenario
+  const bookings = useSelector(state => {
+    const currentBookings = getBookings(state, selectedScenarioId, selectedItemId);
+    if (currentBookings && currentBookings.length > 0) return currentBookings;
+    
+    // If no bookings in current scenario and it's a based scenario, try base scenario
+    if (isBasedScenario && baseScenario) {
+      return getBookings(state, baseScenario.id, selectedItemId);
+    }
+    
+    return currentBookings;
+  });
 
   // Get original group from item.originalParsedData (from import)
   const originalGroup = undefined;
@@ -116,13 +129,28 @@ function GroupDetail({ index, group }) {
     createSelector(
       [
         state => state.simGroup.groupDefsByScenario,
-        () => selectedScenarioId
+        () => selectedScenarioId,
+        () => baseScenario?.id
       ],
-      (groupDefsByScenario, scenarioId) => {
-        return groupDefsByScenario[scenarioId] || EMPTY_GROUP_DEFS;
+      (groupDefsByScenario, scenarioId, baseScenarioId) => {
+        const currentDefs = groupDefsByScenario[scenarioId] || [];
+        const baseDefs = baseScenarioId ? (groupDefsByScenario[baseScenarioId] || []) : [];
+        
+        // Merge base and current
+        const merged = [...baseDefs];
+        currentDefs.forEach(currentDef => {
+          const existingIndex = merged.findIndex(def => def.id === currentDef.id);
+          if (existingIndex >= 0) {
+            merged[existingIndex] = currentDef;
+          } else {
+            merged.push(currentDef);
+          }
+        });
+        
+        return merged;
       }
     ),
-    [selectedScenarioId]
+    [selectedScenarioId, baseScenario?.id]
   );
   const groupDefs = useSelector(groupDefsSelector);
   const allGroupsLookup = React.useMemo(() => {

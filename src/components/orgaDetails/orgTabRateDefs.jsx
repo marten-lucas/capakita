@@ -3,12 +3,23 @@ import {
   Box, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Alert
 } from '@mui/material';
 import { useSelector } from 'react-redux';
+import { useOverlayData } from '../../hooks/useOverlayData';
 
 function OrgaTabRateDefs() {
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
-  const scenario = useSelector(state =>
-    state.simScenario.scenarios.find(s => s.id === selectedScenarioId)
-  );
+  
+  // Use overlay hook to get base scenario info
+  const { baseScenario, isBasedScenario } = useOverlayData();
+  
+  const scenario = useSelector(state => {
+    const currentScenario = state.simScenario.scenarios.find(s => s.id === selectedScenarioId);
+    // If it's a based scenario and current scenario doesn't have rates, try base scenario
+    if (isBasedScenario && (!currentScenario?.organisation?.rates || currentScenario.organisation.rates.length === 0) && baseScenario) {
+      return baseScenario;
+    }
+    return currentScenario;
+  });
+  
   const rates = scenario?.organisation?.rates || [];
 
   return (

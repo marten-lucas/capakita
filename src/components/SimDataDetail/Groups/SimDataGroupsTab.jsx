@@ -3,6 +3,7 @@ import { Typography, Box } from '@mui/material';
 import ModMonitor from '../ModMonitor';
 import GroupCards from './GroupCards';
 import { useSelector } from 'react-redux';
+import { useOverlayData } from '../../../hooks/useOverlayData';
 
 const EMPTY_ARRAY = [];
 
@@ -11,12 +12,16 @@ function SimDataGroupsTab() {
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
   
+  // Use overlay hook to get effective data
+  const { getEffectiveDataItem } = useOverlayData();
+  const item = getEffectiveDataItem(selectedItemId);
+  
   // Get groups from simGroup store instead of item.groups
   const groups = useSelector(
     state => state.simGroup.groupsByScenario[selectedScenarioId] || EMPTY_ARRAY
   );
 
-  if (!selectedItemId) return null;
+  if (!selectedItemId || !item) return null;
 
   return (
     <Box flex={1} display="flex" flexDirection="column" gap={2} sx={{ overflowY: 'auto' }}>

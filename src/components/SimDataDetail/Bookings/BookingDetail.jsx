@@ -7,8 +7,8 @@ import { valueToTime } from '../../../utils/timeUtils';
 import ModMonitor from '../ModMonitor';
 import { useSelector, useDispatch } from 'react-redux';
 import DayControl from './BookingDayControl';
-import { selectDataItemsByScenario } from '../../../store/simDataSlice';
 import { createSelector } from '@reduxjs/toolkit';
+import { useOverlayData } from '../../../hooks/useOverlayData';
 
 // BookingDetail component
 const EMPTY_BOOKINGS = [];
@@ -17,12 +17,10 @@ function BookingDetail({ index }) {
   const dispatch = useDispatch();
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
-  const dataItemsSelector = React.useMemo(
-    () => (state) => selectDataItemsByScenario(state, selectedScenarioId),
-    [selectedScenarioId]
-  );
-  const dataItems = useSelector(dataItemsSelector);
-  const item = dataItems?.find(i => i.id === selectedItemId);
+  
+  // Use overlay hook to get effective data
+  const { getEffectiveDataItem } = useOverlayData();
+  const item = getEffectiveDataItem(selectedItemId);
 
   // Create memoized selector for bookings
   const bookingsSelector = React.useMemo(() => 

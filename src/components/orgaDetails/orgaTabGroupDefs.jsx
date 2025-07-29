@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Box, Typography, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
   IconButton, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Alert
@@ -11,8 +11,34 @@ import { useSelector, useDispatch } from 'react-redux';
 import { addGroupDef, updateGroupDef, deleteGroupDef } from '../../store/simGroupSlice';
 import IconPicker from './IconPicker';
 import { createSelector } from '@reduxjs/toolkit';
+import { useOverlayData } from '../../hooks/useOverlayData';
 
 const getGroupDefs = createSelector(
+  [
+    state => state.simGroup.groupDefsByScenario,
+    (state, scenarioId, baseScenarioId) => ({ scenarioId, baseScenarioId })
+  ],
+  (groupDefsByScenario, { scenarioId, baseScenarioId }) => {
+    const currentDefs = groupDefsByScenario[scenarioId] || [];
+    const baseDefs = baseScenarioId ? (groupDefsByScenario[baseScenarioId] || []) : [];
+    
+    // Merge base and current, with current taking precedence for same IDs
+    const merged = [...baseDefs];
+    currentDefs.forEach(currentDef => {
+      const existingIndex = merged.findIndex(def => def.id === currentDef.id);
+      if (existingIndex >= 0) {
+        merged[existingIndex] = currentDef; // Override base definition
+      } else {
+        merged.push(currentDef); // Add new definition
+      }
+    });
+    
+    return merged;
+  }
+);
+
+// Create a stable selector for current scenario definitions
+const getCurrentScenarioDefs = createSelector(
   [
     state => state.simGroup.groupDefsByScenario,
     (state, scenarioId) => scenarioId
@@ -23,7 +49,28 @@ const getGroupDefs = createSelector(
 function OrgaTabGroupDefs() {
   const dispatch = useDispatch();
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
-  const groupDefs = useSelector(state => getGroupDefs(state, selectedScenarioId));
+  
+  // Use overlay hook to get base scenario info
+  const { baseScenario, isBasedScenario } = useOverlayData();
+  
+  const groupDefs = useSelector(state => 
+    getGroupDefs(state, selectedScenarioId, baseScenario?.id)
+  );
+
+  // Get current scenario definitions for checking if item is from base
+  const currentScenarioDefs = useSelector(state => 
+    getCurrentScenarioDefs(state, selectedScenarioId)
+  );
+
+  // Memoize the function to check if group is from base scenario
+  const isFromBaseScenario = useMemo(() => {
+    if (!isBasedScenario || !baseScenario) {
+      return () => false;
+    }
+    return (group) => {
+      return !currentScenarioDefs.some(def => def.id === group.id);
+    };
+  }, [isBasedScenario, baseScenario, currentScenarioDefs]);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState(null);
@@ -50,9 +97,10 @@ function OrgaTabGroupDefs() {
       return;
     }
     if (editingGroup) {
+      // Always update in current scenario
       dispatch(updateGroupDef({ scenarioId: selectedScenarioId, groupId: editingGroup.id, updates: groupForm }));
     } else {
-      // Ensure a unique id is assigned
+      // Always add to current scenario
       dispatch(addGroupDef({
         scenarioId: selectedScenarioId,
         groupDef: { ...groupForm, id: Date.now().toString() }
@@ -63,6 +111,7 @@ function OrgaTabGroupDefs() {
 
   const handleDeleteGroup = (group) => {
     if (window.confirm(`Möchten Sie die Gruppe "${group.name}" wirklich löschen?`)) {
+      // Always delete from current scenario
       dispatch(deleteGroupDef({ scenarioId: selectedScenarioId, groupId: group.id }));
     }
   };
@@ -98,33 +147,39 @@ function OrgaTabGroupDefs() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {groupDefs.map((group) => (
-                <TableRow key={group.id}>
-                  <TableCell sx={{ fontSize: '1.5em' }}>{group.icon}</TableCell>
-                  <TableCell>{group.name}</TableCell>
-                  <TableCell>{group.id}</TableCell>
-                  <TableCell>
-                    {isAdebisGroup(group) ? 'Adebis Import' : 'Manuell erstellt'}
-                  </TableCell>
-                  <TableCell align="right">
-                    <IconButton
-                      size="small"
-                      onClick={() => handleOpenDialog(group)}
-                      title="Bearbeiten"
-                    >
-                      <EditIcon />
-                    </IconButton>
-                    <IconButton
-                      size="small"
-                      onClick={() => handleDeleteGroup(group)}
-                      title="Löschen"
-                      color="error"
-                    >
-                      <DeleteIcon />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {groupDefs.map((group) => {
+                const fromBase = isFromBaseScenario(group);
+                return (
+                  <TableRow key={group.id} sx={{ opacity: fromBase ? 0.7 : 1 }}>
+                    <TableCell sx={{ fontSize: '1.5em' }}>{group.icon}</TableCell>
+                    <TableCell>
+                      {group.name}
+                      {fromBase && <Typography variant="caption" color="text.secondary"> (von Basis)</Typography>}
+                    </TableCell>
+                    <TableCell>{group.id}</TableCell>
+                    <TableCell>
+                      {isAdebisGroup(group) ? 'Adebis Import' : 'Manuell erstellt'}
+                    </TableCell>
+                    <TableCell align="right">
+                      <IconButton
+                        size="small"
+                        onClick={() => handleOpenDialog(group)}
+                        title="Bearbeiten"
+                      >
+                        <EditIcon />
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        onClick={() => handleDeleteGroup(group)}
+                        title="Löschen"
+                        color="error"
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </TableContainer>

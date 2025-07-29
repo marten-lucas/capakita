@@ -5,6 +5,7 @@ import ModMonitor from '../ModMonitor';
 import BookingCards from './BookingCards';
 import { useSelector, useDispatch } from 'react-redux';
 import { createSelector } from '@reduxjs/toolkit';
+import { useOverlayData } from '../../../hooks/useOverlayData';
 
 const EMPTY_BOOKINGS = [];
 
@@ -12,8 +13,10 @@ function SimDataBookingTab() {
   const dispatch = useDispatch();
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
-  // Get the selected item directly by key
-  const selectedItem = useSelector(state => state.simData.dataByScenario[selectedScenarioId]?.[selectedItemId]);
+  
+  // Use overlay hook to get effective data
+  const { getEffectiveDataItem } = useOverlayData();
+  const selectedItem = getEffectiveDataItem(selectedItemId);
 
   // Memoized selector for bookings
   const bookingsSelector = React.useMemo(() => 

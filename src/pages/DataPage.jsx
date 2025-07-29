@@ -16,7 +16,7 @@ import SimDataList from '../components/SimDataDetail/SimDataList';
 import SimDataDetailForm from '../components/SimDataDetail/SimDataDetailForm';
 import { useSelector, useDispatch } from 'react-redux';
 import { setSelectedScenarioId, addScenario, isSaveAllowed, setSaveDialogOpen, setLoadDialogOpen } from '../store/simScenarioSlice';
-import { addDataItemAndSelect, selectDataItemsByScenario } from '../store/simDataSlice';
+import { addDataItemAndSelect } from '../store/simDataSlice';
 import ScenarioSaveDialog from '../components/modals/ScenarioSaveDialog';
 import ScenarioLoadDialog from '../components/modals/ScenarioLoadDialog';
 import PersonIcon from '@mui/icons-material/Person';
