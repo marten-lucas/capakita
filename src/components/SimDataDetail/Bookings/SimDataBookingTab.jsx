@@ -1,7 +1,6 @@
 import React from 'react';
 import { Box, Button } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import ModMonitor from '../ModMonitor';
 import BookingCards from './BookingCards';
 import { useSelector, useDispatch } from 'react-redux';
 import { useOverlayData } from '../../../hooks/useOverlayData';
@@ -48,15 +47,6 @@ function SimDataBookingTab() {
         >
           Buchungszeitraum hinzufügen
         </Button>
-        <ModMonitor
-          itemId={selectedItemId}
-          field="bookings"
-          value={JSON.stringify(bookings)}
-          originalValue={undefined}
-          onRestore={undefined}
-          title="Alle Buchungen auf importierte Werte zurücksetzen"
-          confirmMsg="Alle Buchungen auf importierten Wert zurücksetzen?"
-        />
       </Box>
       <BookingCards bookings={bookings} />
     </Box>
@@ -64,4 +54,6 @@ function SimDataBookingTab() {
 }
 
 export default SimDataBookingTab;
+
+
   

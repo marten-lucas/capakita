@@ -5,7 +5,6 @@ import {
 } from '@mui/material';
 import React, { useMemo, useEffect } from 'react';
 import { convertDDMMYYYYtoYYYYMMDD } from '../../../utils/dateUtils';
-import ModMonitor from '../ModMonitor';
 import { useSelector, useDispatch } from 'react-redux';
 import { getBookings } from '../../../store/simBookingSlice';
 import { deleteGroupThunk } from '../../../store/simGroupSlice';
@@ -13,7 +12,7 @@ import { useOverlayData } from '../../../hooks/useOverlayData';
 
 const EMPTY_GROUP_DEFS = [];
 
-function GroupDetail({ index, group }) {
+function GroupDetail({ group }) {
   const dispatch = useDispatch();
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
@@ -155,12 +154,6 @@ function GroupDetail({ index, group }) {
     handleUpdateGroup(updatedGroup);
   };
 
-  // Restore für Feld
-  const handleRestoreGroupDate = (field) => {
-    if (!originalGroup) return;
-    const updatedGroup = { ...group, [field]: originalGroup[field] || '' };
-    handleUpdateGroup(updatedGroup);
-  };
 
   // Restore für Gruppen-ID
   const groupDefs = getEffectiveGroupDefs();
@@ -172,22 +165,7 @@ function GroupDetail({ index, group }) {
     return lookup;
   }, [groupDefs]);
 
-  const handleRestoreGroupId = () => {
-    if (!originalGroup) return;
-    const updatedGroup = {
-      ...group,
-      id: originalGroup.id,
-      name: allGroupsLookup[originalGroup.id] || `Gruppe ${originalGroup.id}`,
-    };
-    handleUpdateGroup(updatedGroup);
-  };
 
-  // Restore für alles
-  const handleRestoreAll = () => {
-    if (!originalGroup) return;
-    // Replace group with original
-    handleUpdateGroup({ ...originalGroup });
-  };
 
   const handleGroupModeChange = (event) => {
     const mode = event.target.value;
@@ -239,15 +217,6 @@ function GroupDetail({ index, group }) {
     <Box sx={{ mb: 2 }}>
       <Box alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
         <Box alignItems="center" gap={1}>
-          <ModMonitor
-            itemId={parentItemId}
-            field={`group-${index}`}
-            value={JSON.stringify(group)}
-            originalValue={originalGroup ? JSON.stringify(originalGroup) : undefined}
-            onRestore={handleRestoreAll}
-            title="Komplette Gruppenzuordnung auf importierte Werte zurücksetzen"
-            confirmMsg="Gruppenzuordnung auf importierte Adebis-Daten zurücksetzen?"
-          />
           <Button
             size="small"
             color="error"
@@ -268,15 +237,6 @@ function GroupDetail({ index, group }) {
           value={getDatePickerValue(group.start)}
           onChange={(e) => handleDateChange('start', e.target.value)}
         />
-        <ModMonitor
-          itemId={parentItemId}
-          field={`group-${index}-start`}
-          value={group.start}
-          originalValue={originalGroup ? originalGroup.start : undefined}
-          onRestore={() => handleRestoreGroupDate('start')}
-          title="Startdatum auf importierten Wert zurücksetzen"
-          confirmMsg="Startdatum auf importierten Wert zurücksetzen?"
-        />
         <Typography>bis</Typography>
         <TextField
           label="Enddatum"
@@ -286,29 +246,11 @@ function GroupDetail({ index, group }) {
           value={getDatePickerValue(group.end)}
           onChange={(e) => handleDateChange('end', e.target.value)}
         />
-        <ModMonitor
-          itemId={parentItemId}
-          field={`group-${index}-end`}
-          value={group.end}
-          originalValue={originalGroup ? originalGroup.end : undefined}
-          onRestore={() => handleRestoreGroupDate('end')}
-          title="Enddatum auf importierten Wert zurücksetzen"
-          confirmMsg="Enddatum auf importierten Wert zurücksetzen?"
-        />
       </Box>
       {/* Group Selection Section */}
       <Box sx={{ mb: 3 }}>
         <Box display="flex" alignItems="center" sx={{ mb: 2 }}>
           <FormLabel component="legend" sx={{ mr: 2 }}>Gruppe auswählen:</FormLabel>
-          <ModMonitor
-            itemId={parentItemId}
-            field={`group-${index}-id`}
-            value={group.id}
-            originalValue={originalGroup ? originalGroup.id : undefined}
-            onRestore={handleRestoreGroupId}
-            title="Gruppenzuordnung auf importierten Wert zurücksetzen"
-            confirmMsg="Gruppenzuordnung auf importierten Wert zurücksetzen?"
-          />
         </Box>
         <RadioGroup
           row

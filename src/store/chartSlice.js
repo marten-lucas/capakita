@@ -95,18 +95,6 @@ const chartSlice = createSlice({
   }
 });
 
-// Helper: get scenario chain from current to root
-function getScenarioChain(scenarios, scenarioId) {
-  const chain = [];
-  let currentId = scenarioId;
-  while (currentId) {
-    const scenario = scenarios.find(s => s.id === currentId);
-    if (!scenario) break;
-    chain.push(scenario);
-    currentId = scenario.baseScenarioId;
-  }
-  return chain;
-}
 
 // Thunk to update weekly chart data for a scenario
 export const updateWeeklyChartData = (scenarioId) => (dispatch, getState) => {

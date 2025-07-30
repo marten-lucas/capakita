@@ -1,6 +1,5 @@
 import React from 'react';
 import { Typography, Box } from '@mui/material';
-import ModMonitor from '../ModMonitor';
 import GroupCards from './GroupCards';
 import { useSelector } from 'react-redux';
 import { useOverlayData } from '../../../hooks/useOverlayData';
@@ -19,15 +18,6 @@ function SimDataGroupsTab() {
       <Box display="flex" alignItems="center" gap={2} sx={{ mt: 2, mb: 1 }}>
         <Typography variant="h6" sx={{ flex: 1 }}>
           Gruppen:
-          <ModMonitor
-            itemId={selectedItemId}
-            field="groups"
-            value={undefined}
-            originalValue={undefined}
-            // onRestore logic can be implemented as needed
-            title="Alle Gruppen auf importierte Werte zurücksetzen"
-            confirmMsg="Alle Gruppen auf importierten Wert zurücksetzen?"
-          />
         </Typography>
       </Box>
       <GroupCards itemId={selectedItemId} />
