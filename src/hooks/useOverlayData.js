@@ -2,127 +2,198 @@ import { useCallback, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { setDataItemOverlay, removeDataItemOverlay } from '../store/simOverlaySlice';
 
+// Helper: walk up scenario chain, return array from current to root
+function getScenarioChain(scenarios, scenarioId) {
+  const chain = [];
+  let currentId = scenarioId;
+  while (currentId) {
+    const scenario = scenarios.find(s => s.id === currentId);
+    if (!scenario) break;
+    chain.push(scenario);
+    currentId = scenario.baseScenarioId;
+  }
+  return chain;
+}
+
+// Helper: overlay-aware lookup for object (e.g. dataItems, bookings, groupassignments)
+function overlayObjectChainLookup({ overlaysByScenario, dataByScenario, scenarioChain, key, subkey }) {
+  for (const scenario of scenarioChain) {
+    const sid = scenario.id;
+    // overlaysByScenario: { [sid]: { dataItems: { [key]: ... }, ... } }
+    if (overlaysByScenario[sid]?.[key]?.[subkey]) return overlaysByScenario[sid][key][subkey];
+    if (dataByScenario[sid]?.[subkey]) return dataByScenario[sid][subkey];
+  }
+  return null;
+}
+
 export function useOverlayData() {
   const dispatch = useDispatch();
-  
+
   // Get all necessary data from store
   const scenarios = useSelector(state => state.simScenario.scenarios);
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const overlaysByScenario = useSelector(state => state.simOverlay.overlaysByScenario);
   const dataByScenario = useSelector(state => state.simData.dataByScenario);
+  const bookingsByScenario = useSelector(state => state.simBooking.bookingsByScenario);
+  const groupDefsByScenario = useSelector(state => state.simGroup.groupDefsByScenario);
+  const groupsByScenario = useSelector(state => state.simGroup.groupsByScenario);
+  const qualiDefsByScenario = useSelector(state => state.simQualification.qualificationDefsByScenario);
+  const qualiAssignmentsByScenario = useSelector(state => state.simQualification.qualificationAssignmentsByScenario);
 
-  const selectedScenario = useMemo(() => 
-    scenarios.find(s => s.id === selectedScenarioId), 
+  const selectedScenario = useMemo(() =>
+    scenarios.find(s => s.id === selectedScenarioId),
     [scenarios, selectedScenarioId]
   );
 
-  // Get the base scenario if this is a based scenario
-  const baseScenario = useMemo(() => {
-    if (!selectedScenario?.baseScenarioId) return null;
-    return scenarios.find(s => s.id === selectedScenario.baseScenarioId);
-  }, [scenarios, selectedScenario]);
+  // Build scenario chain from current to root
+  const scenarioChain = useMemo(() => getScenarioChain(scenarios, selectedScenarioId), [scenarios, selectedScenarioId]);
+  const baseScenario = scenarioChain.length > 1 ? scenarioChain[1] : null;
+  const isBasedScenario = !!selectedScenario?.baseScenarioId;
 
-  // Function to get effective data for a data item
+  // Data Items
   const getEffectiveDataItem = useCallback((itemId) => {
-    if (!selectedScenarioId) return null;
-    
-    // If this is a based scenario, check for overlay first, then fall back to base
-    if (selectedScenario?.baseScenarioId) {
-      const overlay = overlaysByScenario[selectedScenarioId]?.dataItems?.[itemId];
-      if (overlay) {
-        return overlay;
-      }
-      // Fall back to base scenario data
-      const baseData = dataByScenario[selectedScenario.baseScenarioId]?.[itemId];
-      return baseData || null;
-    }
-    
-    // Regular scenario - just return direct data
-    return dataByScenario[selectedScenarioId]?.[itemId] || null;
-  }, [selectedScenarioId, selectedScenario, overlaysByScenario, dataByScenario]);
+    if (!itemId) return null;
+    return overlayObjectChainLookup({
+      overlaysByScenario,
+      dataByScenario,
+      scenarioChain,
+      key: 'dataItems',
+      subkey: itemId
+    });
+  }, [overlaysByScenario, dataByScenario, scenarioChain]);
 
-  // Function to get all effective data items for a scenario
   const getEffectiveDataItems = useCallback(() => {
-    if (!selectedScenarioId) return {};
-    
-    if (selectedScenario?.baseScenarioId) {
-      // Start with base scenario data
-      const baseData = dataByScenario[selectedScenario.baseScenarioId] || {};
-      const overlayData = overlaysByScenario[selectedScenarioId]?.dataItems || {};
-      
-      // Merge base data with overlays
-      return { ...baseData, ...overlayData };
+    // Collect all keys from overlays and data, merge overlays over base
+    const allKeys = new Set();
+    for (const scenario of scenarioChain.slice().reverse()) {
+      const sid = scenario.id;
+      if (overlaysByScenario[sid]?.dataItems) Object.keys(overlaysByScenario[sid].dataItems).forEach(k => allKeys.add(k));
+      if (dataByScenario[sid]) Object.keys(dataByScenario[sid]).forEach(k => allKeys.add(k));
     }
-    
-    // Regular scenario
-    return dataByScenario[selectedScenarioId] || {};
-  }, [selectedScenarioId, selectedScenario, overlaysByScenario, dataByScenario]);
+    const result = {};
+    allKeys.forEach(itemId => {
+      result[itemId] = getEffectiveDataItem(itemId);
+    });
+    return result;
+  }, [scenarioChain, overlaysByScenario, dataByScenario, getEffectiveDataItem]);
 
-  // Function to update a data item (creates overlay if needed)
+  // Bookings
+  const getEffectiveBookings = useCallback((itemId) => {
+    // Returns { [bookingId]: booking } for the itemId, overlay-aware, stacked
+    for (const scenario of scenarioChain) {
+      const sid = scenario.id;
+      if (overlaysByScenario[sid]?.bookings?.[itemId]) return overlaysByScenario[sid].bookings[itemId];
+      if (bookingsByScenario[sid]?.[itemId]) return bookingsByScenario[sid][itemId];
+    }
+    return {};
+  }, [scenarioChain, overlaysByScenario, bookingsByScenario]);
+
+  // Group Definitions
+  const getEffectiveGroupDefs = useCallback(() => {
+    // Returns merged groupDefs array, overlays take precedence, stacked
+    for (const scenario of scenarioChain) {
+      const sid = scenario.id;
+      if (Array.isArray(overlaysByScenario[sid]?.groupDefs) && overlaysByScenario[sid].groupDefs.length > 0)
+        return overlaysByScenario[sid].groupDefs;
+      if (Array.isArray(groupDefsByScenario[sid]) && groupDefsByScenario[sid].length > 0)
+        return groupDefsByScenario[sid];
+    }
+    return [];
+  }, [scenarioChain, overlaysByScenario, groupDefsByScenario]);
+
+  // Group Assignments
+  const getEffectiveGroupAssignments = useCallback((itemId) => {
+    // Returns { [groupId]: groupAssignment } for the itemId, overlay-aware, stacked
+    for (const scenario of scenarioChain) {
+      const sid = scenario.id;
+      if (overlaysByScenario[sid]?.groupassignments?.[itemId]) return overlaysByScenario[sid].groupassignments[itemId];
+      if (groupsByScenario[sid]?.[itemId]) return groupsByScenario[sid][itemId];
+    }
+    return {};
+  }, [scenarioChain, overlaysByScenario, groupsByScenario]);
+
+  // Qualification Definitions
+  const getEffectiveQualificationDefs = useCallback(() => {
+    for (const scenario of scenarioChain) {
+      const sid = scenario.id;
+      if (Array.isArray(overlaysByScenario[sid]?.qualificationDefs) && overlaysByScenario[sid].qualificationDefs.length > 0)
+        return overlaysByScenario[sid].qualificationDefs;
+      if (Array.isArray(qualiDefsByScenario[sid]) && qualiDefsByScenario[sid].length > 0)
+        return qualiDefsByScenario[sid];
+    }
+    return [];
+  }, [scenarioChain, overlaysByScenario, qualiDefsByScenario]);
+
+  // Qualification Assignments
+  const getEffectiveQualificationAssignments = useCallback((itemId) => {
+    // overlaysByScenario[sid]?.qualificationDefs: [{ dataItemId, qualification }]
+    for (const scenario of scenarioChain) {
+      const sid = scenario.id;
+      const overlayArr = overlaysByScenario[sid]?.qualificationDefs;
+      if (Array.isArray(overlayArr)) {
+        const found = overlayArr.filter(a => String(a.dataItemId) === String(itemId));
+        if (found.length > 0) return found;
+      }
+      const assignmentsObj = qualiAssignmentsByScenario[sid]?.[itemId];
+      if (assignmentsObj && Object.values(assignmentsObj).length > 0) {
+        return Object.values(assignmentsObj);
+      }
+    }
+    return [];
+  }, [scenarioChain, overlaysByScenario, qualiAssignmentsByScenario]);
+
+  // Overlay helpers (unchanged)
   const updateDataItem = useCallback((itemId, updates) => {
     if (!selectedScenarioId || !selectedScenario) return;
-
     if (selectedScenario.baseScenarioId) {
       // This is a based scenario - create/update overlay
-      const baseData = dataByScenario[selectedScenario.baseScenarioId]?.[itemId];
-      if (!baseData) return; // Item doesn't exist in base scenario
-      
-      const currentOverlay = overlaysByScenario[selectedScenarioId]?.dataItems?.[itemId];
-      const currentData = currentOverlay || baseData;
-      const newData = { ...currentData, ...updates };
-      
+      const baseData = getEffectiveDataItem(itemId);
+      if (!baseData) return;
+      const newData = { ...baseData, ...updates };
       // Check if the new data is identical to base data
       const isIdenticalToBase = JSON.stringify(newData) === JSON.stringify(baseData);
-      
       if (isIdenticalToBase) {
-        // Remove overlay if data matches base
         dispatch(removeDataItemOverlay({ scenarioId: selectedScenarioId, itemId }));
       } else {
-        // Create/update overlay
-        dispatch(setDataItemOverlay({ 
-          scenarioId: selectedScenarioId, 
-          itemId, 
-          overlayData: newData 
+        dispatch(setDataItemOverlay({
+          scenarioId: selectedScenarioId,
+          itemId,
+          overlayData: newData
         }));
       }
     } else {
-      // Regular scenario - update directly in simData
       dispatch({
         type: 'simData/updateDataItemFields',
         payload: { scenarioId: selectedScenarioId, itemId, fields: updates }
       });
     }
-  }, [selectedScenarioId, selectedScenario, overlaysByScenario, dataByScenario, dispatch]);
+  }, [selectedScenarioId, selectedScenario, dispatch, getEffectiveDataItem]);
 
-  // Function to check if an item has an overlay
   const hasOverlay = useCallback((itemId) => {
     if (!selectedScenarioId || !selectedScenario?.baseScenarioId) return false;
     return !!overlaysByScenario[selectedScenarioId]?.dataItems?.[itemId];
   }, [selectedScenarioId, selectedScenario, overlaysByScenario]);
 
-  // Function to remove an overlay and revert to base
   const revertToBase = useCallback((itemId) => {
     if (!selectedScenarioId || !selectedScenario?.baseScenarioId) return;
     dispatch(removeDataItemOverlay({ scenarioId: selectedScenarioId, itemId }));
   }, [selectedScenarioId, selectedScenario, dispatch]);
 
-  // Function to check if a qualification assignment has an overlay
-  const hasQualificationOverlay = useCallback((itemId) => {
-    if (!selectedScenarioId || !selectedScenario?.baseScenarioId) return false;
-    return !!overlaysByScenario[selectedScenarioId]?.qualificationDefs?.find(
-      (assignment) => assignment.dataItemId === itemId
-    );
-  }, [selectedScenarioId, selectedScenario, overlaysByScenario]);
-
+  // Expose all helpers
   return {
     selectedScenario,
     baseScenario,
-    isBasedScenario: !!selectedScenario?.baseScenarioId,
+    isBasedScenario,
+    scenarioChain,
     getEffectiveDataItem,
     getEffectiveDataItems,
+    getEffectiveBookings,
+    getEffectiveGroupDefs,
+    getEffectiveGroupAssignments,
+    getEffectiveQualificationDefs,
+    getEffectiveQualificationAssignments,
     updateDataItem,
     hasOverlay,
     revertToBase,
-    hasQualificationOverlay,
   };
 }

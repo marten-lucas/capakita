@@ -12,60 +12,19 @@ import {
   updateQualificationDef,
   deleteQualificationDef
 } from '../../store/simQualificationSlice';
-import { createSelector } from '@reduxjs/toolkit';
 import { useOverlayData } from '../../hooks/useOverlayData';
-
-// Memoized selector for qualiDefs
-const getQualiDefs = createSelector(
-  [
-    state => state.simQualification.qualificationDefsByScenario,
-    (state, scenarioId) => scenarioId,
-    (state, scenarioId, baseScenarioId) => baseScenarioId
-  ],
-  (qualificationDefsByScenario, scenarioId, baseScenarioId) => {
-    const currentDefs = qualificationDefsByScenario[scenarioId] || [];
-    const baseDefs = baseScenarioId ? (qualificationDefsByScenario[baseScenarioId] || []) : [];
-
-    if (!baseDefs.length) return currentDefs;
-    if (!currentDefs.length) return baseDefs;
-
-    const merged = [...baseDefs];
-    currentDefs.forEach(currentDef => {
-      const existingIndex = merged.findIndex(def => def.key === currentDef.key);
-      if (existingIndex >= 0) {
-        merged[existingIndex] = currentDef; // Override base definition
-      } else {
-        merged.push(currentDef); // Add new definition
-      }
-    });
-
-    return merged;
-  }
-);
-
-// Create a stable selector for current scenario definitions
-const getCurrentScenarioDefs = createSelector(
-  [
-    state => state.simQualification.qualificationDefsByScenario,
-    (state, scenarioId) => scenarioId
-  ],
-  (qualificationDefsByScenario, scenarioId) => qualificationDefsByScenario[scenarioId] || []
-);
 
 function OrgaTabQualificationDefs() {
   const dispatch = useDispatch();
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
-  
-  // Use overlay hook to get base scenario info
-  const { baseScenario, isBasedScenario } = useOverlayData();
-  
-  const qualiDefs = useSelector(state => 
-    getQualiDefs(state, selectedScenarioId, baseScenario?.id)
-  );
+
+  // Use overlay hook to get base scenario info and effective qualification defs
+  const { baseScenario, isBasedScenario, getEffectiveQualificationDefs } = useOverlayData();
+  const qualiDefs = getEffectiveQualificationDefs();
 
   // Get current scenario definitions for checking if item is from base
-  const currentScenarioDefs = useSelector(state => 
-    getCurrentScenarioDefs(state, selectedScenarioId)
+  const currentScenarioDefs = useSelector(state =>
+    state.simQualification.qualificationDefsByScenario[selectedScenarioId] || []
   );
 
   // Memoize the function to check if qualification is from base scenario
@@ -226,3 +185,4 @@ function OrgaTabQualificationDefs() {
 }
 
 export default OrgaTabQualificationDefs;
+   

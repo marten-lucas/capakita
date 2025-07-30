@@ -25,6 +25,7 @@ import {
   ensureScenario,
   updateWeeklyChartData
 } from '../../store/chartSlice';
+import { useOverlayData } from '../../hooks/useOverlayData';
 
 const ITEM_HEIGHT = 48;
 const ITEM_PADDING_TOP = 8;
@@ -69,13 +70,10 @@ function ChartFilterForm({ showStichtag = false, scenarioId }) {
   const selectedGroups = chartState.filter?.Groups || [];
   const selectedQualifications = chartState.filter?.Qualifications || [];
 
-  // Use direct selectors to avoid memoization warning
-  const groupDefs = useSelector(
-    state => state.simGroup.groupDefsByScenario[scenarioId] || EMPTY_GROUP_DEFS
-  );
-  const qualiDefs = useSelector(
-    state => state.simQualification.qualificationDefsByScenario[scenarioId] || EMPTY_QUALI_DEFS
-  );
+  // Use overlay hook for groupDefs and qualiDefs
+  const { getEffectiveGroupDefs, getEffectiveQualificationDefs } = useOverlayData();
+  const groupDefs = getEffectiveGroupDefs();
+  const qualiDefs = getEffectiveQualificationDefs();
 
   // Memoize derived values
   const availableGroups = React.useMemo(() => {
@@ -305,4 +303,5 @@ function ChartFilterForm({ showStichtag = false, scenarioId }) {
 }
 
 export default ChartFilterForm;
+
 

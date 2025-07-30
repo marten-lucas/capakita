@@ -17,7 +17,6 @@ export default function WeeklyChart() {
   const expertRatioColor = '#ff9800'; // Default color for expert ratio
 
   const scenarioId = useSelector(state => state.simScenario.selectedScenarioId);
-
   const dispatch = useDispatch();
 
   // Get current filters from chartSlice (per scenario)

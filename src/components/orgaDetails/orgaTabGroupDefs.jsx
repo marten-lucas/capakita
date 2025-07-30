@@ -10,60 +10,19 @@ import AddIcon from '@mui/icons-material/Add';
 import { useSelector, useDispatch } from 'react-redux';
 import { addGroupDef, updateGroupDef, deleteGroupDef } from '../../store/simGroupSlice';
 import IconPicker from './IconPicker';
-import { createSelector } from '@reduxjs/toolkit';
 import { useOverlayData } from '../../hooks/useOverlayData';
-
-const getGroupDefs = createSelector(
-  [
-    state => state.simGroup.groupDefsByScenario,
-    (state, scenarioId) => scenarioId,
-    (state, scenarioId, baseScenarioId) => baseScenarioId
-  ],
-  (groupDefsByScenario, scenarioId, baseScenarioId) => {
-    const currentDefs = groupDefsByScenario[scenarioId] || [];
-    const baseDefs = baseScenarioId ? (groupDefsByScenario[baseScenarioId] || []) : [];
-
-    // Merge base and current, with current taking precedence for same IDs
-    if (!baseDefs.length) return currentDefs;
-    if (!currentDefs.length) return baseDefs;
-
-    const merged = [...baseDefs];
-    currentDefs.forEach(currentDef => {
-      const existingIndex = merged.findIndex(def => def.id === currentDef.id);
-      if (existingIndex >= 0) {
-        merged[existingIndex] = currentDef; // Override base definition
-      } else {
-        merged.push(currentDef); // Add new definition
-      }
-    });
-
-    return merged;
-  }
-);
-
-// Create a stable selector for current scenario definitions
-const getCurrentScenarioDefs = createSelector(
-  [
-    state => state.simGroup.groupDefsByScenario,
-    (state, scenarioId) => scenarioId
-  ],
-  (groupDefsByScenario, scenarioId) => groupDefsByScenario[scenarioId] || []
-);
 
 function OrgaTabGroupDefs() {
   const dispatch = useDispatch();
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
-  
-  // Use overlay hook to get base scenario info
-  const { baseScenario, isBasedScenario } = useOverlayData();
-  
-  const groupDefs = useSelector(state => 
-    getGroupDefs(state, selectedScenarioId, baseScenario?.id)
-  );
+
+  // Use overlay hook to get base scenario info and effective group defs
+  const { baseScenario, isBasedScenario, getEffectiveGroupDefs } = useOverlayData();
+  const groupDefs = getEffectiveGroupDefs();
 
   // Get current scenario definitions for checking if item is from base
-  const currentScenarioDefs = useSelector(state => 
-    getCurrentScenarioDefs(state, selectedScenarioId)
+  const currentScenarioDefs = useSelector(state =>
+    state.simGroup.groupDefsByScenario[selectedScenarioId] || []
   );
 
   // Memoize the function to check if group is from base scenario
@@ -247,3 +206,4 @@ function OrgaTabGroupDefs() {
 }
 
 export default OrgaTabGroupDefs;
+ 

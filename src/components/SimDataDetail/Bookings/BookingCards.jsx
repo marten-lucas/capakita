@@ -2,9 +2,7 @@ import React from 'react';
 import { Typography, Box, Accordion, AccordionSummary, AccordionDetails } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import BookingDetail from './BookingDetail';
-import { useSelector } from 'react-redux';
 import { consolidateBookingSummary } from '../../../utils/bookingUtils';
-import { createSelector } from '@reduxjs/toolkit';
 
 
 // Hilfsfunktion analog zu SimDataList
@@ -26,59 +24,7 @@ function getBookingHours(times) {
   return `${(totalMinutes / 60).toFixed(1)} h`;
 }
 
-const EMPTY_BOOKINGS = [];
-function BookingCards() {
-  // Use selector for bookings of the selected item
-  const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
-  const selectedItemId = useSelector(state => state.simScenario.selectedItems[selectedScenarioId]);
-  const baseScenarioId = useSelector(state => {
-    const scenario = state.simScenario.scenarios.find(s => s.id === selectedScenarioId);
-    return scenario?.baseScenarioId || null;
-  });
-
-  // Memoized selector for bookings with overlay support (merged overlays over base)
-  const bookingsSelector = React.useMemo(() =>
-    createSelector(
-      [
-        state => state.simBooking.bookingsByScenario,
-        state => state.simOverlay.overlaysByScenario,
-        () => selectedScenarioId,
-        () => baseScenarioId,
-        () => selectedItemId
-      ],
-      (bookingsByScenario, overlaysByScenario, scenarioId, baseScenarioId, itemId) => {
-        if (!scenarioId || !itemId) return EMPTY_BOOKINGS;
-
-        const overlayObj = overlaysByScenario[scenarioId]?.bookings?.[itemId] || {};
-        const overlayArr = Object.values(overlayObj);
-
-        if (baseScenarioId) {
-          const baseObj = bookingsByScenario[baseScenarioId]?.[itemId] || {};
-          const baseArr = Object.values(baseObj);
-          // Merge overlays over base by id
-          const merged = [...baseArr];
-          overlayArr.forEach(overlay => {
-            const idx = merged.findIndex(b => b.id === overlay.id);
-            if (idx >= 0) merged[idx] = overlay;
-            else merged.push(overlay);
-          });
-          return merged;
-        }
-
-        // Try current scenario first
-        const scenarioBookings = bookingsByScenario[scenarioId];
-        if (scenarioBookings && scenarioBookings[itemId]) {
-          return Object.values(scenarioBookings[itemId]);
-        }
-
-        return EMPTY_BOOKINGS;
-      }
-    ),
-    [selectedScenarioId, baseScenarioId, selectedItemId]
-  );
-
-  const bookings = useSelector(bookingsSelector);
-
+function BookingCards({ bookings }) {
   // Track expanded accordion index
   const [expandedIdx, setExpandedIdx] = React.useState(bookings && bookings.length > 0 ? 0 : null);
 
@@ -118,7 +64,7 @@ function BookingCards() {
 
         return (
           <Accordion
-            key={idx}
+            key={booking.id || idx}
             expanded={expandedIdx === idx}
             onChange={handleAccordionChange(idx)}
           >
@@ -131,6 +77,7 @@ function BookingCards() {
             <AccordionDetails>
               <BookingDetail
                 index={idx}
+                booking={booking}
               />
             </AccordionDetails>
           </Accordion>

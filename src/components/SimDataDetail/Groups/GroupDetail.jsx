@@ -7,7 +7,6 @@ import React, { useMemo, useEffect } from 'react';
 import { convertDDMMYYYYtoYYYYMMDD } from '../../../utils/dateUtils';
 import ModMonitor from '../ModMonitor';
 import { useSelector, useDispatch } from 'react-redux';
-import { createSelector } from '@reduxjs/toolkit';
 import { getBookings } from '../../../store/simBookingSlice';
 import { deleteGroupThunk } from '../../../store/simGroupSlice';
 import { useOverlayData } from '../../../hooks/useOverlayData';
@@ -18,7 +17,7 @@ function GroupDetail({ index, group }) {
   const dispatch = useDispatch();
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
-  const { baseScenario, isBasedScenario } = useOverlayData();
+  const { baseScenario, isBasedScenario, getEffectiveGroupDefs } = useOverlayData();
   const baseScenarioId = baseScenario?.id;
 
   // Overlay-aware selector for group assignments (merged base + overlay)
@@ -164,34 +163,7 @@ function GroupDetail({ index, group }) {
   };
 
   // Restore für Gruppen-ID
-  const groupDefsSelector = React.useMemo(() =>
-    createSelector(
-      [
-        state => state.simGroup.groupDefsByScenario,
-        () => selectedScenarioId,
-        () => baseScenario?.id
-      ],
-      (groupDefsByScenario, scenarioId, baseScenarioId) => {
-        const currentDefs = groupDefsByScenario[scenarioId] || [];
-        const baseDefs = baseScenarioId ? (groupDefsByScenario[baseScenarioId] || []) : [];
-        
-        // Merge base and current
-        const merged = [...baseDefs];
-        currentDefs.forEach(currentDef => {
-          const existingIndex = merged.findIndex(def => def.id === currentDef.id);
-          if (existingIndex >= 0) {
-            merged[existingIndex] = currentDef;
-          } else {
-            merged.push(currentDef);
-          }
-        });
-        
-        return merged;
-      }
-    ),
-    [selectedScenarioId, baseScenario?.id]
-  );
-  const groupDefs = useSelector(groupDefsSelector);
+  const groupDefs = getEffectiveGroupDefs();
   const allGroupsLookup = React.useMemo(() => {
     const lookup = {};
     groupDefs.forEach(g => {
@@ -417,3 +389,4 @@ function GroupDetail({ index, group }) {
 }
 
 export default GroupDetail;
+ 

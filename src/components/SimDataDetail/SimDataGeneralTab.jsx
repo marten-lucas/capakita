@@ -8,89 +8,8 @@ import RestoreIcon from '@mui/icons-material/Restore';
 import ModMonitor from './ModMonitor';
 import QualificationPicker from './QualificationPicker';
 import { useSelector, useDispatch } from 'react-redux';
-import { createSelector } from '@reduxjs/toolkit';
 import { useOverlayData } from '../../hooks/useOverlayData';
 import { updateDataItemThunk } from '../../store/simDataSlice';
-
-// Create memoized selectors
-const selectQualificationDefs = createSelector(
-  [
-    state => state.simQualification.qualificationDefsByScenario,
-    (state, scenarioId) => scenarioId,
-    (state, scenarioId, baseScenarioId) => baseScenarioId
-  ],
-  (qualificationDefsByScenario, scenarioId, baseScenarioId) => {
-    const currentDefs = qualificationDefsByScenario[scenarioId] || [];
-    const baseDefs = baseScenarioId ? (qualificationDefsByScenario[baseScenarioId] || []) : [];
-    
-    // Merge base and current
-    const merged = [...baseDefs];
-    currentDefs.forEach(currentDef => {
-      const existingIndex = merged.findIndex(def => def.key === currentDef.key);
-      if (existingIndex >= 0) {
-        merged[existingIndex] = currentDef;
-      } else {
-        merged.push(currentDef);
-      }
-    });
-    
-    return merged;
-  }
-);
-
-const selectQualificationAssignments = createSelector(
-  [
-    state => state.simQualification.qualificationAssignmentsByScenario,
-    state => state.simOverlay.overlaysByScenario,
-    (state, scenarioId) => scenarioId,
-    (state, scenarioId, baseScenarioId) => baseScenarioId,
-    (state, scenarioId, baseScenarioId, itemId) => itemId
-  ],
-  (qualificationAssignmentsByScenario, overlaysByScenario, scenarioId, baseScenarioId, itemId) => {
-    if (!scenarioId || !itemId) return [];
-
-    // Overlay support for based scenarios
-    const overlayAssignments = overlaysByScenario[scenarioId]?.qualificationDefs || [];
-
-    // If overlay exists for this item, use it
-    const overlayForItem = overlayAssignments.find(a => String(a.dataItemId) === String(itemId));
-    if (overlayForItem) {
-      return [overlayForItem];
-    }
-
-    // Try current scenario first
-    const currentScenarioAssignments = qualificationAssignmentsByScenario[scenarioId];
-    if (currentScenarioAssignments && currentScenarioAssignments[itemId]) {
-      return Object.values(currentScenarioAssignments[itemId]);
-    }
-
-    // If no assignments in current scenario and we have a base scenario, try base
-    if (baseScenarioId) {
-      const baseScenarioAssignments = qualificationAssignmentsByScenario[baseScenarioId];
-      if (baseScenarioAssignments && baseScenarioAssignments[itemId]) {
-        return Object.values(baseScenarioAssignments[itemId]);
-      }
-    }
-
-    return [];
-  }
-);
-
-const selectBaseAssignments = createSelector(
-  [
-    state => state.simQualification.qualificationAssignmentsByScenario,
-    (state, baseScenarioId) => baseScenarioId,
-    (state, baseScenarioId, selectedItemId) => selectedItemId
-  ],
-  (qualificationAssignmentsByScenario, baseScenarioId, selectedItemId) => {
-    if (!baseScenarioId || !selectedItemId) return [];
-    
-    const baseScenarioAssignments = qualificationAssignmentsByScenario[baseScenarioId];
-    if (!baseScenarioAssignments || !baseScenarioAssignments[selectedItemId]) return [];
-    
-    return Object.values(baseScenarioAssignments[selectedItemId]);
-  }
-);
 
 function SimDataGeneralTab() {
   // Get scenario and item selection
@@ -104,15 +23,23 @@ function SimDataGeneralTab() {
     getEffectiveDataItem, 
     hasOverlay, 
     revertToBase,
-    baseScenario 
+    baseScenario,
+    getEffectiveQualificationDefs,
+    getEffectiveQualificationAssignments
   } = useOverlayData();
   
   // Get effective item data (overlay if exists, otherwise base/direct data)
   const item = getEffectiveDataItem(selectedItemId);
 
-  // Use memoized selectors with base scenario support
-  const qualiDefs = useSelector(state => selectQualificationDefs(state, selectedScenarioId, baseScenario?.id));
-  const qualiAssignments = useSelector(state => selectQualificationAssignments(state, selectedScenarioId, baseScenario?.id, selectedItemId));
+  // Use overlay helpers for qualification definitions and assignments
+  const qualiDefs = getEffectiveQualificationDefs();
+  const qualiAssignments = getEffectiveQualificationAssignments(selectedItemId);
+
+  // Get base assignment for this item (for overlay revert logic)
+  const baseAssignments = baseScenario
+    ? getEffectiveQualificationAssignments(selectedItemId)
+    : [];
+  const baseAssignment = baseAssignments[0]; // assuming one assignment per item
 
   const assignedQualification = React.useMemo(() => {
     if (!item || item.type !== 'capacity') return '';
@@ -150,10 +77,6 @@ function SimDataGeneralTab() {
       payload: null
     });
   };
-
-  // Get base assignment for this item (for overlay revert logic)
-  const baseAssignments = useSelector(state => selectBaseAssignments(state, baseScenario?.id, selectedItemId));
-  const baseAssignment = baseAssignments[0]; // assuming one assignment per item
 
   // Handler for qualification change
   const handleQualificationChange = (newKey) => {
@@ -462,4 +385,3 @@ function SimDataGeneralTab() {
 }
 
 export default SimDataGeneralTab;
-

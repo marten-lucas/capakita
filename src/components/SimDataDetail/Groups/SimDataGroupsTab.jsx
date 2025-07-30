@@ -9,8 +9,6 @@ function SimDataGroupsTab() {
   // Get scenario and item selection
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
-  
-  // Use overlay hook to get effective data
   const { getEffectiveDataItem } = useOverlayData();
   const item = getEffectiveDataItem(selectedItemId);
 
@@ -32,10 +30,11 @@ function SimDataGroupsTab() {
           />
         </Typography>
       </Box>
-      <GroupCards />
+      <GroupCards itemId={selectedItemId} />
     </Box>
   );
 }
 
 export default SimDataGroupsTab;
+
 

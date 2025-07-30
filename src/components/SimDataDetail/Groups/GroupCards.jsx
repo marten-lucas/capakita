@@ -5,81 +5,33 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import AddIcon from '@mui/icons-material/Add';
 import React from 'react';
 import GroupDetail from './GroupDetail';
-import { useSelector, useDispatch } from 'react-redux';
-import { createSelector } from '@reduxjs/toolkit';
+import { useDispatch, useSelector } from 'react-redux';
 import { addGroup } from '../../../store/simGroupSlice';
 import { useOverlayData } from '../../../hooks/useOverlayData';
 
-const EMPTY_ARRAY = [];
-
-// Overlay-aware selector for group assignments
-const selectGroups = createSelector(
-  [
-    state => state.simGroup.groupsByScenario,
-    state => state.simOverlay.overlaysByScenario,
-    (state, selectedScenarioId) => selectedScenarioId,
-    (state, selectedScenarioId, baseScenarioId) => baseScenarioId,
-    (state, selectedScenarioId, baseScenarioId, selectedItemId) => selectedItemId
-  ],
-  (groupsByScenario, overlaysByScenario, selectedScenarioId, baseScenarioId, selectedItemId) => {
-    if (!selectedScenarioId || !selectedItemId) return EMPTY_ARRAY;
-
-    // Overlay support for based scenarios: merge overlays over base by groupId
-    const overlayGroupsObj = overlaysByScenario[selectedScenarioId]?.groupassignments?.[selectedItemId];
-    const overlayGroupsArr = overlayGroupsObj ? Object.values(overlayGroupsObj) : EMPTY_ARRAY;
-
-    if (baseScenarioId) {
-      const baseGroupsObj = groupsByScenario[baseScenarioId]?.[selectedItemId];
-      const baseArr = baseGroupsObj ? Object.values(baseGroupsObj) : EMPTY_ARRAY;
-
-      // Merge overlays over base by groupId
-      const merged = [...baseArr];
-      overlayGroupsArr.forEach(overlay => {
-        const idx = merged.findIndex(g => String(g.id) === String(overlay.id));
-        if (idx >= 0) merged[idx] = overlay;
-        else merged.push(overlay);
-      });
-      return merged;
-    }
-
-    // Try current scenario first
-    const currentScenarioGroups = groupsByScenario[selectedScenarioId];
-    if (currentScenarioGroups && currentScenarioGroups[selectedItemId]) {
-      return Object.values(currentScenarioGroups[selectedItemId]);
-    }
-
-    return EMPTY_ARRAY;
-  }
-);
-
-function GroupCards() {
-  // Get scenario and item selection
+function GroupCards({ itemId }) {
   const dispatch = useDispatch();
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
-  const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
-  const { baseScenario, isBasedScenario } = useOverlayData();
+  const { isBasedScenario, getEffectiveGroupAssignments } = useOverlayData();
 
-  // Use overlay-aware selector for groups
-  const groups = useSelector(state =>
-    selectGroups(state, selectedScenarioId, baseScenario?.id, selectedItemId)
-  );
+  // Get overlay-aware group assignments for this item
+  const groupAssignmentsObj = getEffectiveGroupAssignments(itemId);
+  const groups = Object.values(groupAssignmentsObj || {});
 
-  // Add group logic
   const handleAddGroup = () => {
-    if (!selectedItemId || !selectedScenarioId) return;
+    if (!itemId || !selectedScenarioId) return;
     const newGroup = {
-      kindId: selectedItemId,
+      kindId: itemId,
       groupId: '', // Set default groupId or let user pick
       start: '',
       end: '',
     };
     if (isBasedScenario) {
-      // Overlay: set group assignment overlay
       dispatch({
         type: 'simOverlay/setGroupAssignmentOverlay',
         payload: {
           scenarioId: selectedScenarioId,
-          itemId: selectedItemId,
+          itemId: itemId,
           groupId: newGroup.groupId || Date.now().toString(),
           overlayData: { ...newGroup, id: newGroup.groupId || Date.now().toString() }
         }
@@ -87,7 +39,7 @@ function GroupCards() {
     } else {
       dispatch(addGroup({
         scenarioId: selectedScenarioId,
-        dataItemId: selectedItemId,
+        dataItemId: itemId,
         group: newGroup
       }));
     }
@@ -110,7 +62,6 @@ function GroupCards() {
   };
 
   if (!groups || groups.length === 0) {
-    // Show add button even if no groups exist
     return (
       <Box>
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
@@ -141,7 +92,6 @@ function GroupCards() {
         </Button>
       </Box>
       {groups.map((group, idx) => {
-        // Use dateRangeText logic for header
         const { start, end } = group;
         let dateRangeText = '';
         if (start && end) {

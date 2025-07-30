@@ -7,76 +7,22 @@ import { valueToTime } from '../../../utils/timeUtils';
 import ModMonitor from '../ModMonitor';
 import { useSelector, useDispatch } from 'react-redux';
 import DayControl from './BookingDayControl';
-import { createSelector } from '@reduxjs/toolkit';
 import { useOverlayData } from '../../../hooks/useOverlayData';
 import { deleteBookingThunk } from '../../../store/simBookingSlice';
 
 // BookingDetail component
-const EMPTY_BOOKINGS = [];
-function BookingDetail({ index }) {
+function BookingDetail({ index, booking }) {
   // Get scenario and item selection
   const dispatch = useDispatch();
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
-  const baseScenarioId = useSelector(state => {
-    const scenario = state.simScenario.scenarios.find(s => s.id === selectedScenarioId);
-    return scenario?.baseScenarioId || null;
-  });
-
-  // Use overlay hook to get effective data
-  const { getEffectiveDataItem } = useOverlayData();
+  const { baseScenario, getEffectiveDataItem, getEffectiveBookings } = useOverlayData();
   const item = getEffectiveDataItem(selectedItemId);
 
-  // Overlay-aware selector for bookings (merged overlays over base)
-  const bookingsSelector = React.useMemo(() =>
-    createSelector(
-      [
-        state => state.simBooking.bookingsByScenario,
-        state => state.simOverlay.overlaysByScenario,
-        () => selectedScenarioId,
-        () => baseScenarioId,
-        () => selectedItemId
-      ],
-      (bookingsByScenario, overlaysByScenario, scenarioId, baseScenarioId, itemId) => {
-        if (!scenarioId || !itemId) return EMPTY_BOOKINGS;
-
-        const overlayObj = overlaysByScenario[scenarioId]?.bookings?.[itemId] || {};
-        const overlayArr = Object.values(overlayObj);
-
-        if (baseScenarioId) {
-          const baseObj = bookingsByScenario[baseScenarioId]?.[itemId] || {};
-          const baseArr = Object.values(baseObj);
-          // Merge overlays over base by id
-          const merged = [...baseArr];
-          overlayArr.forEach(overlay => {
-            const idx = merged.findIndex(b => b.id === overlay.id);
-            if (idx >= 0) merged[idx] = overlay;
-            else merged.push(overlay);
-          });
-          return merged;
-        }
-
-        // Try current scenario first
-        const scenarioBookings = bookingsByScenario[scenarioId];
-        if (scenarioBookings && scenarioBookings[itemId]) {
-          return Object.values(scenarioBookings[itemId]);
-        }
-
-        return EMPTY_BOOKINGS;
-      }
-    ),
-    [selectedScenarioId, baseScenarioId, selectedItemId]
-  );
-
-  const bookings = useSelector(bookingsSelector);
-  const booking = bookings?.[index];
-
   // Get base booking for overlay comparison
-  const baseBooking = useSelector(state => {
-    if (!baseScenarioId || !selectedItemId || !booking?.id) return undefined;
-    const baseBookings = state.simBooking.bookingsByScenario[baseScenarioId]?.[selectedItemId];
-    return baseBookings ? baseBookings[booking.id] : undefined;
-  });
+  const baseScenarioId = baseScenario?.id;
+  const baseBookingsObj = baseScenarioId ? getEffectiveBookings(selectedItemId) : {};
+  const baseBooking = booking?.id ? baseBookingsObj?.[booking.id] : undefined;
 
   const originalBooking = undefined;
   const type = item?.type;
@@ -298,8 +244,6 @@ function BookingDetail({ index }) {
     if (/^\d{2}\.\d{2}\.\d{4}$/.test(dateStr)) return convertDDMMYYYYtoYYYYMMDD(dateStr);
     return '';
   };
-
-  if (!booking) return null;
 
   return (
     <Box sx={{ mb: 3 }}>
