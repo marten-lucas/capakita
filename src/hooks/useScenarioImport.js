@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useDispatch } from 'react-redux';
 import { importScenario } from '../store/simScenarioSlice';
-import { extractAdebisData } from '../utils/adebis-import';
+import { extractAdebisData } from '../utils/adebis-reader';
 import {
   adebis2simData,
   adebis2bookings,
