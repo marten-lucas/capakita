@@ -27,7 +27,7 @@ export function adebis2simData(kidsRaw, employeesRaw) {
   // Kids (demand)
   for (const kind of kidsRaw || []) {
     const newId = createId('simdata');
-    simDataList.push({
+    let item = {
       id: newId,
       type: 'demand',
       source: "adebis export",
@@ -40,13 +40,14 @@ export function adebis2simData(kidsRaw, employeesRaw) {
       rawdata: { ...kind },
       absences: [],
       adebisId: { id: String(kind.KINDNR), source: "kind" }
-    });
+    };
+    simDataList.push(addOriginalData(item));
   }
 
   // Employees (capacity)
   for (const emp of employeesRaw || []) {
     const newId = createId('simdata');
-    simDataList.push({
+    let item = {
       id: newId,
       type: 'capacity',
       source: "adebis export",
@@ -59,7 +60,8 @@ export function adebis2simData(kidsRaw, employeesRaw) {
       rawdata: { ...emp },
       absences: [],
       adebisId: { id: String(emp.IDNR), source: "anstell" }
-    });
+    };
+    simDataList.push(addOriginalData(item));
   }
 
   return { simDataList };
@@ -85,14 +87,15 @@ function belegung2Booking(belegungRaw) {
   const bookingReference = [];
   (belegungRaw || []).forEach((b) => {
     const bookingId = createId('booking');
-    bookings.push({
+    let booking = {
       id: bookingId,
       startdate: convertDDMMYYYYtoYYYYMMDD(b.BELVON) || '',
       enddate: convertDDMMYYYYtoYYYYMMDD(b.BELBIS) || '',
       times: Zeiten2Booking(b.ZEITEN, bookingId),
       rawdata: { ...b },
       adebisId: { id: String(b.IDNR), source: "belegung" }
-    });
+    };
+    bookings.push(addOriginalData(booking));
     bookingReference.push({
       bookingKey: bookingId,
       adebisId: { id: String(b.KINDNR), source: "kind" }
@@ -190,12 +193,13 @@ export function adebis2GroupDefs(groupsRaw) {
     else if (lowerName.includes('blume')) icon = '🌸';
     else if (lowerName.includes('baum')) icon = '🌳';
 
-    return {
+    let groupDef = {
       id: String(group.GRUNR),
       name,
       icon,
       rawdata: { ...group }
     };
+    return addOriginalData(groupDef);
   });
 }
 
@@ -212,7 +216,8 @@ export function adebis2QualiDefs(employeesRaw) {
     let name = key;
     if (key === 'E') name = 'Erzieher';
     else if (key === 'K') name = 'Kinderpfleger';
-    return { key, name, rawdata: { key, name } };
+    let qualiDef = { key, name, rawdata: { key, name } };
+    return addOriginalData(qualiDef);
   });
 }
 
@@ -227,12 +232,13 @@ export function adebis2GroupAssignments(grukiRaw) {
   const groupAssignmentReference = [];
   (grukiRaw || []).forEach(g => {
     const assignmentKey = `${g.KINDNR}-${g.GRUNR}-${g.GKVON}-${g.GKBIS}`;
-    groupAssignments.push({
+    let assignment = {
       groupId: String(g.GRUNR),
       start: convertDDMMYYYYtoYYYYMMDD(g.GKVON) || '',
       end: convertDDMMYYYYtoYYYYMMDD(g.GKBIS) || '',
       rawdata: { ...g }
-    });
+    };
+    groupAssignments.push(addOriginalData(assignment));
     groupAssignmentReference.push({
       assignmentKey,
       adebisId: { id: String(g.KINDNR), source: "kind" }
@@ -252,12 +258,23 @@ export function adebis2QualiAssignments(dataByScenario) {
   const qualiAssignmentsFinal = [];
   Object.entries(dataByScenario).forEach(([storeKey, item]) => {
     if (item.type === 'capacity' && item.rawdata && item.rawdata.QUALIFIK) {
-      qualiAssignmentsFinal.push({
+      let qualiAssignment = {
         dataItemId: storeKey,
         qualification: item.rawdata.QUALIFIK,
         id: `${item.rawdata.QUALIFIK}-${Date.now()}-${Math.random()}`
-      });
+      };
+      qualiAssignmentsFinal.push(addOriginalData(qualiAssignment));
     }
   });
   return qualiAssignmentsFinal;
+}
+
+/**
+ * Adds originalData to an object by excluding rawdata, adebisId, and id.
+ * @param {Object} item - The object to process.
+ * @returns {Object} The object with originalData added.
+ */
+function addOriginalData(item) {
+  const { rawdata: _, adebisId: __, id: ___, ...rest } = item; // Exclude rawdata, adebisId, and id without assigning
+  return { ...item, originalData: rest };
 }

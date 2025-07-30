@@ -8,6 +8,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import IconButton from '@mui/material/IconButton';
 import PersonIcon from '@mui/icons-material/Person';
 import ChildCareIcon from '@mui/icons-material/ChildCare';
+import RestoreButton from './RestoreButton';
 
 // Use a constant for empty object to avoid new reference on each render
 const EMPTY_OBJECT = {};
@@ -16,6 +17,7 @@ function SimDataList() {
   const dispatch = useDispatch();
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
+  const scenarios = useSelector(state => state.simScenario.scenarios);
 
   // Use overlay hook to get effective data
   const { getEffectiveDataItems, hasOverlay, isBasedScenario, getEffectiveGroupAssignments, getEffectiveGroupDefs, getEffectiveBookings } = useOverlayData();
@@ -128,6 +130,49 @@ function SimDataList() {
     return <Chip label="Manuell" size="small" color="default" sx={{ fontSize: '0.7rem', height: 20 }} />;
   }
 
+  // Handler: restore item to base or imported state
+  const handleRestore = (itemId, isBasedScenario, scenarios, data) => {
+
+    if (isBasedScenario) {
+      // Remove overlays for this item in this scenario
+      dispatch({ type: 'simOverlay/removeDataItemOverlay', payload: { scenarioId: selectedScenarioId, itemId } });
+      dispatch({ type: 'simOverlay/removeBookingOverlay', payload: { scenarioId: selectedScenarioId, itemId } });
+      dispatch({ type: 'simOverlay/removeGroupAssignmentOverlay', payload: { scenarioId: selectedScenarioId, itemId } });
+      dispatch({ type: 'simOverlay/removeQualificationDefOverlay', payload: { scenarioId: selectedScenarioId } });
+    } else {
+      // For base scenario: restore imported data if possible
+      // Find imported data for this item
+      const state = window.store?.getState?.() || {};
+      const allScenarios = state.simScenario?.scenarios || [];
+      const importedScenarios = allScenarios.filter(s => s.imported);
+      let importedItem = null;
+      for (const s of importedScenarios) {
+        importedItem = Object.values(state.simData?.dataByScenario?.[s.id] || {}).find(
+          i =>
+            i.adebisId &&
+            data.find(d => d._key === itemId)?.adebisId &&
+            i.adebisId.id === data.find(d => d._key === itemId)?.adebisId.id &&
+            i.adebisId.source === data.find(d => d._key === itemId)?.adebisId.source
+        );
+        if (importedItem) break;
+      }
+      if (importedItem) {
+        dispatch({
+          type: 'simData/updateDataItem',
+          payload: {
+            scenarioId: selectedScenarioId,
+            itemId,
+            updates: {
+              ...importedItem,
+              id: itemId // keep current id
+            }
+          }
+        });
+        // TODO: Also restore bookings, group assignments, qualification assignments if needed
+      }
+    }
+  };
+
   if (!data || data.length === 0) {
     return (
       <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -189,6 +234,11 @@ function SimDataList() {
                     {getSourceChip(item)}
                   </Box>
                 </Box>
+                <RestoreButton
+                  scenarioId={selectedScenarioId}
+                  itemId={item._key}
+                  onRestore={() => handleRestore(item._key, isBasedScenario, scenarios, data)}
+                />
                 <IconButton
                   edge="end"
                   aria-label="delete"
