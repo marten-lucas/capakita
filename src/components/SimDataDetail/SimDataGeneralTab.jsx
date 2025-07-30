@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import {
   Typography, Box, TextField, Button,
-  FormControl, RadioGroup, FormControlLabel, Radio, Chip
+  FormControl, RadioGroup, FormControlLabel, Radio
 } from '@mui/material';
-import DeleteIcon from '@mui/icons-material/Delete';
 import RestoreIcon from '@mui/icons-material/Restore';
 import QualificationPicker from './QualificationPicker';
 import { useSelector, useDispatch } from 'react-redux';
@@ -153,48 +152,6 @@ function SimDataGeneralTab() {
 
   return (
     <Box flex={1} display="flex" flexDirection="column" sx={{ overflowY: 'auto', gap: 0 }}>
-      {/* Show overlay indicator and revert button for based scenarios */}
-      {isBasedScenario && (
-        <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography variant="body2" color="text.secondary">
-            Basiert auf: {baseScenario?.name || 'Unbekannt'}
-          </Typography>
-          {hasOverlay(selectedItemId) && (
-            <>
-              <Chip 
-                label="Geändert" 
-                size="small" 
-                color="warning" 
-                variant="outlined"
-              />
-              <Button
-                size="small"
-                startIcon={<RestoreIcon />}
-                onClick={handleRevertToBase}
-                variant="outlined"
-                color="secondary"
-              >
-                Auf Basis zurücksetzen
-              </Button>
-            </>
-          )}
-        </Box>
-      )}
-
-      {isManualEntry && (
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
-          <Button
-            variant="outlined"
-            color="error"
-            startIcon={<DeleteIcon />}
-            onClick={handleDeleteItem}
-            size="small"
-          >
-            Eintrag löschen
-          </Button>
-        </Box>
-      )}
-
       {/* Name */}
       <Box sx={{ mb: 2 }}>
         <Typography variant="body2" sx={{ mb: 0.5 }}>Name</Typography>

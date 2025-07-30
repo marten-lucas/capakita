@@ -21,6 +21,9 @@ function ScenarioPicker() {
     const [dialogIsNew, setDialogIsNew] = useState(false);
 
     const selectedScenario = scenarios.find(s => s.id === selectedScenarioId);
+    const baseScenario = selectedScenario?.baseScenarioId
+        ? scenarios.find(s => s.id === selectedScenario.baseScenarioId)
+        : null;
 
     // Handlers for dialog
     const handleEdit = (scenario) => {
@@ -102,21 +105,29 @@ function ScenarioPicker() {
                                 }
                             }}
                         >
-                            <Typography
-                                component="span"
-                                sx={{
-                                    color: 'text.primary',
-                                    whiteSpace: 'nowrap',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    flex: 1,
-                                    fontSize: '0.875rem'
-                                }}
-                            >
-                                {selectedScenario
-                                    ? `${selectedScenario.name || `Szenario ${selectedScenario.id}`}${selectedScenario.baseScenarioId ? ' (basiert auf)' : ''}`
-                                    : 'Szenario auswählen'}
-                            </Typography>
+                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                                <Typography
+                                    component="span"
+                                    sx={{
+                                        color: 'text.primary',
+                                        whiteSpace: 'nowrap',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        flex: 1,
+                                        fontSize: '0.875rem'
+                                    }}
+                                >
+                                    {selectedScenario
+                                        ? `${selectedScenario.name || `Szenario ${selectedScenario.id}`}`
+                                        : 'Szenario auswählen'}
+                                </Typography>
+                                {/* Show base scenario name if present */}
+                                {selectedScenario?.baseScenarioId && (
+                                    <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem', mt: 0.2 }}>
+                                        Basiert auf: {baseScenario?.name || 'Unbekannt'}
+                                    </Typography>
+                                )}
+                            </Box>
                         </AccordionSummary>
                         <AccordionDetails sx={{ p: 0 }}>
                             <List dense disablePadding>
