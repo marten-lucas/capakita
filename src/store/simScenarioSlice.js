@@ -1,5 +1,4 @@
 import { createSlice } from '@reduxjs/toolkit';
-import { getItemByAdebisID } from './simDataSlice';
 
 const initialState = {
   scenarios: [],
@@ -104,18 +103,23 @@ export const isSaveAllowed = (state) => {
 export const importScenario = ({
   scenarioSettings,
   simDataList,
-  bookingsList
+  bookings,
+  bookingReference,
+  groupDefs,
+  qualiDefs,
+  groupAssignments,
+  groupAssignmentReference
 }) => async (dispatch, getState) => {
-  // Generate unique scenario id
+  // 1. Generate unique scenario id
   const scenarioId = Date.now().toString();
 
-  // Add scenario to scenario slice
+  // 2. Add scenario to scenario slice
   dispatch(addScenario({
     ...scenarioSettings,
     id: scenarioId
   }));
 
-  // Import sim data items (do NOT attach bookings)
+  // 3. Import sim data items (do NOT attach bookings yet)
   if (simDataList && simDataList.length > 0) {
     dispatch({
       type: 'simData/importDataItems',
@@ -123,27 +127,91 @@ export const importScenario = ({
     });
   }
 
-  // Import bookings into simBooking
-  if (bookingsList && bookingsList.length > 0) {
-    // Link bookings to correct dataItem using adebisId
-    const state = getState();
-    const normalizedBookings = bookingsList.map(b => {
-      // Find the correct dataItem by adebisId
-      const dataItem = getItemByAdebisID(state, scenarioId, { id: b.kindAdebisId, source: "kind" });
-      return {
-        ...b,
-        dataItemId: dataItem ? Object.keys(state.simData.dataByScenario[scenarioId]).find(
-          key => state.simData.dataByScenario[scenarioId][key] === dataItem
-        ) : undefined
-      };
-    }).filter(b => b.dataItemId);
+  // 4. Map external IDs to store keys for demand/capacity items
+  const state = getState();
+  const dataByScenario = state.simData.dataByScenario[scenarioId];
+  const kindKeyMap = {};
+  const capacityKeyMap = {};
+  Object.entries(dataByScenario).forEach(([storeKey, item]) => {
+    if (item.type === 'demand' && item.rawdata && item.rawdata.KINDNR) {
+      kindKeyMap[String(item.rawdata.KINDNR)] = storeKey;
+    }
+    if (item.type === 'capacity' && item.rawdata && item.rawdata.IDNR) {
+      capacityKeyMap[String(item.rawdata.IDNR)] = storeKey;
+    }
+  });
+
+  // 5. Remap groupAssignments using store ids only
+  const groupAssignmentsFinal = (groupAssignments || [])
+    .map(a => ({
+      ...a,
+      kindId: kindKeyMap[String(a.rawdata.KINDNR)]
+    }))
+    .filter(a => !!a.kindId);
+
+  // 6. Import groupDefs and groupAssignments
+  if (groupDefs && groupDefs.length > 0) {
     dispatch({
-      type: 'simBooking/importBookings',
-      payload: { scenarioId, items: normalizedBookings }
+      type: 'simGroup/importGroupDefs',
+      payload: { scenarioId, defs: groupDefs }
+    });
+  }
+  if (groupAssignmentsFinal && groupAssignmentsFinal.length > 0) {
+    dispatch({
+      type: 'simGroup/importGroupAssignments',
+      payload: { scenarioId, assignments: groupAssignmentsFinal }
     });
   }
 
-  // Select the new scenario
+  // 7. Import qualification defs
+  if (qualiDefs && qualiDefs.length > 0) {
+    dispatch({
+      type: 'simQualification/importQualificationDefs',
+      payload: { scenarioId, defs: qualiDefs }
+    });
+  }
+
+  // 8. Build qualification assignments for all imported capacity items
+  const qualiAssignmentsFinal = [];
+  Object.entries(dataByScenario).forEach(([storeKey, item]) => {
+    if (item.type === 'capacity' && item.rawdata && item.rawdata.QUALIFIK) {
+      qualiAssignmentsFinal.push({
+        dataItemId: storeKey,
+        qualification: item.rawdata.QUALIFIK,
+        id: `${item.rawdata.QUALIFIK}-${Date.now()}-${Math.random()}`
+      });
+    }
+  });
+
+  if (qualiAssignmentsFinal.length > 0) {
+    dispatch({
+      type: 'simQualification/importQualificationAssignments',
+      payload: { scenarioId, assignments: qualiAssignmentsFinal }
+    });
+  }
+
+  // 9. Link bookings to correct dataItemId using bookingReference
+  const bookingsWithDataItemId = (bookings || []).map(booking => {
+    const ref = (bookingReference || []).find(r => r.bookingKey === booking.id);
+    if (!ref) return null;
+    let dataItemId = null;
+    if (ref.adebisId.source === 'kind') {
+      dataItemId = kindKeyMap[String(ref.adebisId.id)];
+    } else if (ref.adebisId.source === 'anstell') {
+      dataItemId = capacityKeyMap[String(ref.adebisId.id)];
+    }
+    if (!dataItemId) return null;
+    return { ...booking, dataItemId };
+  }).filter(Boolean);
+
+  if (bookingsWithDataItemId.length > 0) {
+    dispatch({
+      type: 'simBooking/importBookings',
+      payload: { scenarioId, items: bookingsWithDataItemId }
+    });
+  }
+
+  // 10. Select the new scenario
   dispatch(setSelectedScenarioId(scenarioId));
 };
 
