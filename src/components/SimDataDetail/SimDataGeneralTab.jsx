@@ -19,8 +19,6 @@ function SimDataGeneralTab() {
   const { 
     isBasedScenario, 
     getEffectiveDataItem, 
-    hasOverlay, 
-    revertToBase,
     baseScenario,
     getEffectiveQualificationDefs,
     getEffectiveQualificationAssignments
@@ -54,7 +52,6 @@ function SimDataGeneralTab() {
   const [localDateOfBirth, setLocalDateOfBirth] = useState(item?.dateofbirth ?? '');
 
   // Manual entry check
-  const isManualEntry = item?.rawdata?.source === 'manual';
 
   // Sync local state with item
   useEffect(() => { setLocalName(item?.name ?? ''); }, [item?.name, selectedItemId]);
@@ -65,16 +62,6 @@ function SimDataGeneralTab() {
   useEffect(() => { setLocalDateOfBirth(item?.dateofbirth ?? ''); }, [item?.dateofbirth, selectedItemId]);
 
   // Handlers
-  const handleDeleteItem = () => {
-    dispatch({
-      type: 'simData/deleteDataItem',
-      payload: { scenarioId: selectedScenarioId, itemId: selectedItemId }
-    });
-    dispatch({
-      type: 'simScenario/setSelectedItem',
-      payload: null
-    });
-  };
 
   // Handler for qualification change
   const handleQualificationChange = (newKey) => {
@@ -126,11 +113,6 @@ function SimDataGeneralTab() {
   };
 
   // Handle revert to base for overlay scenarios
-  const handleRevertToBase = () => {
-    if (isBasedScenario && hasOverlay(selectedItemId)) {
-      revertToBase(selectedItemId);
-    }
-  };
 
   // Replace updateDataItem with overlay-aware thunk
   const handleUpdateDataItem = (updates) => {

@@ -35,7 +35,6 @@ function GroupDetail({ group }) {
   });
 
   // Get original group from item.originalParsedData (from import)
-  const originalGroup = undefined;
   const parentItemId = selectedItemId;
 
   // Assign missing segment IDs in an effect, not during render
