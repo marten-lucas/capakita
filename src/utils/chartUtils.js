@@ -3,6 +3,9 @@
 // import { ... } from '../store/simBookingSlice';
 // ...other imports...
 
+// REMOVE any getScenarioChain or scenario traversal here!
+// Only use the data passed in for calculations
+
 // Hilfsfunktion für Zeitsegmente
 export function generateTimeSegments() {
   const days = ['Mo', 'Di', 'Mi', 'Do', 'Fr'];
@@ -29,12 +32,11 @@ export function calculateChartData(
     dataByScenario,
     groupsByScenario, 
     qualificationAssignmentsByScenario,
-    overlaysByScenario,
+    overlaysByScenario, // overlaysByScenario is ignored here, overlays must be merged before
     scenarioId
   }
 ) {
-  // ...use the passed-in data for calculations...
-
+  // No scenario chain logic here, only use the passed-in data
   const { demand: filteredDemandBookings, capacity: filteredCapacityBookings } = filterBookings({
     bookingsByScenario,
     dataByScenario,
@@ -44,7 +46,7 @@ export function calculateChartData(
     referenceDate,
     selectedGroups,
     selectedQualifications,
-    groupsByScenario // <-- pass this
+    groupsByScenario
   });
 
   const categories = generateTimeSegments();
@@ -82,7 +84,7 @@ export function filterBookings({
   referenceDate,
   selectedGroups,
   selectedQualifications,
-  groupsByScenario // Pass groupsByScenario for resolving group assignments
+  groupsByScenario
 }) {
   const demand = [];
   const capacity = [];

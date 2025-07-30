@@ -16,13 +16,11 @@ function SimDataList() {
   const dispatch = useDispatch();
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
-  const bookingsByScenario = useSelector(state => state.simBooking.bookingsByScenario);
-  const groupsByScenario = useSelector(state => state.simGroup.groupsByScenario);
-  const groupDefsByScenario = useSelector(state => state.simGroup.groupDefsByScenario);
 
   // Use overlay hook to get effective data
-  const { getEffectiveDataItems, hasOverlay, isBasedScenario } = useOverlayData();
+  const { getEffectiveDataItems, hasOverlay, isBasedScenario, getEffectiveGroupAssignments, getEffectiveGroupDefs, getEffectiveBookings } = useOverlayData();
   const effectiveDataItems = getEffectiveDataItems();
+  const groupDefs = getEffectiveGroupDefs();
 
   const data = useMemo(
     () => Object.entries(effectiveDataItems).map(([key, item]) => ({ ...item, _key: key })),
@@ -37,12 +35,8 @@ function SimDataList() {
 
   // Helper: get group assignment for item (overlay-aware)
   function getCurrentGroup(itemId) {
-    // Overlay-aware: overlaysByScenario?.[selectedScenarioId]?.groupassignments?.[itemId]
-    // For now, just use groupsByScenario
-    const groupAssignments = groupsByScenario?.[selectedScenarioId]?.[itemId];
+    const groupAssignments = getEffectiveGroupAssignments(itemId);
     if (!groupAssignments) return null;
-    // Find the group assignment with no end date or latest start
-    // (Assume only one assignment per item for now)
     const assignments = Object.values(groupAssignments);
     if (assignments.length === 0) return null;
     // Prefer assignment with no end or latest end
@@ -52,16 +46,13 @@ function SimDataList() {
   // Helper: get group definition by groupId
   function getGroupDef(groupId) {
     if (!groupId) return null;
-    const defs = groupDefsByScenario?.[selectedScenarioId];
-    if (!defs) return null;
-    return defs.find(g => String(g.id) === String(groupId));
+    return groupDefs.find(g => String(g.id) === String(groupId));
   }
 
   // Helper: get bookings for item
   function getBookings(itemId) {
-    return bookingsByScenario?.[selectedScenarioId]?.[itemId]
-      ? Object.values(bookingsByScenario[selectedScenarioId][itemId])
-      : [];
+    const bookingsObj = getEffectiveBookings(itemId);
+    return bookingsObj ? Object.values(bookingsObj) : [];
   }
 
   // Helper: sum hours for a booking

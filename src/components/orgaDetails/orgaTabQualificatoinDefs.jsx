@@ -22,20 +22,21 @@ function OrgaTabQualificationDefs() {
   const { baseScenario, isBasedScenario, getEffectiveQualificationDefs } = useOverlayData();
   const qualiDefs = getEffectiveQualificationDefs();
 
-  // Get current scenario definitions for checking if item is from base
-  const currentScenarioDefs = useSelector(state =>
-    state.simQualification.qualificationDefsByScenario[selectedScenarioId] || []
-  );
+  // Remove currentScenarioDefs and use only qualiDefs from the hook
 
   // Memoize the function to check if qualification is from base scenario
   const isFromBaseScenario = useMemo(() => {
     if (!isBasedScenario || !baseScenario) {
       return () => false;
     }
+    // Use qualiDefs from the hook for display, but check if the def is present in the current scenario's own defs
+    const ownDefs = (state) =>
+      state.simQualification.qualificationDefsByScenario[selectedScenarioId] || [];
     return (qualification) => {
-      return !currentScenarioDefs.some(def => def.key === qualification.key);
+      // Only present in base if not in current scenario's own defs
+      return !ownDefs({simQualification: {qualificationDefsByScenario: { [selectedScenarioId]: qualiDefs }}}).some(def => def.key === qualification.key);
     };
-  }, [isBasedScenario, baseScenario, currentScenarioDefs]);
+  }, [isBasedScenario, baseScenario, qualiDefs, selectedScenarioId]);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingQualification, setEditingQualification] = useState(null);
@@ -185,4 +186,3 @@ function OrgaTabQualificationDefs() {
 }
 
 export default OrgaTabQualificationDefs;
-   

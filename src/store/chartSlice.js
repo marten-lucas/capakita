@@ -1,5 +1,6 @@
 import { createSlice } from '@reduxjs/toolkit';
 import { calculateChartData } from '../utils/chartUtils';
+import { buildOverlayAwareData } from '../utils/overlayUtils';
 
 // Helper for initial chart state per scenario
 function getInitialChartState() {
@@ -94,6 +95,19 @@ const chartSlice = createSlice({
   }
 });
 
+// Helper: get scenario chain from current to root
+function getScenarioChain(scenarios, scenarioId) {
+  const chain = [];
+  let currentId = scenarioId;
+  while (currentId) {
+    const scenario = scenarios.find(s => s.id === currentId);
+    if (!scenario) break;
+    chain.push(scenario);
+    currentId = scenario.baseScenarioId;
+  }
+  return chain;
+}
+
 // Thunk to update weekly chart data for a scenario
 export const updateWeeklyChartData = (scenarioId) => (dispatch, getState) => {
   const state = getState();
@@ -102,26 +116,33 @@ export const updateWeeklyChartData = (scenarioId) => (dispatch, getState) => {
   const selectedGroups = [...(chartState.filter?.Groups || [])];
   const selectedQualifications = [...(chartState.filter?.Qualifications || [])];
 
-  // Gather all required data from state
-  const bookingsByScenario = state.simBooking.bookingsByScenario;
-  const dataByScenario = state.simData.dataByScenario;
-  const groupDefs = state.simGroup.groupDefsByScenario;
-  const groupsByScenario = state.simGroup.groupsByScenario; // <-- add this
-  const qualificationAssignmentsByScenario = state.simQualification.qualificationAssignmentsByScenario;
-  const overlaysByScenario = state.simOverlay.overlaysByScenario;
+  // Use utility to build overlay-aware data
+  const {
+    effectiveDataItems,
+    effectiveBookingsByItem,
+    effectiveGroupAssignmentsByItem,
+    effectiveQualificationAssignmentsByItem,
+    effectiveGroupDefs
+  } = buildOverlayAwareData(scenarioId, state);
 
-  // Compute chart data using new structure
+  // Wrap by scenarioId for chartUtils compatibility
+  const bookingsByScenarioWrapped = { [scenarioId]: effectiveBookingsByItem };
+  const groupsByScenarioWrapped = { [scenarioId]: effectiveGroupAssignmentsByItem };
+  const qualificationAssignmentsByScenarioWrapped = { [scenarioId]: effectiveQualificationAssignmentsByItem };
+  const dataByScenarioWrapped = { [scenarioId]: effectiveDataItems };
+
+  // Pass overlay-aware data to chart utils
   const chartData = calculateChartData(
     referenceDate,
     selectedGroups,
     selectedQualifications,
     {
-      bookingsByScenario,
-      dataByScenario,
-      groupDefs,
-      groupsByScenario, // <-- pass this
-      qualificationAssignmentsByScenario,
-      overlaysByScenario,
+      bookingsByScenario: bookingsByScenarioWrapped,
+      dataByScenario: dataByScenarioWrapped,
+      groupDefs: effectiveGroupDefs,
+      groupsByScenario: groupsByScenarioWrapped,
+      qualificationAssignmentsByScenario: qualificationAssignmentsByScenarioWrapped,
+      overlaysByScenario: {}, // overlays already merged
       scenarioId
     }
   );
