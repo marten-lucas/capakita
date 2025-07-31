@@ -11,7 +11,7 @@ import ChildCareIcon from '@mui/icons-material/ChildCare';
 import RestoreButton from './RestoreButton';
 import { getDateRangeString } from '../../utils/dateUtils';
 import { sumBookingHours } from '../../utils/bookingUtils';
-import { getEffectiveGroupAssignments as getEffectiveGroupAssignmentsUtil, getScenarioChain } from '../../utils/overlayUtils';
+import { getEffectiveGroupAssignments, getScenarioChain } from '../../utils/overlayUtils';
 
 // Use a constant for empty object to avoid new reference on each render
 const EMPTY_OBJECT = {};
@@ -67,7 +67,7 @@ function SimDataList() {
 
   // Helper: get Avatar for item
   function getAvatar(item) {
-    const groupAssignments = getEffectiveGroupAssignmentsUtil(
+    const groupAssignments = getEffectiveGroupAssignments(
       scenarioChain,
       overlaysByScenario,
       groupsByScenario,
