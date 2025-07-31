@@ -11,7 +11,7 @@ import ChildCareIcon from '@mui/icons-material/ChildCare';
 import RestoreButton from './RestoreButton';
 import { getDateRangeString } from '../../utils/dateUtils';
 import { sumBookingHours } from '../../utils/bookingUtils';
-import { getEffectiveGroupAssignments as getEffectiveGroupAssignmentsUtil } from '../../utils/overlayUtils';
+import { getEffectiveGroupAssignments as getEffectiveGroupAssignmentsUtil, getScenarioChain } from '../../utils/overlayUtils';
 
 // Use a constant for empty object to avoid new reference on each render
 const EMPTY_OBJECT = {};
@@ -21,6 +21,13 @@ function SimDataList() {
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
   const scenarios = useSelector(state => state.simScenario.scenarios);
+  const overlaysByScenario = useSelector(state => state.simOverlay.overlaysByScenario);
+  const groupsByScenario = useSelector(state => state.simGroup.groupsByScenario);
+
+  const scenarioChain = useMemo(
+    () => getScenarioChain(scenarios, selectedScenarioId),
+    [scenarios, selectedScenarioId]
+  );
 
   // Use overlay hook to get effective data
   const { getEffectiveDataItems, hasOverlay, isBasedScenario, getEffectiveGroupDefs, getEffectiveBookings } = useOverlayData();
@@ -60,7 +67,12 @@ function SimDataList() {
 
   // Helper: get Avatar for item
   function getAvatar(item) {
-    const groupAssignments = getEffectiveGroupAssignmentsUtil(/* scenarioChain, overlaysByScenario, groupsByScenario, item._key */);
+    const groupAssignments = getEffectiveGroupAssignmentsUtil(
+      scenarioChain,
+      overlaysByScenario,
+      groupsByScenario,
+      item._key
+    );
     const assignments = groupAssignments ? Object.values(groupAssignments) : [];
     const groupAssignment = assignments.length === 0 ? null : assignments.find(a => !a.end) || assignments[0];
     const groupDef = groupAssignment ? getGroupDef(groupAssignment.groupId) : null;
