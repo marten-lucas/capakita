@@ -1,26 +1,29 @@
 // Compare two objects or collections for equality (imported vs current)
 export function isSameAsImported(current, original) {
-  if (!current || !original) return false;
-
-  // If both are arrays or both are objects with numeric keys (collections)
-  const isCollection = obj =>
-    Array.isArray(obj) ||
-    (typeof obj === 'object' && obj !== null && Object.keys(obj).every(k => !isNaN(Number(k))));
-
-  if (isCollection(current) && isCollection(original)) {
-    const currentArr = Array.isArray(current) ? current : Object.values(current);
-    const originalArr = Array.isArray(original) ? original : Object.values(original);
-    if (currentArr.length !== originalArr.length) return false;
-    for (let i = 0; i < currentArr.length; i++) {
-      if (!isSameAsImported(currentArr[i], originalArr[i])) return false;
-    }
-    return true;
+  if (!current || !original) {
+    console.log('[isSameAsImported] One of current/original is falsy', { current, original });
+    return false;
   }
 
-  // Compare objects: only keys present in original
-  const filteredCurrent = {};
-  Object.keys(original).forEach(key => {
-    if (key in current) filteredCurrent[key] = current[key];
-  });
-  return JSON.stringify(filteredCurrent) === JSON.stringify(original);
+  // Helper: compare only keys present in original, recursively for objects/arrays
+  const compareKeys = (cur, orig) => {
+    if (Array.isArray(orig)) {
+      if (!Array.isArray(cur) || cur.length !== orig.length) return false;
+      for (let i = 0; i < orig.length; i++) {
+        if (!compareKeys(cur[i], orig[i])) return false;
+      }
+      return true;
+    }
+    if (typeof orig === 'object' && orig !== null) {
+      for (const key of Object.keys(orig)) {
+        if (!compareKeys(cur[key], orig[key])) return false;
+      }
+      return true;
+    }
+    return cur === orig;
+  };
+
+  const result = compareKeys(current, original);
+  console.log('[isSameAsImported] compareKeys result', { current, original, result });
+  return result;
 }
