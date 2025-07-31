@@ -1,24 +1,15 @@
 import { useSelector } from 'react-redux';
 import { useMemo } from 'react';
 import { getItemHasOverlay } from '../utils/overlayUtils';
+import { isSameAsImported } from '../utils/compareUtils';
 
 export function useIsRestorable(scenarioId, itemId) {
   const scenario = useSelector(state => state.simScenario.scenarios.find(s => s.id === scenarioId));
   const overlaysByScenario = useSelector(state => state.simOverlay.overlaysByScenario);
   const dataItem = useSelector(state => state.simData.dataByScenario?.[scenarioId]?.[itemId]);
-  const bookings = useSelector(state => state.simBooking.bookingsByScenario?.[scenarioId]?.[itemId]);
-  const groupAssignments = useSelector(state => state.simGroup.groupsByScenario?.[scenarioId]?.[itemId]);
-  const qualiAssignments = useSelector(state => state.simQualification.qualificationAssignmentsByScenario?.[scenarioId]?.[itemId]);
-
-  // Helper: compare current and original for a given aspect
-  const isSameAsOriginal = (current, original) => {
-    if (!current || !original) return false;
-    const filteredCurrent = {};
-    Object.keys(original).forEach(key => {
-      if (key in current) filteredCurrent[key] = current[key];
-    });
-    return JSON.stringify(filteredCurrent) === JSON.stringify(original);
-  };
+  const bookings = useSelector(state => state.simBooking.bookingsByScenario?.[scenarioId]);
+  const groupAssignments = useSelector(state => state.simGroup.groupsByScenario?.[scenarioId]);
+  const qualiAssignments = useSelector(state => state.simQualification.qualificationAssignmentsByScenario?.[scenarioId]);
 
   return useMemo(() => {
     // 1. If item has overlays in this scenario, it's restorable
@@ -38,13 +29,13 @@ export function useIsRestorable(scenarioId, itemId) {
     // 3. If base scenario and imported, compare all aspects with their originalData
     if (isBaseScenario && dataItem?.originalData) {
       // simData
-      if (!isSameAsOriginal(dataItem, dataItem.originalData)) return true;
+      if (!isSameAsImported(dataItem, dataItem.originalData)) return true;
       // bookings
-      if (bookings && bookings.originalData && !isSameAsOriginal(bookings, bookings.originalData)) return true;
+      if (bookings?.[itemId] && bookings[itemId].originalData && !isSameAsImported(bookings[itemId], bookings[itemId].originalData)) return true;
       // groupAssignments
-      if (groupAssignments && groupAssignments.originalData && !isSameAsOriginal(groupAssignments, groupAssignments.originalData)) return true;
+      if (groupAssignments?.[itemId] && groupAssignments[itemId].originalData && !isSameAsImported(groupAssignments[itemId], groupAssignments[itemId].originalData)) return true;
       // qualiAssignments
-      if (qualiAssignments && qualiAssignments.originalData && !isSameAsOriginal(qualiAssignments, qualiAssignments.originalData)) return true;
+      if (qualiAssignments?.[itemId] && qualiAssignments[itemId].originalData && !isSameAsImported(qualiAssignments[itemId], qualiAssignments[itemId].originalData)) return true;
       // If all aspects match original, not restorable
       return false;
     }
