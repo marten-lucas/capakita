@@ -19,7 +19,6 @@ function SimDataGeneralTab() {
   const { 
     isBasedScenario, 
     getEffectiveDataItem, 
-    baseScenario,
     getEffectiveQualificationDefs,
     getEffectiveQualificationAssignments
   } = useOverlayData();
@@ -30,12 +29,6 @@ function SimDataGeneralTab() {
   // Use overlay helpers for qualification definitions and assignments
   const qualiDefs = getEffectiveQualificationDefs();
   const qualiAssignments = getEffectiveQualificationAssignments(selectedItemId);
-
-  // Get base assignment for this item (for overlay revert logic)
-  const baseAssignments = baseScenario
-    ? getEffectiveQualificationAssignments(selectedItemId)
-    : [];
-  const baseAssignment = baseAssignments[0]; // assuming one assignment per item
 
   const assignedQualification = React.useMemo(() => {
     if (!item || item.type !== 'capacity') return '';
@@ -70,24 +63,15 @@ function SimDataGeneralTab() {
     );
 
     if (isBasedScenario) {
-      if (baseAssignment && baseAssignment.qualification === newKey) {
-        // Remove overlay if newKey matches base
-        dispatch({
-          type: 'simOverlay/removeQualificationDefOverlay',
-          payload: { scenarioId: selectedScenarioId }
-        });
-      } else {
-        // Set overlay if different from base
-        dispatch({
-          type: 'simOverlay/setQualificationDefOverlay',
-          payload: {
-            scenarioId: selectedScenarioId,
-            overlayData: qualiAssignments
-              .filter((a) => String(a.dataItemId) !== String(selectedItemId))
-              .concat([{ dataItemId: selectedItemId, qualification: newKey }]),
-          },
-        });
-      }
+      // Use the overlay dispatch pattern for overlay scenarios
+      dispatch({
+        type: 'simOverlay/setQualificationDefOverlay',
+        payload: {
+          scenarioId: selectedScenarioId,
+          dataItemId: selectedItemId,
+          overlayData: { dataItemId: selectedItemId, qualification: newKey, id: `${newKey}-${Date.now()}` },
+        },
+      });
     } else if (existingAssignment) {
       // For base scenarios, update the qualification assignment
       dispatch({

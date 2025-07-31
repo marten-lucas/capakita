@@ -19,7 +19,7 @@ function OrgaTabQualificationDefs() {
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
 
   // Use overlay hook to get base scenario info and effective qualification defs
-  const { baseScenario, isBasedScenario, getEffectiveQualificationDefs } = useOverlayData();
+  const { baseScenario, isBasedScenario, getEffectiveQualificationDefs, overlaysByScenario } = useOverlayData();
   const qualiDefs = getEffectiveQualificationDefs();
 
   // Remove currentScenarioDefs and use only qualiDefs from the hook
@@ -62,12 +62,40 @@ function OrgaTabQualificationDefs() {
       setError('Buchstabe und Anzeigename sind erforderlich');
       return;
     }
-    if (editingQualification) {
-      // Always update in current scenario
-      dispatch(updateQualificationDef({ scenarioId: selectedScenarioId, qualiKey: editingQualification.key, updates: form }));
+    
+    if (isBasedScenario) {
+      // For based scenarios, use overlays
+      const currentOverlayDefs = overlaysByScenario[selectedScenarioId]?.qualificationDefs || [];
+      let updatedOverlayDefs;
+      
+      if (editingQualification) {
+        // Update existing definition
+        updatedOverlayDefs = currentOverlayDefs.map(def => 
+          def.key === editingQualification.key ? { ...def, ...form } : def
+        );
+        // If not found in overlay, add it
+        if (!updatedOverlayDefs.some(def => def.key === editingQualification.key)) {
+          updatedOverlayDefs.push({ ...form });
+        }
+      } else {
+        // Add new definition
+        updatedOverlayDefs = [...currentOverlayDefs, { ...form }];
+      }
+      
+      dispatch({
+        type: 'simOverlay/setQualificationDefOverlay',
+        payload: {
+          scenarioId: selectedScenarioId,
+          overlayData: updatedOverlayDefs
+        }
+      });
     } else {
-      // Always add to current scenario
-      dispatch(addQualificationDef({ scenarioId: selectedScenarioId, qualiDef: { ...form } }));
+      // For base scenarios, use regular actions
+      if (editingQualification) {
+        dispatch(updateQualificationDef({ scenarioId: selectedScenarioId, qualiKey: editingQualification.key, updates: form }));
+      } else {
+        dispatch(addQualificationDef({ scenarioId: selectedScenarioId, qualiDef: { ...form } }));
+      }
     }
     handleCloseDialog();
   };
@@ -82,8 +110,21 @@ function OrgaTabQualificationDefs() {
 
   const handleDelete = (qualification) => {
     if (window.confirm(`Möchten Sie die Qualifikation "${qualification.name}" wirklich löschen?`)) {
-      // Always delete from current scenario
-      dispatch(deleteQualificationDef({ scenarioId: selectedScenarioId, qualiKey: qualification.key }));
+      if (isBasedScenario) {
+        // For based scenarios, remove from overlay or add a deletion marker
+        const currentOverlayDefs = overlaysByScenario[selectedScenarioId]?.qualificationDefs || [];
+        const updatedOverlayDefs = currentOverlayDefs.filter(def => def.key !== qualification.key);
+        
+        dispatch({
+          type: 'simOverlay/setQualificationDefOverlay',
+          payload: {
+            scenarioId: selectedScenarioId,
+            overlayData: updatedOverlayDefs
+          }
+        });
+      } else {
+        dispatch(deleteQualificationDef({ scenarioId: selectedScenarioId, qualiKey: qualification.key }));
+      }
     }
   };
 

@@ -20,17 +20,19 @@ function SimDataBookingTab() {
   // Handler to add a new booking
   const handleAddBooking = () => {
     if (!selectedScenarioId || !selectedItemId) return;
-    const bookingId = Date.now();
+    const bookingId = Date.now().toString();
+    const newBooking = {
+      id: bookingId,
+      startdate: '',
+      enddate: '',
+      times: [],
+      rawdata: {}
+    };
+    
     dispatch(addBookingThunk({
       scenarioId: selectedScenarioId,
       dataItemId: selectedItemId,
-      booking: {
-        id: bookingId,
-        startdate: '',
-        enddate: '',
-        times: [],
-        rawdata: {}
-      }
+      booking: newBooking
     }));
   };
 
@@ -56,4 +58,3 @@ function SimDataBookingTab() {
 export default SimDataBookingTab;
 
 
-  

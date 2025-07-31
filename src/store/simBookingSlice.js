@@ -97,8 +97,9 @@ export const addBookingThunk = ({ scenarioId, dataItemId, booking }) => (dispatc
   const state = getState();
   const scenario = state.simScenario.scenarios.find(s => s.id === scenarioId);
   const isBasedScenario = !!scenario?.baseScenarioId;
+  
   if (isBasedScenario) {
-    // Overlay: set booking overlay
+    // For based scenarios, add to overlay bookings without replacing existing ones
     dispatch({
       type: 'simOverlay/setBookingOverlay',
       payload: {

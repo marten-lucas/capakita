@@ -38,51 +38,107 @@ export function getEffectiveDataItems(scenarioChain, overlaysByScenario, dataByS
 
 // Get effective bookings for a specific item across scenario chain
 export function getEffectiveBookings(scenarioChain, overlaysByScenario, bookingsByScenario, itemId) {
-  for (const scenario of scenarioChain) {
+  // Collect all bookings from scenario chain and merge overlays
+  const allBookings = {};
+  
+  // Start from base scenario (reverse order) and apply overlays
+  for (const scenario of scenarioChain.slice().reverse()) {
     const sid = scenario.id;
-    if (overlaysByScenario[sid]?.bookings?.[itemId]) return overlaysByScenario[sid].bookings[itemId];
-    if (bookingsByScenario[sid]?.[itemId]) return bookingsByScenario[sid][itemId];
+    // Add base bookings first
+    if (bookingsByScenario[sid]?.[itemId]) {
+      Object.assign(allBookings, bookingsByScenario[sid][itemId]);
+    }
+    // Apply overlays on top
+    if (overlaysByScenario[sid]?.bookings?.[itemId]) {
+      Object.assign(allBookings, overlaysByScenario[sid].bookings[itemId]);
+    }
   }
-  return {};
+  
+  return allBookings;
 }
 
 // Get effective group assignments for a specific item across scenario chain
 export function getEffectiveGroupAssignments(scenarioChain, overlaysByScenario, groupsByScenario, itemId) {
-  for (const scenario of scenarioChain) {
+  // Collect all group assignments from scenario chain and merge overlays
+  const allAssignments = {};
+  
+  // Start from base scenario (reverse order) and apply overlays
+  for (const scenario of scenarioChain.slice().reverse()) {
     const sid = scenario.id;
-    if (overlaysByScenario[sid]?.groupassignments?.[itemId]) return overlaysByScenario[sid].groupassignments[itemId];
-    if (groupsByScenario[sid]?.[itemId]) return groupsByScenario[sid][itemId];
+    // Add base assignments first
+    if (groupsByScenario[sid]?.[itemId]) {
+      Object.assign(allAssignments, groupsByScenario[sid][itemId]);
+    }
+    // Apply overlays on top
+    if (overlaysByScenario[sid]?.groupassignments?.[itemId]) {
+      Object.assign(allAssignments, overlaysByScenario[sid].groupassignments[itemId]);
+    }
   }
-  return {};
+  
+  return allAssignments;
 }
 
 // Get effective group definitions across scenario chain
 export function getEffectiveGroupDefs(scenarioChain, overlaysByScenario, groupDefsByScenario) {
-  for (const scenario of scenarioChain) {
+  // Collect all group definitions and merge them by id
+  const allDefs = new Map();
+  
+  // Start from base scenario (reverse order) and apply overlays
+  for (const scenario of scenarioChain.slice().reverse()) {
     const sid = scenario.id;
-    if (Array.isArray(overlaysByScenario[sid]?.groupDefs) && overlaysByScenario[sid].groupDefs.length > 0)
-      return overlaysByScenario[sid].groupDefs;
-    if (Array.isArray(groupDefsByScenario[sid]) && groupDefsByScenario[sid].length > 0)
-      return groupDefsByScenario[sid];
+    // Add base definitions first
+    if (Array.isArray(groupDefsByScenario[sid])) {
+      groupDefsByScenario[sid].forEach(def => {
+        allDefs.set(def.id, def);
+      });
+    }
+    // Apply overlays on top
+    if (Array.isArray(overlaysByScenario[sid]?.groupDefs)) {
+      overlaysByScenario[sid].groupDefs.forEach(def => {
+        allDefs.set(def.id, def);
+      });
+    }
   }
-  return [];
+  
+  return Array.from(allDefs.values());
 }
 
 // Get effective qualification assignments for a specific item across scenario chain
 export function getEffectiveQualificationAssignments(scenarioChain, overlaysByScenario, qualiAssignmentsByScenario, itemId) {
-  for (const scenario of scenarioChain) {
+  // Collect all qualification assignments and merge them
+  const allAssignments = [];
+  
+  // Start from base scenario (reverse order) and collect assignments
+  for (const scenario of scenarioChain.slice().reverse()) {
     const sid = scenario.id;
+    // Add base assignments first
+    const assignmentsObj = qualiAssignmentsByScenario[sid]?.[itemId];
+    if (assignmentsObj && Object.values(assignmentsObj).length > 0) {
+      allAssignments.push(...Object.values(assignmentsObj));
+    }
+    // Add overlay assignments on top
     const overlayArr = overlaysByScenario[sid]?.qualificationDefs;
     if (Array.isArray(overlayArr)) {
       const found = overlayArr.filter(a => String(a.dataItemId) === String(itemId));
-      if (found.length > 0) return found;
-    }
-    const assignmentsObj = qualiAssignmentsByScenario[sid]?.[itemId];
-    if (assignmentsObj && Object.values(assignmentsObj).length > 0) {
-      return Object.values(assignmentsObj);
+      if (found.length > 0) {
+        allAssignments.push(...found);
+      }
     }
   }
-  return [];
+  
+  // Remove duplicates by qualification key, keeping the last one (highest priority)
+  const uniqueAssignments = [];
+  const seenQualifications = new Set();
+  
+  for (let i = allAssignments.length - 1; i >= 0; i--) {
+    const assignment = allAssignments[i];
+    if (!seenQualifications.has(assignment.qualification)) {
+      seenQualifications.add(assignment.qualification);
+      uniqueAssignments.unshift(assignment);
+    }
+  }
+  
+  return uniqueAssignments;
 }
 
 // Check if any overlay exists for a given item in a scenario (greedy)

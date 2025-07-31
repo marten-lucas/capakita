@@ -20,20 +20,24 @@ function GroupCards({ itemId }) {
 
   const handleAddGroup = () => {
     if (!itemId || !selectedScenarioId) return;
+    const newGroupId = Date.now().toString();
     const newGroup = {
+      id: newGroupId,
       kindId: itemId,
       groupId: '', // Set default groupId or let user pick
       start: '',
       end: '',
     };
+    
     if (isBasedScenario) {
+      // Use the overlay dispatch pattern for overlay scenarios
       dispatch({
         type: 'simOverlay/setGroupAssignmentOverlay',
         payload: {
           scenarioId: selectedScenarioId,
           itemId: itemId,
-          groupId: newGroup.groupId || Date.now().toString(),
-          overlayData: { ...newGroup, id: newGroup.groupId || Date.now().toString() }
+          groupId: newGroupId,
+          overlayData: newGroup
         }
       });
     } else {

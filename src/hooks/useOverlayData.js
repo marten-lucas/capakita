@@ -102,32 +102,65 @@ export function useOverlayData() {
 
   // Qualification Definitions
   const getEffectiveQualificationDefs = useCallback(() => {
-    for (const scenario of scenarioChain) {
+    // Collect all qualification definitions and merge them by key
+    const allDefs = new Map();
+    
+    // Start from base scenario (reverse order) and apply overlays
+    for (const scenario of scenarioChain.slice().reverse()) {
       const sid = scenario.id;
-      if (Array.isArray(overlaysByScenario[sid]?.qualificationDefs) && overlaysByScenario[sid].qualificationDefs.length > 0)
-        return overlaysByScenario[sid].qualificationDefs;
-      if (Array.isArray(qualiDefsByScenario[sid]) && qualiDefsByScenario[sid].length > 0)
-        return qualiDefsByScenario[sid];
+      // Add base definitions first
+      if (Array.isArray(qualiDefsByScenario[sid])) {
+        qualiDefsByScenario[sid].forEach(def => {
+          allDefs.set(def.key, def);
+        });
+      }
+      // Apply overlays on top
+      if (Array.isArray(overlaysByScenario[sid]?.qualificationDefs)) {
+        overlaysByScenario[sid].qualificationDefs.forEach(def => {
+          allDefs.set(def.key, def);
+        });
+      }
     }
-    return [];
+    
+    return Array.from(allDefs.values());
   }, [scenarioChain, overlaysByScenario, qualiDefsByScenario]);
 
   // Qualification Assignments
   const getEffectiveQualificationAssignments = useCallback((itemId) => {
-    // overlaysByScenario[sid]?.qualificationDefs: [{ dataItemId, qualification }]
-    for (const scenario of scenarioChain) {
+    // Collect all qualification assignments and merge them
+    const allAssignments = [];
+    
+    // Start from base scenario (reverse order) and collect assignments
+    for (const scenario of scenarioChain.slice().reverse()) {
       const sid = scenario.id;
+      // Add base assignments first
+      const assignmentsObj = qualiAssignmentsByScenario[sid]?.[itemId];
+      if (assignmentsObj && Object.values(assignmentsObj).length > 0) {
+        allAssignments.push(...Object.values(assignmentsObj));
+      }
+      // Add overlay assignments on top
       const overlayArr = overlaysByScenario[sid]?.qualificationDefs;
       if (Array.isArray(overlayArr)) {
         const found = overlayArr.filter(a => String(a.dataItemId) === String(itemId));
-        if (found.length > 0) return found;
-      }
-      const assignmentsObj = qualiAssignmentsByScenario[sid]?.[itemId];
-      if (assignmentsObj && Object.values(assignmentsObj).length > 0) {
-        return Object.values(assignmentsObj);
+        if (found.length > 0) {
+          allAssignments.push(...found);
+        }
       }
     }
-    return [];
+    
+    // Remove duplicates by qualification key, keeping the last one (highest priority)
+    const uniqueAssignments = [];
+    const seenQualifications = new Set();
+    
+    for (let i = allAssignments.length - 1; i >= 0; i--) {
+      const assignment = allAssignments[i];
+      if (!seenQualifications.has(assignment.qualification)) {
+        seenQualifications.add(assignment.qualification);
+        uniqueAssignments.unshift(assignment);
+      }
+    }
+    
+    return uniqueAssignments;
   }, [scenarioChain, overlaysByScenario, qualiAssignmentsByScenario]);
 
   // Overlay helpers (unchanged)
