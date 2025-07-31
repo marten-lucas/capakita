@@ -2,10 +2,13 @@ import React from 'react';
 import { IconButton, Tooltip, Dialog, DialogTitle, DialogActions, Button } from '@mui/material';
 import RestoreIcon from '@mui/icons-material/Restore';
 import { useIsRestorable } from '../../hooks/useIsRestorable';
+import { useDispatch } from 'react-redux';
+import { restoreDataItemThunk } from '../../store/simDataSlice';
 
 function RestoreButton({ scenarioId, itemId, onRestore }) {
   const isRestorable = useIsRestorable(scenarioId, itemId);
   const [open, setOpen] = React.useState(false);
+  const dispatch = useDispatch();
 
   if (!isRestorable) return null;
 
@@ -34,7 +37,8 @@ function RestoreButton({ scenarioId, itemId, onRestore }) {
             variant="contained"
             onClick={() => {
               setOpen(false);
-              onRestore();
+              dispatch(restoreDataItemThunk({ scenarioId, itemId }));
+              if (onRestore) onRestore();
             }}
           >
             Wiederherstellen

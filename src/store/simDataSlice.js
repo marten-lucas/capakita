@@ -253,4 +253,94 @@ export const deleteAllDataForScenarioThunk = (scenarioId) => (dispatch, getState
   dispatch(deleteAllDataForScenario({ scenarioId }));
 };
 
+// Thunk: restore a data item and all related data to original state (removes overlays and resets to originalData)
+export const restoreDataItemThunk = ({ scenarioId, itemId }) => (dispatch, getState) => {
+  const state = getState();
+
+  // 1. Remove overlays for this item (if any)
+  dispatch({ type: 'simOverlay/removeDataItemOverlay', payload: { scenarioId, itemId } });
+  dispatch({ type: 'simOverlay/removeBookingOverlay', payload: { scenarioId, itemId } });
+  dispatch({ type: 'simOverlay/removeGroupAssignmentOverlay', payload: { scenarioId, itemId } });
+  dispatch({ type: 'simOverlay/removeQualificationDefOverlay', payload: { scenarioId } });
+
+  // 2. Restore simData to originalData if present
+  const dataItem = state.simData.dataByScenario?.[scenarioId]?.[itemId];
+  if (dataItem?.originalData) {
+    dispatch({
+      type: 'simData/updateDataItem',
+      payload: {
+        scenarioId,
+        itemId,
+        updates: { ...dataItem.originalData, id: itemId }
+      }
+    });
+  }
+
+  // 3. Restore bookings to originalData if present, remove others
+  const bookings = state.simBooking.bookingsByScenario?.[scenarioId]?.[itemId] || {};
+  Object.entries(bookings).forEach(([bookingId, booking]) => {
+    if (booking.originalData) {
+      dispatch({
+        type: 'simBooking/updateBooking',
+        payload: {
+          scenarioId,
+          dataItemId: itemId,
+          bookingId,
+          updates: { ...booking.originalData, id: bookingId }
+        }
+      });
+    } else {
+      // Remove manually added bookings
+      dispatch({
+        type: 'simBooking/deleteBooking',
+        payload: { scenarioId, dataItemId: itemId, bookingId }
+      });
+    }
+  });
+
+  // 4. Restore group assignments to originalData if present, remove others
+  const groupAssignments = state.simGroup.groupsByScenario?.[scenarioId]?.[itemId] || {};
+  Object.entries(groupAssignments).forEach(([groupId, groupAssignment]) => {
+    if (groupAssignment.originalData) {
+      dispatch({
+        type: 'simGroup/updateGroup',
+        payload: {
+          scenarioId,
+          dataItemId: itemId,
+          groupId,
+          updates: { ...groupAssignment.originalData, id: groupId }
+        }
+      });
+    } else {
+      // Remove manually added group assignments
+      dispatch({
+        type: 'simGroup/deleteGroup',
+        payload: { scenarioId, dataItemId: itemId, groupId }
+      });
+    }
+  });
+
+  // 5. Restore qualification assignments to originalData if present, remove others
+  const qualiAssignments = state.simQualification.qualificationAssignmentsByScenario?.[scenarioId]?.[itemId] || {};
+  Object.entries(qualiAssignments).forEach(([assignmentId, assignment]) => {
+    if (assignment.originalData) {
+      dispatch({
+        type: 'simQualification/updateQualificationAssignment',
+        payload: {
+          scenarioId,
+          dataItemId: itemId,
+          assignmentId,
+          updates: { ...assignment.originalData, id: assignmentId }
+        }
+      });
+    } else {
+      // Remove manually added qualification assignments
+      dispatch({
+        type: 'simQualification/deleteQualificationAssignment',
+        payload: { scenarioId, dataItemId: itemId, assignmentId }
+      });
+    }
+  });
+};
+
 export default simDataSlice.reducer;

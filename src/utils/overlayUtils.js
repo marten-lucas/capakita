@@ -85,6 +85,23 @@ export function getEffectiveQualificationAssignments(scenarioChain, overlaysBySc
   return [];
 }
 
+// Check if any overlay exists for a given item in a scenario (greedy)
+export function getItemHasOverlay(scenarioId, itemId, overlaysByScenario) {
+  const overlay = overlaysByScenario[scenarioId];
+  if (!overlay) return false;
+  // Check dataItems overlay
+  if (overlay.dataItems && overlay.dataItems[itemId]) return true;
+  // Check bookings overlay
+  if (overlay.bookings && overlay.bookings[itemId]) return true;
+  // Check groupassignments overlay
+  if (overlay.groupassignments && overlay.groupassignments[itemId]) return true;
+  // Check qualificationDefs overlay (array of assignments)
+  if (Array.isArray(overlay.qualificationDefs)) {
+    if (overlay.qualificationDefs.some(a => String(a.dataItemId) === String(itemId))) return true;
+  }
+  return false;
+}
+
 // Build complete overlay-aware data structure for chart calculations
 export function buildOverlayAwareData(scenarioId, state) {
   const scenarios = state.simScenario.scenarios;
