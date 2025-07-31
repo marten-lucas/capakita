@@ -172,21 +172,24 @@ export const importScenario = ({
   }
 
   // 8. Build qualification assignments for all imported capacity items
-  const qualiAssignmentsFinal = [];
+  const qualiAssignmentsFinal = {};
   Object.entries(dataByScenario).forEach(([storeKey, item]) => {
     if (item.type === 'capacity' && item.rawdata && item.rawdata.QUALIFIK) {
-      qualiAssignmentsFinal.push({
+      const id = `${item.rawdata.QUALIFIK}-${Date.now()}-${Math.random()}`;
+      const qualiAssignment = {
         dataItemId: storeKey,
         qualification: item.rawdata.QUALIFIK,
-        id: `${item.rawdata.QUALIFIK}-${Date.now()}-${Math.random()}`
-      });
+        id
+      };
+      if (!qualiAssignmentsFinal[storeKey]) qualiAssignmentsFinal[storeKey] = {};
+      qualiAssignmentsFinal[storeKey][id] = qualiAssignment;
     }
   });
 
-  if (qualiAssignmentsFinal.length > 0) {
+  if (Object.keys(qualiAssignmentsFinal).length > 0) {
     dispatch({
       type: 'simQualification/importQualificationAssignments',
-      payload: { scenarioId, assignments: qualiAssignmentsFinal }
+      payload: { scenarioId, assignments: Object.values(qualiAssignmentsFinal).flatMap(obj => Object.values(obj)) }
     });
   }
 

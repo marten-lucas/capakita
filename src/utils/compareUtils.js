@@ -1,7 +1,6 @@
 // Compare two objects or collections for equality (imported vs current)
 export function isSameAsImported(current, original) {
   if (!current || !original) {
-    console.log('[isSameAsImported] One of current/original is falsy', { current, original });
     return false;
   }
 
@@ -24,6 +23,5 @@ export function isSameAsImported(current, original) {
   };
 
   const result = compareKeys(current, original);
-  console.log('[isSameAsImported] compareKeys result', { current, original, result });
   return result;
 }

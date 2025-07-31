@@ -252,18 +252,20 @@ export function adebis2GroupAssignments(grukiRaw) {
 /**
  * Generates qualification assignments for all capacity items in dataByScenario.
  * @param {Object} dataByScenario - The scenario data keyed by storeKey.
- * @returns {Array} qualiAssignmentsFinal - Array of qualification assignment objects.
+ * @returns {Object} qualiAssignmentsFinal - { [dataItemId]: { [assignmentId]: assignmentObj } }
  */
 export function adebis2QualiAssignments(dataByScenario) {
-  const qualiAssignmentsFinal = [];
+  const qualiAssignmentsFinal = {};
   Object.entries(dataByScenario).forEach(([storeKey, item]) => {
     if (item.type === 'capacity' && item.rawdata && item.rawdata.QUALIFIK) {
-      let qualiAssignment = {
+      const id = `${item.rawdata.QUALIFIK}-${Date.now()}-${Math.random()}`;
+      const qualiAssignment = {
         dataItemId: storeKey,
         qualification: item.rawdata.QUALIFIK,
-        id: `${item.rawdata.QUALIFIK}-${Date.now()}-${Math.random()}`
+        id
       };
-      qualiAssignmentsFinal.push(addOriginalData(qualiAssignment));
+      if (!qualiAssignmentsFinal[storeKey]) qualiAssignmentsFinal[storeKey] = {};
+      qualiAssignmentsFinal[storeKey][id] = addOriginalData(qualiAssignment);
     }
   });
   return qualiAssignmentsFinal;

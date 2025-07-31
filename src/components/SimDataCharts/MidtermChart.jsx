@@ -301,4 +301,3 @@ export default function MidtermChart({ hideFilters = false, scenario, scenarioId
     </Box>
   );
 }
-      

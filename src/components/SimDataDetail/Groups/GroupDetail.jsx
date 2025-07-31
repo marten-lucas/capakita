@@ -330,4 +330,3 @@ function GroupDetail({ group }) {
 }
 
 export default GroupDetail;
- 

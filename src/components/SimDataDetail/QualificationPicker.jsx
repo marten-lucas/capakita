@@ -10,9 +10,9 @@ function QualificationPicker({ qualificationDefs, value, onChange }) {
         value={value || ''}
         onChange={e => onChange(e.target.value)}
       >
-        {qualificationDefs.map(q => (
+        {qualificationDefs.map((q, idx) => (
           <FormControlLabel
-            key={q.key}
+            key={`${q.key}-${idx}`}
             value={q.key}
             control={<Radio />}
             label={q.name}
