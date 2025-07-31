@@ -107,8 +107,7 @@ export const importScenario = ({
   bookingReference,
   groupDefs,
   qualiDefs,
-  groupAssignments,
-  groupAssignmentReference
+  groupAssignments
 }) => async (dispatch, getState) => {
   // 1. Generate unique scenario id
   const scenarioId = Date.now().toString();

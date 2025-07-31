@@ -7,20 +7,16 @@ import {
   adebis2bookings,
   adebis2GroupDefs,
   adebis2QualiDefs,
-  adebis2GroupAssignments,
-  adebis2QualiAssignments
+  adebis2GroupAssignments
 } from '../utils/adebis-parser';
 
-// Refactored: only orchestrates, no direct mapping or slice dispatching
 export function useScenarioImport() {
   const dispatch = useDispatch();
 
   const importScenarioHandler = useCallback(
     async ({ file, isAnonymized, importLimit }) => {
-      // 1. Extract raw data
       const { rawdata } = await extractAdebisData(file, isAnonymized);
 
-      // 2. Apply limit to kids and filter related entities accordingly
       let kidsRaw = rawdata.kidsRaw;
       let employeesRaw = rawdata.employeesRaw;
       let belegungRaw = rawdata.belegungRaw;
@@ -36,14 +32,12 @@ export function useScenarioImport() {
         groupsRaw = groupsRaw.filter(grp => allowedGroupIds.has(String(grp.GRUNR)));
       }
 
-      // 3. Transform raw data using parser functions
       const { simDataList } = adebis2simData(kidsRaw, employeesRaw);
       const { bookings, bookingReference } = adebis2bookings(belegungRaw, employeesRaw);
       const groupDefs = adebis2GroupDefs(groupsRaw);
       const qualiDefs = adebis2QualiDefs(employeesRaw);
       const { groupAssignments, groupAssignmentReference } = adebis2GroupAssignments(grukiRaw);
 
-      // 4. Prepare scenario settings
       const scenarioName = isAnonymized ? 'Importiertes Szenario (anonymisiert)' : 'Importiertes Szenario';
       const scenarioSettings = {
         name: scenarioName,
@@ -56,7 +50,6 @@ export function useScenarioImport() {
         importedAnonymized: !!isAnonymized
       };
 
-      // 5. Build import payload and dispatch importer thunk
       await dispatch(importScenario({
         scenarioSettings,
         simDataList,
@@ -65,8 +58,7 @@ export function useScenarioImport() {
         groupDefs,
         qualiDefs,
         groupAssignments,
-        groupAssignmentReference,
-        // qualiAssignments will be built in the thunk after mapping
+        groupAssignmentReference
       }));
     },
     [dispatch]
