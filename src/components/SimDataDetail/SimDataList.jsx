@@ -9,6 +9,9 @@ import IconButton from '@mui/material/IconButton';
 import PersonIcon from '@mui/icons-material/Person';
 import ChildCareIcon from '@mui/icons-material/ChildCare';
 import RestoreButton from './RestoreButton';
+import { getDateRangeString } from '../../utils/dateUtils';
+import { sumBookingHours } from '../../utils/bookingUtils';
+import { getEffectiveGroupAssignments as getEffectiveGroupAssignmentsUtil } from '../../utils/overlayUtils';
 
 // Use a constant for empty object to avoid new reference on each render
 const EMPTY_OBJECT = {};
@@ -20,7 +23,7 @@ function SimDataList() {
   const scenarios = useSelector(state => state.simScenario.scenarios);
 
   // Use overlay hook to get effective data
-  const { getEffectiveDataItems, hasOverlay, isBasedScenario, getEffectiveGroupAssignments, getEffectiveGroupDefs, getEffectiveBookings } = useOverlayData();
+  const { getEffectiveDataItems, hasOverlay, isBasedScenario, getEffectiveGroupDefs, getEffectiveBookings } = useOverlayData();
   const effectiveDataItems = getEffectiveDataItems();
   const groupDefs = getEffectiveGroupDefs();
 
@@ -32,18 +35,6 @@ function SimDataList() {
   // Define colors for demand/capacity
   const DEMAND_COLOR = '#c0d9f3ff';   // blue for children
   const CAPACITY_COLOR = '#a3c7a5ff'; // green for employees
-
-  // Helper: get scenario for current id
-
-  // Helper: get group assignment for item (overlay-aware)
-  function getCurrentGroup(itemId) {
-    const groupAssignments = getEffectiveGroupAssignments(itemId);
-    if (!groupAssignments) return null;
-    const assignments = Object.values(groupAssignments);
-    if (assignments.length === 0) return null;
-    // Prefer assignment with no end or latest end
-    return assignments.find(a => !a.end) || assignments[0];
-  }
 
   // Helper: get group definition by groupId
   function getGroupDef(groupId) {
@@ -57,24 +48,6 @@ function SimDataList() {
     return bookingsObj ? Object.values(bookingsObj) : [];
   }
 
-  // Helper: sum hours for a booking
-  function sumBookingHours(booking) {
-    if (!booking?.times || booking.times.length === 0) return 0;
-    let total = 0;
-    booking.times.forEach(day => {
-      day.segments.forEach(seg => {
-        if (seg.booking_start && seg.booking_end) {
-          // Parse times as HH:mm
-          const [sh, sm] = seg.booking_start.split(':').map(Number);
-          const [eh, em] = seg.booking_end.split(':').map(Number);
-          let diff = (eh * 60 + em) - (sh * 60 + sm);
-          if (diff > 0) total += diff / 60;
-        }
-      });
-    });
-    return total;
-  }
-
   // Helper: get subtitle for item (booking info)
   function getSubtitle(item) {
     const bookings = getBookings(item._key);
@@ -82,29 +55,14 @@ function SimDataList() {
     // Use the first booking (should be only one per item)
     const booking = bookings[0];
     const hours = sumBookingHours(booking);
-    // Compose date info
-    const start = booking.startdate;
-    const end = booking.enddate;
-    if (start && end) {
-      return `${hours ? `${hours} h von ${formatDate(start)} bis ${formatDate(end)}` : ''}`;
-    }
-    if (start) {
-      return `${hours ? `${hours} h ab ${formatDate(start)}` : ''}`;
-    }
-    return hours ? `${hours} h` : '';
-  }
-
-  // Helper: format date as d.m.yyyy
-  function formatDate(dateStr) {
-    if (!dateStr) return '';
-    const d = new Date(dateStr);
-    if (isNaN(d)) return dateStr;
-    return `${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}`;
+    return getDateRangeString(booking.startdate, booking.enddate, hours);
   }
 
   // Helper: get Avatar for item
   function getAvatar(item) {
-    const groupAssignment = getCurrentGroup(item._key);
+    const groupAssignments = getEffectiveGroupAssignmentsUtil(/* scenarioChain, overlaysByScenario, groupsByScenario, item._key */);
+    const assignments = groupAssignments ? Object.values(groupAssignments) : [];
+    const groupAssignment = assignments.length === 0 ? null : assignments.find(a => !a.end) || assignments[0];
     const groupDef = groupAssignment ? getGroupDef(groupAssignment.groupId) : null;
     const color = item.type === 'demand' ? DEMAND_COLOR : CAPACITY_COLOR;
     let icon = null;

@@ -67,3 +67,25 @@ export function calculateWorktimeFromBookings(bookings) {
   
   return totalMinutesPerWeek / 60; // Convert to hours
 }
+
+/**
+ * Calculate total hours for a single booking object
+ * @param {Object} booking - Booking object with times/segments
+ * @returns {number} - Total hours
+ */
+export function sumBookingHours(booking) {
+  if (!booking?.times || booking.times.length === 0) return 0;
+  let total = 0;
+  booking.times.forEach(day => {
+    day.segments.forEach(seg => {
+      if (seg.booking_start && seg.booking_end) {
+        // Parse times as HH:mm
+        const [sh, sm] = seg.booking_start.split(':').map(Number);
+        const [eh, em] = seg.booking_end.split(':').map(Number);
+        let diff = (eh * 60 + em) - (sh * 60 + sm);
+        if (diff > 0) total += diff / 60;
+      }
+    });
+  });
+  return total;
+}

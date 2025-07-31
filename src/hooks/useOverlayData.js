@@ -1,19 +1,7 @@
 import { useCallback, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { setDataItemOverlay, removeDataItemOverlay } from '../store/simOverlaySlice';
-
-// Helper: walk up scenario chain, return array from current to root
-function getScenarioChain(scenarios, scenarioId) {
-  const chain = [];
-  let currentId = scenarioId;
-  while (currentId) {
-    const scenario = scenarios.find(s => s.id === currentId);
-    if (!scenario) break;
-    chain.push(scenario);
-    currentId = scenario.baseScenarioId;
-  }
-  return chain;
-}
+import { getScenarioChain } from '../utils/overlayUtils'; // <-- import here
 
 // Helper: overlay-aware lookup for object (e.g. dataItems, bookings, groupassignments)
 function overlayObjectChainLookup({ overlaysByScenario, dataByScenario, scenarioChain, key, subkey }) {

@@ -52,3 +52,36 @@ export function isFutureOrEmptyDate(dateString) {
 export function isValidDateString(str) {
   return typeof str === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(str);
 }
+
+// Format date as d.m.yyyy from YYYY-MM-DD or Date object
+export function formatDate(dateStr) {
+  if (!dateStr) return '';
+  let d = typeof dateStr === 'string' ? new Date(dateStr) : dateStr;
+  if (isNaN(d)) return dateStr;
+  return `${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}`;
+}
+
+// Format a date range string with hours
+export function getDateRangeString(start, end, hours) {
+  // Helper: check if start is in the past
+  function isPast(dateStr) {
+    if (!dateStr) return false;
+    const date = new Date(dateStr);
+    if (isNaN(date)) return false;
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    return date < now;
+  }
+
+  if (!start && !end) return hours ? `${hours} h` : '';
+  if (start && end) {
+    return hours ? `${hours} h von ${formatDate(start)} bis ${formatDate(end)}` : `${formatDate(start)} bis ${formatDate(end)}`;
+  }
+  if (start) {
+    if (isPast(start)) {
+      return hours ? `${hours} h seit ${formatDate(start)}` : `seit ${formatDate(start)}`;
+    }
+    return hours ? `${hours} h ab ${formatDate(start)}` : `ab ${formatDate(start)}`;
+  }
+  return hours ? `${hours} h` : '';
+}
