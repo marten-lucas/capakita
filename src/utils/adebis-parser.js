@@ -177,7 +177,11 @@ export function adebis2GroupDefs(groupsRaw) {
     const name = group.BEZ || '';
     const lowerName = name.toLowerCase();
     let icon = '👥';
-    if (lowerName.includes('schul')) icon = '🏫';
+    let IsSchool = false;
+    if (lowerName.includes('schul')) {
+      icon = '🏫';
+      IsSchool = true;
+    }
     else if (lowerName.includes('fuchs')) icon = '🦊';
     else if (lowerName.includes('bär') || lowerName.includes('baer')) icon = '🐻';
     else if (lowerName.includes('hase') || lowerName.includes('kaninchen')) icon = '🐰';
@@ -197,6 +201,7 @@ export function adebis2GroupDefs(groupsRaw) {
       id: String(group.GRUNR),
       name,
       icon,
+      IsSchool, 
       rawdata: { ...group }
     };
     return addOriginalData(groupDef);
@@ -216,6 +221,7 @@ export function adebis2QualiDefs(employeesRaw) {
     let name = key;
     if (key === 'E') name = 'Erzieher';
     else if (key === 'K') name = 'Kinderpfleger';
+    else if (key === 'W') name = 'Weiterbildung';
     let qualiDef = { key, name, rawdata: { key, name } };
     return addOriginalData(qualiDef);
   });

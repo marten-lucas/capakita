@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   Box, Typography, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
-  IconButton, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Alert
+  IconButton, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Alert, Checkbox, FormControlLabel
 } from '@mui/material';
 import GroupIcon from '@mui/icons-material/Group';
 import EditIcon from '@mui/icons-material/Edit';
@@ -38,12 +38,12 @@ function OrgaTabGroupDefs() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState(null);
-  const [groupForm, setGroupForm] = useState({ name: '', icon: '👥' });
+  const [groupForm, setGroupForm] = useState({ name: '', icon: '👥', IsSchool: false });
   const [error, setError] = useState('');
 
   const handleOpenDialog = (group = null) => {
     setEditingGroup(group);
-    setGroupForm(group ? { name: group.name, icon: group.icon } : { name: '', icon: '👥' });
+    setGroupForm(group ? { name: group.name, icon: group.icon, IsSchool: !!group.IsSchool } : { name: '', icon: '👥', IsSchool: false });
     setError('');
     setDialogOpen(true);
   };
@@ -51,7 +51,7 @@ function OrgaTabGroupDefs() {
   const handleCloseDialog = () => {
     setDialogOpen(false);
     setEditingGroup(null);
-    setGroupForm({ name: '', icon: '👥' });
+    setGroupForm({ name: '', icon: '👥', IsSchool: false });
     setError('');
   };
 
@@ -113,6 +113,7 @@ function OrgaTabGroupDefs() {
                 <TableCell>Name</TableCell>
                 <TableCell>ID</TableCell>
                 <TableCell>Quelle</TableCell>
+                <TableCell>Schulkind-Gruppe</TableCell>
                 <TableCell align="right">Aktionen</TableCell>
               </TableRow>
             </TableHead>
@@ -129,6 +130,9 @@ function OrgaTabGroupDefs() {
                     <TableCell>{group.id}</TableCell>
                     <TableCell>
                       {isAdebisGroup(group) ? 'Adebis Import' : 'Manuell erstellt'}
+                    </TableCell>
+                    <TableCell>
+                      <Checkbox checked={!!group.IsSchool} disabled />
                     </TableCell>
                     <TableCell align="right">
                       <IconButton
@@ -192,6 +196,15 @@ function OrgaTabGroupDefs() {
             <IconPicker
               value={groupForm.icon}
               onChange={(icon) => setGroupForm(form => ({ ...form, icon }))}
+            />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={!!groupForm.IsSchool}
+                  onChange={e => setGroupForm(form => ({ ...form, IsSchool: e.target.checked }))}
+                />
+              }
+              label="Schulkind-Gruppe"
             />
           </Box>
         </DialogContent>

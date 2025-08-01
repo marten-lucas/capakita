@@ -2,6 +2,7 @@
 // import { selectDataItemsByScenario } from '../store/simDataSlice';
 // import { ... } from '../store/simBookingSlice';
 // ...other imports...
+import { getBayKiBiGWeightForChild } from './BayKiBiG-calculator';
 
 // REMOVE any getScenarioChain or scenario traversal here!
 // Only use the data passed in for calculations
@@ -38,7 +39,7 @@ export function generateExpertRatioSeries(categories, filteredCapacityBookings, 
   );
 
   // For each category, count total personnel and expert personnel
-  return categories.map((cat, idx) => {
+  return categories.map((cat) => {
     // Parse category to day and time
     const [day, time] = cat.split(' ');
     let total = 0;
@@ -67,6 +68,63 @@ export function generateExpertRatioSeries(categories, filteredCapacityBookings, 
   });
 }
 
+/**
+ * Berechnet den BayKiBiG-Anstellungsschlüssel für jedes Zeitsegment.
+ * Gibt ein Array mit dem Schlüssel (z.B. 11.0) für jedes Segment zurück.
+ */
+export function generateCareRatioSeries(categories, filteredDemandBookings, filteredCapacityBookings, dataByScenario, groupDefs) {
+  // Hilfsfunktion: Hole GroupDef nach groupId
+  function getGroupDefById(groupId) {
+    return groupDefs.find(g => String(g.id) === String(groupId));
+  }
+
+  return categories.map(cat => {
+    // Parse category zu day und time
+    const [day, time] = cat.split(' ');
+
+    // Summe gewichtete Bedarfe (Kinderstunden)
+    let weightedDemand = 0;
+    filteredDemandBookings.forEach(booking => {
+      if (!Array.isArray(booking.times)) return;
+      const covers = booking.times.some(dayObj => {
+        if (dayObj.day_name !== day) return false;
+        if (!Array.isArray(dayObj.segments)) return false;
+        return dayObj.segments.some(seg =>
+          seg.booking_start <= time && seg.booking_end > time
+        );
+      });
+      if (covers) {
+        // Hole das Kind-Objekt und GroupDef
+        const child = dataByScenario?.[booking.itemId];
+        const groupDef = getGroupDefById(booking.groupId);
+        const weight = getBayKiBiGWeightForChild(child, groupDef);
+        weightedDemand += weight;
+      }
+    });
+
+    // Summe Kapazität (Mitarbeiter)
+    let capacityCount = 0;
+    filteredCapacityBookings.forEach(booking => {
+      if (!Array.isArray(booking.times)) return;
+      const covers = booking.times.some(dayObj => {
+        if (dayObj.day_name !== day) return false;
+        if (!Array.isArray(dayObj.segments)) return false;
+        return dayObj.segments.some(seg =>
+          seg.booking_start <= time && seg.booking_end > time
+        );
+      });
+      if (covers) {
+        capacityCount += 1;
+      }
+    });
+
+    // Berechnung des Schlüssels
+    if (capacityCount === 0) return 0;
+    const ratio = weightedDemand / capacityCount;
+    return Math.round(ratio * 10) / 10; // 1 Nachkommastelle
+  });
+}
+
 export function calculateChartData(
   referenceDate,
   selectedGroups,
@@ -75,7 +133,7 @@ export function calculateChartData(
     bookingsByScenario,
     dataByScenario,
     groupDefs,
-    qualificationDefs, // <-- add this argument
+    qualificationDefs, 
     groupsByScenario, 
     qualificationAssignmentsByScenario,
     overlaysByScenario,
@@ -99,14 +157,21 @@ export function calculateChartData(
   const demand = generateBookingDataSeries(referenceDate, filteredDemandBookings, categories);
   const capacity = generateBookingDataSeries(referenceDate, filteredCapacityBookings, categories);
 
+  // Neu: careRatio berechnen
+  const care_ratio = generateCareRatioSeries(
+    categories,
+    filteredDemandBookings,
+    filteredCapacityBookings,
+    dataByScenario[scenarioId],
+    groupDefs || []
+  );
+
   // Fill expert_ratio using new function
   const expert_ratio = generateExpertRatioSeries(
     categories,
     filteredCapacityBookings,
     qualificationDefs || []
   );
-
-  const care_ratio = []; // unchanged
 
   // Return completely new objects and arrays to prevent any mutation issues
   return {
