@@ -59,14 +59,24 @@ const simFinancialsSlice = createSlice({
     addFinancialDef(state, action) {
       const { scenarioId, financialDef } = action.payload;
       if (!state.financialDefsByScenario[scenarioId]) state.financialDefsByScenario[scenarioId] = [];
-      state.financialDefsByScenario[scenarioId].push({ ...financialDef, id: financialDef.id || createId('financialDef') });
+      // Remove feeGroups if present, only keep fees
+      const cleanedDef = {
+        ...financialDef,
+        fees: financialDef.fees || [],
+      };
+      state.financialDefsByScenario[scenarioId].push({ ...cleanedDef, id: financialDef.id || createId('financialDef') });
     },
     updateFinancialDef(state, action) {
       const { scenarioId, financialDefId, updates } = action.payload;
       const defs = state.financialDefsByScenario[scenarioId] || [];
       const idx = defs.findIndex(def => def.id === financialDefId);
       if (idx !== -1) {
-        defs[idx] = { ...defs[idx], ...updates };
+        // Remove feeGroups if present, only keep fees
+        const cleanedUpdates = {
+          ...updates,
+          fees: updates.fees || [],
+        };
+        defs[idx] = { ...defs[idx], ...cleanedUpdates };
       }
     },
     deleteFinancialDef(state, action) {

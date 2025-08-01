@@ -70,6 +70,7 @@ function GroupDetail({ group }) {
   }, [bookings, parentItemId, dispatch, selectedScenarioId]);
 
   // Collect all segments for display
+  // This is overlay-aware because 'bookings' is overlay-aware
   const getAllBookingSegments = useMemo(() => {
     const segments = [];
     bookings.forEach((booking, bookingIdx) => {
