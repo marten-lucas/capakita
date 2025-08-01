@@ -141,6 +141,31 @@ export function getEffectiveQualificationAssignments(scenarioChain, overlaysBySc
   return uniqueAssignments;
 }
 
+// Get effective financial definitions across scenario chain
+export function getEffectiveFinancialDefs(scenarioChain, overlaysByScenario, financialDefsByScenario) {
+  // Collect all financial definitions and merge them by id
+  const allDefs = new Map();
+  
+  // Start from base scenario (reverse order) and apply overlays
+  for (const scenario of scenarioChain.slice().reverse()) {
+    const sid = scenario.id;
+    // Add base definitions first
+    if (Array.isArray(financialDefsByScenario[sid])) {
+      financialDefsByScenario[sid].forEach(def => {
+        allDefs.set(def.id, def);
+      });
+    }
+    // Apply overlays on top
+    if (overlaysByScenario[sid]?.financialDefs) {
+      Object.values(overlaysByScenario[sid].financialDefs).forEach(def => {
+        allDefs.set(def.id, def);
+      });
+    }
+  }
+  
+  return Array.from(allDefs.values());
+}
+
 // Check if any overlay exists for a given item in a scenario (greedy)
 export function getItemHasOverlay(scenarioId, itemId, overlaysByScenario) {
   const overlay = overlaysByScenario[scenarioId];
@@ -168,6 +193,7 @@ export function buildOverlayAwareData(scenarioId, state) {
   const groupsByScenario = state.simGroup.groupsByScenario;
   const qualiAssignmentsByScenario = state.simQualification.qualificationAssignmentsByScenario;
   const qualiDefsByScenario = state.simQualification.qualificationDefsByScenario;
+  const financialDefsByScenario = state.simFinancials.financialDefsByScenario;
 
   const scenarioChain = getScenarioChain(scenarios, scenarioId);
 
@@ -183,6 +209,7 @@ export function buildOverlayAwareData(scenarioId, state) {
   });
 
   const effectiveGroupDefs = getEffectiveGroupDefs(scenarioChain, overlaysByScenario, groupDefsByScenario);
+  const effectiveFinancialDefs = getEffectiveFinancialDefs(scenarioChain, overlaysByScenario, financialDefsByScenario);
 
   // Add effectiveQualificationDefs (merged by key, overlays take precedence)
   const allDefs = new Map();
@@ -208,6 +235,8 @@ export function buildOverlayAwareData(scenarioId, state) {
     effectiveQualificationAssignmentsByItem,
     effectiveGroupDefs,
     effectiveQualificationDefs,
+    effectiveFinancialDefs,
     scenarioChain
   };
 }
+

@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { setDataItemOverlay, removeDataItemOverlay, setFinancialOverlay, removeFinancialOverlay } from '../store/simOverlaySlice';
-import { getScenarioChain } from '../utils/overlayUtils'; // <-- import here
+import { setDataItemOverlay, removeDataItemOverlay } from '../store/simOverlaySlice';
+import { getScenarioChain } from '../utils/overlayUtils';
 
 // Helper: overlay-aware lookup for object (e.g. dataItems, bookings, groupassignments)
 function overlayObjectChainLookup({ overlaysByScenario, dataByScenario, scenarioChain, key, subkey }) {
@@ -187,38 +187,6 @@ export function useOverlayData() {
     return result;
   }, [scenarioChain, overlaysByScenario, financialsByScenario]);
 
-  // Financial Definitions
-  const getEffectiveFinancialDefs = useCallback(() => {
-    // Returns merged financialDefs array, overlays take precedence, stacked
-    const result = [];
-    const seenIds = new Set();
-    
-    // Start from current scenario and work backwards
-    for (const scenario of scenarioChain) {
-      const sid = scenario.id;
-      // Add overlay defs first (highest priority)
-      if (overlaysByScenario[sid]?.financialDefs) {
-        Object.values(overlaysByScenario[sid].financialDefs).forEach(def => {
-          if (!seenIds.has(def.id)) {
-            result.push(def);
-            seenIds.add(def.id);
-          }
-        });
-      }
-      // Add base scenario defs
-      if (Array.isArray(financialDefsByScenario[sid])) {
-        financialDefsByScenario[sid].forEach(def => {
-          if (!seenIds.has(def.id)) {
-            result.push(def);
-            seenIds.add(def.id);
-          }
-        });
-      }
-    }
-    
-    return result;
-  }, [scenarioChain, overlaysByScenario, financialDefsByScenario]);
-
   // Overlay helpers (unchanged)
   const updateDataItem = useCallback((itemId, updates) => {
     if (!selectedScenarioId || !selectedScenario) return;
@@ -270,10 +238,9 @@ export function useOverlayData() {
     getEffectiveQualificationDefs,
     getEffectiveQualificationAssignments,
     getEffectiveFinancials,
-    getEffectiveFinancialDefs,
     updateDataItem,
     hasOverlay,
     revertToBase,
-    overlaysByScenario, // Make sure this is returned
+    overlaysByScenario,
   };
 }

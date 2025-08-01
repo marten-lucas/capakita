@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import {
   Box, Typography, Paper, Button, Tabs, Tab, Select, MenuItem, FormControl, InputLabel,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, IconButton,
@@ -8,7 +8,6 @@ import { useSelector, useDispatch } from 'react-redux';
 import { createSelector } from '@reduxjs/toolkit';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { useOverlayData } from '../../hooks/useOverlayData';
 import {
   addFinancialDefThunk,
   updateFinancialDefThunk,
@@ -20,7 +19,7 @@ const selectScenarioDefs = createSelector(
   [
     (state, scenarioId) => state.simFinancials.financialDefsByScenario[scenarioId]
   ],
-  (defs) => defs || []
+  (defs) => defs ? [...defs] : [] // Transform: create new array to avoid identity function
 );
 
 // Create memoized selector for groupDefs to prevent unnecessary re-renders
@@ -28,7 +27,7 @@ const selectGroupDefs = createSelector(
   [
     (state, scenarioId) => state.simGroup.groupDefsByScenario[scenarioId]
   ],
-  (defs) => defs || []
+  (defs) => defs ? [...defs] : [] // Transform: create new array to avoid identity function
 );
 
 // GroupPicker component for selecting a group
@@ -56,21 +55,12 @@ function OrgaTabRateDefs() {
   const scenarioDefs = useSelector(state => selectScenarioDefs(state, selectedScenarioId));
   const groupDefs = useSelector(state => selectGroupDefs(state, selectedScenarioId));
 
-  // Overlay systematik: get effective financialDefs
-  const { baseScenario, isBasedScenario, overlaysByScenario } = useOverlayData();
-  
-  // Memoize financial defs calculation to prevent hook order issues
-  const financialDefs = useMemo(() => {
-    const baseDefs = baseScenario?.financialDefs || [];
-    const overlayDefs = overlaysByScenario?.[selectedScenarioId]?.financialDefs || [];
-    
-    return isBasedScenario
-      ? [...baseDefs, ...overlayDefs]
-      : scenarioDefs;
-  }, [baseScenario, isBasedScenario, overlaysByScenario, selectedScenarioId, scenarioDefs]);
+  // Remove getEffectiveFinancialDefs usage, use scenarioDefs directly
+  const financialDefs = scenarioDefs;
 
   const [selectedDefIndex, setSelectedDefIndex] = useState(0);
   const [, setSelectedGroupIndex] = useState(0);
+  const [hoveredTabId, setHoveredTabId] = useState(null);
 
   const currentDef = financialDefs[selectedDefIndex];
 
@@ -156,24 +146,40 @@ function OrgaTabRateDefs() {
               sx={{ borderRight: 1, borderColor: 'divider' }}
             >
               {financialDefs.map((def, index) => (
-                <Tab
-                  key={def.id}
-                  label={
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                      <span>{def.description || `Beitragsordnung ${index + 1}`}</span>
-                      <IconButton
-                        size="small"
-                        sx={{ ml: 1 }}
-                        onClick={e => {
-                          e.stopPropagation();
-                          handleDeleteRateDef(def.id);
-                        }}
-                      >
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
-                    </Box>
-                  }
-                />
+                <Box 
+                  key={def.id} 
+                  sx={{ 
+                    position: 'relative',
+                    '&:hover .delete-button': {
+                      opacity: 1
+                    }
+                  }}
+                  onMouseEnter={() => setHoveredTabId(def.id)}
+                  onMouseLeave={() => setHoveredTabId(null)}
+                >
+                  <Tab
+                    label={def.description || `Beitragsordnung ${index + 1}`}
+                    value={index}
+                  />
+                  <IconButton
+                    className="delete-button"
+                    size="small"
+                    sx={{ 
+                      position: 'absolute', 
+                      right: 8, 
+                      top: '50%', 
+                      transform: 'translateY(-50%)',
+                      zIndex: 1,
+                      opacity: hoveredTabId === def.id ? 1 : 0,
+                      transition: 'opacity 0.2s',
+                      backgroundColor: 'background.paper',
+                      '&:hover': { backgroundColor: 'error.light' }
+                    }}
+                    onClick={() => handleDeleteRateDef(def.id)}
+                  >
+                    <DeleteIcon fontSize="small" />
+                  </IconButton>
+                </Box>
               ))}
             </Tabs>
           </Paper>
@@ -259,7 +265,7 @@ function OrgaTabRateDefs() {
                             />
                           </TableCell>
                           <TableCell>
-                            <FormControl fullWidth sx={{ m: 1 }}>
+                            <FormControl sx={{ m: 1 }}>
                               <InputLabel htmlFor={`outlined-adornment-amount-${feeIndex}`}>Amount</InputLabel>
                               <OutlinedInput
                                 id={`outlined-adornment-amount-${feeIndex}`}

@@ -201,14 +201,13 @@ export const updateDataItemAndSyncAvrExpense = ({ scenarioId, itemId, updates })
 
 export const selectDataItemsByScenario = createSelector(
   [
-    state => state.simData.dataByScenario,
-    (state, scenarioId) => scenarioId
+    (state, scenarioId) => state.simData.dataByScenario[scenarioId]
   ],
-  (dataByScenario, scenarioId) => {
-    if (!scenarioId || !dataByScenario[scenarioId]) {
+  (dataForScenario) => {
+    if (!dataForScenario) {
       return []; // Return a consistent empty array
     }
-    return Object.values(dataByScenario[scenarioId]);
+    return Object.values(dataForScenario); // Transform: extract values from object
   }
 );
 
@@ -223,7 +222,7 @@ export const selectDataItemsByScenarioMemoized = createSelector(
   ],
   (selectedScenarioId, dataByScenario) => {
     if (!selectedScenarioId || !dataByScenario[selectedScenarioId]) return EMPTY_ARRAY;
-    return Object.values(dataByScenario[selectedScenarioId]);
+    return Object.values(dataByScenario[selectedScenarioId]); // Transform: extract values
   }
 );
 

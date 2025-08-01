@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import {
   Box, Typography, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
   IconButton, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Alert, Checkbox, FormControlLabel
@@ -31,7 +31,7 @@ function OrgaTabGroupDefs() {
   });
 
   // Memoize the function to check if group is from base scenario
-  const isFromBaseScenario = useMemo(() => {
+  const isFromBaseScenario = React.useMemo(() => {
     if (!isBasedScenario || !baseScenario) {
       return () => false;
     }

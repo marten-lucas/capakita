@@ -176,14 +176,10 @@ export const {
 
 export const getBookings = createSelector(
   [
-    state => state.simBooking.bookingsByScenario,
-    (state, scenarioId) => scenarioId,
-    (state, scenarioId, itemId) => itemId
+    (state, scenarioId, itemId) => state.simBooking.bookingsByScenario[scenarioId]?.[itemId]
   ],
-  (bookingsByScenario, scenarioId, itemId) => {
-    if (!scenarioId || !itemId || !bookingsByScenario[scenarioId]) return EMPTY_BOOKINGS;
-    const itemBookings = bookingsByScenario[scenarioId][itemId];
-    return itemBookings ? Object.values(itemBookings) : EMPTY_BOOKINGS;
+  (itemBookings) => {
+    return itemBookings ? Object.values(itemBookings) : EMPTY_BOOKINGS; // Transform: extract values
   }
 );
 

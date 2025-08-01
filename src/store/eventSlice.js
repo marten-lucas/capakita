@@ -267,65 +267,66 @@ const eventSlice = createSlice({
 
 // Selector: get all events for a scenario
 export const selectEventsForScenario = createSelector(
-    [(state) => state.events?.eventsByScenario || {}, (state, scenarioId) => scenarioId],
-    (eventsByScenario, scenarioId) => {
-        if (!scenarioId) return [];
-        return eventsByScenario[scenarioId] || [];
-    }
+  [
+    (state, scenarioId) => state.events?.eventsByScenario?.[scenarioId]
+  ],
+  (events) => {
+    return events ? [...events] : []; // Transform: create new array
+  }
 );
 
 // Selector: get consolidated events by effectiveDate (future only)
 export const selectConsolidatedEventsForScenario = createSelector(
-    [selectEventsForScenario],
-    (events) => {
-        if (!events || events.length === 0) return [];
-        const today = new Date().toISOString().slice(0, 10);
-        // Helper: is event ongoing (started in past, no end event)
-        function isOngoing(ev) {
-            // Only applies to group_assignment_start, child_presence_start, employee_presence_start, booking_start
-            if (
-                ev.type === 'group_assignment_start' ||
-                ev.type === 'child_presence_start' ||
-                ev.type === 'employee_presence_start' ||
-                ev.type === 'booking_start'
-            ) {
-                // Find corresponding end event for this item
-                const endType =
-                    ev.type === 'group_assignment_start' ? 'group_assignment_end'
-                        : ev.type === 'child_presence_start' ? 'child_presence_end'
-                            : ev.type === 'employee_presence_start' ? 'employee_presence_end'
-                                : ev.type === 'booking_start' ? 'booking_end'
-                                    : null;
-                if (!endType) return false;
-                // Find end event for this item
-                const hasEnd = events.some(e =>
-                    e.type === endType &&
-                    e.itemId === ev.itemId &&
-                    (e.groupId ? e.groupId === ev.groupId : true) &&
-                    (e.bookingId ? e.bookingId === ev.bookingId : true) &&
-                    (e.assignmentId ? e.assignmentId === ev.assignmentId : true) &&
-                    e.effectiveDate >= today
-                );
-                // If no end event in the future, and start is in the past, it's ongoing
-                return !hasEnd && ev.effectiveDate <= today;
-            }
-            return false;
+  [selectEventsForScenario],
+  (events) => {
+    if (!events || events.length === 0) return [];
+    const today = new Date().toISOString().slice(0, 10);
+    // Helper: is event ongoing (started in past, no end event)
+    function isOngoing(ev) {
+        // Only applies to group_assignment_start, child_presence_start, employee_presence_start, booking_start
+        if (
+            ev.type === 'group_assignment_start' ||
+            ev.type === 'child_presence_start' ||
+            ev.type === 'employee_presence_start' ||
+            ev.type === 'booking_start'
+        ) {
+            // Find corresponding end event for this item
+            const endType =
+                ev.type === 'group_assignment_start' ? 'group_assignment_end'
+                    : ev.type === 'child_presence_start' ? 'child_presence_end'
+                        : ev.type === 'employee_presence_start' ? 'employee_presence_end'
+                            : ev.type === 'booking_start' ? 'booking_end'
+                                : null;
+            if (!endType) return false;
+            // Find end event for this item
+            const hasEnd = events.some(e =>
+                e.type === endType &&
+                e.itemId === ev.itemId &&
+                (e.groupId ? e.groupId === ev.groupId : true) &&
+                (e.bookingId ? e.bookingId === ev.bookingId : true) &&
+                (e.assignmentId ? e.assignmentId === ev.assignmentId : true) &&
+                e.effectiveDate >= today
+            );
+            // If no end event in the future, and start is in the past, it's ongoing
+            return !hasEnd && ev.effectiveDate <= today;
         }
-
-        // Filter: future events or ongoing events
-        const filteredEvents = events.filter(ev =>
-            ev.effectiveDate >= today || isOngoing(ev)
-        );
-
-        const byDate = {};
-        filteredEvents.forEach(ev => {
-            if (!byDate[ev.effectiveDate]) byDate[ev.effectiveDate] = [];
-            byDate[ev.effectiveDate].push(ev);
-        });
-        return Object.entries(byDate)
-            .sort(([a], [b]) => a.localeCompare(b))
-            .map(([date, events]) => ({ date, events }));
+        return false;
     }
+
+    // Filter: future events or ongoing events
+    const filteredEvents = events.filter(ev =>
+      ev.effectiveDate >= today || isOngoing(ev)
+    );
+
+    const byDate = {};
+    filteredEvents.forEach(ev => {
+      if (!byDate[ev.effectiveDate]) byDate[ev.effectiveDate] = [];
+      byDate[ev.effectiveDate].push(ev);
+    });
+    return Object.entries(byDate)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, events]) => ({ date, events }));
+  }
 );
 
 export const { refreshAllEvents, refreshEventsForScenario } = eventSlice.actions;
