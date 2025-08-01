@@ -19,7 +19,7 @@ const store = configureStore({
     simFinancials: simFinancialsReducer,
     simOverlay: simOverlayReducer,
     chart: chartReducer,
-    event: eventReducer,
+    events: eventReducer,
   },
 });
 

@@ -162,13 +162,23 @@ const eventSlice = createSlice({
 });
 
 // Selector: get all events for a scenario
-export const selectEventsForScenario = (state, scenarioId) =>
-  state.events.eventsByScenario[scenarioId] || [];
+export const selectEventsForScenario = createSelector(
+  [
+    (state) => state.events?.eventsByScenario || {},
+    (state, scenarioId) => scenarioId
+  ],
+  (eventsByScenario, scenarioId) => {
+    if (!scenarioId) return [];
+    return eventsByScenario[scenarioId] || [];
+  }
+);
 
 // Selector: get consolidated events by effectiveDate
 export const selectConsolidatedEventsForScenario = createSelector(
   [selectEventsForScenario],
   (events) => {
+    if (!events || events.length === 0) return [];
+    
     const byDate = {};
     events.forEach(ev => {
       if (!byDate[ev.effectiveDate]) byDate[ev.effectiveDate] = [];

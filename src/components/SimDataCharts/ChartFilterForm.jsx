@@ -26,6 +26,7 @@ import {
   updateWeeklyChartData
 } from '../../store/chartSlice';
 import { useOverlayData } from '../../hooks/useOverlayData';
+import EventList from '../EventCalendar/EventList';
 
 const ITEM_HEIGHT = 48;
 const ITEM_PADDING_TOP = 8;
@@ -297,6 +298,13 @@ function ChartFilterForm({ showStichtag = false, scenarioId }) {
             </Select>
           </FormControl>
         )}
+      </Box>
+      {/* Add EventList below filter controls */}
+      <Box sx={{ mt: 2 }}>
+        <Typography variant="subtitle2" sx={{ mb: 1 }}>
+          Events
+        </Typography>
+        <EventList scenarioId={scenarioId} />
       </Box>
     </Paper>
   );
