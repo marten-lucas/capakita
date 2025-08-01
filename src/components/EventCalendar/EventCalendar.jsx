@@ -8,6 +8,8 @@ import { PickersDay } from '@mui/x-date-pickers/PickersDay';
 import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
 import { DayCalendarSkeleton } from '@mui/x-date-pickers/DayCalendarSkeleton';
 import { useScenarioEvents } from '../../hooks/useScenarioEvents';
+import { useDispatch } from 'react-redux';
+import { setReferenceDate, updateWeeklyChartData } from '../../store/chartSlice';
 
 function EventDay(props) {
   const { day, outsideCurrentMonth, eventsByDay, ...other } = props;
@@ -50,6 +52,7 @@ function EventDay(props) {
 }
 
 export default function EventCalendar({ scenarioId }) {
+  const dispatch = useDispatch();
   const { events } = useScenarioEvents(scenarioId);
 
   // Group events by date string
@@ -68,16 +71,24 @@ export default function EventCalendar({ scenarioId }) {
   const [loading, setLoading] = React.useState(false);
 
   // Simulate loading on month change
-  const handleMonthChange = React.useCallback((date) => {
+  const handleMonthChange = React.useCallback(() => {
     setLoading(true);
     setTimeout(() => setLoading(false), 200); // quick fake loading
   }, []);
+
+  // Handle date selection
+  const handleDateChange = (date) => {
+    setSelectedDate(date);
+    const formattedDate = date.format('YYYY-MM-DD');
+    dispatch(setReferenceDate({ scenarioId, date: formattedDate }));
+    dispatch(updateWeeklyChartData(scenarioId));
+  };
 
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
       <DateCalendar
         value={selectedDate}
-        onChange={setSelectedDate}
+        onChange={handleDateChange}
         loading={loading}
         onMonthChange={handleMonthChange}
         renderLoading={() => <DayCalendarSkeleton />}
