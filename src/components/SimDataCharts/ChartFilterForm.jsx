@@ -26,7 +26,7 @@ import {
   updateWeeklyChartData
 } from '../../store/chartSlice';
 import { useOverlayData } from '../../hooks/useOverlayData';
-import EventCalendar from '../EventCalendar/EventCalendar';
+import EventPicker from '../EventCalendar/EventPicker';
 
 const ITEM_HEIGHT = 48;
 const ITEM_PADDING_TOP = 8;
@@ -267,21 +267,6 @@ function ChartFilterForm({ showStichtag = false, scenarioId }) {
             ))}
           </Select>
         </FormControl>
-
-        {/* Stichtag (nur wenn showWeekly && showStichtag) */}
-        {showWeekly && showStichtag && (
-          <FormControl sx={{ minWidth: 160 }} size="small">
-            <TextField
-              label="Stichtag"
-              type="date"
-              value={stichtag}
-              onChange={handleDateChange}
-              InputLabelProps={{ shrink: true }}
-              size="small"
-            />
-          </FormControl>
-        )}
-
         {/* Zeitdimension (nur wenn showMidterm) */}
         {showMidterm && (
           <FormControl sx={{ minWidth: 140 }} size="small">
@@ -298,18 +283,17 @@ function ChartFilterForm({ showStichtag = false, scenarioId }) {
             </Select>
           </FormControl>
         )}
+
+        {/* Stichtag (nur wenn showWeekly && showStichtag) - replaced with EventPicker */}
+        {showWeekly && showStichtag && (
+          <EventPicker scenarioId={scenarioId} />
+        )}
+
       </Box>
-      {/* Add EventList below filter controls */}
-      <Box sx={{ mt: 2 }}>
-        <Typography variant="subtitle2" sx={{ mb: 1 }}>
-          Events
-        </Typography>
-        <EventCalendar scenarioId={scenarioId} />
-      </Box>
+      {/* Remove the separate EventPicker section */}
     </Paper>
   );
 }
 
 export default ChartFilterForm;
-
 

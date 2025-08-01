@@ -1,5 +1,6 @@
 import * as React from 'react';
 import dayjs from 'dayjs';
+import 'dayjs/locale/de'; // Import German locale
 import Badge from '@mui/material/Badge';
 import Tooltip from '@mui/material/Tooltip';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
@@ -8,34 +9,17 @@ import { PickersDay } from '@mui/x-date-pickers/PickersDay';
 import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
 import { DayCalendarSkeleton } from '@mui/x-date-pickers/DayCalendarSkeleton';
 import { useScenarioEvents } from '../../hooks/useScenarioEvents';
-import { useDispatch } from 'react-redux';
-import { setReferenceDate, updateWeeklyChartData } from '../../store/chartSlice';
+import { formatEventTooltip } from '../../utils/eventUtils.jsx'; // Updated import
 
 function EventDay(props) {
   const { day, outsideCurrentMonth, eventsByDay, ...other } = props;
   const dateStr = day.format('YYYY-MM-DD');
   const events = eventsByDay[dateStr] || [];
-  console.log(`Date: ${dateStr}, Events:`, events); // Debugging log
   const hasEvents = events.length > 0;
 
   return (
     <Tooltip
-      title={
-        hasEvents
-          ? (
-            <div>
-              {events.map((ev, idx) => (
-                <div key={idx}>
-                  <strong>{ev.label || ev.type}</strong>
-                  <span style={{ marginLeft: 8, color: '#888', fontSize: 11 }}>
-                    [{ev.type}]
-                  </span>
-                </div>
-              ))}
-            </div>
-          )
-          : ''
-      }
+      title={formatEventTooltip(events)} // Use central function for tooltip
       arrow
       placement="top"
       disableHoverListener={!hasEvents}
@@ -51,8 +35,7 @@ function EventDay(props) {
   );
 }
 
-export default function EventCalendar({ scenarioId }) {
-  const dispatch = useDispatch();
+export default function EventCalendar({ scenarioId, selectedDate, onDateChange }) {
   const { events } = useScenarioEvents(scenarioId);
 
   // Group events by date string
@@ -62,12 +45,9 @@ export default function EventCalendar({ scenarioId }) {
       if (!map[ev.effectiveDate]) map[ev.effectiveDate] = [];
       map[ev.effectiveDate].push(ev);
     });
-    console.log('Events grouped by day:', map); // Debugging log
     return map;
   }, [events]);
 
-  // Calendar state
-  const [selectedDate, setSelectedDate] = React.useState(dayjs());
   const [loading, setLoading] = React.useState(false);
 
   // Simulate loading on month change
@@ -78,16 +58,14 @@ export default function EventCalendar({ scenarioId }) {
 
   // Handle date selection
   const handleDateChange = (date) => {
-    setSelectedDate(date);
     const formattedDate = date.format('YYYY-MM-DD');
-    dispatch(setReferenceDate({ scenarioId, date: formattedDate }));
-    dispatch(updateWeeklyChartData(scenarioId));
+    onDateChange(formattedDate);
   };
 
   return (
-    <LocalizationProvider dateAdapter={AdapterDayjs}>
+    <LocalizationProvider dateAdapter={AdapterDayjs} locale="de">
       <DateCalendar
-        value={selectedDate}
+        value={dayjs(selectedDate || new Date())}
         onChange={handleDateChange}
         loading={loading}
         onMonthChange={handleMonthChange}
@@ -102,4 +80,3 @@ export default function EventCalendar({ scenarioId }) {
     </LocalizationProvider>
   );
 }
-
