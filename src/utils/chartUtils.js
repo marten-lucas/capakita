@@ -1,4 +1,5 @@
 import { getBayKiBiGWeightForChild } from './BayKiBiG-calculator';
+import { sumBookingHours } from './bookingUtils';
 
 // REMOVE any getScenarioChain or scenario traversal here!
 // Only use the data passed in for calculations
@@ -318,4 +319,187 @@ export function cloneChartData(chartData) {
     }
   }
   return cloned;
+}
+
+/**
+ * Generate expert ratio series for time dimensions (weeks, months, quarters, years).
+ * Calculates what percentage of booking hours is by expert personnel.
+ * @param {Array} categories - Time dimension categories (e.g. ["2024-01", "2024-02"])
+ * @param {string} timedimension - 'week' | 'month' | 'quarter' | 'year'
+ * @param {Array} filteredCapacityBookings - Array of capacity bookings with qualifications
+ * @param {Array} qualificationDefs - Array of qualification definitions with IsExpert flag
+ * @returns {Array} Array of percentages (0-100) for each category
+ */
+export function generateExpertRatioTimeDimension(categories, timedimension, filteredCapacityBookings, qualificationDefs) {
+  // Build a set of expert qualification keys
+  const expertQualiKeys = new Set(
+    (qualificationDefs || [])
+      .filter(def => def.IsExpert !== false) // default true
+      .map(def => def.key)
+  );
+
+  return categories.map((cat) => {
+    let totalHours = 0;
+    let expertHours = 0;
+
+    filteredCapacityBookings.forEach(booking => {
+      // Check if booking is active during this time period
+      if (isBookingActiveInTimePeriod(booking, cat, timedimension)) {
+        const bookingHours = sumBookingHours(booking);
+        totalHours += bookingHours;
+
+        // Check if this booking has expert qualifications
+        const qualiArr = Array.isArray(booking.qualifications) ? booking.qualifications : [];
+        if (qualiArr.some(q => expertQualiKeys.has(q))) {
+          expertHours += bookingHours;
+        }
+      }
+    });
+
+    if (totalHours === 0) return 0;
+    return Math.round((expertHours / totalHours) * 100);
+  });
+}
+
+/**
+ * Generate care ratio series for time dimensions (weeks, months, quarters, years).
+ * Applies BayKiBiG weighting to demand booking hours and calculates ratio (1:x) to capacity booking hours.
+ * @param {Array} categories - Time dimension categories
+ * @param {string} timedimension - 'week' | 'month' | 'quarter' | 'year'
+ * @param {Array} filteredDemandBookings - Array of demand bookings
+ * @param {Array} filteredCapacityBookings - Array of capacity bookings
+ * @param {Object} dataByScenario - Data items for scenario
+ * @param {Array} groupDefs - Group definitions for BayKiBiG weighting
+ * @returns {Array} Array of care ratios for each category
+ */
+export function generateCareRatioTimeDimension(categories, timedimension, filteredDemandBookings, filteredCapacityBookings, dataByScenario, groupDefs) {
+  // Helper function: get GroupDef by groupId
+  function getGroupDefById(groupId) {
+    return groupDefs.find(g => String(g.id) === String(groupId));
+  }
+
+  return categories.map(cat => {
+    let weightedDemandHours = 0;
+    let capacityHours = 0;
+
+    // Calculate weighted demand hours for this time period
+    filteredDemandBookings.forEach(booking => {
+      if (isBookingActiveInTimePeriod(booking, cat, timedimension)) {
+        const bookingHours = sumBookingHours(booking);
+        
+        // Get the child object and GroupDef for BayKiBiG weighting
+        const child = dataByScenario?.[booking.itemId];
+        const groupDef = getGroupDefById(booking.groupId);
+        const weight = getBayKiBiGWeightForChild(child, groupDef);
+        
+        weightedDemandHours += bookingHours * weight;
+      }
+    });
+
+    // Calculate capacity hours for this time period
+    filteredCapacityBookings.forEach(booking => {
+      if (isBookingActiveInTimePeriod(booking, cat, timedimension)) {
+        capacityHours += sumBookingHours(booking);
+      }
+    });
+
+    // Calculate ratio (weighted demand / capacity)
+    if (capacityHours === 0) return 0;
+    const ratio = weightedDemandHours / capacityHours;
+    return Math.round(ratio * 10) / 10; // 1 decimal place
+  });
+}
+
+/**
+ * Helper function to check if a booking is active during a specific time period.
+ * @param {Object} booking - Booking object with startdate/enddate
+ * @param {string} category - Time category (e.g. "2024-01", "2024-W01", "2024-Q1")
+ * @param {string} timedimension - 'week' | 'month' | 'quarter' | 'year'
+ * @returns {boolean} True if booking is active during the time period
+ */
+function isBookingActiveInTimePeriod(booking, category, timedimension) {
+  // Get the start and end dates of the time period
+  const { startDate, endDate } = getTimePeriodBounds(category, timedimension);
+  
+  // Check if booking overlaps with the time period
+  const bookingStart = booking.startdate || '1900-01-01';
+  const bookingEnd = booking.enddate || '2100-12-31';
+  
+  return bookingStart <= endDate && bookingEnd >= startDate;
+}
+
+/**
+ * Helper function to get start and end dates for a time period category.
+ * @param {string} category - Time category (e.g. "2024-01", "2024-W01", "2024-Q1")
+ * @param {string} timedimension - 'week' | 'month' | 'quarter' | 'year'
+ * @returns {Object} { startDate, endDate } in YYYY-MM-DD format
+ */
+function getTimePeriodBounds(category, timedimension) {
+  switch (timedimension) {
+    case 'week': {
+      // Parse "2024-W01" format
+      const [year, weekStr] = category.split('-W');
+      const weekNum = parseInt(weekStr, 10);
+      const yearNum = parseInt(year, 10);
+      
+      // Calculate first day of the week (Monday)
+      const jan4 = new Date(yearNum, 0, 4);
+      const dayOfWeek = (jan4.getDay() + 6) % 7; // Monday = 0
+      const firstWeekStart = new Date(jan4.getTime() - dayOfWeek * 24 * 60 * 60 * 1000);
+      
+      const weekStart = new Date(firstWeekStart.getTime() + (weekNum - 1) * 7 * 24 * 60 * 60 * 1000);
+      const weekEnd = new Date(weekStart.getTime() + 6 * 24 * 60 * 60 * 1000);
+      
+      return {
+        startDate: weekStart.toISOString().slice(0, 10),
+        endDate: weekEnd.toISOString().slice(0, 10)
+      };
+    }
+    case 'month': {
+      // Parse "2024-01" format
+      const [year, month] = category.split('-');
+      const yearNum = parseInt(year, 10);
+      const monthNum = parseInt(month, 10);
+      
+      const startDate = new Date(yearNum, monthNum - 1, 1);
+      const endDate = new Date(yearNum, monthNum, 0); // Last day of month
+      
+      return {
+        startDate: startDate.toISOString().slice(0, 10),
+        endDate: endDate.toISOString().slice(0, 10)
+      };
+    }
+    case 'quarter': {
+      // Parse "2024-Q1" format
+      const [year, quarterStr] = category.split('-Q');
+      const yearNum = parseInt(year, 10);
+      const quarter = parseInt(quarterStr, 10);
+      
+      const startMonth = (quarter - 1) * 3;
+      const endMonth = startMonth + 2;
+      
+      const startDate = new Date(yearNum, startMonth, 1);
+      const endDate = new Date(yearNum, endMonth + 1, 0); // Last day of quarter
+      
+      return {
+        startDate: startDate.toISOString().slice(0, 10),
+        endDate: endDate.toISOString().slice(0, 10)
+      };
+    }
+    case 'year': {
+      // Parse "2024" format
+      const yearNum = parseInt(category, 10);
+      
+      return {
+        startDate: `${yearNum}-01-01`,
+        endDate: `${yearNum}-12-31`
+      };
+    }
+    default:
+      // Fallback: treat as date
+      return {
+        startDate: category,
+        endDate: category
+      };
+  }
 }

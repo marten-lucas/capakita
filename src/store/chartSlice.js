@@ -210,7 +210,8 @@ export const updateMidTermChartData = (scenarioId) => (dispatch, getState) => {
         groupsByScenario: groupsByScenarioWrapped,
         qualificationAssignmentsByScenario: qualificationAssignmentsByScenarioWrapped,
         overlaysByScenario: {},
-        scenarioId
+        scenarioId,
+        timedimension
       }
     );
   } catch {
