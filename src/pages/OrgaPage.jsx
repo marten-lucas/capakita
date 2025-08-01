@@ -11,7 +11,7 @@ import PersonIcon from '@mui/icons-material/Person';
 import EuroIcon from '@mui/icons-material/Euro';
 import OrgaTabGroupDefs from '../components/orgaDetails/orgaTabGroupDefs';
 import OrgaTabQualificationDefs from '../components/orgaDetails/orgaTabQualificatoinDefs';
-import OrgaTabRateDefs from '../components/orgaDetails/orgTabRateDefs';
+import OrgaTabRateDefs from '../components/orgaDetails/orgaTabRateDefs';
 
 function OrgaPage() {
   const [activeTab, setActiveTab] = useState(0);
