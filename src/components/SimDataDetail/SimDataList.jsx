@@ -30,9 +30,10 @@ function SimDataList() {
   );
 
   // Use overlay hook to get effective data
-  const { getEffectiveDataItems, hasOverlay, isBasedScenario, getEffectiveGroupDefs, getEffectiveBookings } = useOverlayData();
+  const { getEffectiveDataItems, hasOverlay, isBasedScenario, getEffectiveGroupDefs, getEffectiveBookings, getEffectiveQualificationDefs, getEffectiveQualificationAssignments } = useOverlayData();
   const effectiveDataItems = getEffectiveDataItems();
   const groupDefs = getEffectiveGroupDefs();
+  const qualificationDefs = getEffectiveQualificationDefs();
 
   const data = useMemo(
     () => Object.entries(effectiveDataItems).map(([key, item]) => ({ ...item, _key: key })),
@@ -98,6 +99,31 @@ function SimDataList() {
       return <Chip label="Importiert" size="small" color="info" sx={{ fontSize: '0.7rem', height: 20 }} />;
     }
     return <Chip label="Manuell" size="small" color="default" sx={{ fontSize: '0.7rem', height: 20 }} />;
+  }
+
+  // Helper: get qualification chips for capacity items
+  function getQualificationChips(item) {
+    if (item.type !== 'capacity') return null;
+    
+    const qualificationAssignments = getEffectiveQualificationAssignments(item._key);
+    if (!qualificationAssignments || qualificationAssignments.length === 0) return null;
+
+    return qualificationAssignments.map((assignment, index) => {
+      const qualificationDef = qualificationDefs.find(def => def.key === assignment.qualification);
+      const displayName = qualificationDef?.name || assignment.qualification;
+      const isExpert = qualificationDef?.IsExpert !== false;
+      
+      return (
+        <Chip
+          key={`${assignment.qualification}-${index}`}
+          label={displayName}
+          size="small"
+          color={isExpert ? "primary" : "secondary"}
+          variant="outlined"
+          sx={{ fontSize: '0.6rem', height: 18, mr: 0.5 }}
+        />
+      );
+    });
   }
 
   // Handler: restore item to base or imported state
@@ -168,6 +194,7 @@ function SimDataList() {
       {data.map((item) => {
         const itemHasOverlay = isBasedScenario && hasOverlay(item._key);
         const subtitle = getSubtitle(item);
+        const qualificationChips = getQualificationChips(item);
 
         return (
           <div key={item._key}>
@@ -191,7 +218,7 @@ function SimDataList() {
                     {subtitle}
                   </Box>
                   {/* Row 3: Chips */}
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.2, flexWrap: 'wrap' }}>
                     {itemHasOverlay && (
                       <Chip 
                         label="Geändert" 
@@ -202,6 +229,7 @@ function SimDataList() {
                       />
                     )}
                     {getSourceChip(item)}
+                    {qualificationChips}
                   </Box>
                 </Box>
                 <RestoreButton
