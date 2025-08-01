@@ -81,6 +81,7 @@ export default function EventCalendar({ scenarioId }) {
         loading={loading}
         onMonthChange={handleMonthChange}
         renderLoading={() => <DayCalendarSkeleton />}
+        showDaysOutsideCurrentMonth
         slots={{
           day: (props) => (
             <EventDay {...props} eventsByDay={eventsByDay} />
