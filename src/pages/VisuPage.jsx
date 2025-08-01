@@ -42,7 +42,7 @@ function VisuPage() {
   }, [selectedScenarioId, scenarios, dispatch]);
 
   // Use scenario events hook for selected scenario
-  const { events, consolidatedEvents } = useScenarioEvents(selectedScenarioId);
+  useScenarioEvents(selectedScenarioId);
 
   // Prüfe ob Szenarien vorhanden sind
   if (!scenarios || scenarios.length === 0) {

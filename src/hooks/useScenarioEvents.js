@@ -12,7 +12,6 @@ export function useScenarioEvents(scenarioId) {
   const simData = useSelector(state => state.simData);
   const simBooking = useSelector(state => state.simBooking);
   const simGroup = useSelector(state => state.simGroup);
-  const eventsState = useSelector(state => state.events);
 
   // Refresh events for scenario when relevant data changes
   useEffect(() => {

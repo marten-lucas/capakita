@@ -147,7 +147,7 @@ const eventSlice = createSlice({
         action.type.startsWith('simData/') ||
         action.type.startsWith('simBooking/') ||
         action.type.startsWith('simGroup/'),
-      (state, action) => {
+      (state) => {
         // On any relevant change, refresh all events
         // You may optimize to only refresh affected scenario
         // For now, refresh all
@@ -173,14 +173,20 @@ export const selectEventsForScenario = createSelector(
   }
 );
 
-// Selector: get consolidated events by effectiveDate
+// Selector: get consolidated events by effectiveDate (future only)
 export const selectConsolidatedEventsForScenario = createSelector(
   [selectEventsForScenario],
   (events) => {
     if (!events || events.length === 0) return [];
     
+    // Get today's date in YYYY-MM-DD format
+    const today = new Date().toISOString().slice(0, 10);
+    
+    // Filter to only future events (effectiveDate >= today)
+    const futureEvents = events.filter(ev => ev.effectiveDate >= today);
+    
     const byDate = {};
-    events.forEach(ev => {
+    futureEvents.forEach(ev => {
       if (!byDate[ev.effectiveDate]) byDate[ev.effectiveDate] = [];
       byDate[ev.effectiveDate].push(ev);
     });
