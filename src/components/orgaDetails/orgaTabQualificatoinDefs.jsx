@@ -40,12 +40,16 @@ function OrgaTabQualificationDefs() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingQualification, setEditingQualification] = useState(null);
-  const [form, setForm] = useState({ key: '', name: '' });
+  const [form, setForm] = useState({ key: '', name: '', IsExpert: true });
   const [error, setError] = useState('');
 
   const handleOpenDialog = (qualification = null) => {
     setEditingQualification(qualification);
-    setForm(qualification ? { key: qualification.key, name: qualification.name } : { key: '', name: '' });
+    setForm(qualification ? { 
+      key: qualification.key, 
+      name: qualification.name, 
+      IsExpert: qualification.IsExpert !== false // default true
+    } : { key: '', name: '', IsExpert: true });
     setError('');
     setDialogOpen(true);
   };
@@ -53,7 +57,7 @@ function OrgaTabQualificationDefs() {
   const handleCloseDialog = () => {
     setDialogOpen(false);
     setEditingQualification(null);
-    setForm({ key: '', name: '' });
+    setForm({ key: '', name: '', IsExpert: true }); // Ensure all keys are present
     setError('');
   };
 
@@ -151,6 +155,7 @@ function OrgaTabQualificationDefs() {
               <TableRow>
                 <TableCell>Buchstabe</TableCell>
                 <TableCell>Anzeigename</TableCell>
+                <TableCell>Fachkraft</TableCell>
                 <TableCell align="right">Aktionen</TableCell>
               </TableRow>
             </TableHead>
@@ -163,6 +168,15 @@ function OrgaTabQualificationDefs() {
                     <TableCell>
                       {q.name}
                       {fromBase && <Typography variant="caption" color="text.secondary"> (von Basis)</Typography>}
+                    </TableCell>
+                    <TableCell>
+                      <input
+                        type="checkbox"
+                        checked={q.IsExpert !== false}
+                        readOnly
+                        tabIndex={-1}
+                        style={{ pointerEvents: 'none' }}
+                      />
                     </TableCell>
                     <TableCell align="right">
                       <IconButton
@@ -213,6 +227,16 @@ function OrgaTabQualificationDefs() {
               helperText={error && !form.name ? error : ''}
               onKeyDown={handleDialogKeyDown}
             />
+            {/* Add IsExpert checkbox */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <input
+                type="checkbox"
+                checked={form.IsExpert}
+                onChange={e => setForm({ ...form, IsExpert: e.target.checked })}
+                id="isExpertCheckbox"
+              />
+              <label htmlFor="isExpertCheckbox">Fachkraft-Qualifikation</label>
+            </Box>
           </Box>
         </DialogContent>
         <DialogActions>

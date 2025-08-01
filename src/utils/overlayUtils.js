@@ -167,6 +167,7 @@ export function buildOverlayAwareData(scenarioId, state) {
   const groupDefsByScenario = state.simGroup.groupDefsByScenario;
   const groupsByScenario = state.simGroup.groupsByScenario;
   const qualiAssignmentsByScenario = state.simQualification.qualificationAssignmentsByScenario;
+  const qualiDefsByScenario = state.simQualification.qualificationDefsByScenario;
 
   const scenarioChain = getScenarioChain(scenarios, scenarioId);
 
@@ -183,12 +184,30 @@ export function buildOverlayAwareData(scenarioId, state) {
 
   const effectiveGroupDefs = getEffectiveGroupDefs(scenarioChain, overlaysByScenario, groupDefsByScenario);
 
+  // Add effectiveQualificationDefs (merged by key, overlays take precedence)
+  const allDefs = new Map();
+  for (const scenario of scenarioChain.slice().reverse()) {
+    const sid = scenario.id;
+    if (Array.isArray(qualiDefsByScenario[sid])) {
+      qualiDefsByScenario[sid].forEach(def => {
+        allDefs.set(def.key, def);
+      });
+    }
+    if (Array.isArray(overlaysByScenario[sid]?.qualificationDefs)) {
+      overlaysByScenario[sid].qualificationDefs.forEach(def => {
+        allDefs.set(def.key, def);
+      });
+    }
+  }
+  const effectiveQualificationDefs = Array.from(allDefs.values());
+
   return {
     effectiveDataItems,
     effectiveBookingsByItem,
     effectiveGroupAssignmentsByItem,
     effectiveQualificationAssignmentsByItem,
     effectiveGroupDefs,
+    effectiveQualificationDefs,
     scenarioChain
   };
 }

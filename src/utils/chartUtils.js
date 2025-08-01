@@ -23,6 +23,50 @@ export function generateTimeSegments() {
   return [...segments];
 }
 
+/**
+ * Generate a data series for expert ratio (percentage of qualified personnel per segment).
+ * - qualificationDefs: array of { key, name, IsExpert }
+ * - filteredCapacityBookings: array of bookings with qualifications
+ * Returns array of percentages (0-100) for each category.
+ */
+export function generateExpertRatioSeries(categories, filteredCapacityBookings, qualificationDefs) {
+  // Build a set of expert qualification keys
+  const expertQualiKeys = new Set(
+    (qualificationDefs || [])
+      .filter(def => def.IsExpert !== false) // default true
+      .map(def => def.key)
+  );
+
+  // For each category, count total personnel and expert personnel
+  return categories.map((cat, idx) => {
+    // Parse category to day and time
+    const [day, time] = cat.split(' ');
+    let total = 0;
+    let expert = 0;
+    filteredCapacityBookings.forEach(booking => {
+      // booking.times: [{ day_name, segments }]
+      if (!Array.isArray(booking.times)) return;
+      const covers = booking.times.some(dayObj => {
+        if (dayObj.day_name !== day) return false;
+        if (!Array.isArray(dayObj.segments)) return false;
+        return dayObj.segments.some(seg =>
+          seg.booking_start <= time && seg.booking_end > time
+        );
+      });
+      if (covers) {
+        total += 1;
+        // booking.qualifications: array of keys
+        const qualiArr = Array.isArray(booking.qualifications) ? booking.qualifications : [];
+        if (qualiArr.some(q => expertQualiKeys.has(q))) {
+          expert += 1;
+        }
+      }
+    });
+    if (total === 0) return 0;
+    return Math.round((expert / total) * 100);
+  });
+}
+
 export function calculateChartData(
   referenceDate,
   selectedGroups,
@@ -30,9 +74,11 @@ export function calculateChartData(
   {
     bookingsByScenario,
     dataByScenario,
+    groupDefs,
+    qualificationDefs, // <-- add this argument
     groupsByScenario, 
     qualificationAssignmentsByScenario,
-    overlaysByScenario, // overlaysByScenario is ignored here, overlays must be merged before
+    overlaysByScenario,
     scenarioId
   }
 ) {
@@ -52,8 +98,15 @@ export function calculateChartData(
   const categories = generateTimeSegments();
   const demand = generateBookingDataSeries(referenceDate, filteredDemandBookings, categories);
   const capacity = generateBookingDataSeries(referenceDate, filteredCapacityBookings, categories);
-  const care_ratio = [];
-  const expert_ratio = [];
+
+  // Fill expert_ratio using new function
+  const expert_ratio = generateExpertRatioSeries(
+    categories,
+    filteredCapacityBookings,
+    qualificationDefs || []
+  );
+
+  const care_ratio = []; // unchanged
 
   // Return completely new objects and arrays to prevent any mutation issues
   return {

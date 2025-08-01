@@ -52,7 +52,6 @@ export default function EventCalendar({ scenarioId, selectedDate, onDateChange }
 
   // Simulate loading on month change
   const handleMonthChange = React.useCallback(() => {
-  const handleMonthChange = React.useCallback(() => {
     setLoading(true);
     setTimeout(() => setLoading(false), 200); // quick fake loading
   }, []);
@@ -81,3 +80,4 @@ export default function EventCalendar({ scenarioId, selectedDate, onDateChange }
     </LocalizationProvider>
   );
 }
+

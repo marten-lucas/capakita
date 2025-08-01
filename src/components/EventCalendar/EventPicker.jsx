@@ -25,20 +25,25 @@ function EventPicker({ scenarioId }) {
   };
 
   return (
-    <Box sx={{ border: '1px solid #ccc', borderRadius: 4, p: 2, minWidth: 500, maxWidth: 600 }}>
+    <Box sx={{ border: '1px solid #ccc', borderRadius: 4, p: 2, display: 'inline-flex', flexDirection: 'column' }}>
       <Typography variant="subtitle1" sx={{ mb: 2 }}>
         Events
       </Typography>
-      <Grid container spacing={2}>
-        <Grid item xs={6}>
-          <Box sx={{ maxHeight: 300, overflowY: 'auto' }}>
-            <EventList scenarioId={scenarioId} selectedDate={selectedDate} onDateChange={handleDateChange} />
-          </Box>
-        </Grid>
-        <Grid item xs={6}>
+      <Box sx={{ display: 'flex', alignItems: 'stretch' }}>
+        <Box sx={{ maxHeight: 300, overflowY: 'auto', flex: '1 1 auto' }}>
+          <EventList scenarioId={scenarioId} selectedDate={selectedDate} onDateChange={handleDateChange} />
+        </Box>
+        {/* Vertical divider */}
+        <Box sx={{
+          width: '1px',
+          backgroundColor: '#ccc',
+          mx: 2,
+          alignSelf: 'stretch'
+        }} />
+        <Box sx={{ flex: '1 1 auto', minWidth: 0 }}>
           <EventCalendar scenarioId={scenarioId} selectedDate={selectedDate} onDateChange={handleDateChange} />
-        </Grid>
-      </Grid>
+        </Box>
+      </Box>
     </Box>
   );
 }

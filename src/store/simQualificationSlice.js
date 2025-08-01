@@ -107,7 +107,10 @@ const simQualificationSlice = createSlice({
     addQualificationDef(state, action) {
       const { scenarioId, qualiDef } = action.payload;
       if (!state.qualificationDefsByScenario[scenarioId]) state.qualificationDefsByScenario[scenarioId] = [];
-      state.qualificationDefsByScenario[scenarioId].push(qualiDef);
+      state.qualificationDefsByScenario[scenarioId].push({
+        ...qualiDef,
+        IsExpert: qualiDef.IsExpert !== false // default true
+      });
     },
     updateQualificationDef(state, action) {
       const { scenarioId, qualiKey, updates } = action.payload;
@@ -115,7 +118,11 @@ const simQualificationSlice = createSlice({
       if (!defs) return;
       const idx = defs.findIndex(q => q.key === qualiKey);
       if (idx !== -1) {
-        defs[idx] = { ...defs[idx], ...updates };
+        defs[idx] = { 
+          ...defs[idx], 
+          ...updates, 
+          IsExpert: updates.IsExpert !== false // default true
+        };
       }
     },
     deleteQualificationDef(state, action) {

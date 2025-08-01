@@ -217,10 +217,7 @@ function extractEventsForScenario(state, scenarioId) {
         });
     });
 
-    // Log each event's effectiveDate for debugging
-    events.forEach(event => {
-        console.log(`Event ID: ${event.id}, Effective Date: ${event.effectiveDate}`);
-    });
+
 
     return events;
 }

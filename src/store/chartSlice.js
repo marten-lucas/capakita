@@ -110,7 +110,8 @@ export const updateWeeklyChartData = (scenarioId) => (dispatch, getState) => {
     effectiveBookingsByItem,
     effectiveGroupAssignmentsByItem,
     effectiveQualificationAssignmentsByItem,
-    effectiveGroupDefs
+    effectiveGroupDefs,
+    effectiveQualificationDefs // <-- ensure this is available from buildOverlayAwareData
   } = buildOverlayAwareData(scenarioId, state);
 
   // Wrap by scenarioId for chartUtils compatibility
@@ -128,6 +129,7 @@ export const updateWeeklyChartData = (scenarioId) => (dispatch, getState) => {
       bookingsByScenario: bookingsByScenarioWrapped,
       dataByScenario: dataByScenarioWrapped,
       groupDefs: effectiveGroupDefs,
+      qualificationDefs: effectiveQualificationDefs, // <-- pass here
       groupsByScenario: groupsByScenarioWrapped,
       qualificationAssignmentsByScenario: qualificationAssignmentsByScenarioWrapped,
       overlaysByScenario: {}, // overlays already merged
