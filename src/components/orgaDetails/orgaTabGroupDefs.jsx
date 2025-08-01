@@ -20,10 +20,14 @@ function OrgaTabGroupDefs() {
   const { baseScenario, isBasedScenario, getEffectiveGroupDefs } = useOverlayData();
   const groupDefs = getEffectiveGroupDefs();
 
-  // Get current scenario definitions for checking if item is from base - memoized to prevent rerenders
+  // Memoize the current scenario definitions selector to prevent new array creation
   const currentScenarioDefs = useSelector(state => {
     if (!selectedScenarioId) return [];
     return state.simGroup.groupDefsByScenario[selectedScenarioId] || [];
+  }, (left, right) => {
+    // Custom equality check to prevent re-renders when arrays are equal
+    if (left.length !== right.length) return false;
+    return left.every((item, index) => item.id === right[index]?.id);
   });
 
   // Memoize the function to check if group is from base scenario

@@ -3,7 +3,6 @@ import {
   Box, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Alert, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField
 } from '@mui/material';
 import { useSelector, useDispatch } from 'react-redux';
-import { createSelector } from '@reduxjs/toolkit';
 import { useOverlayData } from '../../hooks/useOverlayData';
 import {
   addFinancialDefThunk,
@@ -11,26 +10,18 @@ import {
   deleteFinancialDefThunk
 } from '../../store/simFinancialsSlice';
 
-// Create memoized selector to prevent unnecessary re-renders
-const selectScenarioDefs = createSelector(
-  [
-    (state, scenarioId) => state.simFinancials.financialDefsByScenario[scenarioId]
-  ],
-  (defs) => defs || []
-);
-
 function OrgaTabRateDefs() {
   const dispatch = useDispatch();
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
-  const scenarioDefs = useSelector(state => selectScenarioDefs(state, selectedScenarioId));
+  const scenarioDefs = useSelector(state => state.simFinancials.financialDefsByScenario[selectedScenarioId] || []);
 
   // Overlay systematik: get effective financialDefs
   const { baseScenario, isBasedScenario, overlaysByScenario } = useOverlayData();
   
-  // Memoize financial defs calculation to prevent hook order issues
+  // Memoize the financial defs to prevent unnecessary re-renders
   const financialDefs = useMemo(() => {
     const baseDefs = baseScenario?.financialDefs || [];
-    const overlayDefs = overlaysByScenario?.[selectedScenarioId]?.financialDefs || [];
+    const overlayDefs = overlaysByScenario[selectedScenarioId]?.financialDefs || [];
     
     return isBasedScenario
       ? [...baseDefs, ...overlayDefs]

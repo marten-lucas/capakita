@@ -3,6 +3,7 @@ import { createId } from '../utils/idUtils';
 
 const initialState = {
   financialsByScenario: {},
+  financialDefsByScenario: {}, // <-- NEU: financialDef Verwaltung
 };
 
 const simFinancialsSlice = createSlice({
@@ -53,6 +54,29 @@ const simFinancialsSlice = createSlice({
     },
     loadFinancialsByScenario(state, action) {
       state.financialsByScenario = action.payload || {};
+    },
+    // NEU: Reducer für financialDef
+    addFinancialDef(state, action) {
+      const { scenarioId, financialDef } = action.payload;
+      if (!state.financialDefsByScenario[scenarioId]) state.financialDefsByScenario[scenarioId] = [];
+      state.financialDefsByScenario[scenarioId].push({ ...financialDef, id: financialDef.id || createId('financialDef') });
+    },
+    updateFinancialDef(state, action) {
+      const { scenarioId, financialDefId, updates } = action.payload;
+      const defs = state.financialDefsByScenario[scenarioId] || [];
+      const idx = defs.findIndex(def => def.id === financialDefId);
+      if (idx !== -1) {
+        defs[idx] = { ...defs[idx], ...updates };
+      }
+    },
+    deleteFinancialDef(state, action) {
+      const { scenarioId, financialDefId } = action.payload;
+      if (state.financialDefsByScenario[scenarioId]) {
+        state.financialDefsByScenario[scenarioId] = state.financialDefsByScenario[scenarioId].filter(def => def.id !== financialDefId);
+      }
+    },
+    loadFinancialDefsByScenario(state, action) {
+      state.financialDefsByScenario = action.payload || {};
     },
   },
 });
@@ -126,6 +150,74 @@ export const deleteFinancialThunk = ({ scenarioId, dataItemId, financialId }) =>
   }
 };
 
+// NEU: Overlay-aware thunks für financialDef
+export const addFinancialDefThunk = ({ scenarioId, financialDef }) => (dispatch, getState) => {
+  const state = getState();
+  const scenario = state.simScenario.scenarios.find(s => s.id === scenarioId);
+  const isBasedScenario = !!scenario?.baseScenarioId;
+  const financialDefId = String(financialDef.id || createId('financialDef'));
+  if (isBasedScenario) {
+    dispatch({
+      type: 'simOverlay/setFinancialDefOverlay',
+      payload: {
+        scenarioId,
+        financialDefId,
+        overlayData: { ...financialDef, id: financialDefId }
+      }
+    });
+  } else {
+    dispatch(addFinancialDef({ scenarioId, financialDef: { ...financialDef, id: financialDefId } }));
+  }
+};
+
+export const updateFinancialDefThunk = ({ scenarioId, financialDefId, updates }) => (dispatch, getState) => {
+  const state = getState();
+  const scenario = state.simScenario.scenarios.find(s => s.id === scenarioId);
+  const isBasedScenario = !!scenario?.baseScenarioId;
+  if (isBasedScenario) {
+    // Get current overlay or base financialDef
+    const overlay = state.simOverlay.overlaysByScenario?.[scenarioId]?.financialDefs?.[financialDefId];
+    const baseScenarioId = scenario.baseScenarioId;
+    const baseDefs = state.simFinancials.financialDefsByScenario?.[baseScenarioId] || [];
+    const baseDef = baseDefs.find(def => def.id === financialDefId);
+    const prev = overlay || baseDef || {};
+    const updated = { ...prev, ...updates, id: financialDefId };
+    const isIdenticalToBase = baseDef && JSON.stringify(updated) === JSON.stringify(baseDef);
+    if (isIdenticalToBase) {
+      dispatch({
+        type: 'simOverlay/removeFinancialDefOverlay',
+        payload: { scenarioId, financialDefId }
+      });
+    } else {
+      dispatch({
+        type: 'simOverlay/setFinancialDefOverlay',
+        payload: {
+          scenarioId,
+          financialDefId,
+          overlayData: updated
+        }
+      });
+    }
+  } else {
+    dispatch(updateFinancialDef({ scenarioId, financialDefId, updates }));
+  }
+};
+
+export const deleteFinancialDefThunk = ({ scenarioId, financialDefId }) => (dispatch, getState) => {
+  const state = getState();
+  const scenario = state.simScenario.scenarios.find(s => s.id === scenarioId);
+  const isBasedScenario = !!scenario?.baseScenarioId;
+  const overlay = state.simOverlay.overlaysByScenario?.[scenarioId]?.financialDefs?.[financialDefId];
+  if (isBasedScenario && overlay) {
+    dispatch({
+      type: 'simOverlay/removeFinancialDefOverlay',
+      payload: { scenarioId, financialDefId }
+    });
+  } else {
+    dispatch(deleteFinancialDef({ scenarioId, financialDefId }));
+  }
+};
+
 export const {
   addFinancial,
   updateFinancial,
@@ -133,6 +225,11 @@ export const {
   deleteAllFinancialsForItem,
   deleteAllFinancialsForScenario,
   loadFinancialsByScenario,
+  // NEU:
+  addFinancialDef,
+  updateFinancialDef,
+  deleteFinancialDef,
+  loadFinancialDefsByScenario,
 } = simFinancialsSlice.actions;
 
 export default simFinancialsSlice.reducer;

@@ -28,6 +28,7 @@ export function useOverlayData() {
   const qualiDefsByScenario = useSelector(state => state.simQualification.qualificationDefsByScenario);
   const qualiAssignmentsByScenario = useSelector(state => state.simQualification.qualificationAssignmentsByScenario);
   const financialsByScenario = useSelector(state => state.simFinancials.financialsByScenario);
+  const financialDefsByScenario = useSelector(state => state.simFinancials.financialDefsByScenario);
 
   const selectedScenario = useMemo(() =>
     scenarios.find(s => s.id === selectedScenarioId),
@@ -186,6 +187,38 @@ export function useOverlayData() {
     return result;
   }, [scenarioChain, overlaysByScenario, financialsByScenario]);
 
+  // Financial Definitions
+  const getEffectiveFinancialDefs = useCallback(() => {
+    // Returns merged financialDefs array, overlays take precedence, stacked
+    const result = [];
+    const seenIds = new Set();
+    
+    // Start from current scenario and work backwards
+    for (const scenario of scenarioChain) {
+      const sid = scenario.id;
+      // Add overlay defs first (highest priority)
+      if (overlaysByScenario[sid]?.financialDefs) {
+        Object.values(overlaysByScenario[sid].financialDefs).forEach(def => {
+          if (!seenIds.has(def.id)) {
+            result.push(def);
+            seenIds.add(def.id);
+          }
+        });
+      }
+      // Add base scenario defs
+      if (Array.isArray(financialDefsByScenario[sid])) {
+        financialDefsByScenario[sid].forEach(def => {
+          if (!seenIds.has(def.id)) {
+            result.push(def);
+            seenIds.add(def.id);
+          }
+        });
+      }
+    }
+    
+    return result;
+  }, [scenarioChain, overlaysByScenario, financialDefsByScenario]);
+
   // Overlay helpers (unchanged)
   const updateDataItem = useCallback((itemId, updates) => {
     if (!selectedScenarioId || !selectedScenario) return;
@@ -237,8 +270,10 @@ export function useOverlayData() {
     getEffectiveQualificationDefs,
     getEffectiveQualificationAssignments,
     getEffectiveFinancials,
+    getEffectiveFinancialDefs,
     updateDataItem,
     hasOverlay,
     revertToBase,
+    overlaysByScenario, // Make sure this is returned
   };
 }

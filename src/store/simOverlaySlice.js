@@ -168,6 +168,28 @@ const simOverlaySlice = createSlice({
         }
       }
     },
+    setFinancialDefOverlay(state, action) {
+      const { scenarioId, financialDefId, overlayData } = action.payload;
+      if (!state.overlaysByScenario[scenarioId]) {
+        state.overlaysByScenario[scenarioId] = {};
+      }
+      if (!state.overlaysByScenario[scenarioId].financialDefs) {
+        state.overlaysByScenario[scenarioId].financialDefs = {};
+      }
+      state.overlaysByScenario[scenarioId].financialDefs[financialDefId] = overlayData;
+    },
+    removeFinancialDefOverlay(state, action) {
+      const { scenarioId, financialDefId } = action.payload;
+      if (state.overlaysByScenario[scenarioId]?.financialDefs) {
+        delete state.overlaysByScenario[scenarioId].financialDefs[financialDefId];
+        if (Object.keys(state.overlaysByScenario[scenarioId].financialDefs).length === 0) {
+          delete state.overlaysByScenario[scenarioId].financialDefs;
+          if (Object.keys(state.overlaysByScenario[scenarioId]).length === 0) {
+            delete state.overlaysByScenario[scenarioId];
+          }
+        }
+      }
+    },
   },
 });
 
@@ -186,6 +208,8 @@ export const {
   removeGroupAssignmentOverlay,
   setFinancialOverlay,
   removeFinancialOverlay,
+  setFinancialDefOverlay,
+  removeFinancialDefOverlay,
 } = simOverlaySlice.actions;
 
 export default simOverlaySlice.reducer;
