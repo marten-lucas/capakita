@@ -414,43 +414,14 @@ export function calcAvrYearlyBonus(dateStr, groupName, stage, wochenstunden, sta
   return { amount, payoutDate };
 }
 
-// Dynamically import all AVR JSONs in the avg-data folder (Vite syntax)
-const avrDataModules = import.meta.glob('../assets/avr-data/*.json', { eager: true });
-
-// Extract all JSON objects into an array
-const avrDataArray = Object.values(avrDataModules).map(mod => mod.default);
-
-// Helper to parse DD.MM.YYYY to Date
-function parseDate(d) {
-  const [day, month, year] = d.split('.').map(Number);
-  return new Date(year, month - 1, day);
-}
-
-// Helper to normalize date string to YYYY-MM-DD
-export function normalizeDateString(dateStr) {
-  if (!dateStr) return '';
-  // If already in YYYY-MM-DD
-  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
-  // If in DD.MM.YYYY
-  if (/^\d{2}\.\d{2}\.\d{4}$/.test(dateStr)) {
-    const [day, month, year] = dateStr.split('.');
-    return `${year}-${month}-${day}`;
-  }
-  // Otherwise, try to parse as Date
-  const d = new Date(dateStr);
-  if (!isNaN(d)) {
-    return d.toISOString().slice(0, 10);
-  }
-  return dateStr;
-}
-
-// Find the AVR data valid for a given date (dateStr: 'YYYY-MM-DD' or similar)
-export function findApplicableAvrData(dateStr) {
-  const normalized = normalizeDateString(dateStr);
-  const date = new Date(normalized);
-  return avrDataArray.find(data => {
-    const from = parseDate(data.validfrom);
-    const to = parseDate(data.validto);
-    return date >= from && date <= to;
-  });
+/**
+ * Helper to check if groupName matches groupId or groupName.
+ * Used for yearly bonus percentage selection.
+ * @param {string} groupName
+ * @param {string|number} from_group
+ * @returns {boolean}
+ */
+function groupNameMatchesGroupId(groupName, from_group) {
+  // Handles both string and number comparison
+  return String(groupName) === String(from_group);
 }

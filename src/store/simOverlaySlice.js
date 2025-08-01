@@ -140,6 +140,34 @@ const simOverlaySlice = createSlice({
         }
       }
     },
+    setFinancialOverlay(state, action) {
+      const { scenarioId, itemId, financialId, overlayData } = action.payload;
+      if (!state.overlaysByScenario[scenarioId]) {
+        state.overlaysByScenario[scenarioId] = {};
+      }
+      if (!state.overlaysByScenario[scenarioId].financials) {
+        state.overlaysByScenario[scenarioId].financials = {};
+      }
+      if (!state.overlaysByScenario[scenarioId].financials[itemId]) {
+        state.overlaysByScenario[scenarioId].financials[itemId] = {};
+      }
+      state.overlaysByScenario[scenarioId].financials[itemId][financialId] = overlayData;
+    },
+    removeFinancialOverlay(state, action) {
+      const { scenarioId, itemId, financialId } = action.payload;
+      if (state.overlaysByScenario[scenarioId]?.financials?.[itemId]) {
+        delete state.overlaysByScenario[scenarioId].financials[itemId][financialId];
+        if (Object.keys(state.overlaysByScenario[scenarioId].financials[itemId]).length === 0) {
+          delete state.overlaysByScenario[scenarioId].financials[itemId];
+          if (Object.keys(state.overlaysByScenario[scenarioId].financials).length === 0) {
+            delete state.overlaysByScenario[scenarioId].financials;
+            if (Object.keys(state.overlaysByScenario[scenarioId]).length === 0) {
+              delete state.overlaysByScenario[scenarioId];
+            }
+          }
+        }
+      }
+    },
   },
 });
 
@@ -156,6 +184,8 @@ export const {
   loadOverlaysByScenario,
   setGroupAssignmentOverlay,
   removeGroupAssignmentOverlay,
+  setFinancialOverlay,
+  removeFinancialOverlay,
 } = simOverlaySlice.actions;
 
 export default simOverlaySlice.reducer;

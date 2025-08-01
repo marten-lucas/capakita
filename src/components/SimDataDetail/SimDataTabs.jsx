@@ -52,7 +52,7 @@ function SimDataTabs() {
         <Tab icon={<PersonIcon />} label="Allgemein" />
         <Tab icon={<AccessTimeIcon />} label="Zeiten" />
         <Tab icon={<GroupIcon />} label="Gruppen" />
-        {/*<Tab icon={<EuroIcon />} label="Finanzen" /> */}
+        <Tab icon={<EuroIcon />} label="Finanzen" />
       </Tabs>
       {activeTab === 0 && (
         <SimDataGeneralTab />
@@ -63,12 +63,12 @@ function SimDataTabs() {
       {activeTab === 2 && (
         <SimDataGroupsTab />
       )}
-      {/*
+      
       {activeTab === 3 && (
         <SimDataFinanceTab
           item={item}
         />
-      )} */}
+      )}
     </Box>
   );
 }

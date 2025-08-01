@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { setDataItemOverlay, removeDataItemOverlay } from '../store/simOverlaySlice';
+import { setDataItemOverlay, removeDataItemOverlay, setFinancialOverlay, removeFinancialOverlay } from '../store/simOverlaySlice';
 import { getScenarioChain } from '../utils/overlayUtils'; // <-- import here
 
 // Helper: overlay-aware lookup for object (e.g. dataItems, bookings, groupassignments)
@@ -27,6 +27,7 @@ export function useOverlayData() {
   const groupsByScenario = useSelector(state => state.simGroup.groupsByScenario);
   const qualiDefsByScenario = useSelector(state => state.simQualification.qualificationDefsByScenario);
   const qualiAssignmentsByScenario = useSelector(state => state.simQualification.qualificationAssignmentsByScenario);
+  const financialsByScenario = useSelector(state => state.simFinancials.financialsByScenario);
 
   const selectedScenario = useMemo(() =>
     scenarios.find(s => s.id === selectedScenarioId),
@@ -163,6 +164,28 @@ export function useOverlayData() {
     return uniqueAssignments;
   }, [scenarioChain, overlaysByScenario, qualiAssignmentsByScenario]);
 
+  // Financials
+  const getEffectiveFinancials = useCallback((itemId) => {
+    // Returns { [financialId]: financial } for the itemId, overlay-aware, stacked
+    const result = {};
+    for (const scenario of scenarioChain.slice().reverse()) {
+      const sid = scenario.id;
+      // Add base financials first
+      if (financialsByScenario[sid]?.[itemId]) {
+        Object.entries(financialsByScenario[sid][itemId]).forEach(([fid, fin]) => {
+          result[fid] = fin;
+        });
+      }
+      // Apply overlays on top
+      if (overlaysByScenario[sid]?.financials?.[itemId]) {
+        Object.entries(overlaysByScenario[sid].financials[itemId]).forEach(([fid, fin]) => {
+          result[fid] = fin;
+        });
+      }
+    }
+    return result;
+  }, [scenarioChain, overlaysByScenario, financialsByScenario]);
+
   // Overlay helpers (unchanged)
   const updateDataItem = useCallback((itemId, updates) => {
     if (!selectedScenarioId || !selectedScenario) return;
@@ -213,6 +236,7 @@ export function useOverlayData() {
     getEffectiveGroupAssignments,
     getEffectiveQualificationDefs,
     getEffectiveQualificationAssignments,
+    getEffectiveFinancials,
     updateDataItem,
     hasOverlay,
     revertToBase,
