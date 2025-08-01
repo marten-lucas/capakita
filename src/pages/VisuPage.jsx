@@ -8,6 +8,7 @@ import { setSelectedScenarioId } from '../store/simScenarioSlice';
 import React from 'react'
 import ScenarioSaveDialog from '../components/modals/ScenarioSaveDialog'
 import ChartFilterForm from '../components/SimDataCharts/ChartFilterForm'
+import { useScenarioEvents } from '../hooks/useScenarioEvents';
 
 const EMPTY_TOGGLES = [];
 
@@ -39,6 +40,9 @@ function VisuPage() {
       dispatch(setSelectedScenarioId(scenarios[0].id));
     }
   }, [selectedScenarioId, scenarios, dispatch]);
+
+  // Use scenario events hook for selected scenario
+  const { events, consolidatedEvents } = useScenarioEvents(selectedScenarioId);
 
   // Prüfe ob Szenarien vorhanden sind
   if (!scenarios || scenarios.length === 0) {

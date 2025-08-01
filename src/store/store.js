@@ -7,6 +7,7 @@ import simQualificationReducer from './simQualificationSlice';
 import simFinancialsReducer from './simFinancialsSlice';
 import simOverlayReducer from './simOverlaySlice';
 import chartReducer from './chartSlice';
+import eventReducer from './eventSlice';
 
 const store = configureStore({
   reducer: {
@@ -18,6 +19,7 @@ const store = configureStore({
     simFinancials: simFinancialsReducer,
     simOverlay: simOverlayReducer,
     chart: chartReducer,
+    event: eventReducer,
   },
 });
 
