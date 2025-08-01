@@ -17,7 +17,6 @@ import BarChartIcon from '@mui/icons-material/BarChart';
 import TimelineIcon from '@mui/icons-material/Timeline';
 import { useSelector, useDispatch } from 'react-redux';
 import {
-  setReferenceDate,
   setTimedimension,
   setChartToggles,
   setFilterGroups,

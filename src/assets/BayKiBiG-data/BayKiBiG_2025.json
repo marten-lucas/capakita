@@ -1,0 +1,39 @@
+{
+  "valid_from": "2025-01-01",
+  "valid_to": "",
+  "weighting_factors": [
+    {
+      "key": "under_3",
+      "description": "Children under 3 years (as of Dec 31)",
+      "criteria": {
+        "method": "max_age",
+        "value": 2
+      },
+      "successor": "preschool",
+      "eval_order": 1,
+      "factor": 2.0
+    },
+    {
+      "key": "preschool",
+      "description": "Children from 3 years until school entry",
+      "criteria": {
+        "method": "min_age",
+        "value": 3
+      },
+      "successor": "preschool",
+      "eval_order": 3,
+      "factor": 1.0
+    },
+    {
+      "key": "school_child",
+      "description": "Children from school entry",
+      "criteria": {
+        "method": "groupflag",
+        "value": "IsSchool"
+      },
+      "successor": "preschool",
+      "eval_order": 2,
+      "factor": 1.2
+    }
+  ]
+}
