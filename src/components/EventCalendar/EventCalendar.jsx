@@ -10,8 +10,6 @@ import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
 import { DayCalendarSkeleton } from '@mui/x-date-pickers/DayCalendarSkeleton';
 import { useScenarioEvents } from '../../hooks/useScenarioEvents';
 import { formatEventTooltip } from '../../utils/eventUtils.jsx'; // Updated import
-import { useDispatch } from 'react-redux';
-import { setReferenceDate, updateWeeklyChartData } from '../../store/chartSlice';
 
 function EventDay(props) {
   const { day, outsideCurrentMonth, eventsByDay, ...other } = props;
@@ -37,7 +35,7 @@ function EventDay(props) {
   );
 }
 
-export default function EventCalendar({ scenarioId }) {
+export default function EventCalendar({ scenarioId, selectedDate, onDateChange }) {
   const { events } = useScenarioEvents(scenarioId);
 
   // Group events by date string
@@ -54,15 +52,22 @@ export default function EventCalendar({ scenarioId }) {
 
   // Simulate loading on month change
   const handleMonthChange = React.useCallback(() => {
+  const handleMonthChange = React.useCallback(() => {
     setLoading(true);
     setTimeout(() => setLoading(false), 200); // quick fake loading
   }, []);
 
+  // Handle date selection
+  const handleDateChange = (date) => {
+    const formattedDate = date.format('YYYY-MM-DD');
+    onDateChange(formattedDate);
+  };
+
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs} locale="de">
       <DateCalendar
-        value={selectedDate}
-        onChange={setSelectedDate}
+        value={dayjs(selectedDate || new Date())}
+        onChange={handleDateChange}
         loading={loading}
         onMonthChange={handleMonthChange}
         renderLoading={() => <DayCalendarSkeleton />}
