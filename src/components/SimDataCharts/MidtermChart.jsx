@@ -1,141 +1,64 @@
-import React, { useMemo, useEffect, useCallback } from 'react';
+import React, { useMemo } from 'react';
 import HighchartsReact from 'highcharts-react-official';
 import Highcharts from 'highcharts';
-import { useSelector, useDispatch } from 'react-redux';
-import {
-  setTimedimension,
-  setFilterGroups,
-  setFilterQualifications,
-  ensureScenario
-} from '../../store/chartSlice';
+import { useSelector } from 'react-redux';
 import Box from '@mui/material/Box';
-import Typography from '@mui/material/Typography';
-import FormGroup from '@mui/material/FormGroup';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import Checkbox from '@mui/material/Checkbox';
-import ToggleButton from '@mui/material/ToggleButton';
-import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
+import { generateWeeklyChartTooltip } from '../../utils/chartUtils';
 
-// Accept scenarioId as prop or derive from scenario
-export default function MidtermChart({ hideFilters = false, scenario, scenarioId: propScenarioId }) {
-  const dispatch = useDispatch();
+// MidtermChart component
+export default function MidtermChart({ scenarioId: propScenarioId }) {
+  // Colors
+  const demandColor = 'rgba(124,181,236,0.8)';
+  const capacityColor = '#90ed7d';
+  const careRatioColor = '#f45b5b';
+  const expertRatioColor = '#ff9800';
 
-  // Determine scenarioId
-  const scenarioId = propScenarioId || scenario?.id || useSelector(state => state.simScenario.selectedScenarioId);
-
-  // Always use the scenario prop's simulation data for charting
-  const simulationData = useMemo(() => {
-    if (scenario) {
-      return scenario.simulationData ?? [];
-    }
-    return [];
-  }, [scenario]);
-
-  // Use qualifications from qualification slice
-  const qualifications = useSelector(state => state.simQualification.qualificationDefsByScenario[scenarioId] || []);
-  const groupDefs = useSelector(state => state.simGroup.groupDefsByScenario[scenarioId] || []);
-  const qualiDefs = qualifications;
+  // ScenarioId from prop or redux
+  const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
+  const scenarioId = propScenarioId || selectedScenarioId;
 
   // Chart state (per scenario)
   const chartState = useSelector(state => state.chart[scenarioId] || {});
-  const midtermTimeDimension = chartState.timedimension || 'month';
-  const midtermSelectedGroups = chartState.filter?.Groups || [];
-  const midtermSelectedQualifications = chartState.filter?.Qualifications || [];
-
-  const hasNoGroup = useMemo(() => (
-    simulationData.some(item =>
-      (item.type === 'demand' || item.type === 'capacity') &&
-      (!item.parseddata?.group || item.parseddata.group.length === 0)
-    )
-  ), [simulationData]);
-
-  const allGroupNames = useMemo(() => {
-    return hasNoGroup ? [...groupDefs.map(g => g.id), '0'] : groupDefs.map(g => g.id);
-  }, [groupDefs, hasNoGroup]);
-
-  const qualificationKeys = useMemo(() => qualiDefs.map(q => q.key), [qualiDefs]);
-  const allQualificationNames = useMemo(() => qualificationKeys, [qualificationKeys]);
-
-  // Ensure scenario chart state exists
-  useEffect(() => {
-    if (scenarioId) dispatch(ensureScenario(scenarioId));
-  }, [dispatch, scenarioId]);
-
-  // Initialize selections if empty
-  useEffect(() => {
-    if (midtermSelectedGroups.length === 0 && allGroupNames.length > 0) {
-      dispatch(setFilterGroups({ scenarioId, groups: allGroupNames }));
-    }
-  }, [allGroupNames, midtermSelectedGroups.length, dispatch, scenarioId]);
-
-  useEffect(() => {
-    if (midtermSelectedQualifications.length === 0 && allQualificationNames.length > 0) {
-      dispatch(setFilterQualifications({ scenarioId, qualifications: allQualificationNames }));
-    }
-  }, [allQualificationNames, midtermSelectedQualifications.length, dispatch, scenarioId]);
-
-  // Stable reference for chart data calculation
-  const getChartData = useCallback((midtermTimeDimension, midtermSelectedGroups, midtermSelectedQualifications) => {
-    // ...existing code...
-    // calculateMidtermChartData(simulationData, midtermTimeDimension, midtermSelectedGroups, midtermSelectedQualifications)
-    // ...existing code...
-  }, []);
-
-  // Calculate chart data with proper dependencies
-  const chartData = useMemo(() => {
-    return getChartData(midtermTimeDimension, midtermSelectedGroups, midtermSelectedQualifications);
-  }, [getChartData, midtermTimeDimension, midtermSelectedGroups, midtermSelectedQualifications]);
-
-  // Defensive: Provide fallback empty structure if chartData is undefined/null
-  const safeChartData = useMemo(() => (
-    chartData || {
-      bedarf: [],
-      kapazitaet: [],
-      baykibigAnstellungsschluessel: [],
-      maxKapazitaet: 0,
-      maxAnstellungsschluessel: 0,
-      maxFachkraftquote: 100,
-      categories: [],
-    }
-  ), [chartData]);
+  const timedimension = chartState.timedimension || 'month';
+  const chartData = useMemo(() => chartState.chartData?.midterm || {}, [chartState]);
 
   // Chart options
   const midtermOptions = useMemo(() => ({
     chart: { type: 'column' },
-    title: { text: `Midterm Simulation - ${midtermTimeDimension}` },
+    title: { text: `Midterm Simulation - ${timedimension}` },
     xAxis: { 
-      categories: safeChartData.categories,
+      categories: chartData.categories || [],
       title: { text: 'Zeitraum' }
     },
     yAxis: [
-      { // Primary: Bedarf
+      { // Bedarf
         title: { text: 'Bedarf (Stunden)' },
         min: 0,
-        max: null,
+        max: chartData.maxdemand || null,
         tickInterval: null,
         opposite: false,
         gridLineWidth: 1
       },
-      { // Secondary: Kapazität
+      { // Kapazität
         title: { text: 'Kapazität (Stunden)' },
         min: 0,
-        max: safeChartData.maxKapazitaet,
+        max: chartData.maxcapacity || null,
         tickInterval: null,
         opposite: false,
         gridLineWidth: 1
       },
-      { // Tertiary: BayKiBig Anstellungsschlüssel
-        title: { text: 'BayKiBig Anstellungsschlüssel (Nenner)' },
+      { // Betreuungsschlüssel
+        title: { text: 'Betreuungsschlüssel' },
         min: 0,
-        max: safeChartData.maxAnstellungsschluessel,
+        max: chartData.max_care_ratio || null,
         tickInterval: null,
         opposite: true,
         gridLineWidth: 0
       },
-      { // Quaternary: Fachkraftquote
+      { // Fachkraftquote
         title: { text: 'Fachkraftquote (%)' },
         min: 0,
-        max: safeChartData.maxFachkraftquote,
+        max: chartData.maxexpert_ratio || 100,
         tickInterval: 10,
         opposite: true,
         gridLineWidth: 0
@@ -145,40 +68,35 @@ export default function MidtermChart({ hideFilters = false, scenario, scenarioId
       {
         name: 'Bedarf',
         type: 'area',
-        data: safeChartData.bedarf,
+        data: chartData.demand || [],
         yAxis: 0,
-        color: 'rgba(124,181,236,0.8)',
+        color: demandColor,
         fillOpacity: 0.6,
         marker: { enabled: false }
       },
       {
         name: 'Kapazität',
         type: 'area',
-        data: safeChartData.kapazitaet,
+        data: chartData.capacity || [],
         yAxis: 1,
-        color: '#90ed7d',
+        color: capacityColor,
         fillOpacity: 0.6,
         marker: { enabled: false }
       },
       {
-        name: 'BayKiBig Anstellungsschlüssel',
+        name: 'Betreuungsschlüssel',
         type: 'line',
-        data: safeChartData.baykibigAnstellungsschluessel?.map(item => {
-          if (!item || item.totalBookingHours === 0) return 0;
-          return item.totalStaffHours > 0 ? item.totalBookingHours / item.totalStaffHours : 0;
-        }),
+        data: chartData.care_ratio || [],
         yAxis: 2,
-        color: '#f45b5b',
+        color: careRatioColor,
         marker: { enabled: false }
       },
       {
-        name: 'BayKiBig Fachkraftquote',
+        name: 'Fachkraftquote',
         type: 'line',
-        data: safeChartData.baykibigAnstellungsschluessel?.map(item => {
-          return item?.fachkraftQuotePercent || 0;
-        }),
+        data: chartData.expert_ratio || [],
         yAxis: 3,
-        color: '#ff9800',
+        color: expertRatioColor,
         marker: { enabled: false }
       }
     ],
@@ -187,114 +105,13 @@ export default function MidtermChart({ hideFilters = false, scenario, scenarioId
       shared: true,
       useHTML: true,
       formatter: function () {
-        let s = `<b>${this.x}</b><br/>`;
-        this.points.forEach(point => {
-          if (point.series.name.includes('BayKiBig')) {
-            const baykibigData = safeChartData.baykibigAnstellungsschluessel[point.point.index];
-            if (baykibigData) {
-              if (point.series.name.includes('Anstellungsschlüssel')) {
-                const schluessel = baykibigData.totalStaffHours > 0 ? baykibigData.totalBookingHours / baykibigData.totalStaffHours : 0;
-                s += `<span style="color:${point.color}">\u25CF</span> <b>${point.series.name}:</b> 1:${schluessel.toFixed(1)}<br/>`;
-                s += `<span style="margin-left:16px;font-size:0.9em;">Buchungsstunden: ${baykibigData.totalBookingHours.toFixed(1)}h, Personalstunden: ${baykibigData.totalStaffHours.toFixed(1)}h</span><br/>`;
-                s += `<span style="margin-left:16px;font-size:0.9em;">Erforderlich: 1:11 oder besser</span><br/>`;
-              }
-              if (point.series.name.includes('Fachkraftquote')) {
-                s += `<span style="color:${point.color}">\u25CF</span> <b>${point.series.name}:</b> ${baykibigData.fachkraftQuotePercent.toFixed(1)}%<br/>`;
-                s += `<span style="margin-left:16px;font-size:0.9em;">Fachkraftstunden: ${baykibigData.fachkraftHours.toFixed(1)}h, Gesamtstunden: ${baykibigData.totalStaffHours.toFixed(1)}h</span><br/>`;
-                s += `<span style="margin-left:16px;font-size:0.9em;">Erforderlich: 50% oder mehr</span><br/>`;
-              }
-            }
-          } else {
-            s += `<span style="color:${point.color}">\u25CF</span> <b>${point.series.name}:</b> ${point.y.toFixed(1)}h<br/>`;
-          }
-        });
-        return s;
+        return generateWeeklyChartTooltip(this.points, this.x);
       }
     }
-  }), [safeChartData, midtermTimeDimension]);
+  }), [chartData, timedimension, demandColor, capacityColor, careRatioColor, expertRatioColor]);
 
-  // Filter Form
   return (
-    <Box sx={{ flex: 1, p: 2, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-      {/* Filter Form */}
-      {!hideFilters && (
-        <Box sx={{ mb: 2, display: 'flex', gap: 4, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-          <Box>
-            <Typography variant="body1" sx={{ mb: 1 }}>Zeitdimension:</Typography>
-            <ToggleButtonGroup
-              value={midtermTimeDimension}
-              exclusive
-              onChange={(e, newDimension) => {
-                if (newDimension !== null) {
-                  dispatch(setTimedimension({ scenarioId, timedimension: newDimension }));
-                }
-              }}
-              size="small"
-            >
-              <ToggleButton value="week">Wochen</ToggleButton>
-              <ToggleButton value="month">Monate</ToggleButton>
-              <ToggleButton value="year">Jahre</ToggleButton>
-            </ToggleButtonGroup>
-          </Box>
-          
-          <Box>
-            <Typography variant="body1" sx={{ mb: 1 }}>Gruppen:</Typography>
-            <FormGroup row>
-              {allGroupNames.map(groupId => {
-                const label = groupId === '0'
-                  ? 'keine Gruppe'
-                  : (groupDefs.find(g => g.id === groupId)?.name || groupId);
-                return (
-                  <FormControlLabel
-                    key={groupId}
-                    control={
-                      <Checkbox
-                        checked={midtermSelectedGroups.includes(groupId)}
-                        onChange={() => {
-                          const newGroups = midtermSelectedGroups.includes(groupId)
-                            ? midtermSelectedGroups.filter(g => g !== groupId)
-                            : [...midtermSelectedGroups, groupId];
-                          dispatch(setFilterGroups({ scenarioId, groups: newGroups }));
-                        }}
-                      />
-                    }
-                    label={label}
-                  />
-                );
-              })}
-            </FormGroup>
-          </Box>
-          
-          <Box>
-            <Typography variant="body1" sx={{ mb: 1 }}>Qualifikationen:</Typography>
-            <FormGroup row>
-              {allQualificationNames.map(qualification => {
-                const displayName =
-                  qualifications.find(q => q.key === qualification)?.name || qualification;
-                return (
-                  <FormControlLabel
-                    key={qualification}
-                    control={
-                      <Checkbox
-                        checked={midtermSelectedQualifications.includes(qualification)}
-                        onChange={() => {
-                          const newQualifications = midtermSelectedQualifications.includes(qualification)
-                            ? midtermSelectedQualifications.filter(q => q !== qualification)
-                            : [...midtermSelectedQualifications, qualification];
-                          dispatch(setFilterQualifications({ scenarioId, qualifications: newQualifications }));
-                        }}
-                      />
-                    }
-                    label={displayName}
-                  />
-                );
-              })}
-            </FormGroup>
-          </Box>
-        </Box>
-      )}
-
-      {/* Chart */}
+    <Box sx={{ flex: 1, p: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       <Box sx={{ flex: 1, minHeight: 0 }}>
         <HighchartsReact highcharts={Highcharts} options={midtermOptions} />
       </Box>

@@ -93,14 +93,14 @@ function VisuPage() {
             <WeeklyChart  />
           </Box>
         )}
-        {/* {chartToggles.includes('midterm') && (
+        {chartToggles.includes('midterm') && (
           <Box sx={{ minHeight: '400px' }}>
             <Typography variant="h6" sx={{ mb: 2, color: 'text.secondary' }}>
               Midterm Chart
             </Typography>
-            <MidtermChart hideFilters scenario={selectedScenario} />
+            <MidtermChart hideFilters scenarioId={selectedScenarioId} />
           </Box>
-        )} */}
+        )}
         {chartToggles.length === 0 && (
           <Paper sx={{ p: 4, textAlign: 'center', bgcolor: '#f5f5f5' }}>
             <Typography variant="h6" color="text.secondary">
