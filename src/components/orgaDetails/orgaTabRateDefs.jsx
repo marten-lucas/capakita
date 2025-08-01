@@ -49,6 +49,11 @@ const GroupPicker = ({ groupDefs, value, onChange }) => {
   );
 };
 
+// Utility wrapper to avoid passing unwanted props to DOM
+const RemoveDomProps = ({ style, children }) => (
+  <div style={style}>{children}</div>
+);
+
 function OrgaTabRateDefs() {
   const dispatch = useDispatch();
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
@@ -146,40 +151,43 @@ function OrgaTabRateDefs() {
               sx={{ borderRight: 1, borderColor: 'divider' }}
             >
               {financialDefs.map((def, index) => (
-                <Box 
-                  key={def.id} 
-                  sx={{ 
-                    position: 'relative',
-                    '&:hover .delete-button': {
-                      opacity: 1
-                    }
+                <RemoveDomProps
+                  key={def.id}
+                  style={{
+                    position: 'relative'
                   }}
-                  onMouseEnter={() => setHoveredTabId(def.id)}
-                  onMouseLeave={() => setHoveredTabId(null)}
                 >
-                  <Tab
-                    label={def.description || `Beitragsordnung ${index + 1}`}
-                    value={index}
-                  />
-                  <IconButton
-                    className="delete-button"
-                    size="small"
-                    sx={{ 
-                      position: 'absolute', 
-                      right: 8, 
-                      top: '50%', 
-                      transform: 'translateY(-50%)',
-                      zIndex: 1,
-                      opacity: hoveredTabId === def.id ? 1 : 0,
-                      transition: 'opacity 0.2s',
-                      backgroundColor: 'background.paper',
-                      '&:hover': { backgroundColor: 'error.light' }
+                  <Box
+                    sx={{
+                      '&:hover .delete-button': { opacity: 1 }
                     }}
-                    onClick={() => handleDeleteRateDef(def.id)}
+                    onMouseEnter={() => setHoveredTabId(def.id)}
+                    onMouseLeave={() => setHoveredTabId(null)}
                   >
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                </Box>
+                    <Tab
+                      label={def.description || `Beitragsordnung ${index + 1}`}
+                      value={index}
+                    />
+                    <IconButton
+                      className="delete-button"
+                      size="small"
+                      sx={{
+                        position: 'absolute',
+                        right: 8,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        zIndex: 1,
+                        opacity: hoveredTabId === def.id ? 1 : 0,
+                        transition: 'opacity 0.2s',
+                        backgroundColor: 'background.paper',
+                        '&:hover': { backgroundColor: 'error.light' }
+                      }}
+                      onClick={() => handleDeleteRateDef(def.id)}
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
+                </RemoveDomProps>
               ))}
             </Tabs>
           </Paper>
