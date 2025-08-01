@@ -65,7 +65,6 @@ function ChartFilterForm({ showStichtag = false, scenarioId }) {
     }
   );
 
-  const stichtag = chartState.referenceDate || '';
   const timedimension = chartState.timedimension || 'month';
   const chartToggles = chartState.chartToggles || ['weekly', 'midterm'];
   const selectedGroups = chartState.filter?.Groups || [];
@@ -164,13 +163,6 @@ function ChartFilterForm({ showStichtag = false, scenarioId }) {
     dispatch(setChartToggles({ scenarioId, toggles: newToggles }));
   };
 
-  const handleDateChange = (e) => {
-    dispatch(setReferenceDate({ scenarioId, date: e.target.value }));
-    // Ensure chart data is updated after reference date changes
-    setTimeout(() => {
-      dispatch(updateWeeklyChartData(scenarioId));
-    }, 0);
-  };
 
   const handleTimedimensionChange = (e) => {
     dispatch(setTimedimension({ scenarioId, timedimension: e.target.value }));
