@@ -1,28 +1,8 @@
-// Import selectors as needed
-// import { selectDataItemsByScenario } from '../store/simDataSlice';
-// import { ... } from '../store/simBookingSlice';
-// ...other imports...
 import { getBayKiBiGWeightForChild } from './BayKiBiG-calculator';
 
 // REMOVE any getScenarioChain or scenario traversal here!
 // Only use the data passed in for calculations
 
-// Hilfsfunktion für Zeitsegmente
-export function generateTimeSegments() {
-  const days = ['Mo', 'Di', 'Mi', 'Do', 'Fr'];
-  const startHour = 7;
-  const endHour = 17;
-  const segments = [];
-  for (let d = 0; d < days.length; d++) {
-    for (let h = startHour; h <= endHour; h += 0.5) {
-      const hour = Math.floor(h);
-      const min = h % 1 === 0 ? '00' : '30';
-      segments.push(`${days[d]} ${hour}:${min}`);
-    }
-  }
-  // Ensure we return a new mutable array every time
-  return [...segments];
-}
 
 /**
  * Generate a data series for expert ratio (percentage of qualified personnel per segment).
@@ -125,67 +105,7 @@ export function generateCareRatioSeries(categories, filteredDemandBookings, filt
   });
 }
 
-export function calculateChartData(
-  referenceDate,
-  selectedGroups,
-  selectedQualifications,
-  {
-    bookingsByScenario,
-    dataByScenario,
-    groupDefs,
-    qualificationDefs, 
-    groupsByScenario, 
-    qualificationAssignmentsByScenario,
-    overlaysByScenario,
-    scenarioId
-  }
-) {
-  // No scenario chain logic here, only use the passed-in data
-  const { demand: filteredDemandBookings, capacity: filteredCapacityBookings } = filterBookings({
-    bookingsByScenario,
-    dataByScenario,
-    qualificationAssignmentsByScenario,
-    overlaysByScenario,
-    scenarioId,
-    referenceDate,
-    selectedGroups,
-    selectedQualifications,
-    groupsByScenario
-  });
 
-  const categories = generateTimeSegments();
-  const demand = generateBookingDataSeries(referenceDate, filteredDemandBookings, categories);
-  const capacity = generateBookingDataSeries(referenceDate, filteredCapacityBookings, categories);
-
-  // Neu: careRatio berechnen
-  const care_ratio = generateCareRatioSeries(
-    categories,
-    filteredDemandBookings,
-    filteredCapacityBookings,
-    dataByScenario[scenarioId],
-    groupDefs || []
-  );
-
-  // Fill expert_ratio using new function
-  const expert_ratio = generateExpertRatioSeries(
-    categories,
-    filteredCapacityBookings,
-    qualificationDefs || []
-  );
-
-  // Return completely new objects and arrays to prevent any mutation issues
-  return {
-    categories: [...categories],
-    demand: [...demand],
-    maxdemand: Math.max(...demand, 0),
-    capacity: [...capacity],
-    maxcapacity: Math.max(...capacity, 0),
-    care_ratio: [...care_ratio],
-    max_care_ratio: Math.max(...care_ratio, 0),
-    expert_ratio: [...expert_ratio],
-    maxexpert_ratio: Math.max(...expert_ratio, 0),
-  };
-}
 
 /**
  * Overlay-aware booking filter.
@@ -376,13 +296,7 @@ export function generateBookingDataSeries(referenceDate, filteredBookings, categ
   return series.map(val => val); // Create a new array with copied values
 }
 
-export function generateWeeklyChartTooltip(points, x) {
-  let s = `<b>${x}</b><br/>`;
-  points.forEach(point => {
-    s += `<span style="color:${point.color}">\u25CF</span> <b>${point.series.name}:</b> ${point.y}<br/>`;
-  });
-  return s;
-}
+
 
 // Helper function to ensure chart data arrays are mutable
 export function cloneChartData(chartData) {

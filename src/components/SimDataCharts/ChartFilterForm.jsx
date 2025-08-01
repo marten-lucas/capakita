@@ -22,7 +22,8 @@ import {
   setFilterGroups,
   setFilterQualifications,
   ensureScenario,
-  updateWeeklyChartData
+  updateWeeklyChartData,
+  updateMidTermChartData
 } from '../../store/chartSlice';
 import { useOverlayData } from '../../hooks/useOverlayData';
 import EventPicker from '../EventCalendar/EventPicker';
@@ -165,6 +166,10 @@ function ChartFilterForm({ showStichtag = false, scenarioId }) {
 
   const handleTimedimensionChange = (e) => {
     dispatch(setTimedimension({ scenarioId, timedimension: e.target.value }));
+    // Use setTimeout to ensure state update is processed first
+    setTimeout(() => {
+      dispatch(updateMidTermChartData(scenarioId));
+    }, 0);
   };
 
   // UI

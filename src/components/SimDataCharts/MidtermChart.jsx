@@ -1,33 +1,41 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import HighchartsReact from 'highcharts-react-official';
 import Highcharts from 'highcharts';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import Box from '@mui/material/Box';
-import { generateWeeklyChartTooltip } from '../../utils/chartUtils';
+import { updateMidTermChartData } from '../../store/chartSlice';
+import { generateWeeklyChartTooltip } from '../../utils/chartUtilsWeekly';
 
 // MidtermChart component
-export default function MidtermChart({ scenarioId: propScenarioId }) {
+export default function MidtermChart() {
   // Colors
   const demandColor = 'rgba(124,181,236,0.8)';
   const capacityColor = '#90ed7d';
   const careRatioColor = '#f45b5b';
   const expertRatioColor = '#ff9800';
 
-  // ScenarioId from prop or redux
-  const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
-  const scenarioId = propScenarioId || selectedScenarioId;
+  const scenarioId = useSelector(state => state.simScenario.selectedScenarioId);
+  const dispatch = useDispatch();
 
-  // Chart state (per scenario)
+  // Get current filters from chartSlice (per scenario)
   const chartState = useSelector(state => state.chart[scenarioId] || {});
-  const timedimension = chartState.timedimension || 'month';
   const chartData = useMemo(() => chartState.chartData?.midterm || {}, [chartState]);
+  const timedimension = chartState.timedimension || 'month';
+
+  // Update chart data when filters or simulation data change
+  useEffect(() => {
+    if (scenarioId) {
+      dispatch(updateMidTermChartData(scenarioId));
+    }
+  }, [dispatch, scenarioId]);
+
 
   // Chart options
   const midtermOptions = useMemo(() => ({
     chart: { type: 'column' },
     title: { text: `Midterm Simulation - ${timedimension}` },
     xAxis: { 
-      categories: chartData.categories || [],
+      categories: chartData.categories,
       title: { text: 'Zeitraum' }
     },
     yAxis: [
@@ -118,3 +126,4 @@ export default function MidtermChart({ scenarioId: propScenarioId }) {
     </Box>
   );
 }
+

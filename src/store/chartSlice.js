@@ -1,5 +1,6 @@
 import { createSlice } from '@reduxjs/toolkit';
-import { calculateChartData } from '../utils/chartUtils';
+import { calculateChartDataWeekly } from '../utils/chartUtilsWeekly';
+import { calculateChartDataMidterm, generateMidtermCategories } from '../utils/chartUtilsMidterm';
 import { buildOverlayAwareData } from '../utils/overlayUtils';
 
 // Helper for initial chart state per scenario
@@ -111,7 +112,7 @@ export const updateWeeklyChartData = (scenarioId) => (dispatch, getState) => {
     effectiveGroupAssignmentsByItem,
     effectiveQualificationAssignmentsByItem,
     effectiveGroupDefs,
-    effectiveQualificationDefs // <-- ensure this is available from buildOverlayAwareData
+    effectiveQualificationDefs
   } = buildOverlayAwareData(scenarioId, state);
 
   // Wrap by scenarioId for chartUtils compatibility
@@ -121,38 +122,117 @@ export const updateWeeklyChartData = (scenarioId) => (dispatch, getState) => {
   const dataByScenarioWrapped = { [scenarioId]: effectiveDataItems };
 
   // Pass overlay-aware data to chart utils
-  const chartData = calculateChartData(
-    referenceDate,
-    selectedGroups,
-    selectedQualifications,
-    {
-      bookingsByScenario: bookingsByScenarioWrapped,
-      dataByScenario: dataByScenarioWrapped,
-      groupDefs: effectiveGroupDefs,
-      qualificationDefs: effectiveQualificationDefs, // <-- pass here
-      groupsByScenario: groupsByScenarioWrapped,
-      qualificationAssignmentsByScenario: qualificationAssignmentsByScenarioWrapped,
-      overlaysByScenario: {}, // overlays already merged
-      scenarioId
-    }
-  );
+  let chartData;
+  try {
+    chartData = calculateChartDataWeekly(
+      referenceDate,
+      selectedGroups,
+      selectedQualifications,
+      {
+        bookingsByScenario: bookingsByScenarioWrapped,
+        dataByScenario: dataByScenarioWrapped,
+        groupDefs: effectiveGroupDefs,
+        qualificationDefs: effectiveQualificationDefs,
+        groupsByScenario: groupsByScenarioWrapped,
+        qualificationAssignmentsByScenario: qualificationAssignmentsByScenarioWrapped,
+        overlaysByScenario: {},
+        scenarioId
+      }
+    );
+   
+  } catch {
+    chartData = {};
+  }
 
   // Ensure all arrays are deeply cloned and completely mutable
   const clonedData = {
-    categories: chartData.categories ? [...chartData.categories] : [],
-    demand: chartData.demand ? chartData.demand.map(val => typeof val === 'number' ? val : 0) : [],
-    maxdemand: chartData.maxdemand || "",
-    capacity: chartData.capacity ? chartData.capacity.map(val => typeof val === 'number' ? val : 0) : [],
-    maxcapacity: chartData.maxcapacity || "",
-    care_ratio: chartData.care_ratio ? chartData.care_ratio.map(val => typeof val === 'number' ? val : 0) : [],
-    max_care_ratio: chartData.max_care_ratio || "",
-    expert_ratio: chartData.expert_ratio ? chartData.expert_ratio.map(val => typeof val === 'number' ? val : 0) : [],
-    maxexpert_ratio: chartData.maxexpert_ratio || "100"
+    categories: chartData?.categories ? [...chartData.categories] : [],
+    demand: chartData?.demand ? chartData.demand.map(val => typeof val === 'number' ? val : 0) : [],
+    maxdemand: chartData?.maxdemand || "",
+    capacity: chartData?.capacity ? chartData.capacity.map(val => typeof val === 'number' ? val : 0) : [],
+    maxcapacity: chartData?.maxcapacity || "",
+    care_ratio: chartData?.care_ratio ? chartData.care_ratio.map(val => typeof val === 'number' ? val : 0) : [],
+    max_care_ratio: chartData?.max_care_ratio || "",
+    expert_ratio: chartData?.expert_ratio ? chartData.expert_ratio.map(val => typeof val === 'number' ? val : 0) : [],
+    maxexpert_ratio: chartData?.maxexpert_ratio || "100"
   };
 
   dispatch(setChartData({
     scenarioId,
     chartType: 'weekly',
+    data: clonedData
+  }));
+};
+
+// Thunk to update midterm chart data for a scenario
+export const updateMidTermChartData = (scenarioId) => (dispatch, getState) => {
+  const state = getState();
+  const chartState = state.chart[scenarioId] || {};
+  const referenceDate = chartState.referenceDate || '';
+  const timedimension = chartState.timedimension || 'month';
+  const selectedGroups = [...(chartState.filter?.Groups || [])];
+  const selectedQualifications = [...(chartState.filter?.Qualifications || [])];
+
+  // Use utility to build overlay-aware data
+  const {
+    effectiveDataItems,
+    effectiveBookingsByItem,
+    effectiveGroupAssignmentsByItem,
+    effectiveQualificationAssignmentsByItem,
+    effectiveGroupDefs,
+    effectiveQualificationDefs
+  } = buildOverlayAwareData(scenarioId, state);
+
+  // Get events for scenario
+  const events = state.events?.eventsByScenario?.[scenarioId] || [];
+  // Generate categories for midterm chart
+  const categories = generateMidtermCategories(timedimension, events);
+
+  // Wrap by scenarioId for chartUtils compatibility
+  const bookingsByScenarioWrapped = { [scenarioId]: effectiveBookingsByItem };
+  const groupsByScenarioWrapped = { [scenarioId]: effectiveGroupAssignmentsByItem };
+  const qualificationAssignmentsByScenarioWrapped = { [scenarioId]: effectiveQualificationAssignmentsByItem };
+  const dataByScenarioWrapped = { [scenarioId]: effectiveDataItems };
+
+  // Pass overlay-aware data to chart utils
+  let chartData;
+  try {
+    chartData = calculateChartDataMidterm(
+      categories,
+      referenceDate,
+      selectedGroups,
+      selectedQualifications,
+      {
+        bookingsByScenario: bookingsByScenarioWrapped,
+        dataByScenario: dataByScenarioWrapped,
+        groupDefs: effectiveGroupDefs,
+        qualificationDefs: effectiveQualificationDefs,
+        groupsByScenario: groupsByScenarioWrapped,
+        qualificationAssignmentsByScenario: qualificationAssignmentsByScenarioWrapped,
+        overlaysByScenario: {},
+        scenarioId
+      }
+    );
+  } catch {
+    chartData = {};
+  }
+
+  // Ensure all arrays are deeply cloned and completely mutable
+  const clonedData = {
+    categories: chartData?.categories ? [...chartData.categories] : [],
+    demand: chartData?.demand ? chartData.demand.map(val => typeof val === 'number' ? val : 0) : [],
+    maxdemand: chartData?.maxdemand || "",
+    capacity: chartData?.capacity ? chartData.capacity.map(val => typeof val === 'number' ? val : 0) : [],
+    maxcapacity: chartData?.maxcapacity || "",
+    care_ratio: chartData?.care_ratio ? chartData.care_ratio.map(val => typeof val === 'number' ? val : 0) : [],
+    max_care_ratio: chartData?.max_care_ratio || "",
+    expert_ratio: chartData?.expert_ratio ? chartData.expert_ratio.map(val => typeof val === 'number' ? val : 0) : [],
+    maxexpert_ratio: chartData?.maxexpert_ratio || "100"
+  };
+
+  dispatch(setChartData({
+    scenarioId,
+    chartType: 'midterm',
     data: clonedData
   }));
 };
