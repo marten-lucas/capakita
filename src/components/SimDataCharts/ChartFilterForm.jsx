@@ -284,13 +284,11 @@ function ChartFilterForm({ showStichtag = false, scenarioId }) {
           </FormControl>
         )}
 
-        {/* Stichtag (nur wenn showWeekly && showStichtag) - replaced with EventPicker */}
+        {/* Stichtag (nur wenn showWeekly && showStichtag) - EventPicker bleibt in der Reihe */}
         {showWeekly && showStichtag && (
           <EventPicker scenarioId={scenarioId} />
         )}
-
       </Box>
-      {/* Remove the separate EventPicker section */}
     </Paper>
   );
 }
