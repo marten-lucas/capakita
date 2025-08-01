@@ -31,7 +31,8 @@ function SimDataFinanceTab({ item }) {
       amount: '',
       from: '',
       to: '',
-      note: ''
+      note: '',
+      ...(type === 'income-fee' ? { financialDefId: '' } : {})
     };
     addFinancial(item.id, newObj);
     setExpandedItems(prev => new Set([...prev, newId]));
