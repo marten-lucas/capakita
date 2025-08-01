@@ -1,23 +1,14 @@
 import React, { useState } from 'react';
 import { Box, Button, Menu, MenuItem, Typography } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import { useSelector, useDispatch } from 'react-redux';
 import FinancialsCards from './FinancialsCards';
 import { useOverlayData } from '../../../hooks/useOverlayData';
-import { addFinancialThunk, updateFinancialThunk, deleteFinancialThunk } from '../../../store/simFinancialsSlice';
-
-const FINANCIAL_TYPES = [
-  { value: 'expense-avr', label: 'Ausgabe: AVR-Entgelt', allowed: ['capacity'] },
-  { value: 'income-fee', label: 'Einnahme: Beitrag', allowed: ['demand'] },
-  { value: 'income-baykibig', label: 'Einnahme: BayKiBig-Förderung', allowed: ['demand'] },
-  { value: 'income-other', label: 'Einnahme: Förderung', allowed: ['capacity', 'demand'] },
-];
+import { FINANCIAL_TYPE_REGISTRY } from '../../../config/financialTypeRegistry';
+import { useFinancialsActions } from '../../../hooks/useFinancialsActions';
 
 function SimDataFinanceTab({ item }) {
-  const dispatch = useDispatch();
-  const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
+  const { addFinancial, updateFinancial, deleteFinancial } = useFinancialsActions();
   const { getEffectiveFinancials } = useOverlayData();
-
   const financialsObj = getEffectiveFinancials(item?.id);
   const financials = Object.values(financialsObj || {});
 
@@ -25,30 +16,24 @@ function SimDataFinanceTab({ item }) {
   const [expandedItems, setExpandedItems] = useState(new Set());
   const open = Boolean(anchorEl);
 
-  const handleAddClick = (event) => {
-    setAnchorEl(event.currentTarget);
-  };
+  const allowedTypes = FINANCIAL_TYPE_REGISTRY.filter(opt => opt.allowed.includes(item.type));
 
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-  };
+  const handleAddClick = (event) => setAnchorEl(event.currentTarget);
+  const handleMenuClose = () => setAnchorEl(null);
 
   const handleAddFinancial = (type) => {
+    const typeEntry = FINANCIAL_TYPE_REGISTRY.find(t => t.value === type);
     const newId = `${Date.now()}-${Math.random()}`;
     const newObj = {
       id: newId,
       type: type,
-      label: FINANCIAL_TYPES.find(t => t.value === type)?.label || '',
+      label: typeEntry?.label || '',
       amount: '',
       from: '',
       to: '',
       note: ''
     };
-    dispatch(addFinancialThunk({
-      scenarioId: selectedScenarioId,
-      dataItemId: item.id,
-      financial: newObj
-    }));
+    addFinancial(item.id, newObj);
     setExpandedItems(prev => new Set([...prev, newId]));
     handleMenuClose();
   };
@@ -56,11 +41,8 @@ function SimDataFinanceTab({ item }) {
   const handleToggleExpanded = (financialId) => {
     setExpandedItems(prev => {
       const newSet = new Set(prev);
-      if (newSet.has(financialId)) {
-        newSet.delete(financialId);
-      } else {
-        newSet.add(financialId);
-      }
+      if (newSet.has(financialId)) newSet.delete(financialId);
+      else newSet.add(financialId);
       return newSet;
     });
   };
@@ -68,22 +50,13 @@ function SimDataFinanceTab({ item }) {
   const handleUpdateFinancial = (idx, updated) => {
     const financialId = financials[idx]?.id;
     if (!financialId) return;
-    dispatch(updateFinancialThunk({
-      scenarioId: selectedScenarioId,
-      dataItemId: item.id,
-      financialId,
-      updates: updated
-    }));
+    updateFinancial(item.id, financialId, updated);
   };
 
   const handleDeleteFinancial = (idx) => {
     const financialToDelete = financials[idx];
     if (!financialToDelete) return;
-    dispatch(deleteFinancialThunk({
-      scenarioId: selectedScenarioId,
-      dataItemId: item.id,
-      financialId: financialToDelete.id
-    }));
+    deleteFinancial(item.id, financialToDelete.id);
     setExpandedItems(prev => {
       const newSet = new Set(prev);
       newSet.delete(financialToDelete.id);
@@ -107,16 +80,14 @@ function SimDataFinanceTab({ item }) {
           open={open}
           onClose={handleMenuClose}
         >
-          {FINANCIAL_TYPES
-            .filter(opt => opt.allowed.includes(item.type))
-            .map(opt => (
-              <MenuItem 
-                key={opt.value} 
-                onClick={() => handleAddFinancial(opt.value)}
-              >
-                {opt.label}
-              </MenuItem>
-            ))}
+          {allowedTypes.map(opt => (
+            <MenuItem 
+              key={opt.value} 
+              onClick={() => handleAddFinancial(opt.value)}
+            >
+              {opt.label}
+            </MenuItem>
+          ))}
         </Menu>
       </Box>
       <FinancialsCards
