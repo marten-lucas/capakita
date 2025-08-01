@@ -1,9 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import {
-  Box, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Alert, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField
+  Box, Typography, Paper, Button, Tabs, Tab, Select, MenuItem, FormControl, InputLabel,
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, IconButton
 } from '@mui/material';
 import { useSelector, useDispatch } from 'react-redux';
 import { createSelector } from '@reduxjs/toolkit';
+import AddIcon from '@mui/icons-material/Add';
+import DeleteIcon from '@mui/icons-material/Delete';
 import { useOverlayData } from '../../hooks/useOverlayData';
 import {
   addFinancialDefThunk,
@@ -19,10 +22,19 @@ const selectScenarioDefs = createSelector(
   (defs) => defs || []
 );
 
+// Create memoized selector for groupDefs to prevent unnecessary re-renders
+const selectGroupDefs = createSelector(
+  [
+    (state, scenarioId) => state.simGroup.groupDefsByScenario[scenarioId]
+  ],
+  (defs) => defs || []
+);
+
 function OrgaTabRateDefs() {
   const dispatch = useDispatch();
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const scenarioDefs = useSelector(state => selectScenarioDefs(state, selectedScenarioId));
+  const groupDefs = useSelector(state => selectGroupDefs(state, selectedScenarioId));
 
   // Overlay systematik: get effective financialDefs
   const { baseScenario, isBasedScenario, overlaysByScenario } = useOverlayData();
@@ -37,160 +49,255 @@ function OrgaTabRateDefs() {
       : scenarioDefs;
   }, [baseScenario, isBasedScenario, overlaysByScenario, selectedScenarioId, scenarioDefs]);
 
-  // Dialog state
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingDef, setEditingDef] = useState(null);
-  const [form, setForm] = useState({
-    id: '',
-    description: '',
-    valid_from: '',
-    valid_to: '',
-    feeGroups: []
-  });
+  const [selectedDefIndex, setSelectedDefIndex] = useState(0);
+  const [selectedGroupIndex, setSelectedGroupIndex] = useState(0);
 
-  const handleOpenDialog = (def = null) => {
-    setEditingDef(def);
-    setForm(def ? { ...def } : {
-      id: '',
-      description: '',
+  const currentDef = financialDefs[selectedDefIndex];
+
+  const handleAddRateDef = () => {
+    const newDef = {
+      description: 'Neue Beitragsordnung',
       valid_from: '',
       valid_to: '',
       feeGroups: []
-    });
-    setDialogOpen(true);
+    };
+    dispatch(addFinancialDefThunk({
+      scenarioId: selectedScenarioId,
+      financialDef: newDef
+    }));
   };
 
-  const handleCloseDialog = () => {
-    setDialogOpen(false);
-    setEditingDef(null);
-    setForm({
-      id: '',
-      description: '',
-      valid_from: '',
-      valid_to: '',
-      feeGroups: []
-    });
+  const handleAddFeeGroup = () => {
+    if (!currentDef) return;
+    const updatedDef = {
+      ...currentDef,
+      feeGroups: [
+        ...currentDef.feeGroups,
+        {
+          groupRef: '',
+          fees: []
+        }
+      ]
+    };
+    dispatch(updateFinancialDefThunk({
+      scenarioId: selectedScenarioId,
+      financialDefId: currentDef.id,
+      updates: updatedDef
+    }));
+    setSelectedGroupIndex(updatedDef.feeGroups.length - 1);
   };
 
-  const handleSave = () => {
-    if (!form.description.trim()) return;
-    if (editingDef) {
-      dispatch(updateFinancialDefThunk({
-        scenarioId: selectedScenarioId,
-        financialDefId: editingDef.id,
-        updates: form
-      }));
-    } else {
-      dispatch(addFinancialDefThunk({
-        scenarioId: selectedScenarioId,
-        financialDef: form
-      }));
-    }
-    handleCloseDialog();
+  const handleUpdateFeeGroup = (groupIndex, updates) => {
+    if (!currentDef) return;
+    const updatedFeeGroups = [...currentDef.feeGroups];
+    updatedFeeGroups[groupIndex] = { ...updatedFeeGroups[groupIndex], ...updates };
+    dispatch(updateFinancialDefThunk({
+      scenarioId: selectedScenarioId,
+      financialDefId: currentDef.id,
+      updates: { ...currentDef, feeGroups: updatedFeeGroups }
+    }));
   };
 
-  const handleDelete = (def) => {
-    if (window.confirm(`Beitragsordnung "${def.description}" wirklich löschen?`)) {
-      dispatch(deleteFinancialDefThunk({
-        scenarioId: selectedScenarioId,
-        financialDefId: def.id
-      }));
-    }
+  const handleAddFee = (groupIndex) => {
+    const newFee = {
+      minBookingHours: 0,
+      maxBookingHours: 0,
+      amount: 0
+    };
+    const updatedFeeGroups = [...currentDef.feeGroups];
+    updatedFeeGroups[groupIndex].fees.push(newFee);
+    dispatch(updateFinancialDefThunk({
+      scenarioId: selectedScenarioId,
+      financialDefId: currentDef.id,
+      updates: { ...currentDef, feeGroups: updatedFeeGroups }
+    }));
   };
+
+  const handleUpdateFee = (groupIndex, feeIndex, updates) => {
+    const updatedFeeGroups = [...currentDef.feeGroups];
+    updatedFeeGroups[groupIndex].fees[feeIndex] = { ...updatedFeeGroups[groupIndex].fees[feeIndex], ...updates };
+    dispatch(updateFinancialDefThunk({
+      scenarioId: selectedScenarioId,
+      financialDefId: currentDef.id,
+      updates: { ...currentDef, feeGroups: updatedFeeGroups }
+    }));
+  };
+
+  const handleDeleteFee = (groupIndex, feeIndex) => {
+    const updatedFeeGroups = [...currentDef.feeGroups];
+    updatedFeeGroups[groupIndex].fees.splice(feeIndex, 1);
+    dispatch(updateFinancialDefThunk({
+      scenarioId: selectedScenarioId,
+      financialDefId: currentDef.id,
+      updates: { ...currentDef, feeGroups: updatedFeeGroups }
+    }));
+  };
+
+  const currentFeeGroup = currentDef?.feeGroups[selectedGroupIndex];
 
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h5">Beitragsordnungen</Typography>
-        <Button variant="contained" onClick={() => handleOpenDialog()}>
+        <Button variant="contained" startIcon={<AddIcon />} onClick={handleAddRateDef}>
           Neue Beitragsordnung
         </Button>
       </Box>
+
       {financialDefs.length === 0 ? (
-        <Alert severity="info">
-          Keine Beitragsordnungen definiert.
-        </Alert>
+        <Typography>Keine Beitragsordnungen definiert.</Typography>
       ) : (
-        <TableContainer component={Paper}>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>ID</TableCell>
-                <TableCell>Beschreibung</TableCell>
-                <TableCell>Gültig von</TableCell>
-                <TableCell>Gültig bis</TableCell>
-                <TableCell>Gruppen</TableCell>
-                <TableCell align="right">Aktionen</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {financialDefs.map(def => (
-                <TableRow key={def.id}>
-                  <TableCell>{def.id}</TableCell>
-                  <TableCell>{def.description}</TableCell>
-                  <TableCell>{def.valid_from}</TableCell>
-                  <TableCell>{def.valid_to}</TableCell>
-                  <TableCell>
-                    {def.feeGroups?.map(g => g.groupRef).join(', ')}
-                  </TableCell>
-                  <TableCell align="right">
-                    <Button size="small" onClick={() => handleOpenDialog(def)}>Bearbeiten</Button>
-                    <Button size="small" color="error" onClick={() => handleDelete(def)}>Löschen</Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      )}
-      <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          {editingDef ? 'Beitragsordnung bearbeiten' : 'Neue Beitragsordnung'}
-        </DialogTitle>
-        <DialogContent>
-          <Box sx={{ pt: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <TextField
-              label="Beschreibung"
-              value={form.description}
-              onChange={e => setForm({ ...form, description: e.target.value })}
-              fullWidth
-            />
-            <TextField
-              label="Gültig von"
-              value={form.valid_from}
-              onChange={e => setForm({ ...form, valid_from: e.target.value })}
-              fullWidth
-            />
-            <TextField
-              label="Gültig bis"
-              value={form.valid_to}
-              onChange={e => setForm({ ...form, valid_to: e.target.value })}
-              fullWidth
-            />
-            {/* FeeGroups als JSON für schnellen Prototyp */}
-            <TextField
-              label="Gruppen & Gebühren (JSON)"
-              value={JSON.stringify(form.feeGroups)}
-              onChange={e => {
-                try {
-                  setForm({ ...form, feeGroups: JSON.parse(e.target.value) });
-                } catch {
-                  // ignore parse error
-                }
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          {/* Left side: Rate definitions */}
+          <Paper sx={{ minWidth: 300, p: 2 }}>
+            <Typography variant="h6" sx={{ mb: 2 }}>Beitragsordnungen</Typography>
+            <Tabs
+              orientation="vertical"
+              variant="scrollable"
+              value={selectedDefIndex}
+              onChange={(_, newValue) => {
+                setSelectedDefIndex(newValue);
+                setSelectedGroupIndex(0);
               }}
-              fullWidth
-              multiline
-              minRows={2}
-            />
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDialog}>Abbrechen</Button>
-          <Button onClick={handleSave} variant="contained">
-            {editingDef ? 'Speichern' : 'Hinzufügen'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+              sx={{ borderRight: 1, borderColor: 'divider' }}
+            >
+              {financialDefs.map((def, index) => (
+                <Tab key={def.id} label={def.description || `Ordnung ${index + 1}`} />
+              ))}
+            </Tabs>
+          </Paper>
+
+          {/* Right side: Fee groups management */}
+          {currentDef && (
+            <Box sx={{ flex: 1 }}>
+              <Paper sx={{ p: 2, mb: 2 }}>
+                <Typography variant="h6">{currentDef.description}</Typography>
+                <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
+                  <TextField
+                    label="Gültig von"
+                    value={currentDef.valid_from || ''}
+                    onChange={e => dispatch(updateFinancialDefThunk({
+                      scenarioId: selectedScenarioId,
+                      financialDefId: currentDef.id,
+                      updates: { ...currentDef, valid_from: e.target.value }
+                    }))}
+                    size="small"
+                  />
+                  <TextField
+                    label="Gültig bis"
+                    value={currentDef.valid_to || ''}
+                    onChange={e => dispatch(updateFinancialDefThunk({
+                      scenarioId: selectedScenarioId,
+                      financialDefId: currentDef.id,
+                      updates: { ...currentDef, valid_to: e.target.value }
+                    }))}
+                    size="small"
+                  />
+                  <Button variant="outlined" startIcon={<AddIcon />} onClick={handleAddFeeGroup}>
+                    Gebührengruppe hinzufügen
+                  </Button>
+                </Box>
+              </Paper>
+
+              {currentDef.feeGroups.length > 0 && (
+                <Box sx={{ display: 'flex', gap: 2 }}>
+                  {/* Fee groups tabs */}
+                  <Paper sx={{ minWidth: 200, p: 1 }}>
+                    <Typography variant="subtitle1" sx={{ mb: 1 }}>Gebührengruppen</Typography>
+                    <Tabs
+                      orientation="vertical"
+                      variant="scrollable"
+                      value={selectedGroupIndex}
+                      onChange={(_, newValue) => setSelectedGroupIndex(newValue)}
+                    >
+                      {currentDef.feeGroups.map((group, index) => {
+                        const groupName = groupDefs.find(g => g.id === group.groupRef)?.name || 'Unbekannte Gruppe';
+                        return (
+                          <Tab key={index} label={groupName || `Gruppe ${index + 1}`} />
+                        );
+                      })}
+                    </Tabs>
+                  </Paper>
+
+                  {/* Fee table for selected group */}
+                  {currentFeeGroup && (
+                    <Paper sx={{ flex: 1, p: 2 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                        <FormControl size="small" sx={{ minWidth: 200 }}>
+                          <InputLabel>Gruppe</InputLabel>
+                          <Select
+                            value={currentFeeGroup.groupRef || ''}
+                            label="Gruppe"
+                            onChange={e => handleUpdateFeeGroup(selectedGroupIndex, { groupRef: e.target.value })}
+                          >
+                            {groupDefs.map(group => (
+                              <MenuItem key={group.id} value={group.id}>{group.name}</MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                        <Button variant="outlined" startIcon={<AddIcon />} onClick={() => handleAddFee(selectedGroupIndex)}>
+                          Gebühr hinzufügen
+                        </Button>
+                      </Box>
+
+                      <TableContainer>
+                        <Table size="small">
+                          <TableHead>
+                            <TableRow>
+                              <TableCell>Min. Stunden</TableCell>
+                              <TableCell>Max. Stunden</TableCell>
+                              <TableCell>Betrag (€)</TableCell>
+                              <TableCell align="right">Aktionen</TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {currentFeeGroup.fees.map((fee, feeIndex) => (
+                              <TableRow key={feeIndex}>
+                                <TableCell>
+                                  <TextField
+                                    type="number"
+                                    value={fee.minBookingHours || 0}
+                                    onChange={e => handleUpdateFee(selectedGroupIndex, feeIndex, { minBookingHours: Number(e.target.value) })}
+                                    size="small"
+                                    sx={{ width: 80 }}
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <TextField
+                                    type="number"
+                                    value={fee.maxBookingHours || 0}
+                                    onChange={e => handleUpdateFee(selectedGroupIndex, feeIndex, { maxBookingHours: Number(e.target.value) })}
+                                    size="small"
+                                    sx={{ width: 80 }}
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <TextField
+                                    type="number"
+                                    value={fee.amount || 0}
+                                    onChange={e => handleUpdateFee(selectedGroupIndex, feeIndex, { amount: Number(e.target.value) })}
+                                    size="small"
+                                    sx={{ width: 100 }}
+                                  />
+                                </TableCell>
+                                <TableCell align="right">
+                                  <IconButton size="small" onClick={() => handleDeleteFee(selectedGroupIndex, feeIndex)}>
+                                    <DeleteIcon />
+                                  </IconButton>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
+                    </Paper>
+                  )}
+                </Box>
+              )}
+            </Box>
+          )}
+        </Box>
+      )}
     </Box>
   );
 }
