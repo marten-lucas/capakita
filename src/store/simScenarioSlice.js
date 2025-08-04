@@ -24,7 +24,7 @@ const simScenarioSlice = createSlice({
       // Assign a unique id if not present
       const now = Date.now().toString();
       // Use all properties from payload, fallback to defaults if missing
-      const scenario = {
+      let scenario = {
         name: action.payload.name || 'Neues Szenario',
         remark: action.payload.remark ?? '',
         confidence: action.payload.confidence ?? 50,
@@ -32,11 +32,11 @@ const simScenarioSlice = createSlice({
         desirability: action.payload.desirability ?? 50,
         baseScenarioId: action.payload.baseScenarioId ?? null,
         id: action.payload.id ? String(action.payload.id) : now,
-        imported: action.payload.imported ?? false, // ensure default for manual add
-        importedAnonymized: action.payload.importedAnonymized ?? false, // ensure default for manual add
-        ...action.payload // <-- merge all other properties from payload
+        imported: action.payload.imported ?? false,
+        importedAnonymized: action.payload.importedAnonymized ?? false,
+        ...action.payload
       };
-      
+
       // Make name unique if requested
       if (action.payload.makeNameUnique) {
         const existingNames = state.scenarios.map(s => s.name);
@@ -48,7 +48,7 @@ const simScenarioSlice = createSlice({
         }
         scenario.name = uniqueName;
       }
-      
+
       state.scenarios.push(scenario);
       state.selectedScenarioId = scenario.id; 
     },
@@ -86,7 +86,7 @@ const simScenarioSlice = createSlice({
       state.loadDialogOpen = action.payload;
     },
     setScenarios(state, action) {
-      state.scenarios = action.payload;
+      state.scenarios = (action.payload || []).map(s => ({ ...s }));
     },
   },
 });

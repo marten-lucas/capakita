@@ -1,4 +1,5 @@
 import { createSlice, createSelector } from '@reduxjs/toolkit';
+import { Event } from '../models/Event';
 
 // Helper: get next working day (Mon-Fri)
 function getNextWorkingDay(dateStr) {

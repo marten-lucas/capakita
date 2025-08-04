@@ -79,7 +79,7 @@ const simGroupSlice = createSlice({
         const dataItemId = String(assignment.kindId);
         if (!state.groupsByScenario[scenarioId][dataItemId]) state.groupsByScenario[scenarioId][dataItemId] = {};
         const id = assignment.id ? String(assignment.id) : createId('group');
-        state.groupsByScenario[scenarioId][dataItemId][id] = { ...assignment, id,  };
+        state.groupsByScenario[scenarioId][dataItemId][id] = { ...assignment, id };
       });
     },
     deleteAllGroupAssignmentsForItem(state, action) {

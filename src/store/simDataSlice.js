@@ -15,8 +15,8 @@ const simDataSlice = createSlice({
       const key = createId('simdata');
       state.dataByScenario[scenarioId][key] = {
         ...item,
+        id: key,
         absences: Array.isArray(item.absences) ? item.absences : [],
-        // Remove id attribute
       };
     },
     updateDataItem(state, action) {
@@ -64,8 +64,7 @@ const simDataSlice = createSlice({
         const key = createId('simdata');
         state.dataByScenario[scenarioId][key] = {
           ...item,
-          id: key, // Ensure id matches store key
-          absences: Array.isArray(item.absences) ? item.absences : [],
+          id: key
         };
       });
     },
@@ -83,9 +82,10 @@ const simDataSlice = createSlice({
         dateofbirth: item.dateofbirth || '',
         groupId: item.groupId || '',
         rawdata: { source: item.source || 'manual entry', ...item.rawdata },
-        absences: Array.isArray(item.absences) ? item.absences : []
+        absences: Array.isArray(item.absences) ? item.absences : [],
+        id
       };
-      },
+    },
     loadDataByScenario(state, action) {
         state.dataByScenario = action.payload || {};
       },

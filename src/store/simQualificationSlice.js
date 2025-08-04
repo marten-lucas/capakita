@@ -15,7 +15,7 @@ const simQualificationSlice = createSlice({
   reducers: {
     importQualificationDefs(state, action) {
       const { scenarioId, defs } = action.payload;
-      state.qualificationDefsByScenario[scenarioId] = defs;
+      state.qualificationDefsByScenario[scenarioId] = defs.map(def => ({ ...def }));
     },
     importQualificationAssignments(state, action) {
       const { scenarioId, assignments } = action.payload;
@@ -65,7 +65,7 @@ const simQualificationSlice = createSlice({
       state.qualificationAssignmentsByScenario[scenarioId][itemId][id] = {
         ...assignment,
         id,
-        dataItemId: itemId, // Ensure dataItemId is included
+        dataItemId: itemId,
       };
     },
     updateQualificationAssignment(state, action) {
@@ -109,7 +109,7 @@ const simQualificationSlice = createSlice({
       if (!state.qualificationDefsByScenario[scenarioId]) state.qualificationDefsByScenario[scenarioId] = [];
       state.qualificationDefsByScenario[scenarioId].push({
         ...qualiDef,
-        IsExpert: qualiDef.IsExpert !== false // default true
+        IsExpert: qualiDef.IsExpert !== false
       });
     },
     updateQualificationDef(state, action) {

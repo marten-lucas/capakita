@@ -12,12 +12,12 @@ const simFinancialsSlice = createSlice({
   reducers: {
     addFinancial(state, action) {
       const { scenarioId, dataItemId, financial } = action.payload;
-      if (!dataItemId) return; // Ensure dataItemId is set
+      if (!dataItemId) return;
       if (!state.financialsByScenario[scenarioId]) state.financialsByScenario[scenarioId] = {};
       const itemId = String(dataItemId);
       if (!state.financialsByScenario[scenarioId][itemId]) state.financialsByScenario[scenarioId][itemId] = {};
       const key = String(financial.id || createId('financial'));
-      state.financialsByScenario[scenarioId][itemId][key] = { ...financial, id: key,  };
+      state.financialsByScenario[scenarioId][itemId][key] = { ...financial, id: key };
     },
     updateFinancial(state, action) {
       const { scenarioId, dataItemId, financialId, updates } = action.payload;
