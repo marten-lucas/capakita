@@ -4,10 +4,8 @@ import { sumBookingHours as sumBookingHoursFromBooking } from "../../bookingUtil
 // TODO: Implpement inflation beyond avr Data
 
 export function updatePayments(financial, dataItem, bookings, avrStageUpgrades) {
-  console.log("[AVR Expense] updatePayments called", { financial, dataItem, bookings, avrStageUpgrades });
   // Compose payments using all dependencies
   const payments = buildPayments(financial, dataItem, bookings, avrStageUpgrades);
-  console.log("[AVR Expense] Payments generated:", payments);
   return payments;
 }
 
@@ -20,11 +18,8 @@ export function updatePayments(financial, dataItem, bookings, avrStageUpgrades) 
  * @returns {Array} payments
  */
 function buildPayments(financial, dataItem, bookings, avrStageUpgrades) {
-  console.log("[AVR Expense] buildPayments", { financial, dataItem, bookings, avrStageUpgrades });
   const dates = collectRelevantDates(financial, dataItem, bookings, avrStageUpgrades);
-  console.log("[AVR Expense] Relevant dates:", dates);
   const periods = buildPeriodsFromDates(dates);
-  console.log("[AVR Expense] Periods:", periods);
 
   const group = Number(financial?.type_details?.group);
   const initialStage = Number(financial?.type_details?.stage);
@@ -34,7 +29,6 @@ function buildPayments(financial, dataItem, bookings, avrStageUpgrades) {
 
   // Use working hours from type_details or fallback to sum of bookings
   const workingHours = Number(financial?.type_details?.WorkingHours) || sumBookingHours(bookings, null, null);
-  console.log("[AVR Expense] Group:", group, "InitialStage:", initialStage, "EmploymentStart:", employmentStart, "WorkingHours:", workingHours);
 
   return periods.map(period => {
     const { valid_from, valid_to } = period;
@@ -56,9 +50,6 @@ function buildPayments(financial, dataItem, bookings, avrStageUpgrades) {
       // 4. Calculate part time reduction factor
       const reduction = fulltimeHours > 0 ? (workingHours / fulltimeHours) : 1;
       amount = avrAmount * reduction;
-      console.log(`[AVR Expense] Period ${valid_from} - ${valid_to}: avrAmount=${avrAmount}, fulltimeHours=${fulltimeHours}, reduction=${reduction}, amount=${amount}`);
-    } else {
-      console.log(`[AVR Expense] Period ${valid_from} - ${valid_to}: absent=${absent}, group=${group}, avrStage=${avrStage}, amount=0`);
     }
 
     return {
@@ -213,7 +204,6 @@ function isFullyAbsent(absences, from, to) {
  * @returns {number}
  */
 function sumBookingHours(bookingsById, from, to) {
-  console.log("[AVR Expense] sumBookingHours called", { bookingsById, from, to });
   if (!bookingsById || typeof bookingsById !== "object") return 0;
   let total = 0;
   Object.values(bookingsById).forEach(booking => {
@@ -226,11 +216,9 @@ function sumBookingHours(bookingsById, from, to) {
       (!to || !booking.enddate || booking.enddate > from)
     ) {
       const hours = sumBookingHoursFromBooking(booking);
-      console.log("[AVR Expense] Booking", booking, "hours:", hours);
       total += hours;
     }
   });
-  console.log("[AVR Expense] sumBookingHours total:", total);
   return total;
 }
 

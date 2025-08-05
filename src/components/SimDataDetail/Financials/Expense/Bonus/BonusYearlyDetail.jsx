@@ -3,8 +3,6 @@ import { Typography, Box } from '@mui/material';
 import { getAvrBonusByType } from '../../../../../utils/financialCalculators/avrUtils';
 
 function BonusYearlyDetail({ parent }) {
-  // Debug: log parent prop
-  console.log("[BonusYearlyDetail] parent prop:", parent);
 
   // If parent is an AVR expense, show AVR bonus data
   let avrBonus = null;
