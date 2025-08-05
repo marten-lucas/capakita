@@ -1,6 +1,8 @@
 import { getAvrAmountForGroupAndStage, getAvrFulltimeHours, getStageUpgradeDates } from "../avrUtils";
 import { sumBookingHours as sumBookingHoursFromBooking } from "../../bookingUtils";
 
+// TODO: Implpement inflation beyond avr Data
+
 export function updatePayments(financial, dataItem, bookings, avrStageUpgrades) {
   console.log("[AVR Expense] updatePayments called", { financial, dataItem, bookings, avrStageUpgrades });
   // Compose payments using all dependencies
