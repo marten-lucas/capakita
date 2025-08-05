@@ -1,7 +1,9 @@
 import { createSlice } from '@reduxjs/toolkit';
-import { calculateChartDataWeekly } from '../utils/chartUtilsWeekly';
-import { calculateChartDataMidterm, generateMidtermCategories } from '../utils/chartUtilsMidterm';
+import { calculateChartDataWeekly } from '../utils/chartUtils/chartUtilsWeekly';
+import { calculateChartDataMidterm, generateMidtermCategories } from '../utils/chartUtils/chartUtilsMidterm';
 import { buildOverlayAwareData } from '../utils/overlayUtils';
+import { calculateChartDataFinancial, generateFinancialCategories } from '../utils/chartUtils/chartUtilsFinancial';
+import { FINANCIAL_TYPE_REGISTRY, FINANCIAL_BONUS_REGISTRY } from '../config/financialTypeRegistry';
 
 // Helper for initial chart state per scenario
 function getInitialChartState() {
@@ -235,6 +237,92 @@ export const updateMidTermChartData = (scenarioId) => (dispatch, getState) => {
     scenarioId,
     chartType: 'midterm',
     data: clonedData
+  }));
+};
+
+// Thunk to update payments for all financials in a scenario
+export const updatePaymentsThunk = (scenarioId) => async (dispatch, getState) => {
+  const state = getState();
+  const financialsByScenario = state.simFinancials.financialsByScenario || {};
+  const financials = financialsByScenario[scenarioId] || {};
+
+  // Build a lookup for all calculators by type
+  const registry = [
+    ...FINANCIAL_TYPE_REGISTRY,
+    ...FINANCIAL_BONUS_REGISTRY,
+  ];
+  const calculatorMap = Object.fromEntries(
+    registry.map(entry => [entry.value, entry.calculator])
+  );
+
+  // For each financial, dynamically import and call its updatePayments
+  await Promise.all(Object.values(financials).map(async financial => {
+    const calculatorLoader = calculatorMap[financial.type];
+    if (typeof calculatorLoader === 'function') {
+      const updatePayments = await calculatorLoader();
+      if (typeof updatePayments === 'function') {
+        // Use returned payments array, do not mutate financial
+        const payments = updatePayments(financial);
+        // Use a Redux action or a mutation-safe update here
+        // For example, dispatch an action to update payments in the store
+        // Or collect the payments and update in a batch after all are processed
+      } else if (updatePayments && typeof updatePayments.updatePayments === 'function') {
+        const payments = updatePayments.updatePayments(financial);
+        // Same as above
+      }
+    } else {
+      // fallback: ensure payments is an array
+      if (!Array.isArray(financial.payments)) {
+        financial.payments = [];
+      }
+    }
+  }));
+};
+
+// Thunk to update financial chart data for a scenario
+export const updateFinancialChartData = (scenarioId) => async (dispatch, getState) => {
+  const state = getState();
+  const chartState = state.chart[scenarioId] || {};
+  const timedimension = chartState.timedimension || 'month';
+
+  // Use utility to build overlay-aware data
+  const {
+    effectiveDataItems,
+    effectiveFinancialDefs
+  } = buildOverlayAwareData(scenarioId, state);
+
+  // Get events for scenario
+  const events = state.events?.eventsByScenario?.[scenarioId] || [];
+  // Generate categories for financial chart
+  const categories = generateFinancialCategories(timedimension, events);
+
+  // Helper: get all financial entries for this scenario
+  function getAllFinancialEntries() {
+    const financialsByScenario = state.simFinancials.financialsByScenario || {};
+    const financials = financialsByScenario[scenarioId] || {};
+    return Object.values(financials);
+  }
+
+  // 1. Update payments for all financials
+  dispatch(updatePaymentsThunk(scenarioId));
+
+  // 2. Get updated financial entries
+  const financialEntries = getAllFinancialEntries();
+
+  // 3. Calculate chart data (payments are now up-to-date)
+  const chartData = calculateChartDataFinancial({
+    categories,
+    financialEntries,
+    financialDefs: effectiveFinancialDefs,
+    dataItems: effectiveDataItems,
+    timedimension,
+    events
+  });
+
+  dispatch(setChartData({
+    scenarioId,
+    chartType: 'financial',
+    data: chartData
   }));
 };
 

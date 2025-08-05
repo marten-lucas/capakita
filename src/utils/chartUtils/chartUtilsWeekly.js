@@ -1,4 +1,4 @@
-import { generateExpertRatioSeries, generateCareRatioSeries, filterBookings } from './chartUtils';
+import { generateExpertRatioSeries, generateCareRatioSeries, filterBookings } from '../chartUtils/chartUtils';
 
 // Hilfsfunktion für Zeitsegmente
 export function generateTimeSegments() {

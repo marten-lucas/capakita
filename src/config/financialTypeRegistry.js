@@ -4,14 +4,14 @@ export const FINANCIAL_TYPE_REGISTRY = [
     label: 'Ausgabe: AVR-Entgelt',
     allowed: ['capacity'],
     component: () => import('../components/SimDataDetail/Financials/Expense/AvrExpenseDetail'),
-    calculator: () => ({}),
+    calculator: () => import('../utils/financialCalculators/Expense/avrCalculator/Bonus/avrSaleryCalc').then(mod => mod.updatePayments),
   },
   {
     value: 'income-fee',
     label: 'Einnahme: Elternbeitrag',
     allowed: ['demand'],
     component: () => import('../components/SimDataDetail/Financials/Income/FeeIncomeDetail'),
-    calculator: () => ({}),
+    calculator: () => import('../utils/financialCalculators/Income/feeIncomeCalculator').then(mod => mod.updatePayments),
   },
   // ...other types...
 ];
@@ -23,7 +23,7 @@ export const FINANCIAL_BONUS_REGISTRY = [
     label: 'Jahressonderzahlung',
     allowed: ['capacity'],
     component: () => import('../components/SimDataDetail/Financials/Expense/Bonus/BonusYearlyDetail'),
-    calculator: () => ({}),
+    calculator: () => import('../utils/financialCalculators/Expense/avrCalculator/Bonus/avrYearlyBonusCalc').then(mod => mod.updatePayments),
     unique: true,
     deleteable: false,
   },
@@ -32,7 +32,7 @@ export const FINANCIAL_BONUS_REGISTRY = [
     label: 'Kinderzuschlag',
     allowed: ['capacity'],
     component: () => import('../components/SimDataDetail/Financials/Expense/Bonus/BonusChildrenDetail'),
-    calculator: () => ({}),
+    calculator: () => import('../utils/financialCalculators/Expense/avrCalculator/Bonus/avrChildBonusCalc').then(mod => mod.updatePayments),
     unique: false,
     deleteable: false,
   },
@@ -41,7 +41,7 @@ export const FINANCIAL_BONUS_REGISTRY = [
     label: 'Praxisanleiterzulage',
     allowed: ['capacity'],
     component: () => import('../components/SimDataDetail/Financials/Expense/Bonus/BonusInstructorDetail'),
-    calculator: () => ({}),
+    calculator: () => import('../utils/financialCalculators/Expense/avrCalculator/Bonus/avrYearlyBonusCalc').then(mod => mod.updatePayments), // Replace with correct file if needed
     unique: false,
     deleteable: true,
   },

@@ -1,25 +1,29 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import HighchartsReact from 'highcharts-react-official';
 import Highcharts from 'highcharts';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import Box from '@mui/material/Box';
-// Placeholder for future: import { updateFinancialChartData } from '../../store/chartSlice';
-// Placeholder for future: import { generateFinancialChartTooltip } from '../../utils/chartUtilsFinancial';
+import { updateFinancialChartData } from '../../store/chartSlice';
+import { generateFinancialChartTooltip } from '../../utils/chartUtils/chartUtilsFinancial';
 
 export default function FinancialChart({ scenarioId }) {
   // Colors (adjust as needed)
   const expenseColor = '#f45b5b';
   const incomeColor = '#90ed7d';
 
-  // Placeholder: get chart data from redux (to be implemented)
+  const dispatch = useDispatch();
+
+  // Get chart data from redux
   const chartState = useSelector(state => state.chart[scenarioId] || {});
   const chartData = useMemo(() => chartState.chartData?.financial || {}, [chartState]);
-  // Placeholder: const timedimension = chartState.timedimension || 'month';
 
-  // Placeholder: dispatch = useDispatch();
-  // Placeholder: useEffect(() => { dispatch(updateFinancialChartData(scenarioId)); }, [dispatch, scenarioId]);
+  useEffect(() => {
+    if (scenarioId) {
+      dispatch(updateFinancialChartData(scenarioId));
+    }
+  }, [dispatch, scenarioId]);
 
-  // Chart options (skeleton)
+  // Chart options
   const financialOptions = useMemo(() => ({
     chart: { type: 'column' },
     title: { text: 'Finanzen (Prototyp)' },
@@ -55,7 +59,7 @@ export default function FinancialChart({ scenarioId }) {
     tooltip: {
       shared: true,
       useHTML: true,
-      // formatter: function () { return generateFinancialChartTooltip(this.points, this.x); }
+      formatter: function () { return generateFinancialChartTooltip(this.points, this.x); }
     }
   }), [chartData, expenseColor, incomeColor]);
 

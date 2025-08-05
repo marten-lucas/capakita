@@ -1,5 +1,5 @@
-import { generateExpertRatioTimeDimension, generateCareRatioTimeDimension, filterBookings } from './chartUtils';
-import { sumBookingHours } from './bookingUtils';
+import { generateExpertRatioTimeDimension, generateCareRatioTimeDimension, filterBookings } from '../chartUtils/chartUtils';
+import { sumBookingHours } from '../bookingUtils';
 
 /**
  * Generate categories for midterm chart from today until the latest event date.

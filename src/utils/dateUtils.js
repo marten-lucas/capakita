@@ -29,7 +29,7 @@ export function isDateModified(local, original) {
 }
 
 // Parse date string (dd.mm.yyyy)
-export function parseDate(dateString) {
+export function parseGermanDateString(dateString) {
   if (!dateString) return null;
   const parts = dateString.split('.');
   if (parts.length === 3) {
@@ -41,7 +41,7 @@ export function parseDate(dateString) {
 // Check if date is in the future or empty
 export function isFutureOrEmptyDate(dateString) {
   if (!dateString || dateString.trim() === '') return true;
-  const date = parseDate(dateString);
+  const date = parseGermanDateString(dateString);
   if (!date) return false;
   const now = new Date();
   now.setHours(0, 0, 0, 0);
@@ -84,4 +84,23 @@ export function getDateRangeString(start, end, hours) {
     return hours ? `${hours} h ab ${formatDate(start)}` : `ab ${formatDate(start)}`;
   }
   return hours ? `${hours} h` : '';
+}
+
+/**
+ * Normalize a date string to ISO format (YYYY-MM-DD).
+ * Accepts DD.MM.YYYY, YYYY-MM-DD, or other parseable formats.
+ * Returns '' if input is empty or invalid.
+ */
+export function normalizeToISODateString(dateStr) {
+  if (!dateStr) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+  if (/^\d{2}\.\d{2}\.\d{4}$/.test(dateStr)) {
+    const [day, month, year] = dateStr.split('.');
+    return `${year}-${month}-${day}`;
+  }
+  const d = new Date(dateStr);
+  if (!isNaN(d)) {
+    return d.toISOString().slice(0, 10);
+  }
+  return dateStr;
 }

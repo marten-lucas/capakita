@@ -1,7 +1,7 @@
 export function updatePayments(financial) {
-  // ...implement fee income payment calculation...
+  // ...implement child bonus payment calculation...
   const payments = [];
   // ...fill payments as needed...
-  console.log("Fee income payments updated:", payments);
+  console.log("Child bonus payments updated:", payments);
   return payments;
 }

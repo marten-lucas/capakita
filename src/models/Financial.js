@@ -1,7 +1,7 @@
 /**
  * @typedef {Object} Payment
  * @property {string} id
- * @property {string} type   // e.g. 'income', 'expense', 'bonus'
+ * @property {string} type   // e.g. 'income', 'expense'
  * @property {number} amount
  * @property {string} valid_from
  * @property {string} valid_to

@@ -1,5 +1,5 @@
-import { getBayKiBiGWeightForChild } from './BayKiBiG-calculator';
-import { sumBookingHours } from './bookingUtils';
+import { getBayKiBiGWeightForChild } from '../BayKiBiG-calculator';
+import { sumBookingHours } from '../bookingUtils';
 
 // REMOVE any getScenarioChain or scenario traversal here!
 // Only use the data passed in for calculations
@@ -248,31 +248,10 @@ export function filterBookings({
   return { demand, capacity };
 }
 
-// Helper: get overlayed financial definitions for a scenario
-function getOverlayedFinancialDefs(scenarioId, overlaysByScenario, financialDefsByScenario) {
-  const baseDefs = financialDefsByScenario[scenarioId] || [];
-  const overlayDefs = overlaysByScenario[scenarioId]?.financialDefs || {};
-  
-  // Merge base definitions with overlays
-  const allDefs = new Map();
-  
-  // Add base definitions first
-  baseDefs.forEach(def => {
-    allDefs.set(def.id, def);
-  });
-  
-  // Apply overlays on top
-  Object.values(overlayDefs).forEach(def => {
-    allDefs.set(def.id, def);
-  });
-  
-  return Array.from(allDefs.values());
-}
-
-/**
- * Generate a data series for the chart by counting bookings per category (time segment).
- * Each booking must have a 'times' array with { day, start, end }.
- */
+// /**
+//  * Generate a data series for the chart by counting bookings per category (time segment).
+//  * Each booking must have a 'times' array with { day, start, end }.
+//  */
 export function generateBookingDataSeries(referenceDate, filteredBookings, categories) {
   // categories: e.g. ["Mo 7:00", "Mo 7:30", ...]
   // Always return a new array, not a reference to a constant or reused array

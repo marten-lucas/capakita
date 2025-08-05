@@ -4,7 +4,7 @@ import Highcharts from 'highcharts';
 import { useSelector, useDispatch } from 'react-redux';
 import Box from '@mui/material/Box';
 import { updateMidTermChartData } from '../../store/chartSlice';
-import { generateWeeklyChartTooltip } from '../../utils/chartUtilsWeekly';
+import { generateWeeklyChartTooltip } from '../../utils/chartUtils/chartUtilsWeekly';
 
 // MidtermChart component
 export default function MidtermChart() {

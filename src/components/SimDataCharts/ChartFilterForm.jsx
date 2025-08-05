@@ -15,6 +15,7 @@ import {
 } from '@mui/material';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import TimelineIcon from '@mui/icons-material/Timeline';
+import PaidIcon from '@mui/icons-material/Paid'; // Add icon for financial chart
 import { useSelector, useDispatch } from 'react-redux';
 import {
   setTimedimension,
@@ -207,6 +208,9 @@ function ChartFilterForm({ showStichtag = false, scenarioId }) {
           </ToggleButton>
           <ToggleButton value="midterm" aria-label="Midterm Chart">
             <TimelineIcon sx={{ mr: 1 }} /> Zeitverlauf
+          </ToggleButton>
+          <ToggleButton value="financial" aria-label="Financial Chart">
+            <PaidIcon sx={{ mr: 1 }} /> Finanzen
           </ToggleButton>
         </ToggleButtonGroup>
 

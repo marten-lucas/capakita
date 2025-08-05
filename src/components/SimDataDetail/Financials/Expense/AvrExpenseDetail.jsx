@@ -1,43 +1,15 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { Box, TextField, Typography, MenuItem, Button, IconButton, Menu, List, ListItem, ListItemText, ListItemSecondaryAction } from '@mui/material';
+import { Box, TextField, Typography, MenuItem, Button, IconButton, Menu, List, ListItem } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
-import { useAvrExpenseCalculator } from '../../../../utils/financialCalculators/Expense/avrExpenseCalculator';
 import { useOverlayData } from '../../../../hooks/useOverlayData';
 import { calculateWorktimeFromBookings } from '../../../../utils/bookingUtils';
-import { getAllStagesForGroup } from '../../../../utils/financialCalculators/Expense/avr-calculator';
-
-// Define bonus registry inline to avoid circular dependency
-const BONUS_REGISTRY = [
-  {
-    value: 'bonus-yearly',
-    label: 'Jahressonderzahlung',
-    component: () => import('./Bonus/BonusYearlyDetail'),
-    unique: true,
-    deleteable: false,
-  },
-  {
-    value: 'bonus-children',
-    label: 'Kinderzuschlag',
-    component: () => import('./Bonus/BonusChildrenDetail'),
-    unique: false,
-    deleteable: false,
-  },
-  {
-    value: 'bonus-instructor',
-    label: 'Praxisanleiterzulage',
-    component: () => import('./Bonus/BonusInstructorDetail'),
-    unique: false,
-    deleteable: true,
-  },
-];
+import { getAllStagesForGroup, getAllAvrGroups } from "../../../../utils/financialCalculators/avrUtils";
+import { FINANCIAL_BONUS_REGISTRY as BONUS_REGISTRY } from '../../../../config/financialTypeRegistry';
 
 function AvrExpenseDetail({ financial, onChange, item }) {
-  // Use calculator for all AVR logic
-  const {
-    groupOptions,
-    avrSalary
-  } = useAvrExpenseCalculator({ financial, onChange, item });
+  // Load all AVR groups for the group dropdown
+  const groupOptions = useMemo(() => getAllAvrGroups(), []);
 
   // Overlay-aware data access
   const { getEffectiveBookings } = useOverlayData();
@@ -147,12 +119,11 @@ function AvrExpenseDetail({ financial, onChange, item }) {
   const stageDropdownOptions = useMemo(() => {
     if (!typeDetails.group) return [];
     // Use item's startdate or today as reference date
-    const refDate = item?.startdate || new Date().toISOString().slice(0, 10);
-    return getAllStagesForGroup(refDate, Number(typeDetails.group)).map(stage => ({
-      value: stage,
-      label: `Stufe ${stage}`
+    return getAllStagesForGroup(Number(typeDetails.group)).map(stage => ({
+      value: stage.stage,
+      label: `Stufe ${stage.stage}`
     }));
-  }, [typeDetails.group, item?.startdate]);
+  }, [typeDetails.group]);
 
   // Handler for updating type_details
   const updateTypeDetails = (updates) => {
@@ -355,11 +326,6 @@ function AvrExpenseDetail({ financial, onChange, item }) {
             : undefined
         }
       />
-      {avrSalary !== null && (
-        <Typography variant="body2" color="primary">
-          AVR-Gehalt: {avrSalary.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
-        </Typography>
-      )}
 
       {/* Bonus-Tabelle */}
       <Box>
