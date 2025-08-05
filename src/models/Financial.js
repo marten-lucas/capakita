@@ -15,11 +15,11 @@
  * @property {string} dataItemId
  * @property {string} type
  * @property {string} name
- * @property {string} from
- * @property {string} to
- * @property {number} amount
- * @property {Object} [type_details]
- * @property {Array<Financial>} [financial] // stackable financial objects (e.g. for bonus, etc.)
+ * @property {string} valid_from
+ * @property {string} valid_to
+ * @property {Object} [type_details] // User-editable fields, e.g. for AVR: stage, group, StartDate, NoOfChildren, WorkingHours; for income-fee: group_ref
+ * @property {string} [financialDefId] // Only for income-fee type
+ * @property {Array<Financial>} [financial] // Stacked financials (e.g. bonuses)
  * // ...add other properties as needed
  */
 
@@ -33,22 +33,21 @@ export class Financial {
     dataItemId,
     type = '', // e.g. avr, fee, etc.
     name = '',
-    from = '',
-    to = '',
-    amount = 0,
-    type_details = {}, // e.g. for avr: group, stage, startdate
-    financial = [],    // Array of Financial objects (stackable)
+    valid_from = '',
+    valid_to = '',
+    type_details = {}, // User-editable fields
+    financial = [],    // Stacked financials (e.g. bonuses)
     ...rest
   }) {
     this.id = String(id);
     this.dataItemId = String(dataItemId);
     this.type = type;
     this.name = name;
-    this.from = from;
-    this.to = to;
-    this.amount = amount;
+    this.valid_from = valid_from;
+    this.valid_to = valid_to;
     this.type_details = type_details;
     this.financial = Array.isArray(financial) ? financial : [];
     Object.assign(this, rest);
   }
 }
+

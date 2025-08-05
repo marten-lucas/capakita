@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Typography, IconButton, Button, RadioGroup, FormControlLabel, Radio, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
+import { Box, Typography, IconButton, Button, RadioGroup, FormControlLabel, Radio, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useSelector } from 'react-redux';
 import { useOverlayData } from '../../../hooks/useOverlayData';
@@ -12,22 +12,27 @@ function FeeIncomeDetail({ financial, onChange, onDelete, item }) {
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const financialDefs = useSelector(state => state.simFinancials.financialDefsByScenario[selectedScenarioId]) || [];
 
-  // Find groupRef from group assignments (first active group)
+  // Use type_details for group_ref and financialDefId
+  const typeDetails = financial.type_details || {};
+
+  // Find groupRef from type_details or group assignments (first active group)
   const now = new Date().toISOString().slice(0, 10);
-  let groupRef = null;
-  if (groupAssignments) {
-    const activeAssignment = Object.values(groupAssignments).find(a => {
-      const startOk = !a.start || a.start <= now;
-      const endOk = !a.end || a.end >= now;
-      return startOk && endOk;
-    });
-    groupRef = activeAssignment?.groupId || item.groupId || null;
-  } else {
-    groupRef = item.groupId || null;
+  let groupRef = typeDetails.group_ref;
+  if (!groupRef) {
+    if (groupAssignments) {
+      const activeAssignment = Object.values(groupAssignments).find(a => {
+        const startOk = !a.start || a.start <= now;
+        const endOk = !a.end || !a.end || a.end >= now;
+        return startOk && endOk;
+      });
+      groupRef = activeAssignment?.groupId || item.groupId || null;
+    } else {
+      groupRef = item.groupId || null;
+    }
   }
 
   // Find selected financialDef
-  const selectedDef = financialDefs.find(def => def.id === financial.financialDefId);
+  const selectedDef = financialDefs.find(def => def.id === typeDetails.financialDefId);
 
   // Find the fee group for the current groupRef
   let matchedFeeGroup = null;
@@ -58,6 +63,22 @@ function FeeIncomeDetail({ financial, onChange, onDelete, item }) {
     }
   }
 
+  // Handler for updating type_details
+  const updateTypeDetails = (updates) => {
+    onChange({
+      ...financial,
+      type_details: { ...typeDetails, ...updates }
+    });
+  };
+
+  // Handler for updating root-level fields (valid_from, valid_to)
+  const updateRootFields = (updates) => {
+    onChange({
+      ...financial,
+      ...updates
+    });
+  };
+
   // Only show financialDefs that have a fee_group for the current groupRef
   const matchingDefs = financialDefs.filter(def =>
     Array.isArray(def.fee_groups) && def.fee_groups.some(g => g.groupref === groupRef)
@@ -65,6 +86,27 @@ function FeeIncomeDetail({ financial, onChange, onDelete, item }) {
 
   return (
     <Box display="flex" flexDirection="column" gap={2} position="relative">
+      {/* Valid from/to fields */}
+      <Box display="flex" gap={2}>
+        <TextField
+          label="Gültig von"
+          type="date"
+          value={financial.valid_from || ''}
+          onChange={e => updateRootFields({ valid_from: e.target.value })}
+          InputLabelProps={{ shrink: true }}
+          size="small"
+          sx={{ maxWidth: 180 }}
+        />
+        <TextField
+          label="Gültig bis"
+          type="date"
+          value={financial.valid_to || ''}
+          onChange={e => updateRootFields({ valid_to: e.target.value })}
+          InputLabelProps={{ shrink: true }}
+          size="small"
+          sx={{ maxWidth: 180 }}
+        />
+      </Box>
       <IconButton
         aria-label="Entfernen"
         onClick={onDelete}
@@ -78,8 +120,8 @@ function FeeIncomeDetail({ financial, onChange, onDelete, item }) {
         Wählen Sie die passende Beitragsordnung für die Gruppe.
       </Typography>
       <RadioGroup
-        value={financial.financialDefId || ''}
-        onChange={e => onChange({ ...financial, financialDefId: e.target.value })}
+        value={typeDetails.financialDefId || ''}
+        onChange={e => updateTypeDetails({ financialDefId: e.target.value })}
       >
         {matchingDefs.length === 0 && (
           <Typography variant="caption" color="error">
@@ -95,42 +137,7 @@ function FeeIncomeDetail({ financial, onChange, onDelete, item }) {
           />
         ))}
       </RadioGroup>
-      {selectedDef && matchedFeeGroup && (
-        <Paper variant="outlined" sx={{ p: 2 }}>
-          <Typography variant="subtitle2">{selectedDef.description}</Typography>
-          <Typography variant="caption" color="text.secondary">
-            Gültig von: {selectedDef.valid_from} bis {selectedDef.valid_to}
-          </Typography>
-          <TableContainer>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Min. Stunden</TableCell>
-                  <TableCell>Betrag</TableCell>
-                  <TableCell>Währung</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {matchedFee ? (
-                  <TableRow>
-                    <TableCell>{matchedFee.minHours}</TableCell>
-                    <TableCell>{matchedFee.amount}</TableCell>
-                    <TableCell>{matchedFee.currency}</TableCell>
-                  </TableRow>
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={3}>
-                      <Typography variant="caption" color="error">
-                        Keine passende Gebühr gefunden für {sumOfBookingTimes} Stunden.
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Paper>
-      )}
+     
       <Button
         variant="outlined"
         color="error"

@@ -1,14 +1,16 @@
-import React, { useState } from 'react';
-import { Box, TextField, Typography, MenuItem, Button, Table, TableBody, TableCell, TableHead, TableRow, Checkbox, IconButton, Menu } from '@mui/material';
+import React, { useMemo } from 'react';
+import { Box, TextField, Typography, MenuItem, Button, Table, TableBody, TableCell, TableHead, TableRow, IconButton } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import { useAvrExpenseCalculator } from '../../../utils/financialCalculators/avrExpenseCalculator';
+import { useOverlayData } from '../../../hooks/useOverlayData';
+import { calculateWorktimeFromBookings } from '../../../utils/bookingUtils';
+import { getAllStagesForGroup } from '../../../utils/avr-calculator';
 
 function AvrExpenseDetail({ financial, onChange, onDelete, item }) {
   // Use calculator for all AVR logic
   const {
     groupOptions,
-    stageOptions,
     avrSalary,
     bonusRows,
     eintrittsdatum,
@@ -23,15 +25,117 @@ function AvrExpenseDetail({ financial, onChange, onDelete, item }) {
     bonusMenuOpen,
   } = useAvrExpenseCalculator({ financial, onChange, item });
 
+  // Overlay-aware data access
+  const { getEffectiveBookings } = useOverlayData();
+  const bookingsObj = getEffectiveBookings(item?.id);
+  const bookings = useMemo(() => Object.values(bookingsObj || {}), [bookingsObj]);
+
+  // Calculate working hours from bookings (sum of all booking hours)
+  const calculatedWorkingHours = useMemo(() => {
+    return calculateWorktimeFromBookings(bookings);
+  }, [bookings]);
+
+  // Extract type_details for editing
+  const typeDetails = financial.type_details || {};
+
+  // Handler for updating root-level fields (valid_from, valid_to)
+  const updateRootFields = (updates) => {
+    onChange({
+      ...financial,
+      ...updates
+    });
+  };
+
+  // --- NEW: Get available stages for selected group from AVR data ---
+  const stageDropdownOptions = useMemo(() => {
+    if (!typeDetails.group) return [];
+    // Use item's startdate or today as reference date
+    const refDate = item?.startdate || new Date().toISOString().slice(0, 10);
+    return getAllStagesForGroup(refDate, Number(typeDetails.group)).map(stage => ({
+      value: stage,
+      label: `Stufe ${stage}`
+    }));
+  }, [typeDetails.group, item?.startdate]);
+
+  // Handler for updating type_details
+  const updateTypeDetails = (updates) => {
+    onChange({
+      ...financial,
+      type_details: { ...typeDetails, ...updates }
+    });
+  };
+
+  // Handler for stacking bonuses as financials
+  const handleAddBonus = (bonusType) => {
+    const newBonus = {
+      id: `${Date.now()}-${Math.random()}`,
+      type: bonusType,
+      type_details: {},
+      amount: 0,
+      from: '',
+      to: '',
+      financial: []
+    };
+    onChange({
+      ...financial,
+      financial: [...(financial.financial || []), newBonus]
+    });
+  };
+
+  const handleUpdateBonus = (idx, updatedBonus) => {
+    const updatedBonuses = [...(financial.financial || [])];
+    updatedBonuses[idx] = updatedBonus;
+    onChange({
+      ...financial,
+      financial: updatedBonuses
+    });
+  };
+
+  const handleDeleteBonus = (idx) => {
+    const updatedBonuses = [...(financial.financial || [])];
+    updatedBonuses.splice(idx, 1);
+    onChange({
+      ...financial,
+      financial: updatedBonuses
+    });
+  };
+
+  // --- NEW: Sync Eintrittsdatum with data item's startdate if not set ---
+  const effectiveStartDate = typeDetails.StartDate || item?.startdate || '';
+  // --- NEW: Use calculated working hours unless user overrides ---
+  const effectiveWorkingHours = typeDetails.WorkingHours !== undefined && typeDetails.WorkingHours !== ''
+    ? typeDetails.WorkingHours
+    : calculatedWorkingHours;
+
   return (
     <Box display="flex" flexDirection="column" gap={2} position="relative">
+      {/* Valid from/to fields */}
+      <Box display="flex" gap={2}>
+        <TextField
+          label="Gültig von"
+          type="date"
+          value={financial.valid_from || ''}
+          onChange={e => updateRootFields({ valid_from: e.target.value })}
+          InputLabelProps={{ shrink: true }}
+          size="small"
+          sx={{ maxWidth: 180 }}
+        />
+        <TextField
+          label="Gültig bis"
+          type="date"
+          value={financial.valid_to || ''}
+          onChange={e => updateRootFields({ valid_to: e.target.value })}
+          InputLabelProps={{ shrink: true }}
+          size="small"
+          sx={{ maxWidth: 180 }}
+        />
+      </Box>
+      {/* Group selection */}
       <TextField
         select
         label="Gruppe"
-        value={financial.group || ''}
-        onChange={e =>
-          onChange({ ...financial, group: Number(e.target.value), stage: '' })
-        }
+        value={typeDetails.group || ''}
+        onChange={e => updateTypeDetails({ group: Number(e.target.value), stage: '' })}
       >
         {groupOptions.map(opt => (
           <MenuItem key={opt.group_id} value={opt.group_id}>
@@ -39,35 +143,54 @@ function AvrExpenseDetail({ financial, onChange, onDelete, item }) {
           </MenuItem>
         ))}
       </TextField>
+      {/* Stage selection */}
       <TextField
         select
         label="Stufe"
-        value={financial.stage || ''}
-        onChange={e =>
-          onChange({ ...financial, stage: Number(e.target.value) })
-        }
-        disabled={!financial.group}
+        value={typeDetails.stage || ''}
+        onChange={e => updateTypeDetails({ stage: Number(e.target.value) })}
+        disabled={!typeDetails.group}
       >
-        {stageOptions.map(opt => (
+        {stageDropdownOptions.map(opt => (
           <MenuItem key={opt.value} value={opt.value}>
             {opt.label}
           </MenuItem>
         ))}
       </TextField>
+      {/* Eintrittsdatum as datepicker, synced with data item */}
       <TextField
         label="Eintrittsdatum"
-        value={eintrittsdatum}
-        InputProps={{ readOnly: true }}
-        disabled
+        type="date"
+        value={effectiveStartDate}
+        onChange={e => updateTypeDetails({ StartDate: e.target.value })}
+        InputLabelProps={{ shrink: true }}
+        size="small"
+        sx={{ maxWidth: 180 }}
       />
+      {/* NoOfChildren */}
       <TextField
         label="Anzahl Kinder"
         type="number"
         size="small"
-        value={financial.kinderanzahl || ''}
-        onChange={e => onChange({ ...financial, kinderanzahl: e.target.value })}
+        value={typeDetails.NoOfChildren || ''}
+        onChange={e => updateTypeDetails({ NoOfChildren: e.target.value })}
         sx={{ maxWidth: 180 }}
         inputProps={{ min: 0 }}
+      />
+      {/* Wochenstunden, calculated from bookings */}
+      <TextField
+        label="Wochenstunden"
+        type="number"
+        size="small"
+        value={effectiveWorkingHours}
+        onChange={e => updateTypeDetails({ WorkingHours: e.target.value })}
+        sx={{ maxWidth: 180 }}
+        inputProps={{ min: 0 }}
+        helperText={
+          calculatedWorkingHours !== undefined && calculatedWorkingHours !== ''
+            ? `Berechnet aus Buchungen: ${calculatedWorkingHours} h/Woche`
+            : undefined
+        }
       />
       {avrSalary !== null && (
         <Typography variant="body2" color="primary">
@@ -83,86 +206,36 @@ function AvrExpenseDetail({ financial, onChange, onDelete, item }) {
             variant="outlined"
             size="small"
             startIcon={<AddIcon />}
-            onClick={(e) => setBonusMenuAnchor(e.currentTarget)}
-            disabled={availableBonusTypes.length === 0}
+            onClick={() => handleAddBonus('bonus')}
           >
             Bonus hinzufügen
           </Button>
         </Box>
-        <Menu
-          anchorEl={bonusMenuAnchor}
-          open={bonusMenuOpen}
-          onClose={() => setBonusMenuAnchor(null)}
-        >
-          {availableBonusTypes.map((bonus) => (
-            <MenuItem key={bonus.value} onClick={() => handleBonusAdd(bonus.value)}>
-              {bonus.label}
-            </MenuItem>
-          ))}
-        </Menu>
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell>Name</TableCell>
-              <TableCell>Auszahlung</TableCell>
+              <TableCell>Typ</TableCell>
               <TableCell>Betrag</TableCell>
-              <TableCell>Fortzahlung</TableCell>
-              <TableCell>Gültig von</TableCell>
-              <TableCell>Gültig bis</TableCell>
               <TableCell>Aktion</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {filteredBonusRows.map((row) => (
-              <TableRow key={row.value}>
+            {(financial.financial || []).map((bonus, idx) => (
+              <TableRow key={bonus.id}>
+                <TableCell>{bonus.type}</TableCell>
                 <TableCell>
-                  {row.label}
-                  {row.payoutDate && (
-                    <Typography variant="caption" color="text.secondary" display="block">
-                      Auszahlung: {row.payoutDate}
-                    </Typography>
-                  )}
-                </TableCell>
-                <TableCell>{row.payout}</TableCell>
-                <TableCell>
-                  {row.amount !== null && row.amount !== undefined && row.amount !== ''
-                    ? Number(row.amount).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })
-                    : ''}
-                </TableCell>
-                <TableCell>
-                  <Checkbox checked={row.continueOnAbsence} disabled />
-                </TableCell>
-                <TableCell>
-                  {row.startInput ? (
-                    <TextField
-                      type="date"
-                      size="small"
-                      value={row.bonusStart || ''}
-                      onChange={e => handleBonusDateChange(row.value, 'start', e.target.value)}
-                      sx={{ minWidth: 120 }}
-                    />
-                  ) : (
-                    row.bonusStart ? row.bonusStart : ''
-                  )}
-                </TableCell>
-                <TableCell>
-                  {row.endInput ? (
-                    <TextField
-                      type="date"
-                      size="small"
-                      value={row.bonusEnd || ''}
-                      onChange={e => handleBonusDateChange(row.value, 'end', e.target.value)}
-                      sx={{ minWidth: 120 }}
-                    />
-                  ) : (
-                    row.bonusEnd ? row.bonusEnd : ''
-                  )}
+                  <TextField
+                    type="number"
+                    size="small"
+                    value={bonus.amount || ''}
+                    onChange={e => handleUpdateBonus(idx, { ...bonus, amount: Number(e.target.value) })}
+                  />
                 </TableCell>
                 <TableCell>
                   <IconButton
                     aria-label="Entfernen"
                     size="small"
-                    onClick={() => handleBonusDelete(row.value)}
+                    onClick={() => handleDeleteBonus(idx)}
                   >
                     <DeleteIcon fontSize="small" />
                   </IconButton>

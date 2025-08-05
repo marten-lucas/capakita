@@ -428,3 +428,17 @@ function groupNameMatchesGroupId(groupName, groupId) {
 
 // Export all loaded AVR data if needed elsewhere
 export { avrDataArray };
+
+/**
+ * Returns all salary stages ("Stufen") for a group_id at a given date (or latest if not found).
+ * @param {string} dateStr
+ * @param {number} groupId
+ * @returns {Array<number>} Array of stage numbers
+ */
+export function getAllStagesForGroup(dateStr, groupId) {
+  const avrData = findApplicableAvrData(dateStr) || avrDataArray[avrDataArray.length - 1];
+  if (!avrData) return [];
+  const group = avrData.salery_groups.find(g => g.group_id === groupId);
+  if (!group || !Array.isArray(group.amount)) return [];
+  return group.amount.map(a => a.stage);
+}
