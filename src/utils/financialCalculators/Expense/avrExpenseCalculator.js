@@ -8,7 +8,7 @@ import {
   calcAvrChildBonus,
   calcAvrInstructorBonus,
   calcAvrYearlyBonus
-} from '../avr-calculator';
+} from './avr-calculator';
 import { useState } from 'react';
 
 export function useAvrExpenseCalculator({ financial, onChange, item }) {
