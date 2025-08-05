@@ -26,25 +26,27 @@ function FeeIncomeDetail({ financial, onChange, onDelete, item }) {
     groupRef = item.groupId || null;
   }
 
-  // Filter financialDefs by groupRef
-  const matchingDefs = financialDefs.filter(def => def.groupRef === groupRef);
+  // Find selected financialDef
+  const selectedDef = financialDefs.find(def => def.id === financial.financialDefId);
+
+  // Find the fee group for the current groupRef
+  let matchedFeeGroup = null;
+  if (selectedDef && Array.isArray(selectedDef.fee_groups)) {
+    matchedFeeGroup = selectedDef.fee_groups.find(g => g.groupref === groupRef);
+  }
 
   // Calculate sum of booking times for the item (overlay-aware)
-  // Use bookingUtils function, which expects an array of bookings
   const sumOfBookingTimes = calculateWorktimeFromBookings(item.bookings || []);
 
-  // Find selected financialDef
-  const selectedDef = matchingDefs.find(def => def.id === financial.financialDefId);
-
-  // Find the fee that matches the sumOfBookingTimes
+  // Find the fee that matches the sumOfBookingTimes in the matched fee group
   let matchedFee = null;
-  if (selectedDef && Array.isArray(selectedDef.fees)) {
-    // Sort fees by maxBookingHours ascending
-    const sortedFees = [...selectedDef.fees].sort((a, b) => (a.maxBookingHours ?? 0) - (b.maxBookingHours ?? 0));
+  if (matchedFeeGroup && Array.isArray(matchedFeeGroup.fees)) {
+    // Sort fees by minHours ascending
+    const sortedFees = [...matchedFeeGroup.fees].sort((a, b) => (a.minHours ?? 0) - (b.minHours ?? 0));
     for (let i = 0; i < sortedFees.length; i++) {
-      const lowerBound = i === 0 ? 0 : sortedFees[i - 1].maxBookingHours;
-      const upperBound = sortedFees[i].maxBookingHours;
-      if (sumOfBookingTimes > lowerBound && sumOfBookingTimes <= upperBound) {
+      const lowerBound = sortedFees[i].minHours ?? 0;
+      const upperBound = sortedFees[i + 1]?.minHours ?? Infinity;
+      if (sumOfBookingTimes >= lowerBound && sumOfBookingTimes < upperBound) {
         matchedFee = sortedFees[i];
         break;
       }
@@ -55,6 +57,11 @@ function FeeIncomeDetail({ financial, onChange, onDelete, item }) {
       }
     }
   }
+
+  // Only show financialDefs that have a fee_group for the current groupRef
+  const matchingDefs = financialDefs.filter(def =>
+    Array.isArray(def.fee_groups) && def.fee_groups.some(g => g.groupref === groupRef)
+  );
 
   return (
     <Box display="flex" flexDirection="column" gap={2} position="relative">
@@ -88,7 +95,7 @@ function FeeIncomeDetail({ financial, onChange, onDelete, item }) {
           />
         ))}
       </RadioGroup>
-      {selectedDef && (
+      {selectedDef && matchedFeeGroup && (
         <Paper variant="outlined" sx={{ p: 2 }}>
           <Typography variant="subtitle2">{selectedDef.description}</Typography>
           <Typography variant="caption" color="text.secondary">
@@ -98,19 +105,21 @@ function FeeIncomeDetail({ financial, onChange, onDelete, item }) {
             <Table size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell>Max. Stunden</TableCell>
-                  <TableCell>Betrag (€)</TableCell>
+                  <TableCell>Min. Stunden</TableCell>
+                  <TableCell>Betrag</TableCell>
+                  <TableCell>Währung</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {matchedFee ? (
                   <TableRow>
-                    <TableCell>{matchedFee.maxBookingHours}</TableCell>
+                    <TableCell>{matchedFee.minHours}</TableCell>
                     <TableCell>{matchedFee.amount}</TableCell>
+                    <TableCell>{matchedFee.currency}</TableCell>
                   </TableRow>
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={2}>
+                    <TableCell colSpan={3}>
                       <Typography variant="caption" color="error">
                         Keine passende Gebühr gefunden für {sumOfBookingTimes} Stunden.
                       </Typography>

@@ -1,17 +1,3 @@
-import React, { useState } from 'react';
-import { Box, TextField, Button, Typography, MenuItem, IconButton, Table, TableBody, TableCell, TableHead, TableRow, Checkbox, Menu } from '@mui/material';
-import DeleteIcon from '@mui/icons-material/Delete';
-import AddIcon from '@mui/icons-material/Add';
-import { 
-  getSalaryForGroupAndStage, 
-  normalizeDateString, 
-  getAllSalaryGroups, 
-  getAllSalaryStages, 
-  getAllBonusTypes,
-  getBonusDefinition,
-  calcAvrChildBonus,
-  calcAvrInstructorBonus,
-  calcAvrYearlyBonus} from '../../../utils/avr-calculator';
 import { FINANCIAL_TYPE_REGISTRY } from '../../../config/financialTypeRegistry';
 
 function FinancialsDetail({ financial, onChange, onDelete, item }) {

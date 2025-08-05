@@ -80,15 +80,16 @@ function OrgaTabRateDefs() {
     }));
   };
 
-  // Remove all feeGroups logic, work directly with fees on the financialDef
-  const handleAddFee = () => {
-    const newFee = {
-      maxBookingHours: 0,
-      amount: 0
+  // Add Fee Group
+  const handleAddFeeGroup = () => {
+    const newGroup = {
+      id: Math.random().toString(36).slice(2),
+      groupref: '',
+      fees: []
     };
     const updatedDef = {
       ...currentDef,
-      fees: [...(currentDef.fees || []), newFee]
+      fee_groups: [...(currentDef.fee_groups || []), newGroup]
     };
     dispatch(updateFinancialDefThunk({
       scenarioId: selectedScenarioId,
@@ -97,23 +98,68 @@ function OrgaTabRateDefs() {
     }));
   };
 
-  const handleUpdateFee = (feeIndex, updates) => {
-    const updatedFees = [...(currentDef.fees || [])];
-    updatedFees[feeIndex] = { ...updatedFees[feeIndex], ...updates };
+  // Remove Fee Group
+  const handleDeleteFeeGroup = (groupIndex) => {
+    const updatedGroups = [...(currentDef.fee_groups || [])];
+    updatedGroups.splice(groupIndex, 1);
     dispatch(updateFinancialDefThunk({
       scenarioId: selectedScenarioId,
       financialDefId: currentDef.id,
-      updates: { ...currentDef, fees: updatedFees }
+      updates: { ...currentDef, fee_groups: updatedGroups }
     }));
   };
 
-  const handleDeleteFee = (feeIndex) => {
-    const updatedFees = [...(currentDef.fees || [])];
-    updatedFees.splice(feeIndex, 1);
+  // Add Fee to FeeGroup
+  const handleAddFee = (groupIndex) => {
+    const updatedGroups = [...(currentDef.fee_groups || [])];
+    updatedGroups[groupIndex] = {
+      ...updatedGroups[groupIndex],
+      fees: [
+        ...(updatedGroups[groupIndex].fees || []),
+        { maxHours: 0, amount: 0, currency: 'EUR' }
+      ]
+    };
     dispatch(updateFinancialDefThunk({
       scenarioId: selectedScenarioId,
       financialDefId: currentDef.id,
-      updates: { ...currentDef, fees: updatedFees }
+      updates: { ...currentDef, fee_groups: updatedGroups }
+    }));
+  };
+
+  // Update Fee in FeeGroup
+  const handleUpdateFee = (groupIndex, feeIndex, updates) => {
+    const updatedGroups = [...(currentDef.fee_groups || [])];
+    const updatedFees = [...(updatedGroups[groupIndex].fees || [])];
+    updatedFees[feeIndex] = { ...updatedFees[feeIndex], ...updates };
+    updatedGroups[groupIndex] = { ...updatedGroups[groupIndex], fees: updatedFees };
+    dispatch(updateFinancialDefThunk({
+      scenarioId: selectedScenarioId,
+      financialDefId: currentDef.id,
+      updates: { ...currentDef, fee_groups: updatedGroups }
+    }));
+  };
+
+  // Delete Fee from FeeGroup
+  const handleDeleteFee = (groupIndex, feeIndex) => {
+    const updatedGroups = [...(currentDef.fee_groups || [])];
+    const updatedFees = [...(updatedGroups[groupIndex].fees || [])];
+    updatedFees.splice(feeIndex, 1);
+    updatedGroups[groupIndex] = { ...updatedGroups[groupIndex], fees: updatedFees };
+    dispatch(updateFinancialDefThunk({
+      scenarioId: selectedScenarioId,
+      financialDefId: currentDef.id,
+      updates: { ...currentDef, fee_groups: updatedGroups }
+    }));
+  };
+
+  // Update groupref in FeeGroup
+  const handleUpdateGroupRef = (groupIndex, groupref) => {
+    const updatedGroups = [...(currentDef.fee_groups || [])];
+    updatedGroups[groupIndex] = { ...updatedGroups[groupIndex], groupref };
+    dispatch(updateFinancialDefThunk({
+      scenarioId: selectedScenarioId,
+      financialDefId: currentDef.id,
+      updates: { ...currentDef, fee_groups: updatedGroups }
     }));
   };
 
@@ -209,15 +255,6 @@ function OrgaTabRateDefs() {
                     size="small"
                     sx={{ minWidth: 200 }}
                   />
-                  <GroupPicker
-                    groupDefs={groupDefs}
-                    value={currentDef.groupRef}
-                    onChange={e => dispatch(updateFinancialDefThunk({
-                      scenarioId: selectedScenarioId,
-                      financialDefId: currentDef.id,
-                      updates: { ...currentDef, groupRef: e.target.value }
-                    }))}
-                  />
                   <TextField
                     label="Gültig von"
                     type="date"
@@ -244,57 +281,88 @@ function OrgaTabRateDefs() {
                   />
                 </Box>
               </Paper>
-              {/* Gebühren table */}
+              {/* Fee Groups */}
               <Paper sx={{ flex: 1, p: 2 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                  <Button variant="outlined" startIcon={<AddIcon />} onClick={handleAddFee}>
-                    Gebühr hinzufügen
+                  <Button variant="outlined" startIcon={<AddIcon />} onClick={handleAddFeeGroup}>
+                    Gebühren-Gruppe hinzufügen
                   </Button>
                 </Box>
-                <TableContainer>
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Max. Stunden</TableCell>
-                        <TableCell>Betrag (€)</TableCell>
-                        <TableCell align="right">Aktionen</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {(currentDef.fees || []).map((fee, feeIndex) => (
-                        <TableRow key={feeIndex}>
-                          <TableCell>
-                            <TextField
-                              type="number"
-                              value={fee.maxBookingHours || 0}
-                              onChange={e => handleUpdateFee(feeIndex, { maxBookingHours: Number(e.target.value) })}
-                              size="small"
-                              sx={{ width: 80 }}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <FormControl sx={{ m: 1 }}>
-                              <InputLabel htmlFor={`outlined-adornment-amount-${feeIndex}`}>Amount</InputLabel>
-                              <OutlinedInput
-                                id={`outlined-adornment-amount-${feeIndex}`}
-                                type="number"
-                                value={fee.amount || 0}
-                                onChange={e => handleUpdateFee(feeIndex, { amount: Number(e.target.value) })}
-                                startAdornment={<InputAdornment position="start">€</InputAdornment>}
-                                label="Amount"
-                              />
-                            </FormControl>
-                          </TableCell>
-                          <TableCell align="right">
-                            <IconButton size="small" onClick={() => handleDeleteFee(feeIndex)}>
-                              <DeleteIcon />
-                            </IconButton>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
+                {(currentDef.fee_groups || []).map((feeGroup, groupIndex) => (
+                  <Box key={feeGroup.id || groupIndex} sx={{ mb: 4, border: '1px solid #eee', borderRadius: 2, p: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+                      <GroupPicker
+                        groupDefs={groupDefs}
+                        value={feeGroup.groupref}
+                        onChange={e => handleUpdateGroupRef(groupIndex, e.target.value)}
+                      />
+                      <IconButton size="small" onClick={() => handleDeleteFeeGroup(groupIndex)}>
+                        <DeleteIcon />
+                      </IconButton>
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        startIcon={<AddIcon />}
+                        onClick={() => handleAddFee(groupIndex)}
+                      >
+                        Gebühr hinzufügen
+                      </Button>
+                    </Box>
+                    <TableContainer>
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>Max. Stunden</TableCell>
+                            <TableCell>Betrag</TableCell>
+                            <TableCell>Währung</TableCell>
+                            <TableCell align="right">Aktionen</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {(feeGroup.fees || []).map((fee, feeIndex) => (
+                            <TableRow key={feeIndex}>
+                              <TableCell>
+                                <TextField
+                                  type="number"
+                                  value={fee.maxHours || 0}
+                                  onChange={e => handleUpdateFee(groupIndex, feeIndex, { maxHours: Number(e.target.value) })}
+                                  size="small"
+                                  sx={{ width: 80 }}
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <FormControl sx={{ m: 1 }}>
+                                  <InputLabel htmlFor={`outlined-adornment-amount-${groupIndex}-${feeIndex}`}>Betrag</InputLabel>
+                                  <OutlinedInput
+                                    id={`outlined-adornment-amount-${groupIndex}-${feeIndex}`}
+                                    type="number"
+                                    value={fee.amount || 0}
+                                    onChange={e => handleUpdateFee(groupIndex, feeIndex, { amount: Number(e.target.value) })}
+                                    startAdornment={<InputAdornment position="start">€</InputAdornment>}
+                                    label="Betrag"
+                                  />
+                                </FormControl>
+                              </TableCell>
+                              <TableCell>
+                                <TextField
+                                  value={fee.currency || 'EUR'}
+                                  onChange={e => handleUpdateFee(groupIndex, feeIndex, { currency: e.target.value })}
+                                  size="small"
+                                  sx={{ width: 80 }}
+                                />
+                              </TableCell>
+                              <TableCell align="right">
+                                <IconButton size="small" onClick={() => handleDeleteFee(groupIndex, feeIndex)}>
+                                  <DeleteIcon />
+                                </IconButton>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </Box>
+                ))}
               </Paper>
             </Box>
           )}

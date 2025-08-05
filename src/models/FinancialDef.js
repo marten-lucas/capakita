@@ -1,9 +1,23 @@
 /**
+ * @typedef {Object} Fee
+ * @property {number} maxHours
+ * @property {number} amount
+ * @property {string} currency
+ */
+
+/**
+ * @typedef {Object} FeeGroup
+ * @property {string} id
+ * @property {string} groupref
+ * @property {Array<Fee>} fees
+ */
+
+/**
  * @typedef {Object} FinancialDef
  * @property {string} id
  * @property {string} name
  * @property {string} [remark]
- * @property {Array} fees
+ * @property {Array<FeeGroup>} fee_groups
  * // ...add other properties as needed
  */
 
@@ -15,13 +29,25 @@ export class FinancialDef {
     id,
     name = '',
     remark = '',
-    fees = [],
+    fee_groups = [
+      {
+        id: '',
+        groupref: '',
+        fees: [
+          {
+            maxHours: 0,
+            amount: 0,
+            currency: 'EUR',
+          }
+        ]
+      }
+    ],
     ...rest
   }) {
     this.id = String(id);
     this.name = name;
     this.remark = remark;
-    this.fees = Array.isArray(fees) ? fees : [];
+    this.fee_groups = Array.isArray(fee_groups) ? fee_groups : [];
     Object.assign(this, rest);
   }
 }

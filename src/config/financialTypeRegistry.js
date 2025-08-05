@@ -1,7 +1,7 @@
 import AvrExpenseDetail from '../components/SimDataDetail/Financials/AvrExpenseDetail';
 import FeeIncomeDetail from '../components/SimDataDetail/Financials/FeeIncomeDetail';
 // ...import other detail components...
-import { useAvrExpenseCalculator } from '../utils/financialCalculators/avrExpenseCalculator';
+import { avrExpenseCalculator } from '../utils/financialCalculators/avrExpenseCalculator';
 import { feeIncomeCalculator } from '../utils/financialCalculators/feeIncomeCalculator';
 // ...import other calculators...
 
@@ -11,14 +11,14 @@ export const FINANCIAL_TYPE_REGISTRY = [
     label: 'Ausgabe: AVR-Entgelt',
     allowed: ['capacity'],
     component: AvrExpenseDetail,
-    calculator: useAvrExpenseCalculator,
+    calculator: (params) => avrExpenseCalculator(params),
   },
   {
     value: 'income-fee',
     label: 'Einnahme: Elternbeitrag',
     allowed: ['demand'],
     component: FeeIncomeDetail,
-    calculator: feeIncomeCalculator,
+    calculator: (params) => feeIncomeCalculator(params),
   },
   // ...other types...
 ];

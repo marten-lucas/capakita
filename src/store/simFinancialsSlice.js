@@ -59,10 +59,10 @@ const simFinancialsSlice = createSlice({
     addFinancialDef(state, action) {
       const { scenarioId, financialDef } = action.payload;
       if (!state.financialDefsByScenario[scenarioId]) state.financialDefsByScenario[scenarioId] = [];
-      // Remove feeGroups if present, only keep fees
+      // Ensure fee_groups is present and is an array
       const cleanedDef = {
         ...financialDef,
-        fees: financialDef.fees || [],
+        fee_groups: Array.isArray(financialDef.fee_groups) ? financialDef.fee_groups : [],
       };
       state.financialDefsByScenario[scenarioId].push({ ...cleanedDef, id: financialDef.id || createId('financialDef') });
     },
@@ -71,10 +71,10 @@ const simFinancialsSlice = createSlice({
       const defs = state.financialDefsByScenario[scenarioId] || [];
       const idx = defs.findIndex(def => def.id === financialDefId);
       if (idx !== -1) {
-        // Remove feeGroups if present, only keep fees
+        // Ensure fee_groups is present and is an array
         const cleanedUpdates = {
           ...updates,
-          fees: updates.fees || [],
+          fee_groups: Array.isArray(updates.fee_groups) ? updates.fee_groups : [],
         };
         defs[idx] = { ...defs[idx], ...cleanedUpdates };
       }
