@@ -2,10 +2,10 @@ import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Box, TextField, Typography, MenuItem, Button, IconButton, Menu, List, ListItem, ListItemText, ListItemSecondaryAction } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
-import { useAvrExpenseCalculator } from '../../../../utils/financialCalculators/avrExpenseCalculator';
+import { useAvrExpenseCalculator } from '../../../../utils/financialCalculators/Expense/avrExpenseCalculator';
 import { useOverlayData } from '../../../../hooks/useOverlayData';
 import { calculateWorktimeFromBookings } from '../../../../utils/bookingUtils';
-import { getAllStagesForGroup } from '../../../../utils/avr-calculator';
+import { getAllStagesForGroup } from '../../../../utils/financialCalculators/Expense/avr-calculator';
 
 // Define bonus registry inline to avoid circular dependency
 const BONUS_REGISTRY = [

@@ -2,10 +2,10 @@ import { useMemo, useState } from 'react';
 import { Box, TextField, Typography, MenuItem, Button, List, ListItem, ListItemText, ListItemSecondaryAction, IconButton, Menu } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
-import { useAvrExpenseCalculator } from '../../../utils/financialCalculators/avrExpenseCalculator';
+import { useAvrExpenseCalculator } from '../../../utils/financialCalculators/Expense/avrExpenseCalculator';
 import { useOverlayData } from '../../../hooks/useOverlayData';
 import { calculateWorktimeFromBookings } from '../../../utils/bookingUtils';
-import { getAllStagesForGroup } from '../../../utils/avr-calculator';
+import { getAllStagesForGroup } from '../../../utils/financialCalculators/Expense/avr-calculator';
 import { FINANCIAL_BONUS_REGISTRY } from '../../../config/financialTypeRegistry';
 
 function AvrExpenseDetail({ financial, onChange, item }) {

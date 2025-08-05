@@ -3,6 +3,7 @@ import FileUploadIcon from '@mui/icons-material/FileUpload'
 import { useNavigate } from 'react-router-dom'
 import WeeklyChart from '../components/SimDataCharts/WeeklyChart'
 import MidtermChart from '../components/SimDataCharts/MidtermChart'
+import FinancialChart from '../components/SimDataCharts/FinancialChart'
 import { useSelector, useDispatch } from 'react-redux';
 import { setSelectedScenarioId } from '../store/simScenarioSlice';
 import React from 'react'
@@ -99,6 +100,14 @@ function VisuPage() {
               Midterm Chart
             </Typography>
             <MidtermChart hideFilters scenarioId={selectedScenarioId} />
+          </Box>
+        )}
+        {chartToggles.includes('financial') && (
+          <Box sx={{ minHeight: '400px' }}>
+            <Typography variant="h6" sx={{ mb: 2, color: 'text.secondary' }}>
+              Financial Chart
+            </Typography>
+            <FinancialChart scenarioId={selectedScenarioId} />
           </Box>
         )}
         {chartToggles.length === 0 && (
