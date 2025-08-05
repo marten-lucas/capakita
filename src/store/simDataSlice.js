@@ -16,7 +16,9 @@ const simDataSlice = createSlice({
       state.dataByScenario[scenarioId][key] = {
         ...item,
         id: key,
-        absences: Array.isArray(item.absences) ? item.absences : [],
+        absences: Array.isArray(item.absences)
+          ? item.absences.map(a => ({ ...a, payType: a.payType || 'fully_paid' }))
+          : [],
       };
     },
     updateDataItem(state, action) {
@@ -25,8 +27,16 @@ const simDataSlice = createSlice({
       if (!state.dataByScenario[scenarioId] || !state.dataByScenario[scenarioId][id]) return;
       state.dataByScenario[scenarioId][id] = {
         ...state.dataByScenario[scenarioId][id],
-        ...updates
-
+        ...updates,
+        // Ensure absences have payType if updated
+        ...(updates.absences
+          ? {
+              absences: updates.absences.map(a => ({
+                ...a,
+                payType: a.payType || 'fully_paid'
+              }))
+            }
+          : {})
       };
     },
     updateDataItemFields(state, action) {
@@ -35,7 +45,14 @@ const simDataSlice = createSlice({
       const item = state.dataByScenario[scenarioId]?.[id];
       if (!item) return;
       Object.entries(fields).forEach(([key, value]) => {
-        item[key] = value;
+        if (key === 'absences' && Array.isArray(value)) {
+          item.absences = value.map(a => ({
+            ...a,
+            payType: a.payType || 'fully_paid'
+          }));
+        } else {
+          item[key] = value;
+        }
       });
       // If name is changed, also update id if needed (not strictly necessary now)
       if ('name' in fields) {

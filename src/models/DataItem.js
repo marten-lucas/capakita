@@ -10,7 +10,7 @@
  * @property {string} dateofbirth
  * @property {string} groupId
  * @property {Object} rawdata
- * @property {Array} absences
+ * @property {Array<{start: string, end: string, payType?: string}>} absences
  * // ...add other properties as needed
  */
 
@@ -42,7 +42,10 @@ export class DataItem {
     this.dateofbirth = dateofbirth;
     this.groupId = groupId;
     this.rawdata = rawdata;
-    this.absences = absences;
+    // Ensure absences have payType
+    this.absences = Array.isArray(absences)
+      ? absences.map(a => ({ ...a, payType: a.payType || 'fully_paid' }))
+      : [];
     Object.assign(this, rest);
   }
 }

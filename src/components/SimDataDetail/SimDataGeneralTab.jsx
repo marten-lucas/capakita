@@ -248,7 +248,7 @@ function SimDataGeneralTab() {
                 }
               }
               return (
-                <Box key={idx} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Box key={idx} sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                   <TextField
                     label="von"
                     type="date"
@@ -283,6 +283,23 @@ function SimDataGeneralTab() {
                   <Typography variant="body2" sx={{ minWidth: 80 }}>
                     {workdays > 0 ? `${workdays} Arbeitstage` : ''}
                   </Typography>
+                  {/* Pay type radio group */}
+                  <FormControl component="fieldset" sx={{ ml: 2 }}>
+                    <RadioGroup
+                      row
+                      value={absence.payType || 'fully_paid'}
+                      onChange={e => {
+                        const newAbsence = { ...absence, payType: e.target.value };
+                        const newList = localAbsences.map((a, i) => (i === idx ? newAbsence : a));
+                        setLocalAbsences(newList);
+                        handleUpdateDataItem({ absences: newList });
+                      }}
+                    >
+                      <FormControlLabel value="limited_paid" control={<Radio size="small" />} label="Lohnfortzahlung" />
+                      <FormControlLabel value="fully_paid" control={<Radio size="small" />} label="Voll bezahlt" />
+                      <FormControlLabel value="unpaid" control={<Radio size="small" />} label="Unbezahlt" />
+                    </RadioGroup>
+                  </FormControl>
                   <Button
                     variant="outlined"
                     color="error"
