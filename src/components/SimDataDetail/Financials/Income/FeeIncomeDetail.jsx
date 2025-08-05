@@ -2,7 +2,7 @@ import React from 'react';
 import { Box, Typography, IconButton, Button, RadioGroup, FormControlLabel, Radio, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useSelector } from 'react-redux';
-import { useOverlayData } from '../../../hooks/useOverlayData';
+import { useOverlayData } from '../../../../hooks/useOverlayData';
 
 function FeeIncomeDetail({ financial, onChange, onDelete, item }) {
   // Get effective financial defs and group assignments

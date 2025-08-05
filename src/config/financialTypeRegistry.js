@@ -1,24 +1,17 @@
-import AvrExpenseDetail from '../components/SimDataDetail/Financials/AvrExpenseDetail';
-import FeeIncomeDetail from '../components/SimDataDetail/Financials/FeeIncomeDetail';
-// ...import other detail components...
-import { useAvrExpenseCalculator } from '../utils/financialCalculators/avrExpenseCalculator';
-import { feeIncomeCalculator } from '../utils/financialCalculators/feeIncomeCalculator';
-// ...import other calculators...
-
 export const FINANCIAL_TYPE_REGISTRY = [
   {
     value: 'expense-avr',
     label: 'Ausgabe: AVR-Entgelt',
     allowed: ['capacity'],
-    component: AvrExpenseDetail,
-    calculator: (params) => useAvrExpenseCalculator(params),
+    component: () => import('../components/SimDataDetail/Financials/Expense/AvrExpenseDetail'),
+    calculator: () => ({}),
   },
   {
     value: 'income-fee',
     label: 'Einnahme: Elternbeitrag',
     allowed: ['demand'],
-    component: FeeIncomeDetail,
-    calculator: (params) => feeIncomeCalculator(params),
+    component: () => import('../components/SimDataDetail/Financials/Income/FeeIncomeDetail'),
+    calculator: () => ({}),
   },
   // ...other types...
 ];
@@ -29,21 +22,27 @@ export const FINANCIAL_BONUS_REGISTRY = [
     value: 'bonus-yearly',
     label: 'Jahressonderzahlung',
     allowed: ['capacity'],
-    component: AvrExpenseDetail,
+    component: () => import('../components/SimDataDetail/Financials/Expense/Bonus/BonusYearlyDetail'),
     calculator: () => ({}),
+    unique: true,
+    deleteable: false,
   },
   {
     value: 'bonus-children',
     label: 'Kinderzuschlag',
     allowed: ['capacity'],
-    component: AvrExpenseDetail,
+    component: () => import('../components/SimDataDetail/Financials/Expense/Bonus/BonusChildrenDetail'),
     calculator: () => ({}),
+    unique: false,
+    deleteable: false,
   },
   {
     value: 'bonus-instructor',
     label: 'Praxisanleiterzulage',
     allowed: ['capacity'],
-    component: AvrExpenseDetail,
+    component: () => import('../components/SimDataDetail/Financials/Expense/Bonus/BonusInstructorDetail'),
     calculator: () => ({}),
+    unique: false,
+    deleteable: true,
   },
 ];

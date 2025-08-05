@@ -1,12 +1,36 @@
-import { useMemo, useState } from 'react';
-import { Box, TextField, Typography, MenuItem, Button, List, ListItem, ListItemText, ListItemSecondaryAction, IconButton, Menu } from '@mui/material';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { Box, TextField, Typography, MenuItem, Button, IconButton, Menu, List, ListItem, ListItemText, ListItemSecondaryAction } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
-import { useAvrExpenseCalculator } from '../../../utils/financialCalculators/avrExpenseCalculator';
-import { useOverlayData } from '../../../hooks/useOverlayData';
-import { calculateWorktimeFromBookings } from '../../../utils/bookingUtils';
-import { getAllStagesForGroup } from '../../../utils/avr-calculator';
-import { FINANCIAL_BONUS_REGISTRY } from '../../../config/financialTypeRegistry';
+import { useAvrExpenseCalculator } from '../../../../utils/financialCalculators/avrExpenseCalculator';
+import { useOverlayData } from '../../../../hooks/useOverlayData';
+import { calculateWorktimeFromBookings } from '../../../../utils/bookingUtils';
+import { getAllStagesForGroup } from '../../../../utils/avr-calculator';
+
+// Define bonus registry inline to avoid circular dependency
+const BONUS_REGISTRY = [
+  {
+    value: 'bonus-yearly',
+    label: 'Jahressonderzahlung',
+    component: () => import('./Bonus/BonusYearlyDetail'),
+    unique: true,
+    deleteable: false,
+  },
+  {
+    value: 'bonus-children',
+    label: 'Kinderzuschlag',
+    component: () => import('./Bonus/BonusChildrenDetail'),
+    unique: false,
+    deleteable: false,
+  },
+  {
+    value: 'bonus-instructor',
+    label: 'Praxisanleiterzulage',
+    component: () => import('./Bonus/BonusInstructorDetail'),
+    unique: false,
+    deleteable: true,
+  },
+];
 
 function AvrExpenseDetail({ financial, onChange, item }) {
   // Use calculator for all AVR logic
@@ -27,6 +51,89 @@ function AvrExpenseDetail({ financial, onChange, item }) {
 
   // Extract type_details for editing
   const typeDetails = financial.type_details || {};
+
+  // --- Always add yearly bonus if not present ---
+  useEffect(() => {
+    const bonuses = Array.isArray(financial.financial) ? financial.financial : [];
+    const yearlyBonusIdx = bonuses.findIndex(b => b.type === 'bonus-yearly');
+    if (yearlyBonusIdx === -1) {
+      const newBonus = {
+        id: `${Date.now()}-${Math.random()}`,
+        type: 'bonus-yearly',
+        label: BONUS_REGISTRY.find(b => b.value === 'bonus-yearly')?.label || 'Jahressonderzahlung',
+        type_details: {},
+        financial: []
+      };
+      onChange({
+        ...financial,
+        financial: [...bonuses, newBonus]
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only on mount
+
+  // --- Child Bonus Sync Logic ---
+  // Use a ref to avoid infinite loops when onChange triggers a re-render
+  const lastNoOfChildrenRef = useRef();
+
+  useEffect(() => {
+    const noOfChildren = Number(typeDetails.NoOfChildren) || 0;
+    const bonuses = Array.isArray(financial.financial) ? financial.financial : [];
+    const childBonusIdx = bonuses.findIndex(b => b.type === 'bonus-children');
+    // Prevent unnecessary updates
+    if (lastNoOfChildrenRef.current === noOfChildren && ((childBonusIdx !== -1) === (noOfChildren > 0))) {
+      return;
+    }
+    lastNoOfChildrenRef.current = noOfChildren;
+    if (noOfChildren > 0) {
+      // Add or update child bonus
+      if (childBonusIdx === -1) {
+        const newBonus = {
+          id: `${Date.now()}-${Math.random()}`,
+          type: 'bonus-children',
+          label: BONUS_REGISTRY.find(b => b.value === 'bonus-children')?.label || 'Kinderzuschlag',
+          type_details: { noOfChildren },
+          financial: []
+        };
+        onChange({
+          ...financial,
+          financial: [...bonuses, newBonus]
+        });
+      } else {
+        const bonus = bonuses[childBonusIdx];
+        if (bonus.type_details?.noOfChildren !== noOfChildren) {
+          const updatedBonuses = [...bonuses];
+          updatedBonuses[childBonusIdx] = {
+            ...bonus,
+            type_details: { ...bonus.type_details, noOfChildren }
+          };
+          onChange({
+            ...financial,
+            financial: updatedBonuses
+          });
+        }
+      }
+    } else if (childBonusIdx !== -1) {
+      const updatedBonuses = [...bonuses];
+      updatedBonuses.splice(childBonusIdx, 1);
+      onChange({
+        ...financial,
+        financial: updatedBonuses
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [typeDetails.NoOfChildren, financial.financial]);
+
+  // --- Sync Enddatum with data item's enddate if not set or if item.enddate changes ---
+  useEffect(() => {
+    if (item?.enddate && (!financial.enddate || financial.enddate !== item.enddate)) {
+      onChange({
+        ...financial,
+        enddate: item.enddate
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item?.enddate]);
 
   // Handler for updating root-level fields (valid_from, valid_to)
   const updateRootFields = (updates) => {
@@ -63,7 +170,7 @@ function AvrExpenseDetail({ financial, onChange, item }) {
     const newBonus = {
       id: `${Date.now()}-${Math.random()}`,
       type: bonusType,
-      label: FINANCIAL_BONUS_REGISTRY.find(b => b.value === bonusType)?.label || bonusType,
+      label: BONUS_REGISTRY.find(b => b.value === bonusType)?.label || bonusType,
       type_details: {},
       financial: []
     };
@@ -72,25 +179,6 @@ function AvrExpenseDetail({ financial, onChange, item }) {
       financial: [...(Array.isArray(financial.financial) ? financial.financial : []), newBonus]
     });
   };
-
-  // --- NEW: Sync Eintrittsdatum with data item's startdate if not set ---
-  const effectiveStartDate = typeDetails.StartDate || item?.startdate || '';
-  // --- NEW: Use calculated working hours unless user overrides ---
-  const effectiveWorkingHours = typeDetails.WorkingHours !== undefined && typeDetails.WorkingHours !== ''
-    ? typeDetails.WorkingHours
-    : calculatedWorkingHours;
-
-  // Compute available bonus types from bonus registry, disabling unique types already present
-  const bonusTypeRegistry = useMemo(() => {
-    const bonuses = Array.isArray(financial.financial) ? financial.financial : [];
-    return FINANCIAL_BONUS_REGISTRY.map(t => {
-      const isPresent = !!bonuses.find(b => b.type === t.value);
-      return {
-        ...t,
-        disabled: t.unique && isPresent
-      };
-    });
-  }, [financial.financial]);
 
   // Handler for opening bonus menu
   const handleBonusMenuOpen = (event) => {
@@ -108,11 +196,55 @@ function AvrExpenseDetail({ financial, onChange, item }) {
     handleBonusMenuClose();
   };
 
+  const handleDeleteBonus = (bonusId) => {
+    const updatedBonuses = (financial.financial || []).filter(b => b.id !== bonusId);
+    onChange({
+      ...financial,
+      financial: updatedBonuses
+    });
+  };
+
+  // --- NEW: Sync Eintrittsdatum with data item's startdate if not set ---
+  const effectiveStartDate = typeDetails.StartDate || item?.startdate || '';
+  // --- NEW: Use calculated working hours unless user overrides ---
+  const effectiveWorkingHours = typeDetails.WorkingHours !== undefined && typeDetails.WorkingHours !== ''
+    ? typeDetails.WorkingHours
+    : calculatedWorkingHours;
+
+  // Compute available bonus types from bonus registry, disabling unique types already present
+  const bonusTypeRegistry = useMemo(() => {
+    const bonuses = Array.isArray(financial.financial) ? financial.financial : [];
+    return BONUS_REGISTRY.map(t => {
+      const isPresent = !!bonuses.find(b => b.type === t.value);
+      return {
+        ...t,
+        disabled: t.unique && isPresent
+      };
+    });
+  }, [financial.financial]);
+
+  // Load bonus components dynamically
+  const [loadedBonusComponents, setLoadedBonusComponents] = useState({});
+
+  useEffect(() => {
+    const bonuses = Array.isArray(financial.financial) ? financial.financial : [];
+    bonuses.forEach(bonus => {
+      const registry = BONUS_REGISTRY.find(b => b.value === bonus.type);
+      if (registry && !loadedBonusComponents[bonus.type]) {
+        registry.component().then(module => {
+          setLoadedBonusComponents(prev => ({
+            ...prev,
+            [bonus.type]: module.default
+          }));
+        });
+      }
+    });
+  }, [financial.financial, loadedBonusComponents]);
+
   // Helper to render bonus detail component
   const renderBonusDetail = (bonus) => {
-    const registry = FINANCIAL_BONUS_REGISTRY.find(b => b.value === bonus.type);
-    if (!registry || !registry.component) return null;
-    const BonusDetail = registry.component;
+    const BonusDetail = loadedBonusComponents[bonus.type];
+    if (!BonusDetail) return null;
     return (
       <BonusDetail
         financial={bonus}
@@ -126,15 +258,6 @@ function AvrExpenseDetail({ financial, onChange, item }) {
         }}
       />
     );
-  };
-
-  // Handler for deleting a bonus
-  const handleDeleteBonus = (bonusId) => {
-    const updatedBonuses = (financial.financial || []).filter(b => b.id !== bonusId);
-    onChange({
-      ...financial,
-      financial: updatedBonuses
-    });
   };
 
   return (
@@ -159,6 +282,7 @@ function AvrExpenseDetail({ financial, onChange, item }) {
           size="small"
           sx={{ maxWidth: 180 }}
         />
+        
       </Box>
       {/* Group selection */}
       <TextField
@@ -197,6 +321,15 @@ function AvrExpenseDetail({ financial, onChange, item }) {
         size="small"
         sx={{ maxWidth: 180 }}
       />
+      <TextField
+          label="Enddatum"
+          type="date"
+          value={financial.enddate || ''}
+          onChange={e => updateRootFields({ enddate: e.target.value })}
+          InputLabelProps={{ shrink: true }}
+          size="small"
+          sx={{ maxWidth: 180 }}
+        />
       {/* NoOfChildren */}
       <TextField
         label="Anzahl Kinder"
@@ -258,7 +391,7 @@ function AvrExpenseDetail({ financial, onChange, item }) {
         </Box>
         <List dense>
           {(Array.isArray(financial.financial) ? financial.financial : []).map(bonus => {
-            const registry = FINANCIAL_BONUS_REGISTRY.find(b => b.value === bonus.type);
+            const registry = BONUS_REGISTRY.find(b => b.value === bonus.type);
             const deleteable = registry?.deleteable !== false;
             return (
               <ListItem key={bonus.id} alignItems="flex-start" sx={{ pl: 0, flexDirection: 'column', alignItems: 'stretch' }}>
@@ -284,6 +417,7 @@ function AvrExpenseDetail({ financial, onChange, item }) {
           })}
         </List>
       </Box>
+     
     </Box>
   );
 }
