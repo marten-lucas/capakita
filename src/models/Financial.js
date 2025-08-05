@@ -6,6 +6,7 @@
  * @property {string} valid_from
  * @property {string} valid_to
  * @property {string} currency
+ * @property {string} frequency // e.g. 'monthly', 'yearly'
  * // ...add other properties as needed
  */
 
@@ -37,6 +38,7 @@ export class Financial {
     valid_to = '',
     type_details = {}, // User-editable fields
     financial = [],    // Stacked financials (e.g. bonuses)
+    payments = [], // Array of Payment objects
     ...rest
   }) {
     this.id = String(id);
@@ -46,6 +48,7 @@ export class Financial {
     this.valid_from = valid_from;
     this.valid_to = valid_to;
     this.type_details = type_details;
+    this.payments = Array.isArray(payments) ? payments : [];
     this.financial = Array.isArray(financial) ? financial : [];
     Object.assign(this, rest);
   }

@@ -245,8 +245,12 @@ export const updateMidTermChartData = (scenarioId) => (dispatch, getState) => {
 export const updatePaymentsThunk = (scenarioId) => async (dispatch, getState) => {
   const state = getState();
   
-  // Get all financials for this scenario using overlay-aware utility
-  const { effectiveFinancialsByItem } = buildOverlayAwareData(scenarioId, state);
+  // Get all overlay-aware data
+  const {
+    effectiveFinancialsByItem,
+    effectiveDataItems,
+    effectiveBookingsByItem,
+  } = buildOverlayAwareData(scenarioId, state);
   
   // Flatten all financials across all items, preserving the dataItemId
   const allFinancials = Object.entries(effectiveFinancialsByItem || {}).flatMap(
@@ -257,16 +261,13 @@ export const updatePaymentsThunk = (scenarioId) => async (dispatch, getState) =>
       }))
   );
 
-  // If no financials found, return early
   if (allFinancials.length === 0) {
     console.log(`No financials found for scenario ${scenarioId}`);
     return [];
   }
 
-  // Process each financial and update payments
   const updatePromises = allFinancials.map(async (financial) => {
     const calculatorLoader = getCalculatorForType(financial.type);
-    
     if (!calculatorLoader) {
       console.warn(`No calculator found for financial type: ${financial.type}`);
       return null;
@@ -274,16 +275,26 @@ export const updatePaymentsThunk = (scenarioId) => async (dispatch, getState) =>
 
     try {
       const updatePayments = await calculatorLoader();
-      const newPayments = updatePayments(financial);
-      
-      // Update the financial with new payments
+
+      // --- FIX: Pass correct arguments to updatePayments ---
+      const dataItem = effectiveDataItems[financial.dataItemId];
+      const bookings = effectiveBookingsByItem[financial.dataItemId];
+      const avrStageUpgrades = financial.type_details?.stage_upgrades || [];
+
+      const newPayments = updatePayments(
+        financial,
+        dataItem,
+        bookings,
+        avrStageUpgrades
+      );
+      // -----------------------------------------------------
+
       dispatch(updateFinancialThunk({
         scenarioId,
         dataItemId: financial.dataItemId,
         financialId: financial.id,
         updates: { payments: newPayments }
       }));
-      
       return { financialId: financial.id, payments: newPayments };
     } catch (error) {
       console.error(`Error updating payments for financial ${financial.id}:`, error);
@@ -291,7 +302,6 @@ export const updatePaymentsThunk = (scenarioId) => async (dispatch, getState) =>
     }
   });
 
-  // Wait for all updates to complete
   const results = await Promise.all(updatePromises);
   const successfulUpdates = results.filter(result => result !== null);
   

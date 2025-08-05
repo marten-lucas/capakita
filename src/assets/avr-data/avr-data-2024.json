@@ -516,6 +516,33 @@
       ]
     }
   ],
+  "stage_upgrade": [
+    {
+      "from_stage": 1,
+      "to_stage": 2,
+      "years": 1
+    },
+    {
+      "from_stage": 2,
+      "to_stage": 3,
+      "years": 3
+    },
+    {
+      "from_stage": 3,
+      "to_stage": 4,
+      "years": 4
+    },
+    {
+      "from_stage": 4,
+      "to_stage": 5,
+      "years": 4
+    },
+    {
+      "from_stage": 5,
+      "to_stage": 6,
+      "years": 5
+    }
+  ],
   "bonus": [
     {
       "type": "avr-yearly",
