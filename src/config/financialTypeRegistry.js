@@ -41,7 +41,7 @@ export const FINANCIAL_BONUS_REGISTRY = [
     label: 'Praxisanleiterzulage',
     allowed: ['capacity'],
     component: () => import('../components/SimDataDetail/Financials/Expense/Bonus/BonusInstructorDetail'),
-    calculator: () => import('../utils/financialCalculators/Expense/avrCalculator/Bonus/avrYearlyBonusCalc').then(mod => mod.updatePayments),
+    calculator: () => import('../utils/financialCalculators/Expense/avrCalculator/Bonus/avrInstructorBonusCalc').then(mod => mod.updatePayments),
     unique: false,
     deleteable: true,
   },
