@@ -8,15 +8,7 @@ import {
   calcAvrChildBonus,
   calcAvrInstructorBonus,
   calcAvrYearlyBonus
-<<<<<<< HEAD
-<<<<<<< HEAD
-} from './avrUtils';
-=======
 } from './avr-calculator';
->>>>>>> df9580b (restructured folrder)
-=======
-} from './avr-calculator';
->>>>>>> df9580b622e2313ef0fed77965c12629ee4f9637
 import { useState } from 'react';
 
 export function useAvrExpenseCalculator({ financial, onChange, item }) {
