@@ -219,7 +219,8 @@ function AvrExpenseDetail({ financial, onChange, item }) {
     return (
       <BonusDetail
         financial={bonus}
-        parentFinancial={financial}
+        parent={financial} // Pass parent prop correctly
+        parentFinancial={financial} // For compatibility if needed
         onChange={updatedBonus => {
           const updatedBonuses = (financial.financial || []).map(b => b.id === bonus.id ? updatedBonus : b);
           onChange({

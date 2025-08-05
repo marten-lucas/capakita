@@ -545,7 +545,7 @@
   ],
 "bonus": [
     {
-      "type": "avr-yearly",
+      "type": "bonus-yearly",
       "name": "AVR Jahressonderzahlung",
       "payable": "yearly",
       "due_month": 11,
@@ -573,7 +573,7 @@
       "reduce_partyear": true
     },
     {
-      "type": "avr-childbonus",
+      "type": "bonus-children",
       "name": "AVR Kinderzuschlag",
       "continue_on_absence": true,
       "payable": "monthly",
@@ -584,7 +584,7 @@
       "reduce_partyear": false
     },
     {
-      "type": "avr-instructor",
+      "type": "bonus-instructor",
       "name": "AVR Praxisanleiterzulage",
       "continue_on_absence": true,
       "payable": "monthly",

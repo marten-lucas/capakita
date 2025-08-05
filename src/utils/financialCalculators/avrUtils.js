@@ -115,3 +115,15 @@ export function getStageUpgradeDates(startDate, _currentStage, referenceDate) {
   }
   return result;
 }
+
+/**
+ * Get the bonus definition of a specific type from the AVR config valid at a reference date.
+ * @param {string} bonusType - e.g. "avr-yearly"
+ * @param {string} referenceDate - ISO date string (YYYY-MM-DD)
+ * @returns {object|null} The bonus object or null if not found
+ */
+export function getAvrBonusByType(bonusType, referenceDate) {
+  const avrConfig = getAvrConfigForDate(referenceDate);
+  if (!Array.isArray(avrConfig.bonus)) return null;
+  return avrConfig.bonus.find(b => b.type === bonusType) || null;
+}
