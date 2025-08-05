@@ -1,28 +1,19 @@
-import React, { useMemo } from 'react';
-import { Box, TextField, Typography, MenuItem, Button, Table, TableBody, TableCell, TableHead, TableRow, IconButton } from '@mui/material';
+import React, { useMemo, useState } from 'react';
+import { Box, TextField, Typography, MenuItem, Button, Table, TableBody, TableCell, TableHead, TableRow, IconButton, Menu } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import { useAvrExpenseCalculator } from '../../../utils/financialCalculators/avrExpenseCalculator';
 import { useOverlayData } from '../../../hooks/useOverlayData';
 import { calculateWorktimeFromBookings } from '../../../utils/bookingUtils';
 import { getAllStagesForGroup } from '../../../utils/avr-calculator';
+import { FINANCIAL_BONUS_REGISTRY } from '../../../config/financialTypeRegistry';
+import FinancialsCards from './FinancialsCards'; // Import for nested accordion rendering
 
-function AvrExpenseDetail({ financial, onChange, onDelete, item }) {
+function AvrExpenseDetail({ financial, onChange, item }) {
   // Use calculator for all AVR logic
   const {
     groupOptions,
-    avrSalary,
-    bonusRows,
-    eintrittsdatum,
-    wochenstunden,
-    handleBonusDateChange,
-    handleBonusDelete,
-    handleBonusAdd,
-    availableBonusTypes,
-    filteredBonusRows,
-    bonusMenuAnchor,
-    setBonusMenuAnchor,
-    bonusMenuOpen,
+    avrSalary
   } = useAvrExpenseCalculator({ financial, onChange, item });
 
   // Overlay-aware data access
@@ -65,40 +56,25 @@ function AvrExpenseDetail({ financial, onChange, onDelete, item }) {
     });
   };
 
-  // Handler for stacking bonuses as financials
+  // Local state for bonus menu anchor
+  const [bonusMenuAnchor, setBonusMenuAnchor] = useState(null);
+
+  // Handler for stacking bonuses as nested financials
   const handleAddBonus = (bonusType) => {
     const newBonus = {
       id: `${Date.now()}-${Math.random()}`,
       type: bonusType,
+      label: FINANCIAL_BONUS_REGISTRY.find(b => b.value === bonusType)?.label || bonusType,
       type_details: {},
-      amount: 0,
-      from: '',
-      to: '',
       financial: []
     };
     onChange({
       ...financial,
-      financial: [...(financial.financial || []), newBonus]
+      financial: [...(Array.isArray(financial.financial) ? financial.financial : []), newBonus]
     });
   };
 
-  const handleUpdateBonus = (idx, updatedBonus) => {
-    const updatedBonuses = [...(financial.financial || [])];
-    updatedBonuses[idx] = updatedBonus;
-    onChange({
-      ...financial,
-      financial: updatedBonuses
-    });
-  };
-
-  const handleDeleteBonus = (idx) => {
-    const updatedBonuses = [...(financial.financial || [])];
-    updatedBonuses.splice(idx, 1);
-    onChange({
-      ...financial,
-      financial: updatedBonuses
-    });
-  };
+  
 
   // --- NEW: Sync Eintrittsdatum with data item's startdate if not set ---
   const effectiveStartDate = typeDetails.StartDate || item?.startdate || '';
@@ -106,6 +82,30 @@ function AvrExpenseDetail({ financial, onChange, onDelete, item }) {
   const effectiveWorkingHours = typeDetails.WorkingHours !== undefined && typeDetails.WorkingHours !== ''
     ? typeDetails.WorkingHours
     : calculatedWorkingHours;
+
+  // Compute available bonus types from bonus registry
+  const bonusTypeRegistry = useMemo(() =>
+    FINANCIAL_BONUS_REGISTRY.filter(t =>
+      t.allowed.includes('capacity')
+    ).map(t => ({ value: t.value, label: t.label })),
+    []
+  );
+
+  // Handler for opening bonus menu
+  const handleBonusMenuOpen = (event) => {
+    setBonusMenuAnchor(event.currentTarget);
+  };
+
+  // Handler for closing bonus menu
+  const handleBonusMenuClose = () => {
+    setBonusMenuAnchor(null);
+  };
+
+  // Handler for selecting a bonus type
+  const handleSelectBonusType = (type) => {
+    handleAddBonus(type);
+    handleBonusMenuClose();
+  };
 
   return (
     <Box display="flex" flexDirection="column" gap={2} position="relative">
@@ -206,53 +206,28 @@ function AvrExpenseDetail({ financial, onChange, onDelete, item }) {
             variant="outlined"
             size="small"
             startIcon={<AddIcon />}
-            onClick={() => handleAddBonus('bonus')}
+            onClick={handleBonusMenuOpen}
           >
             Bonus hinzufügen
           </Button>
-        </Box>
-        <Table size="small">
-          <TableHead>
-            <TableRow>
-              <TableCell>Typ</TableCell>
-              <TableCell>Betrag</TableCell>
-              <TableCell>Aktion</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {(financial.financial || []).map((bonus, idx) => (
-              <TableRow key={bonus.id}>
-                <TableCell>{bonus.type}</TableCell>
-                <TableCell>
-                  <TextField
-                    type="number"
-                    size="small"
-                    value={bonus.amount || ''}
-                    onChange={e => handleUpdateBonus(idx, { ...bonus, amount: Number(e.target.value) })}
-                  />
-                </TableCell>
-                <TableCell>
-                  <IconButton
-                    aria-label="Entfernen"
-                    size="small"
-                    onClick={() => handleDeleteBonus(idx)}
-                  >
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                </TableCell>
-              </TableRow>
+          <Menu
+            anchorEl={bonusMenuAnchor}
+            open={Boolean(bonusMenuAnchor)}
+            onClose={handleBonusMenuClose}
+          >
+            {bonusTypeRegistry.map(bonusType => (
+              <MenuItem
+                key={bonusType.value}
+                onClick={() => handleSelectBonusType(bonusType.value)}
+              >
+                {bonusType.label}
+              </MenuItem>
             ))}
-          </TableBody>
-        </Table>
+          </Menu>
+        </Box>
+
       </Box>
-      <Button
-        variant="outlined"
-        color="error"
-        size="small"
-        onClick={onDelete}
-      >
-        Entfernen
-      </Button>
+     
     </Box>
   );
 }

@@ -3,7 +3,6 @@ import { Box, Typography, IconButton, Button, RadioGroup, FormControlLabel, Radi
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useSelector } from 'react-redux';
 import { useOverlayData } from '../../../hooks/useOverlayData';
-import { calculateWorktimeFromBookings } from '../../../utils/bookingUtils';
 
 function FeeIncomeDetail({ financial, onChange, onDelete, item }) {
   // Get effective financial defs and group assignments
@@ -31,37 +30,8 @@ function FeeIncomeDetail({ financial, onChange, onDelete, item }) {
     }
   }
 
-  // Find selected financialDef
-  const selectedDef = financialDefs.find(def => def.id === typeDetails.financialDefId);
-
-  // Find the fee group for the current groupRef
-  let matchedFeeGroup = null;
-  if (selectedDef && Array.isArray(selectedDef.fee_groups)) {
-    matchedFeeGroup = selectedDef.fee_groups.find(g => g.groupref === groupRef);
-  }
-
-  // Calculate sum of booking times for the item (overlay-aware)
-  const sumOfBookingTimes = calculateWorktimeFromBookings(item.bookings || []);
-
-  // Find the fee that matches the sumOfBookingTimes in the matched fee group
-  let matchedFee = null;
-  if (matchedFeeGroup && Array.isArray(matchedFeeGroup.fees)) {
-    // Sort fees by minHours ascending
-    const sortedFees = [...matchedFeeGroup.fees].sort((a, b) => (a.minHours ?? 0) - (b.minHours ?? 0));
-    for (let i = 0; i < sortedFees.length; i++) {
-      const lowerBound = sortedFees[i].minHours ?? 0;
-      const upperBound = sortedFees[i + 1]?.minHours ?? Infinity;
-      if (sumOfBookingTimes >= lowerBound && sumOfBookingTimes < upperBound) {
-        matchedFee = sortedFees[i];
-        break;
-      }
-      // Special case: sum == 0 should match first fee
-      if (sumOfBookingTimes === 0 && i === 0) {
-        matchedFee = sortedFees[0];
-        break;
-      }
-    }
-  }
+  
+  
 
   // Handler for updating type_details
   const updateTypeDetails = (updates) => {

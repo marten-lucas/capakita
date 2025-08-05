@@ -22,3 +22,28 @@ export const FINANCIAL_TYPE_REGISTRY = [
   },
   // ...other types...
 ];
+
+// Registry for bonus types only (for bonus menu)
+export const FINANCIAL_BONUS_REGISTRY = [
+  {
+    value: 'bonus-yearly',
+    label: 'Jahressonderzahlung',
+    allowed: ['capacity'],
+    component: AvrExpenseDetail,
+    calculator: () => ({}),
+  },
+  {
+    value: 'bonus-children',
+    label: 'Kinderzuschlag',
+    allowed: ['capacity'],
+    component: AvrExpenseDetail,
+    calculator: () => ({}),
+  },
+  {
+    value: 'bonus-instructor',
+    label: 'Praxisanleiterzulage',
+    allowed: ['capacity'],
+    component: AvrExpenseDetail,
+    calculator: () => ({}),
+  },
+];
