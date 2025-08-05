@@ -228,6 +228,16 @@ export const deleteFinancialDefThunk = ({ scenarioId, financialDefId }) => (disp
   }
 };
 
+// Helper thunk to update payments for a specific financial
+export const updateFinancialPaymentsThunk = ({ scenarioId, dataItemId, financialId, payments }) => (dispatch) => {
+  dispatch(updateFinancialThunk({
+    scenarioId,
+    dataItemId,
+    financialId,
+    updates: { payments: payments || [] }
+  }));
+};
+
 export const {
   addFinancial,
   updateFinancial,

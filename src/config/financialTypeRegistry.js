@@ -4,7 +4,7 @@ export const FINANCIAL_TYPE_REGISTRY = [
     label: 'Ausgabe: AVR-Entgelt',
     allowed: ['capacity'],
     component: () => import('../components/SimDataDetail/Financials/Expense/AvrExpenseDetail'),
-    calculator: () => import('../utils/financialCalculators/Expense/avrCalculator/Bonus/avrSaleryCalc').then(mod => mod.updatePayments),
+    calculator: () => import('../utils/financialCalculators/Expense/avrExpenseCalculator').then(mod => mod.updatePayments),
   },
   {
     value: 'income-fee',
@@ -41,8 +41,15 @@ export const FINANCIAL_BONUS_REGISTRY = [
     label: 'Praxisanleiterzulage',
     allowed: ['capacity'],
     component: () => import('../components/SimDataDetail/Financials/Expense/Bonus/BonusInstructorDetail'),
-    calculator: () => import('../utils/financialCalculators/Expense/avrCalculator/Bonus/avrYearlyBonusCalc').then(mod => mod.updatePayments), // Replace with correct file if needed
+    calculator: () => import('../utils/financialCalculators/Expense/avrCalculator/Bonus/avrYearlyBonusCalc').then(mod => mod.updatePayments),
     unique: false,
     deleteable: true,
   },
 ];
+
+// Helper function to get calculator for a financial type
+export function getCalculatorForType(financialType) {
+  const allTypes = [...FINANCIAL_TYPE_REGISTRY, ...FINANCIAL_BONUS_REGISTRY];
+  const typeEntry = allTypes.find(entry => entry.value === financialType);
+  return typeEntry?.calculator;
+}

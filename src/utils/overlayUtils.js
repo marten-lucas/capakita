@@ -166,6 +166,27 @@ export function getEffectiveFinancialDefs(scenarioChain, overlaysByScenario, fin
   return Array.from(allDefs.values());
 }
 
+// Get effective financials for a specific item across scenario chain
+export function getEffectiveFinancials(scenarioChain, overlaysByScenario, financialsByScenario, itemId) {
+  // Collect all financials from scenario chain and merge overlays
+  const allFinancials = {};
+  
+  // Start from base scenario (reverse order) and apply overlays
+  for (const scenario of scenarioChain.slice().reverse()) {
+    const sid = scenario.id;
+    // Add base financials first
+    if (financialsByScenario[sid]?.[itemId]) {
+      Object.assign(allFinancials, financialsByScenario[sid][itemId]);
+    }
+    // Apply overlays on top
+    if (overlaysByScenario[sid]?.financials?.[itemId]) {
+      Object.assign(allFinancials, overlaysByScenario[sid].financials[itemId]);
+    }
+  }
+  
+  return allFinancials;
+}
+
 // Check if any overlay exists for a given item in a scenario (greedy)
 export function getItemHasOverlay(scenarioId, itemId, overlaysByScenario) {
   const overlay = overlaysByScenario[scenarioId];
@@ -194,6 +215,7 @@ export function buildOverlayAwareData(scenarioId, state) {
   const qualiAssignmentsByScenario = state.simQualification.qualificationAssignmentsByScenario;
   const qualiDefsByScenario = state.simQualification.qualificationDefsByScenario;
   const financialDefsByScenario = state.simFinancials.financialDefsByScenario;
+  const financialsByScenario = state.simFinancials.financialsByScenario;
 
   const scenarioChain = getScenarioChain(scenarios, scenarioId);
 
@@ -201,11 +223,13 @@ export function buildOverlayAwareData(scenarioId, state) {
   const effectiveBookingsByItem = {};
   const effectiveGroupAssignmentsByItem = {};
   const effectiveQualificationAssignmentsByItem = {};
+  const effectiveFinancialsByItem = {};
 
   Object.keys(effectiveDataItems).forEach(itemId => {
     effectiveBookingsByItem[itemId] = getEffectiveBookings(scenarioChain, overlaysByScenario, bookingsByScenario, itemId);
     effectiveGroupAssignmentsByItem[itemId] = getEffectiveGroupAssignments(scenarioChain, overlaysByScenario, groupsByScenario, itemId);
     effectiveQualificationAssignmentsByItem[itemId] = getEffectiveQualificationAssignments(scenarioChain, overlaysByScenario, qualiAssignmentsByScenario, itemId);
+    effectiveFinancialsByItem[itemId] = getEffectiveFinancials(scenarioChain, overlaysByScenario, financialsByScenario, itemId);
   });
 
   const effectiveGroupDefs = getEffectiveGroupDefs(scenarioChain, overlaysByScenario, groupDefsByScenario);
@@ -236,6 +260,7 @@ export function buildOverlayAwareData(scenarioId, state) {
     effectiveGroupDefs,
     effectiveQualificationDefs,
     effectiveFinancialDefs,
+    effectiveFinancialsByItem,
     scenarioChain
   };
 }

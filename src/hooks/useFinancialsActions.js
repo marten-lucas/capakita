@@ -1,5 +1,10 @@
 import { useDispatch, useSelector } from 'react-redux';
-import { addFinancialThunk, updateFinancialThunk, deleteFinancialThunk } from '../store/simFinancialsSlice';
+import { 
+  addFinancialThunk, 
+  updateFinancialThunk, 
+  deleteFinancialThunk,
+  updateFinancialPaymentsThunk 
+} from '../store/simFinancialsSlice';
 
 export function useFinancialsActions() {
   const dispatch = useDispatch();
@@ -30,5 +35,29 @@ export function useFinancialsActions() {
     }));
   };
 
-  return { addFinancial, updateFinancial, deleteFinancial };
+  const updateFinancialPayments = (dataItemId, financialId, payments) => {
+    // Validate required parameters
+    if (!selectedScenarioId || !dataItemId || !financialId) {
+      console.error('updateFinancialPayments: Missing required parameters', {
+        selectedScenarioId,
+        dataItemId,
+        financialId
+      });
+      return;
+    }
+
+    dispatch(updateFinancialPaymentsThunk({
+      scenarioId: selectedScenarioId,
+      dataItemId,
+      financialId,
+      payments: payments || []
+    }));
+  };
+
+  return { 
+    addFinancial, 
+    updateFinancial, 
+    deleteFinancial,
+    updateFinancialPayments 
+  };
 }

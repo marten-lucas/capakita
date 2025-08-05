@@ -3,7 +3,8 @@ import { calculateChartDataWeekly } from '../utils/chartUtils/chartUtilsWeekly';
 import { calculateChartDataMidterm, generateMidtermCategories } from '../utils/chartUtils/chartUtilsMidterm';
 import { buildOverlayAwareData } from '../utils/overlayUtils';
 import { calculateChartDataFinancial, generateFinancialCategories } from '../utils/chartUtils/chartUtilsFinancial';
-import { FINANCIAL_TYPE_REGISTRY, FINANCIAL_BONUS_REGISTRY } from '../config/financialTypeRegistry';
+import { FINANCIAL_TYPE_REGISTRY, FINANCIAL_BONUS_REGISTRY, getCalculatorForType } from '../config/financialTypeRegistry';
+import { updateFinancialThunk } from './simFinancialsSlice';
 
 // Helper for initial chart state per scenario
 function getInitialChartState() {
@@ -243,40 +244,59 @@ export const updateMidTermChartData = (scenarioId) => (dispatch, getState) => {
 // Thunk to update payments for all financials in a scenario
 export const updatePaymentsThunk = (scenarioId) => async (dispatch, getState) => {
   const state = getState();
-  const financialsByScenario = state.simFinancials.financialsByScenario || {};
-  const financials = financialsByScenario[scenarioId] || {};
-
-  // Build a lookup for all calculators by type
-  const registry = [
-    ...FINANCIAL_TYPE_REGISTRY,
-    ...FINANCIAL_BONUS_REGISTRY,
-  ];
-  const calculatorMap = Object.fromEntries(
-    registry.map(entry => [entry.value, entry.calculator])
+  
+  // Get all financials for this scenario using overlay-aware utility
+  const { effectiveFinancialsByItem } = buildOverlayAwareData(scenarioId, state);
+  
+  // Flatten all financials across all items, preserving the dataItemId
+  const allFinancials = Object.entries(effectiveFinancialsByItem || {}).flatMap(
+    ([dataItemId, itemFinancials]) => 
+      Object.values(itemFinancials || {}).map(financial => ({
+        ...financial,
+        dataItemId // Add the dataItemId to each financial
+      }))
   );
 
-  // For each financial, dynamically import and call its updatePayments
-  await Promise.all(Object.values(financials).map(async financial => {
-    const calculatorLoader = calculatorMap[financial.type];
-    if (typeof calculatorLoader === 'function') {
-      const updatePayments = await calculatorLoader();
-      if (typeof updatePayments === 'function') {
-        // Use returned payments array, do not mutate financial
-        const payments = updatePayments(financial);
-        // Use a Redux action or a mutation-safe update here
-        // For example, dispatch an action to update payments in the store
-        // Or collect the payments and update in a batch after all are processed
-      } else if (updatePayments && typeof updatePayments.updatePayments === 'function') {
-        const payments = updatePayments.updatePayments(financial);
-        // Same as above
-      }
-    } else {
-      // fallback: ensure payments is an array
-      if (!Array.isArray(financial.payments)) {
-        financial.payments = [];
-      }
+  // If no financials found, return early
+  if (allFinancials.length === 0) {
+    console.log(`No financials found for scenario ${scenarioId}`);
+    return [];
+  }
+
+  // Process each financial and update payments
+  const updatePromises = allFinancials.map(async (financial) => {
+    const calculatorLoader = getCalculatorForType(financial.type);
+    
+    if (!calculatorLoader) {
+      console.warn(`No calculator found for financial type: ${financial.type}`);
+      return null;
     }
-  }));
+
+    try {
+      const updatePayments = await calculatorLoader();
+      const newPayments = updatePayments(financial);
+      
+      // Update the financial with new payments
+      dispatch(updateFinancialThunk({
+        scenarioId,
+        dataItemId: financial.dataItemId,
+        financialId: financial.id,
+        updates: { payments: newPayments }
+      }));
+      
+      return { financialId: financial.id, payments: newPayments };
+    } catch (error) {
+      console.error(`Error updating payments for financial ${financial.id}:`, error);
+      return null;
+    }
+  });
+
+  // Wait for all updates to complete
+  const results = await Promise.all(updatePromises);
+  const successfulUpdates = results.filter(result => result !== null);
+  
+  console.log(`Updated payments for ${successfulUpdates.length} financials in scenario ${scenarioId}`);
+  return successfulUpdates;
 };
 
 // Thunk to update financial chart data for a scenario
@@ -285,36 +305,35 @@ export const updateFinancialChartData = (scenarioId) => async (dispatch, getStat
   const chartState = state.chart[scenarioId] || {};
   const timedimension = chartState.timedimension || 'month';
 
-  // Use utility to build overlay-aware data
+  // 1. First update all payments
+  await dispatch(updatePaymentsThunk(scenarioId));
+  
+  // 2. Get fresh state after payment updates
+  const updatedState = getState();
+  
+  // 3. Use utility to build overlay-aware data with updated payments
   const {
     effectiveDataItems,
-    effectiveFinancialDefs
-  } = buildOverlayAwareData(scenarioId, state);
+    effectiveFinancialDefs,
+    effectiveFinancialsByItem
+  } = buildOverlayAwareData(scenarioId, updatedState);
 
   // Get events for scenario
-  const events = state.events?.eventsByScenario?.[scenarioId] || [];
+  const events = updatedState.events?.eventsByScenario?.[scenarioId] || [];
   // Generate categories for financial chart
   const categories = generateFinancialCategories(timedimension, events);
 
-  // Helper: get all financial entries for this scenario
-  function getAllFinancialEntries() {
-    const financialsByScenario = state.simFinancials.financialsByScenario || {};
-    const financials = financialsByScenario[scenarioId] || {};
-    return Object.values(financials);
-  }
+  // Flatten all financials for chart calculation using overlay utility data
+  const financialEntries = Object.values(effectiveFinancialsByItem || {}).flatMap(
+    itemFinancials => Object.values(itemFinancials || {})
+  );
 
-  // 1. Update payments for all financials
-  dispatch(updatePaymentsThunk(scenarioId));
-
-  // 2. Get updated financial entries
-  const financialEntries = getAllFinancialEntries();
-
-  // 3. Calculate chart data (payments are now up-to-date)
+  // 4. Calculate chart data with updated payments
   const chartData = calculateChartDataFinancial({
     categories,
     financialEntries,
-    financialDefs: effectiveFinancialDefs,
-    dataItems: effectiveDataItems,
+    financialDefs: effectiveFinancialDefs || {},
+    dataItems: effectiveDataItems || {},
     timedimension,
     events
   });
