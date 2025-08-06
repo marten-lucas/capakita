@@ -561,12 +561,12 @@
         {
           "value": 0.86,
           "from_group": 1,
-          "to_stage": 6
+          "to_group": 6
         },
         {
           "value": 0.76,
           "from_group": 7,
-          "to_stage": 17
+          "to_group": 17
         }
       ],
       "reduce_parttime": true,

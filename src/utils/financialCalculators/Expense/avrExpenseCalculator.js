@@ -1,4 +1,4 @@
-import { getAvrAmountForGroupAndStage, getAvrFulltimeHours, getStageUpgradeDates } from "../avrUtils";
+import { getAvrAmountForGroupAndStage, getAvrFulltimeHours, getStageUpgradeDates, getPresencePercentageInPeriod } from "../avrUtils";
 import { sumBookingHours as sumBookingHoursFromBooking } from "../../bookingUtils";
 
 // TODO: Implpement inflation beyond avr Data
@@ -38,20 +38,20 @@ function buildPayments(financial, dataItem, bookings, avrStageUpgrades) {
       avrStageUpgrades,
       valid_from
     );
-    const absent = isFullyAbsent(dataItem?.absences, valid_from, valid_to);
-
-    // 1. If fully absent, amount is 0
-    let amount = 0;
-    if (!absent && group && avrStage) {
-      // 2. Get AVR value for group and stage at valid_from
-      const avrAmount = getAvrAmountForGroupAndStage(group, avrStage, valid_from);
-      // 3. Get fulltime hours from AVR data at valid_from
-      const fulltimeHours = getAvrFulltimeHours(valid_from);
-      // 4. Calculate part time reduction factor
-      const reduction = fulltimeHours > 0 ? (workingHours / fulltimeHours) : 1;
-      amount = avrAmount * reduction;
+    // Use presence percentage for absence reduction
+    let absenceFactor = 1;
+    if (Array.isArray(dataItem?.absences) && valid_to) {
+      const periodStart = new Date(valid_from);
+      const periodEnd = new Date(valid_to);
+      absenceFactor = getPresencePercentageInPeriod(dataItem, periodStart, periodEnd);
     }
-
+    let amount = 0;
+    if (group && avrStage) {
+      const avrAmount = getAvrAmountForGroupAndStage(group, avrStage, valid_from);
+      const fulltimeHours = getAvrFulltimeHours(valid_from);
+      const reduction = fulltimeHours > 0 ? (workingHours / fulltimeHours) : 1;
+      amount = avrAmount * reduction * absenceFactor;
+    }
     return {
       valid_from,
       valid_to,
@@ -176,25 +176,6 @@ function getAvrStageAtDate(startdate, initialStage, avrStageUpgrades, currentDat
   return stage;
 }
 
-/**
- * Check if the employee is fully absent during a period.
- * @param {Array} absences - Array of absence objects with .start and .end (ISO strings)
- * @param {string} from - Period start (inclusive, ISO string)
- * @param {string} to - Period end (exclusive, ISO string)
- * @returns {boolean}
- */
-function isFullyAbsent(absences, from, to) {
-  if (!Array.isArray(absences)) return false;
-  for (const abs of absences) {
-    if (abs.start && abs.end) {
-      // If absence fully covers the period
-      if (abs.start <= from && abs.end >= to) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
 
 /**
  * Calculate the sum of booking hours for a period.

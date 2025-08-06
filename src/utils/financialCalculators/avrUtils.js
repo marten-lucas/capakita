@@ -127,3 +127,71 @@ export function getAvrBonusByType(bonusType, referenceDate) {
   if (!Array.isArray(avrConfig.bonus)) return null;
   return avrConfig.bonus.find(b => b.type === bonusType) || null;
 }
+
+
+/**
+ * Calculate the percentage of presence for a dataItem in a given time period.
+ * Only considers working days (Monday-Friday).
+ * For limited_paid: paid phase (first 42 calendar days) is present, unpaid phase is absent.
+ * @param {Object} dataItem
+ * @param {Date} periodStart
+ * @param {Date} periodEnd
+ * @param {boolean} considerAbsences
+ * @returns {number} Presence percentage (0..1)
+ */
+export function getPresencePercentageInPeriod(dataItem, periodStart, periodEnd, considerAbsences = true) {
+  if (!dataItem) return 0;
+  // Clamp period to employment
+  const employmentStart = dataItem.startdate ? new Date(dataItem.startdate) : null;
+  const employmentEnd = dataItem.enddate ? new Date(dataItem.enddate) : null;
+  const start = employmentStart && employmentStart > periodStart ? employmentStart : periodStart;
+  const end = employmentEnd && employmentEnd < periodEnd ? employmentEnd : periodEnd;
+  if (start > end) return 0;
+
+  // Calculate total working days in period (Mon-Fri)
+  let totalDays = 0;
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const day = d.getDay();
+    if (day >= 1 && day <= 5) totalDays++;
+  }
+  if (totalDays <= 0) return 0;
+
+  // Subtract absences if requested
+  let absentDays = 0;
+  if (considerAbsences && Array.isArray(dataItem.absences)) {
+    dataItem.absences.forEach(abs => {
+      if (abs.start && abs.end) {
+        const absStart = new Date(abs.start) < start ? start : new Date(abs.start);
+        const absEnd = new Date(abs.end) > end ? end : new Date(abs.end);
+        if (absStart > absEnd) return;
+
+        if (abs.payType === "unpaid") {
+          // All working days in absence are absent
+          for (let d = new Date(absStart); d <= absEnd; d.setDate(d.getDate() + 1)) {
+            const day = d.getDay();
+            if (day >= 1 && day <= 5) absentDays++;
+          }
+        } else if (abs.payType === "limited_paid") {
+          // First 42 calendar days are paid (present), rest is unpaid (absent)
+          const paidEnd = new Date(absStart);
+          paidEnd.setDate(paidEnd.getDate() + 41); // 42 days including start
+          // Paid phase: present, do not subtract
+          // Unpaid phase: after paidEnd, subtract working days
+          const unpaidStart = new Date(paidEnd);
+          unpaidStart.setDate(unpaidStart.getDate() + 1);
+          const actualUnpaidStart = unpaidStart > absEnd ? null : unpaidStart;
+          if (actualUnpaidStart) {
+            for (let d = new Date(actualUnpaidStart); d <= absEnd; d.setDate(d.getDate() + 1)) {
+              const day = d.getDay();
+              if (day >= 1 && day <= 5) absentDays++;
+            }
+          }
+        }
+        // fully_paid: do not subtract
+      }
+    });
+  }
+
+  const presentDays = Math.max(0, totalDays - absentDays);
+  return presentDays / totalDays;
+}
