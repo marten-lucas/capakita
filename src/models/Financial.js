@@ -49,8 +49,6 @@ export class Financial {
       payable: { type: 'string', required: true },
       due_month: { type: 'number', required: true },
       continue_on_absence: { type: 'boolean', required: false },
-      startdate: { type: 'string', required: false },
-      enddate: { type: 'string', required: false },
       base_month_average: { type: 'array', required: false },
       percentage: { type: 'array', required: false },
       reduce_parttime: { type: 'boolean', required: false },
