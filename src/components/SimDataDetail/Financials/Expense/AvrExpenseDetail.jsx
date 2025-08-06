@@ -37,7 +37,9 @@ function AvrExpenseDetail({ financial, onChange, item }) {
         type: 'bonus-yearly',
         label: registry?.label || 'Jahressonderzahlung',
         type_details: defaultTypeDetails,
-        financial: []
+        financial: [],
+        parentId: financial.id,
+        parentType: financial.type // <-- add this line
       };
       onChange({
         ...financial,
@@ -70,7 +72,9 @@ function AvrExpenseDetail({ financial, onChange, item }) {
           type: 'bonus-children',
           label: registry?.label || 'Kinderzuschlag',
           type_details: { ...defaultTypeDetails, noOfChildren },
-          financial: []
+          financial: [],
+          parentId: financial.id,
+          parentType: financial.type // <-- add this line
         };
         onChange({
           ...financial,
@@ -151,7 +155,9 @@ function AvrExpenseDetail({ financial, onChange, item }) {
       type: bonusType,
       label: registry?.label || bonusType,
       type_details: defaultTypeDetails,
-      financial: []
+      financial: [],
+      parentId: financial.id,
+      parentType: financial.type // <-- add this line
     };
     onChange({
       ...financial,
@@ -268,7 +274,7 @@ function AvrExpenseDetail({ financial, onChange, item }) {
       <TextField
         select
         label="Gruppe"
-        value={typeDetails.group || ''}
+        value={typeof typeDetails.group === 'object' ? '' : typeDetails.group || ''}
         onChange={e => updateTypeDetails({ group: Number(e.target.value), stage: '' })}
       >
         {groupOptions.map(opt => (
@@ -281,7 +287,7 @@ function AvrExpenseDetail({ financial, onChange, item }) {
       <TextField
         select
         label="Stufe"
-        value={typeDetails.stage || ''}
+        value={typeof typeDetails.stage === 'object' ? '' : typeDetails.stage || ''}
         onChange={e => updateTypeDetails({ stage: Number(e.target.value) })}
         disabled={!typeDetails.group}
       >

@@ -15,6 +15,7 @@
  * @property {string} id
  * @property {string} dataItemId
  * @property {string} type
+ * @property {string} [parentId] 
  * @property {string} name
  * @property {string} valid_from
  * @property {string} valid_to
@@ -61,6 +62,7 @@ export class Financial {
   constructor({
     id,
     dataItemId,
+    parentId = '', // Optional parent reference for hierarchical financials
     type = '', // e.g. avr, fee, etc.
     name = '',
     valid_from = '',
@@ -72,6 +74,12 @@ export class Financial {
   }) {
     this.id = String(id);
     this.dataItemId = String(dataItemId);
+    // Only set parentId if parent type starts with "expense-"
+    if (rest.parentType && typeof rest.parentType === 'string' && rest.parentType.startsWith('expense-')) {
+      this.parentId = String(parentId);
+    } else {
+      this.parentId = '';
+    }
     this.type = type;
     this.name = name;
     this.valid_from = valid_from;

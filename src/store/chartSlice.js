@@ -244,17 +244,17 @@ export const updateMidTermChartData = (scenarioId) => (dispatch, getState) => {
 // Thunk to update payments for all financials in a scenario
 export const updatePaymentsThunk = (scenarioId) => async (dispatch, getState) => {
   const state = getState();
-  
+
   // Get all overlay-aware data
   const {
     effectiveFinancialsByItem,
     effectiveDataItems,
     effectiveBookingsByItem,
   } = buildOverlayAwareData(scenarioId, state);
-  
+
   // Flatten all financials across all items, preserving the dataItemId
   const allFinancials = Object.entries(effectiveFinancialsByItem || {}).flatMap(
-    ([dataItemId, itemFinancials]) => 
+    ([dataItemId, itemFinancials]) =>
       Object.values(itemFinancials || {}).map(financial => ({
         ...financial,
         dataItemId // Add the dataItemId to each financial
@@ -266,36 +266,54 @@ export const updatePaymentsThunk = (scenarioId) => async (dispatch, getState) =>
     return [];
   }
 
-  const updatePromises = allFinancials.map(async (financial) => {
+  // Recursive payment updater for nested financials (bonuses)
+  const updatePaymentsRecursive = async (financial, dataItem, bookings, avrStageUpgrades, allFinancials) => {
     const calculatorLoader = getCalculatorForType(financial.type);
-    if (!calculatorLoader) {
-      console.warn(`No calculator found for financial type: ${financial.type}`);
-      return null;
+    if (!calculatorLoader) return financial;
+    const updatePayments = await calculatorLoader();
+    // Calculate payments for this financial
+    const newPayments = updatePayments(financial, dataItem, bookings, avrStageUpgrades, allFinancials);
+
+    // Update this financial with its payments
+    let updatedFinancial = { ...financial, payments: newPayments };
+
+    // Recursively update payments for nested bonuses, passing updated parent financials
+    if (Array.isArray(financial.financial)) {
+      // Build a new allFinancials array with the updated parent financial
+      const updatedAllFinancials = allFinancials.map(f =>
+        f.id === updatedFinancial.id ? updatedFinancial : f
+      );
+      updatedFinancial.financial = await Promise.all(
+        financial.financial.map(async bonus => {
+          return await updatePaymentsRecursive(bonus, dataItem, bookings, avrStageUpgrades, updatedAllFinancials);
+        })
+      );
     }
+    return updatedFinancial;
+  };
+
+  const updatePromises = allFinancials.map(async (financial) => {
+    const dataItem = effectiveDataItems[financial.dataItemId];
+    const bookings = effectiveBookingsByItem[financial.dataItemId];
+    const avrStageUpgrades = financial.type_details?.stage_upgrades || [];
 
     try {
-      const updatePayments = await calculatorLoader();
-
-      // --- FIX: Pass correct arguments to updatePayments ---
-      const dataItem = effectiveDataItems[financial.dataItemId];
-      const bookings = effectiveBookingsByItem[financial.dataItemId];
-      const avrStageUpgrades = financial.type_details?.stage_upgrades || [];
-
-      const newPayments = updatePayments(
+      // Pass allFinancials to the recursive updater
+      const updatedFinancial = await updatePaymentsRecursive(
         financial,
         dataItem,
         bookings,
-        avrStageUpgrades
+        avrStageUpgrades,
+        allFinancials
       );
-      // -----------------------------------------------------
 
       dispatch(updateFinancialThunk({
         scenarioId,
         dataItemId: financial.dataItemId,
         financialId: financial.id,
-        updates: { payments: newPayments }
+        updates: { payments: updatedFinancial.payments, financial: updatedFinancial.financial }
       }));
-      return { financialId: financial.id, payments: newPayments };
+      return { financialId: financial.id, payments: updatedFinancial.payments };
     } catch (error) {
       console.error(`Error updating payments for financial ${financial.id}:`, error);
       return null;
@@ -304,7 +322,7 @@ export const updatePaymentsThunk = (scenarioId) => async (dispatch, getState) =>
 
   const results = await Promise.all(updatePromises);
   const successfulUpdates = results.filter(result => result !== null);
-  
+
   console.log(`Updated payments for ${successfulUpdates.length} financials in scenario ${scenarioId}`);
   return successfulUpdates;
 };
