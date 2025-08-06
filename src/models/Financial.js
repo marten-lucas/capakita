@@ -29,6 +29,37 @@
  * Financial model class
  */
 export class Financial {
+  // Static type_details definitions for registry reference
+  static typeDetailsDefinitions = {
+    'expense-avr': {
+      group: { type: 'number', required: true },
+      stage: { type: 'number', required: true },
+      startDate: { type: 'string', required: false },
+      endDate: { type: 'string', required: false },
+      WorkingHours: { type: 'number', required: false },
+      NoOfChildren: { type: 'number', required: false },
+      // ...other AVR-specific fields...
+    },
+    'income-fee': {
+      financialDefId: { type: 'string', required: true },
+      groupRef: { type: 'string', required: false },
+      // ...other fee-specific fields...
+    },
+    'bonus-yearly': {
+      payable: { type: 'string', required: true },
+      due_month: { type: 'number', required: true },
+      continue_on_absence: { type: 'boolean', required: false },
+      startdate: { type: 'string', required: false },
+      enddate: { type: 'string', required: false },
+      base_month_average: { type: 'array', required: false },
+      percentage: { type: 'array', required: false },
+      reduce_parttime: { type: 'boolean', required: false },
+      reduce_partyear: { type: 'boolean', required: false },
+      // ...other bonus fields...
+    },
+    // ...add definitions for other types...
+  };
+
   constructor({
     id,
     dataItemId,

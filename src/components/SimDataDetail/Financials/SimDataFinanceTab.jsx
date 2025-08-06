@@ -24,6 +24,8 @@ function SimDataFinanceTab({ item }) {
   const handleAddFinancial = (type) => {
     const typeEntry = FINANCIAL_TYPE_REGISTRY.find(t => t.value === type);
     const newId = `${Date.now()}-${Math.random()}`;
+    // Use typeDetailsDefinition from registry if available
+    const defaultTypeDetails = typeEntry?.typeDetailsDefinition ? { ...typeEntry.typeDetailsDefinition } : {};
     const newObj = {
       id: newId,
       type: type,
@@ -32,7 +34,7 @@ function SimDataFinanceTab({ item }) {
       from: '',
       to: '',
       note: '',
-      ...(type === 'income-fee' ? { type_details: { financialDefId: '' } } : {})
+      type_details: defaultTypeDetails,
     };
     addFinancial(item.id, newObj);
     setExpandedItems(prev => new Set([...prev, newId]));

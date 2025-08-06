@@ -569,7 +569,7 @@
           "to_stage": 17
         }
       ],
-      "reduce_parttime": true,
+      "reduce_parttime": false,
       "reduce_partyear": true
     },
     {

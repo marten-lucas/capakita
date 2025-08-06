@@ -1,3 +1,5 @@
+import { Financial } from '../models/Financial';
+
 export const FINANCIAL_TYPE_REGISTRY = [
   {
     value: 'expense-avr',
@@ -5,6 +7,7 @@ export const FINANCIAL_TYPE_REGISTRY = [
     allowed: ['capacity'],
     component: () => import('../components/SimDataDetail/Financials/Expense/AvrExpenseDetail'),
     calculator: () => import('../utils/financialCalculators/Expense/avrExpenseCalculator').then(mod => mod.updatePayments),
+    typeDetailsDefinition: Financial.typeDetailsDefinitions['expense-avr'], // <-- use typeDetailsDefinition
   },
   {
     value: 'income-fee',
@@ -12,6 +15,7 @@ export const FINANCIAL_TYPE_REGISTRY = [
     allowed: ['demand'],
     component: () => import('../components/SimDataDetail/Financials/Income/FeeIncomeDetail'),
     calculator: () => import('../utils/financialCalculators/Income/feeIncomeCalculator').then(mod => mod.updatePayments),
+    typeDetailsDefinition: Financial.typeDetailsDefinitions['income-fee'],
   },
   // ...other types...
 ];
@@ -26,6 +30,7 @@ export const FINANCIAL_BONUS_REGISTRY = [
     calculator: () => import('../utils/financialCalculators/Expense/avrCalculator/Bonus/avrYearlyBonusCalc').then(mod => mod.updatePayments),
     unique: true,
     deleteable: false,
+    typeDetailsDefinition: Financial.typeDetailsDefinitions['bonus-yearly'],
   },
   {
     value: 'bonus-children',
@@ -35,6 +40,7 @@ export const FINANCIAL_BONUS_REGISTRY = [
     calculator: () => import('../utils/financialCalculators/Expense/avrCalculator/Bonus/avrChildBonusCalc').then(mod => mod.updatePayments),
     unique: false,
     deleteable: false,
+    typeDetailsDefinition: Financial.typeDetailsDefinitions['bonus-children'],
   },
   {
     value: 'bonus-instructor',
@@ -44,6 +50,7 @@ export const FINANCIAL_BONUS_REGISTRY = [
     calculator: () => import('../utils/financialCalculators/Expense/avrCalculator/Bonus/avrInstructorBonusCalc').then(mod => mod.updatePayments),
     unique: false,
     deleteable: true,
+    typeDetailsDefinition: Financial.typeDetailsDefinitions['bonus-instructor'],
   },
 ];
 

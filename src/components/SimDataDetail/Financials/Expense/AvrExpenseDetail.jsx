@@ -29,11 +29,14 @@ function AvrExpenseDetail({ financial, onChange, item }) {
     const bonuses = Array.isArray(financial.financial) ? financial.financial : [];
     const yearlyBonusIdx = bonuses.findIndex(b => b.type === 'bonus-yearly');
     if (yearlyBonusIdx === -1) {
+      // Use typeDetailsDefinition from registry if available
+      const registry = BONUS_REGISTRY.find(b => b.value === 'bonus-yearly');
+      const defaultTypeDetails = registry?.typeDetailsDefinition ? { ...registry.typeDetailsDefinition } : {};
       const newBonus = {
         id: `${Date.now()}-${Math.random()}`,
         type: 'bonus-yearly',
-        label: BONUS_REGISTRY.find(b => b.value === 'bonus-yearly')?.label || 'Jahressonderzahlung',
-        type_details: {},
+        label: registry?.label || 'Jahressonderzahlung',
+        type_details: defaultTypeDetails,
         financial: []
       };
       onChange({
@@ -60,11 +63,13 @@ function AvrExpenseDetail({ financial, onChange, item }) {
     if (noOfChildren > 0) {
       // Add or update child bonus
       if (childBonusIdx === -1) {
+        const registry = BONUS_REGISTRY.find(b => b.value === 'bonus-children');
+        const defaultTypeDetails = registry?.typeDetailsDefinition ? { ...registry.typeDetailsDefinition } : { noOfChildren };
         const newBonus = {
           id: `${Date.now()}-${Math.random()}`,
           type: 'bonus-children',
-          label: BONUS_REGISTRY.find(b => b.value === 'bonus-children')?.label || 'Kinderzuschlag',
-          type_details: { noOfChildren },
+          label: registry?.label || 'Kinderzuschlag',
+          type_details: { ...defaultTypeDetails, noOfChildren },
           financial: []
         };
         onChange({
@@ -138,11 +143,14 @@ function AvrExpenseDetail({ financial, onChange, item }) {
 
   // Handler for stacking bonuses as nested financials
   const handleAddBonus = (bonusType) => {
+    // Use typeDetailsDefinition from registry if available
+    const registry = BONUS_REGISTRY.find(b => b.value === bonusType);
+    const defaultTypeDetails = registry?.typeDetailsDefinition ? { ...registry.typeDetailsDefinition } : {};
     const newBonus = {
       id: `${Date.now()}-${Math.random()}`,
       type: bonusType,
-      label: BONUS_REGISTRY.find(b => b.value === bonusType)?.label || bonusType,
-      type_details: {},
+      label: registry?.label || bonusType,
+      type_details: defaultTypeDetails,
       financial: []
     };
     onChange({
