@@ -9,6 +9,8 @@
  * @typedef {Object} FeeGroup
  * @property {string} id
  * @property {string} groupref
+ * @property {string} valid_from
+ * @property {string} valid_to
  * @property {Array<Fee>} fees
  */
 
@@ -33,6 +35,8 @@ export class FinancialDef {
       {
         id: '',
         groupref: '',
+        valid_from: '',
+        valid_to: '',
         fees: [
           {
             maxHours: 0,

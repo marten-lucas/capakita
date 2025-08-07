@@ -85,6 +85,8 @@ function OrgaTabRateDefs() {
     const newGroup = {
       id: Math.random().toString(36).slice(2),
       groupref: '',
+      valid_from: '',
+      valid_to: '',
       fees: []
     };
     const updatedDef = {
@@ -152,10 +154,12 @@ function OrgaTabRateDefs() {
     }));
   };
 
-  // Update groupref in FeeGroup
-  const handleUpdateGroupRef = (groupIndex, groupref) => {
+
+
+  // Update FeeGroup fields (valid_from, valid_to, groupref)
+  const handleUpdateFeeGroupField = (groupIndex, field, value) => {
     const updatedGroups = [...(currentDef.fee_groups || [])];
-    updatedGroups[groupIndex] = { ...updatedGroups[groupIndex], groupref };
+    updatedGroups[groupIndex] = { ...updatedGroups[groupIndex], [field]: value };
     dispatch(updateFinancialDefThunk({
       scenarioId: selectedScenarioId,
       financialDefId: currentDef.id,
@@ -255,30 +259,7 @@ function OrgaTabRateDefs() {
                     size="small"
                     sx={{ minWidth: 200 }}
                   />
-                  <TextField
-                    label="Gültig von"
-                    type="date"
-                    value={currentDef.valid_from || ''}
-                    onChange={e => dispatch(updateFinancialDefThunk({
-                      scenarioId: selectedScenarioId,
-                      financialDefId: currentDef.id,
-                      updates: { ...currentDef, valid_from: e.target.value }
-                    }))}
-                    size="small"
-                    InputLabelProps={{ shrink: true }}
-                  />
-                  <TextField
-                    label="Gültig bis"
-                    type="date"
-                    value={currentDef.valid_to || ''}
-                    onChange={e => dispatch(updateFinancialDefThunk({
-                      scenarioId: selectedScenarioId,
-                      financialDefId: currentDef.id,
-                      updates: { ...currentDef, valid_to: e.target.value }
-                    }))}
-                    size="small"
-                    InputLabelProps={{ shrink: true }}
-                  />
+                  
                 </Box>
               </Paper>
               {/* Fee Groups */}
@@ -294,7 +275,23 @@ function OrgaTabRateDefs() {
                       <GroupPicker
                         groupDefs={groupDefs}
                         value={feeGroup.groupref}
-                        onChange={e => handleUpdateGroupRef(groupIndex, e.target.value)}
+                        onChange={e => handleUpdateFeeGroupField(groupIndex, 'groupref', e.target.value)}
+                      />
+                      <TextField
+                        label="Gültig von"
+                        type="date"
+                        value={feeGroup.valid_from || ''}
+                        onChange={e => handleUpdateFeeGroupField(groupIndex, 'valid_from', e.target.value)}
+                        size="small"
+                        InputLabelProps={{ shrink: true }}
+                      />
+                      <TextField
+                        label="Gültig bis"
+                        type="date"
+                        value={feeGroup.valid_to || ''}
+                        onChange={e => handleUpdateFeeGroupField(groupIndex, 'valid_to', e.target.value)}
+                        size="small"
+                        InputLabelProps={{ shrink: true }}
                       />
                       <IconButton size="small" onClick={() => handleDeleteFeeGroup(groupIndex)}>
                         <DeleteIcon />
