@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Box, Typography, IconButton, Button, RadioGroup, FormControlLabel, Radio, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useSelector } from 'react-redux';
@@ -30,9 +30,6 @@ function FeeIncomeDetail({ financial, onChange, onDelete, item }) {
     }
   }
 
-  
-  
-
   // Handler for updating type_details
   const updateTypeDetails = (updates) => {
     onChange({
@@ -53,6 +50,20 @@ function FeeIncomeDetail({ financial, onChange, onDelete, item }) {
   const matchingDefs = financialDefs.filter(def =>
     Array.isArray(def.fee_groups) && def.fee_groups.some(g => g.groupref === groupRef)
   );
+
+  // Auto-select the first available option if none is selected
+  useEffect(() => {
+    if (
+      matchingDefs.length > 0 &&
+      (!typeDetails.financialDefId || !matchingDefs.some(def => def.id === typeDetails.financialDefId))
+    ) {
+      onChange({
+        ...financial,
+        type_details: { ...typeDetails, financialDefId: matchingDefs[0].id }
+      });
+    }
+    // eslint-disable-next-line
+  }, [matchingDefs.length]);
 
   return (
     <Box display="flex" flexDirection="column" gap={2} position="relative">

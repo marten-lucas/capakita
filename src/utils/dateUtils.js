@@ -104,3 +104,32 @@ export function normalizeToISODateString(dateStr) {
   }
   return dateStr;
 }
+
+/**
+ * Given a sorted array of unique dates, build periods with valid_from and valid_to.
+ * The last period will have only valid_from and no valid_to (open-ended).
+ * Periods should not overlap - valid_to is one day before the next valid_from.
+ * @param {string[]} sortedDates - Array of ISO date strings, sorted ascending.
+ * @returns {Array<{valid_from: string, valid_to?: string}>}
+ */
+export function buildPeriodsFromDates(sortedDates) {
+  const periods = [];
+  for (let i = 0; i < sortedDates.length - 1; i++) {
+    // Calculate valid_to as one day before the next period starts
+    const nextDate = new Date(sortedDates[i + 1]);
+    const validTo = new Date(nextDate);
+    validTo.setDate(validTo.getDate() - 1);
+    periods.push({
+      valid_from: sortedDates[i],
+      valid_to: validTo.toISOString().slice(0, 10)
+    });
+  }
+  if (sortedDates.length > 0) {
+    // Add last open-ended period
+    periods.push({
+      valid_from: sortedDates[sortedDates.length - 1]
+      // no valid_to
+    });
+  }
+  return periods;
+}

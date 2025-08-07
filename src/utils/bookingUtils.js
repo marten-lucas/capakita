@@ -89,3 +89,36 @@ export function sumBookingHours(booking) {
   });
   return total;
 }
+
+/**
+ * Calculate the sum of booking hours for all bookings overlapping a period.
+ * @param {Object|Array} bookings - booking objects (array or object)
+ * @param {string} from - Period start (inclusive, ISO string)
+ * @param {string} to - Period end (inclusive, ISO string)
+ * @returns {number}
+ */
+export function sumBookingHoursForPeriod(bookings, from, to) {
+  let total = 0;
+  const overlaps = (start, end, from, to) => {
+    const s = start ? new Date(start) : null;
+    const e = end ? new Date(end) : null;
+    const fromD = from ? new Date(from) : null;
+    const toD = to ? new Date(to) : null;
+    // Overlap: booking period intersects [from, to]
+    return (!toD || !e || e >= fromD) && (!fromD || !s || s <= toD);
+  };
+  if (Array.isArray(bookings)) {
+    bookings.forEach(b => {
+      if (b.startdate && overlaps(b.startdate, b.enddate, from, to)) {
+        total += sumBookingHours(b);
+      }
+    });
+  } else if (typeof bookings === "object" && bookings !== null) {
+    Object.values(bookings).forEach(b => {
+      if (b.startdate && overlaps(b.startdate, b.enddate, from, to)) {
+        total += sumBookingHours(b);
+      }
+    });
+  }
+  return total;
+}

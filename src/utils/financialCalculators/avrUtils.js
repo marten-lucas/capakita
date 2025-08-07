@@ -195,3 +195,27 @@ export function getPresencePercentageInPeriod(dataItem, periodStart, periodEnd, 
   const presentDays = Math.max(0, totalDays - absentDays);
   return presentDays / totalDays;
 }
+
+/**
+ * Determine AVR stage for a given date.
+ * @param {string} startdate - Employment start date (ISO string)
+ * @param {number} initialStage - The starting AVR stage (from type_details.stage)
+ * @param {Array} avrStageUpgrades - Array of upgrade rules (with .from_stage, .to_stage, .years)
+ * @param {string} currentDate - The date to check (ISO string)
+ * @returns {number} The AVR stage at the given date
+ */
+export function getAvrStageAtDate(startdate, initialStage, avrStageUpgrades, currentDate) {
+  if (!startdate || !initialStage || !Array.isArray(avrStageUpgrades)) return initialStage;
+  let stage = initialStage;
+  let baseDate = new Date(startdate);
+
+  for (const upg of avrStageUpgrades) {
+    baseDate = new Date(baseDate.getFullYear() + (upg.years || 0), baseDate.getMonth(), baseDate.getDate());
+    if (new Date(currentDate) >= baseDate) {
+      stage = upg.to_stage;
+    } else {
+      break;
+    }
+  }
+  return stage;
+}
