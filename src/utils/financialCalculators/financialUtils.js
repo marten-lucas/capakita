@@ -49,7 +49,7 @@ export function getPaymentSum4Period(start, end, financial) {
  */
 export function getValidFee(financial, financialDef, feeGroups, refDate, bookingHours) {
   // Find the assigned fee group for this date
-  let groupRef = financial?.type_details?.groupRef || "";
+  let groupRef = ""; // Not used for id matching anymore
   let assignedGroup = null;
 
   // Prefer explicit feeGroups assignment if present
@@ -69,8 +69,10 @@ export function getValidFee(financial, financialDef, feeGroups, refDate, booking
   // Find the matching fee group in the FinancialDef
   let feeGroup = null;
   if (financialDef?.fee_groups && Array.isArray(financialDef.fee_groups)) {
+    // Use groupref from assignedGroup if present, otherwise use groupref from fee group
     feeGroup = financialDef.fee_groups.find(g => {
-      if (groupRef && g.groupref !== groupRef) return false;
+      // If assignedGroup, match groupref; otherwise, just match by date
+      if (assignedGroup && g.groupref !== groupRef) return false;
       const from = g.valid_from ? new Date(g.valid_from) : null;
       const to = g.valid_to ? new Date(g.valid_to) : null;
       const d = new Date(refDate);

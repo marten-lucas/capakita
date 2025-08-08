@@ -14,17 +14,17 @@ import { sumBookingHoursForPeriod } from "../../bookingUtils";
  * @param {Object} dataItem - The child or entity assigned
  * @param {Object|Array} bookings - Booking objects (by id or array)
  * @param {Array} feeGroups - Array of fee group assignments (with valid_from/to)
- * @param {Object} financialDef - The FinancialDef object for this fee income
+ * @param {Object|Array} financialDefs - Array of FinancialDef objects for this fee income
  * @returns {Array} payments
  */
-export function updatePayments(financial, dataItem, bookings, feeGroups, financialDef) {
+export function updatePayments(financial, dataItem, bookings, feeGroups, financialDefs) {
   // Debug: log all incoming props for verification
   console.log("[feeIncomeCalculator] PROPS", {
     financial,
     dataItem,
     bookings,
     feeGroups,
-    financialDef
+    financialDefs
   });
 
   // Collect all relevant change dates (do NOT filter by minDate here)
@@ -33,7 +33,7 @@ export function updatePayments(financial, dataItem, bookings, feeGroups, financi
     bookings,
     feeGroups,
     [financial],
-    financialDef?.fee_groups
+    Array.isArray(financialDefs) ? financialDefs.flatMap(def => def.fee_groups) : financialDefs?.fee_groups
   ]);
   console.log("[feeIncomeCalculator] relevant dates:", dates);
 
@@ -43,28 +43,32 @@ export function updatePayments(financial, dataItem, bookings, feeGroups, financi
   const today = new Date().toISOString().slice(0, 10);
   periods = periods.filter(p => !p.valid_to || p.valid_to >= today);
 
-  // Determine groupRef as a string (do NOT mutate financial)
-  let groupRef = financial?.type_details?.groupRef;
-  if (typeof groupRef !== "string" || !groupRef) {
-    const groupAssignment = Array.isArray(feeGroups) && feeGroups.length > 0
-      ? feeGroups.find(g => g.groupId || g.groupref)
-      : null;
-    if (groupAssignment) {
-      groupRef = groupAssignment.groupId || groupAssignment.groupref || "";
-    } else if (typeof dataItem?.groupId === "string") {
-      groupRef = dataItem.groupId;
+  // Determine financialDefId as a string (do NOT mutate financial)
+  let financialDefId = financial?.type_details?.financialDefId;
+  if (typeof financialDefId !== "string" || !financialDefId) {
+    // Try to pick the first available financialDef if not set
+    if (Array.isArray(financialDefs) && financialDefs.length > 0) {
+      financialDefId = financialDefs[0].id;
     } else {
-      groupRef = "";
+      financialDefId = "";
     }
+  }
+
+  // Find the correct financialDef object by id
+  let financialDef = null;
+  if (Array.isArray(financialDefs)) {
+    financialDef = financialDefs.find(def => def.id === financialDefId) || financialDefs[0] || null;
+  } else if (financialDefs && typeof financialDefs === "object") {
+    financialDef = financialDefs;
   }
 
   // For each period, determine booking hours and fee
   const payments = periods.map(period => {
     const { valid_from, valid_to } = period;
     const bookingHours = sumBookingHoursForPeriod(bookings, valid_from, valid_to);
-    // Pass groupRef as override in a shallow copy of financial
+    // Pass financialDefId as override in a shallow copy of financial
     const fee = getValidFee(
-      { ...financial, type_details: { ...financial.type_details, groupRef } },
+      { ...financial, type_details: { ...financial.type_details, financialDefId } },
       financialDef,
       feeGroups,
       valid_from,

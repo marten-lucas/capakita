@@ -250,6 +250,8 @@ export const updatePaymentsThunk = (scenarioId) => async (dispatch, getState) =>
     effectiveFinancialsByItem,
     effectiveDataItems,
     effectiveBookingsByItem,
+    effectiveGroupAssignmentsByItem,
+    effectiveFinancialDefs,
   } = buildOverlayAwareData(scenarioId, state);
 
   // Flatten all financials across all items, preserving the dataItemId
@@ -296,17 +298,43 @@ export const updatePaymentsThunk = (scenarioId) => async (dispatch, getState) =>
     const dataItem = effectiveDataItems[financial.dataItemId];
     const bookings = effectiveBookingsByItem[financial.dataItemId];
     const avrStageUpgrades = financial.type_details?.stage_upgrades || [];
+    
+    // Get group assignments for this data item
+    const groupAssignments = effectiveGroupAssignmentsByItem[financial.dataItemId];
+    const feeGroups = groupAssignments ? Object.values(groupAssignments) : [];
+    
+    // Get financial definitions (array)
+    const financialDefs = Array.isArray(effectiveFinancialDefs) ? effectiveFinancialDefs : Object.values(effectiveFinancialDefs || {});
 
     try {
-      // Pass allFinancials to the recursive updater
-      const updatedFinancial = await updatePaymentsRecursive(
-        financial,
-        dataItem,
-        bookings,
-        avrStageUpgrades,
-        allFinancials
-      );
+      const calculatorLoader = getCalculatorForType(financial.type);
+      if (!calculatorLoader) return financial;
+      
+      const updatePayments = await calculatorLoader();
+      
+      // Pass the correct parameters based on financial type
+      let newPayments;
+      if (financial.type === 'income-fee') {
+        newPayments = updatePayments(financial, dataItem, bookings, feeGroups, financialDefs);
+      } else {
+        newPayments = updatePayments(financial, dataItem, bookings, avrStageUpgrades, allFinancials);
+      }
 
+      // Update this financial with its payments
+      let updatedFinancial = { ...financial, payments: newPayments };
+
+      // Recursively update payments for nested bonuses, passing updated parent financials
+      if (Array.isArray(financial.financial)) {
+        // Build a new allFinancials array with the updated parent financial
+        const updatedAllFinancials = allFinancials.map(f =>
+          f.id === updatedFinancial.id ? updatedFinancial : f
+        );
+        updatedFinancial.financial = await Promise.all(
+          financial.financial.map(async bonus => {
+            return await updatePaymentsRecursive(bonus, dataItem, bookings, avrStageUpgrades, updatedAllFinancials);
+          })
+        );
+      }
       dispatch(updateFinancialThunk({
         scenarioId,
         dataItemId: financial.dataItemId,
