@@ -19,7 +19,10 @@ export function generateFinancialCategories(timedimension, events) {
     .filter(Boolean)
     .sort();
   if (dates.length === 0) return [];
-  const firstDate = new Date(dates[0]);
+  // Start with today instead of first event date
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const firstDate = today;
   const lastDate = new Date(dates[dates.length - 1]);
 
   // Helper: format label for each timedimension
