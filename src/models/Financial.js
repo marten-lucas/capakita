@@ -41,6 +41,9 @@ export class Financial {
       NoOfChildren: { type: 'number', required: false },
       // ...other AVR-specific fields...
     },
+    'expense-custom': {
+      Amount: { type: 'number', required: true },
+    },
     'income-fee': {
       financialDefId: { type: 'string', required: true },
       groupRef: { type: 'string', required: false },

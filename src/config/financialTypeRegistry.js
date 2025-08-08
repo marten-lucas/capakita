@@ -10,6 +10,14 @@ export const FINANCIAL_TYPE_REGISTRY = [
     typeDetailsDefinition: Financial.typeDetailsDefinitions['expense-avr'], // <-- use typeDetailsDefinition
   },
   {
+    value: 'expense-custom',
+    label: 'Ausgabe: Festbetrag',
+    allowed: ['capacity'],
+    component: () => import('../components/SimDataDetail/Financials/Expense/CustomExpenseDetail'),
+    calculator: () => import('../utils/financialCalculators/Expense/customExpenseCalculator').then(mod => mod.updatePayments),
+    typeDetailsDefinition: Financial.typeDetailsDefinitions['expense-custom'],
+  },
+  {
     value: 'income-fee',
     label: 'Einnahme: Elternbeitrag',
     allowed: ['demand'],
