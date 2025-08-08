@@ -25,7 +25,7 @@ export default function FinancialChart({ scenarioId, timedimension }) {
 
   // Chart options
   const financialOptions = useMemo(() => ({
-    chart: { type: 'column' },
+    chart: { type: 'column', alignTicks: true },
     title: { text: 'Finanzen (Prototyp)' },
     xAxis: { 
       categories: chartData.categories || [],
@@ -34,11 +34,17 @@ export default function FinancialChart({ scenarioId, timedimension }) {
     yAxis: [
       {
         title: { text: 'Betrag (€)' },
-        min: 0,
-        // max: chartData.maxAmount || null,
+        //min: 0,
+        max: chartData.maxAmount || null,
         tickInterval: null,
         opposite: false,
         gridLineWidth: 1
+      },
+      {
+        title: { text: 'Saldo (€)' },
+        //min: chartData.minAmount || null,
+        opposite: true,
+        gridLineWidth: 0
       }
     ],
     series: [
@@ -46,13 +52,39 @@ export default function FinancialChart({ scenarioId, timedimension }) {
         name: 'Ausgaben',
         type: 'column',
         data: chartData.expenses || [],
-        color: expenseColor
+        color: expenseColor,
+        yAxis: 0
       },
       {
         name: 'Einnahmen',
         type: 'column',
         data: chartData.income || [],
-        color: incomeColor
+        color: incomeColor,
+        yAxis: 0
+      },
+      {
+        name: 'Monatlicher Saldo',
+        type: 'line',
+        data: (chartData.income || []).map((inc, i) => inc - (chartData.expenses?.[i] || 0)),
+        color: '#0077cc',
+        yAxis: 1,
+        marker: { enabled: true }
+      },
+      {
+        name: 'Kumulierter Saldo',
+        type: 'line',
+        data: (() => {
+          const income = chartData.income || [];
+          const expenses = chartData.expenses || [];
+          let cum = 0;
+          return income.map((inc, i) => {
+            cum += (inc - (expenses[i] || 0));
+            return cum;
+          });
+        })(),
+        color: '#ff9900',
+        yAxis: 1,
+        marker: { enabled: true }
       }
     ],
     legend: { align: 'center', verticalAlign: 'bottom' },
