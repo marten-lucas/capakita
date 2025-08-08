@@ -13,7 +13,7 @@ export function getPayments4Period(start, end, financials, opts = {}) {
     return financials.flatMap(financial => getPayments4Period(start, end, financial, opts));
   }
   if (!financials?.payments || !Array.isArray(financials.payments)) {
-    console.log("[getPayments4Period] No payments found for financial:", financials);
+    console.warn("[getPayments4Period] No payments found for financial:", financials);
     return [];
   }
   const startDate = new Date(start);
@@ -31,7 +31,6 @@ export function getPayments4Period(start, end, financials, opts = {}) {
     }
     return true;
   });
-  console.log(`[getPayments4Period] start: ${start}, end: ${end}, found:`, filtered);
   return filtered;
 }
 
@@ -56,7 +55,6 @@ export function getPaymentSum4Period(start, end, financials, opts = {}) {
     if (balance && p.type === 'expense') amount = -amount;
     sum += amount;
   });
-  console.log(`[getPaymentSum4Period] start: ${start}, end: ${end}, sum:`, sum);
   return { sum, types: Array.from(typeSet) };
 }
 
@@ -85,8 +83,7 @@ export function getValidFee(financial, financialDef, feeGroups, refDate, booking
     if (assignedGroup) groupRef = assignedGroup.groupref;
   }
 
-  // Debug: log groupRef and assignedGroup
-  console.log("[getValidFee] groupRef:", groupRef, "assignedGroup:", assignedGroup);
+  
 
   // Find the matching fee group in the FinancialDef
   let feeGroup = null;
@@ -102,11 +99,10 @@ export function getValidFee(financial, financialDef, feeGroups, refDate, booking
     });
   }
 
-  // Debug: log feeGroup
-  console.log("[getValidFee] feeGroup:", feeGroup);
+
 
   if (!feeGroup || !Array.isArray(feeGroup.fees)) {
-    console.log("[getValidFee] No matching feeGroup or fees array");
+    console.warn("[getValidFee] No matching feeGroup or fees array");
     return null;
   }
 
@@ -114,16 +110,14 @@ export function getValidFee(financial, financialDef, feeGroups, refDate, booking
   const sortedFees = [...feeGroup.fees].sort((a, b) => a.maxHours - b.maxHours);
   for (const fee of sortedFees) {
     if (bookingHours <= fee.maxHours) {
-      console.log("[getValidFee] matched fee:", fee, "for bookingHours:", bookingHours);
       return fee;
     }
   }
   // If no fee matches, return the highest maxHours fee (fallback)
   if (sortedFees.length > 0) {
-    console.log("[getValidFee] fallback fee:", sortedFees[sortedFees.length - 1]);
     return sortedFees[sortedFees.length - 1];
   }
-  console.log("[getValidFee] No fee found at all");
+  console.warn("[getValidFee] No fee found at all");
   return null;
 }
 

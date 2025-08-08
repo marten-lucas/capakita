@@ -264,7 +264,7 @@ export const updatePaymentsThunk = (scenarioId) => async (dispatch, getState) =>
   );
 
   if (allFinancials.length === 0) {
-    console.log(`No financials found for scenario ${scenarioId}`);
+    console.warn(`No financials found for scenario ${scenarioId}`);
     return [];
   }
 
@@ -351,7 +351,6 @@ export const updatePaymentsThunk = (scenarioId) => async (dispatch, getState) =>
   const results = await Promise.all(updatePromises);
   const successfulUpdates = results.filter(result => result !== null);
 
-  console.log(`Updated payments for ${successfulUpdates.length} financials in scenario ${scenarioId}`);
   return successfulUpdates;
 };
 

@@ -8,7 +8,6 @@ import { collectRelevantDatesFromObjects } from "../financialUtils";
 export function updatePayments(financial, dataItem, bookings, avrStageUpgrades) {
   // Compose payments using all dependencies
   const payments = buildPayments(financial, dataItem, bookings, avrStageUpgrades);
-  console.log("[avrExpenseCalculator] payments:", payments);
   return payments;
 }
 
@@ -73,7 +72,6 @@ function buildPayments(financial, dataItem, bookings, avrStageUpgrades) {
       const periodStart = new Date(valid_from);
       const periodEnd = new Date(valid_to);
       absenceFactor = getPresencePercentageInPeriod(dataItem, periodStart, periodEnd);
-      console.log(`[avrExpenseCalculator] period:`, valid_from, valid_to, "absenceFactor:", absenceFactor);
     }
     let amount = 0;
     if (group && avrStage) {
@@ -81,7 +79,6 @@ function buildPayments(financial, dataItem, bookings, avrStageUpgrades) {
       const fulltimeHours = getAvrFulltimeHours(valid_from);
       const reduction = fulltimeHours > 0 ? (workingHours / fulltimeHours) : 1;
       amount = avrAmount * reduction * absenceFactor;
-      console.log(`[avrExpenseCalculator] period:`, valid_from, valid_to, "avrAmount:", avrAmount, "fulltimeHours:", fulltimeHours, "workingHours:", workingHours, "reduction:", reduction, "amount:", amount);
     }
     return {
       valid_from,

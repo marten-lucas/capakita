@@ -18,14 +18,7 @@ import { sumBookingHoursForPeriod } from "../../bookingUtils";
  * @returns {Array} payments
  */
 export function updatePayments(financial, dataItem, bookings, feeGroups, financialDefs) {
-  // Debug: log all incoming props for verification
-  console.log("[feeIncomeCalculator] PROPS", {
-    financial,
-    dataItem,
-    bookings,
-    feeGroups,
-    financialDefs
-  });
+  
 
   // Collect all relevant change dates (do NOT filter by minDate here)
   const dates = collectRelevantDatesFromObjects([
@@ -35,7 +28,6 @@ export function updatePayments(financial, dataItem, bookings, feeGroups, financi
     [financial],
     Array.isArray(financialDefs) ? financialDefs.flatMap(def => def.fee_groups) : financialDefs?.fee_groups
   ]);
-  console.log("[feeIncomeCalculator] relevant dates:", dates);
 
   let periods = buildPeriodsFromDates(dates);
 
@@ -74,7 +66,6 @@ export function updatePayments(financial, dataItem, bookings, feeGroups, financi
       valid_from,
       bookingHours
     );
-    console.log("[feeIncomeCalculator] period:", period, "bookingHours:", bookingHours, "fee:", fee);
     return {
       valid_from,
       valid_to,
@@ -85,7 +76,6 @@ export function updatePayments(financial, dataItem, bookings, feeGroups, financi
     };
   });
 
-  console.log("Fee income payments updated:", payments);
   return payments;
 }
 

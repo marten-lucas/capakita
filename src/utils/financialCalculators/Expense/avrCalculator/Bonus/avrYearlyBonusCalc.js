@@ -21,25 +21,20 @@ function getBonusPercentage(bonusDef, group) {
 export function updatePayments(financial, dataItem, bookings, avrStageUpgrades, allFinancials) {
   // Guard: allFinancials must be defined and an array
   if (!Array.isArray(allFinancials)) {
-    console.log("[avrYearlyBonusCalc] allFinancials is undefined or not an array");
     return [];
   }
   // Use parentId if present, otherwise do not proceed
   if (!financial.parentId) {
-    console.log("[avrYearlyBonusCalc] No parentId for bonus financial:", financial);
     return [];
   }
   const parentFinancial = allFinancials.find(f => f.id === financial.parentId);
   if (!parentFinancial) {
-    console.log("[avrYearlyBonusCalc] Parent financial not found for parentId:", financial.parentId);
     return [];
   }
-  console.log("[avrYearlyBonusCalc] parentFinancial:", parentFinancial);
 
   // 1. Load bonus details from AVR data
   const referenceDate = financial.valid_from || dataItem?.startdate || new Date().toISOString().slice(0, 10);
   const bonusDef = getAvrBonusByType(financial.type, referenceDate);
-  console.log("[avrYearlyBonusCalc] bonusDef:", bonusDef);
   if (!bonusDef) return [];
 
   // 2. Evaluate start/end date
@@ -50,7 +45,6 @@ export function updatePayments(financial, dataItem, bookings, avrStageUpgrades, 
   if (!endDate || endDate === "") {
     endDate = `${maxYear}-12-31`;
   }
-  console.log("[avrYearlyBonusCalc] startDate:", startDate, "endDate:", endDate);
   if (!startDate) return [];
 
   const start = new Date(startDate);
@@ -76,7 +70,6 @@ export function updatePayments(financial, dataItem, bookings, avrStageUpgrades, 
       const periodStart = new Date(year, dueMonth - 1, 1);
       const periodEnd = new Date(year, dueMonth, 0);
       presenceFactor = getPresencePercentageInPeriod(dataItem, periodStart, periodEnd, false);
-      console.log(`[avrYearlyBonusCalc] year ${year} presenceFactor:`, presenceFactor, "period:", periodStart, periodEnd);
       if (presenceFactor <= 0) {
         year++;
         paymentDate = getLastDayOfMonth(year, dueMonth);
@@ -93,17 +86,14 @@ export function updatePayments(financial, dataItem, bookings, avrStageUpgrades, 
       const monthStart = new Date(year, m, 1).toISOString().slice(0, 10);
       const monthEnd = new Date(year, m, 0).toISOString().slice(0, 10);
       const monthAmount = getPaymentSum4Period(monthStart, monthEnd, parentFinancial);
-      console.log(`[avrYearlyBonusCalc] year ${year} baseMonth ${monthStart} - ${monthEnd} sum:`, monthAmount);
       totalAmount += monthAmount;
       count++;
     });
     const avgAmount = count > 0 ? totalAmount / count : 0;
-    console.log(`[avrYearlyBonusCalc] year ${year} avgAmount:`, avgAmount);
 
     // 7. Find correct percentage
     const group = financial?.type_details?.group || 1;
     const percentage = getBonusPercentage(bonusDef, group);
-    console.log(`[avrYearlyBonusCalc] year ${year} group:`, group, "percentage:", percentage);
 
     // 8. If reduce_partyear, calculate fraction of year covered
     let partYearFactor = 1;
@@ -114,7 +104,6 @@ export function updatePayments(financial, dataItem, bookings, avrStageUpgrades, 
       const coveredEnd = end && end < yearEnd ? end : yearEnd;
       const daysCovered = (coveredEnd - coveredStart) / (1000 * 60 * 60 * 24) + 1;
       partYearFactor = Math.max(0, Math.min(1, daysCovered / 365));
-      console.log(`[avrYearlyBonusCalc] year ${year} partYearFactor:`, partYearFactor, "daysCovered:", daysCovered);
     }
 
     // 9. Generate payment object
@@ -127,7 +116,6 @@ export function updatePayments(financial, dataItem, bookings, avrStageUpgrades, 
       type: "expense",
       label: `${bonusDef.name || "Jahressonderzahlung"} ${year}`
     };
-    console.log(`[avrYearlyBonusCalc] year ${year} paymentObj:`, paymentObj);
 
     payments.push(paymentObj);
 
@@ -136,6 +124,5 @@ export function updatePayments(financial, dataItem, bookings, avrStageUpgrades, 
     paymentDate = getLastDayOfMonth(year, dueMonth);
   }
 
-  console.log("[avrYearlyBonusCalc] payments:", payments);
   return payments;
 }
