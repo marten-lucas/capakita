@@ -32,7 +32,7 @@ export function useScenarioEvents(scenarioId) {
   const emptyEvents = useMemo(() => [], []);
   const emptyConsolidatedEvents = useMemo(() => [], []);
 
-  // Use selectors only if events state is initialized
+  // Use selectors with proper memoization
   const events = useSelector(state => 
     state.events ? selectEventsForScenario(state, scenarioId) : emptyEvents
   );

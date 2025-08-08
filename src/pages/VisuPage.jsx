@@ -10,8 +10,25 @@ import React from 'react'
 import ScenarioSaveDialog from '../components/modals/ScenarioSaveDialog'
 import ChartFilterForm from '../components/SimDataCharts/ChartFilterForm'
 import { useScenarioEvents } from '../hooks/useScenarioEvents';
+import { createSelector } from '@reduxjs/toolkit';
 
 const EMPTY_TOGGLES = [];
+
+// Memoized selector for chart toggles
+const selectChartToggles = createSelector(
+  [
+    (state, scenarioId) => state.chart[scenarioId]?.chartToggles
+  ],
+  (chartToggles) => chartToggles || EMPTY_TOGGLES
+);
+
+// Memoized selector for chart state
+const selectChartState = createSelector(
+  [
+    (state, scenarioId) => state.chart[scenarioId]
+  ],
+  (chartState) => chartState || {}
+);
 
 function VisuPage() {
   const navigate = useNavigate();
@@ -22,16 +39,10 @@ function VisuPage() {
   const dispatch = useDispatch();
 
   // Use memoized selector for chartToggles to prevent rerenders
-  const chartToggles = useSelector(
-    state => {
-      const scenarioChart = state.chart[selectedScenarioId];
-      return scenarioChart?.chartToggles || EMPTY_TOGGLES;
-    },
-    (left, right) => JSON.stringify(left) === JSON.stringify(right)
-  );
+  const chartToggles = useSelector(state => selectChartToggles(state, selectedScenarioId));
 
   // Track timedimension for financial chart
-  const chartState = useSelector(state => state.chart[selectedScenarioId] || {});
+  const chartState = useSelector(state => selectChartState(state, selectedScenarioId));
   const timedimension = chartState.timedimension || 'month';
 
   // Check if selected scenario still exists, if not select the first available one
