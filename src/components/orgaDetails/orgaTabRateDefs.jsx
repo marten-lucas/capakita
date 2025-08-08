@@ -81,7 +81,7 @@ function OrgaTabRateDefs() {
   };
 
   // Add Fee Group
-  const handleAddFeeGroup = () => {
+  const handleAddFeeSet = () => {
     const newGroup = {
       id: Math.random().toString(36).slice(2),
       groupref: '',
@@ -91,7 +91,7 @@ function OrgaTabRateDefs() {
     };
     const updatedDef = {
       ...currentDef,
-      fee_groups: [...(currentDef.fee_groups || []), newGroup]
+      fee_sets: [...(currentDef.fee_sets || []), newGroup]
     };
     dispatch(updateFinancialDefThunk({
       scenarioId: selectedScenarioId,
@@ -101,19 +101,19 @@ function OrgaTabRateDefs() {
   };
 
   // Remove Fee Group
-  const handleDeleteFeeGroup = (groupIndex) => {
-    const updatedGroups = [...(currentDef.fee_groups || [])];
+  const handleDeleteFeeSet = (groupIndex) => {
+    const updatedGroups = [...(currentDef.fee_sets || [])];
     updatedGroups.splice(groupIndex, 1);
     dispatch(updateFinancialDefThunk({
       scenarioId: selectedScenarioId,
       financialDefId: currentDef.id,
-      updates: { ...currentDef, fee_groups: updatedGroups }
+      updates: { ...currentDef, fee_sets: updatedGroups }
     }));
   };
 
-  // Add Fee to FeeGroup
+  // Add Fee to FeeSet
   const handleAddFee = (groupIndex) => {
-    const updatedGroups = [...(currentDef.fee_groups || [])];
+    const updatedGroups = [...(currentDef.fee_sets || [])];
     updatedGroups[groupIndex] = {
       ...updatedGroups[groupIndex],
       fees: [
@@ -124,46 +124,44 @@ function OrgaTabRateDefs() {
     dispatch(updateFinancialDefThunk({
       scenarioId: selectedScenarioId,
       financialDefId: currentDef.id,
-      updates: { ...currentDef, fee_groups: updatedGroups }
+      updates: { ...currentDef, fee_sets: updatedGroups }
     }));
   };
 
-  // Update Fee in FeeGroup
+  // Update Fee in FeeSet
   const handleUpdateFee = (groupIndex, feeIndex, updates) => {
-    const updatedGroups = [...(currentDef.fee_groups || [])];
+    const updatedGroups = [...(currentDef.fee_sets || [])];
     const updatedFees = [...(updatedGroups[groupIndex].fees || [])];
     updatedFees[feeIndex] = { ...updatedFees[feeIndex], ...updates };
     updatedGroups[groupIndex] = { ...updatedGroups[groupIndex], fees: updatedFees };
     dispatch(updateFinancialDefThunk({
       scenarioId: selectedScenarioId,
       financialDefId: currentDef.id,
-      updates: { ...currentDef, fee_groups: updatedGroups }
+      updates: { ...currentDef, fee_sets: updatedGroups }
     }));
   };
 
-  // Delete Fee from FeeGroup
+  // Delete Fee from FeeSet
   const handleDeleteFee = (groupIndex, feeIndex) => {
-    const updatedGroups = [...(currentDef.fee_groups || [])];
+    const updatedGroups = [...(currentDef.fee_sets || [])];
     const updatedFees = [...(updatedGroups[groupIndex].fees || [])];
     updatedFees.splice(feeIndex, 1);
     updatedGroups[groupIndex] = { ...updatedGroups[groupIndex], fees: updatedFees };
     dispatch(updateFinancialDefThunk({
       scenarioId: selectedScenarioId,
       financialDefId: currentDef.id,
-      updates: { ...currentDef, fee_groups: updatedGroups }
+      updates: { ...currentDef, fee_sets: updatedGroups }
     }));
   };
 
-
-
-  // Update FeeGroup fields (valid_from, valid_to, groupref)
-  const handleUpdateFeeGroupField = (groupIndex, field, value) => {
-    const updatedGroups = [...(currentDef.fee_groups || [])];
+  // Update FeeSet fields (valid_from, valid_to, groupref)
+  const handleUpdateFeeSetField = (groupIndex, field, value) => {
+    const updatedGroups = [...(currentDef.fee_sets || [])];
     updatedGroups[groupIndex] = { ...updatedGroups[groupIndex], [field]: value };
     dispatch(updateFinancialDefThunk({
       scenarioId: selectedScenarioId,
       financialDefId: currentDef.id,
-      updates: { ...currentDef, fee_groups: updatedGroups }
+      updates: { ...currentDef, fee_sets: updatedGroups }
     }));
   };
 
@@ -265,35 +263,35 @@ function OrgaTabRateDefs() {
               {/* Fee Groups */}
               <Paper sx={{ flex: 1, p: 2 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                  <Button variant="outlined" startIcon={<AddIcon />} onClick={handleAddFeeGroup}>
+                  <Button variant="outlined" startIcon={<AddIcon />} onClick={handleAddFeeSet}>
                     Gebühren-Gruppe hinzufügen
                   </Button>
                 </Box>
-                {(currentDef.fee_groups || []).map((feeGroup, groupIndex) => (
-                  <Box key={feeGroup.id || groupIndex} sx={{ mb: 4, border: '1px solid #eee', borderRadius: 2, p: 2 }}>
+                {(currentDef.fee_sets || []).map((FeeSet, groupIndex) => (
+                  <Box key={FeeSet.id || groupIndex} sx={{ mb: 4, border: '1px solid #eee', borderRadius: 2, p: 2 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
                       <GroupPicker
                         groupDefs={groupDefs}
-                        value={feeGroup.groupref}
-                        onChange={e => handleUpdateFeeGroupField(groupIndex, 'groupref', e.target.value)}
+                        value={FeeSet.groupref}
+                        onChange={e => handleUpdateFeeSetField(groupIndex, 'groupref', e.target.value)}
                       />
                       <TextField
                         label="Gültig von"
                         type="date"
-                        value={feeGroup.valid_from || ''}
-                        onChange={e => handleUpdateFeeGroupField(groupIndex, 'valid_from', e.target.value)}
+                        value={FeeSet.valid_from || ''}
+                        onChange={e => handleUpdateFeeSetField(groupIndex, 'valid_from', e.target.value)}
                         size="small"
                         InputLabelProps={{ shrink: true }}
                       />
                       <TextField
                         label="Gültig bis"
                         type="date"
-                        value={feeGroup.valid_to || ''}
-                        onChange={e => handleUpdateFeeGroupField(groupIndex, 'valid_to', e.target.value)}
+                        value={FeeSet.valid_to || ''}
+                        onChange={e => handleUpdateFeeSetField(groupIndex, 'valid_to', e.target.value)}
                         size="small"
                         InputLabelProps={{ shrink: true }}
                       />
-                      <IconButton size="small" onClick={() => handleDeleteFeeGroup(groupIndex)}>
+                      <IconButton size="small" onClick={() => handleDeleteFeeSet(groupIndex)}>
                         <DeleteIcon />
                       </IconButton>
                       <Button
@@ -316,7 +314,7 @@ function OrgaTabRateDefs() {
                           </TableRow>
                         </TableHead>
                         <TableBody>
-                          {(feeGroup.fees || []).map((fee, feeIndex) => (
+                          {(FeeSet.fees || []).map((fee, feeIndex) => (
                             <TableRow key={feeIndex}>
                               <TableCell>
                                 <TextField

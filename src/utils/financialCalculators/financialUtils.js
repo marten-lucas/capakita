@@ -59,55 +59,81 @@ export function getPaymentSum4Period(start, end, financials, opts = {}) {
 }
 
 /**
- * Returns the valid fee object for a given financial assignment, reference date, and booking hours.
- * @param {Object} financial - The Financial object (income-fee)
- * @param {Object} financialDef - The FinancialDef object
- * @param {Array} feeGroups - Array of assigned fee groups (with valid_from/to)
+ * Returns the valid fee object for a given child, financial assignment, reference date, and bookings.
  * @param {string} refDate - ISO date string
- * @param {number} bookingHours - Number of booking hours in this period
+ * @param {Object} dataItem - The child object
+ * @param {Object} financialItem - The Financial object (income-fee)
+ * @param {Object} financialDef - The FinancialDef object
+ * @param {Object} groupAssignments - Group assignments for the child (object of assignments)
+ * @param {Array} bookings - Array of booking objects for the child
  * @returns {Object|null} The matching fee object or null
  */
-export function getValidFee(financial, financialDef, feeGroups, refDate, bookingHours) {
-  // Find the assigned fee group for this date
-  let groupRef = ""; // Not used for id matching anymore
-  let assignedGroup = null;
+export function getValidFee(refDate, dataItem, financialItem, financialDef, groupAssignments, bookings) {
+  // 1. Check if child is present at refDate
+  if (!dataItem) return null;
+  const present =
+    (!dataItem.startdate || dataItem.startdate <= refDate) &&
+    (!dataItem.enddate || dataItem.enddate >= refDate);
+  if (!present) return null;
 
-  // Prefer explicit feeGroups assignment if present
-  if (Array.isArray(feeGroups) && feeGroups.length > 0) {
-    assignedGroup = feeGroups.find(g => {
-      const from = g.valid_from ? new Date(g.valid_from) : null;
-      const to = g.valid_to ? new Date(g.valid_to) : null;
-      const d = new Date(refDate);
-      return (!from || d >= from) && (!to || d <= to);
+  // 2. Find assigned group at refDate
+  let assignedGroupId = null;
+  if (groupAssignments) {
+    const activeAssignment = Object.values(groupAssignments).find(a => {
+      const startOk = !a.start || a.start <= refDate;
+      const endOk = !a.end || a.end >= refDate;
+      return startOk && endOk;
     });
-    if (assignedGroup) groupRef = assignedGroup.groupref;
+    assignedGroupId = activeAssignment?.groupId || dataItem.groupId || null;
+  } else {
+    assignedGroupId = dataItem.groupId || null;
   }
+  if (!assignedGroupId) return null;
 
-  
-
-  // Find the matching fee group in the FinancialDef
-  let feeGroup = null;
-  if (financialDef?.fee_groups && Array.isArray(financialDef.fee_groups)) {
-    // Use groupref from assignedGroup if present, otherwise use groupref from fee group
-    feeGroup = financialDef.fee_groups.find(g => {
-      // If assignedGroup, match groupref; otherwise, just match by date
-      if (assignedGroup && g.groupref !== groupRef) return false;
-      const from = g.valid_from ? new Date(g.valid_from) : null;
-      const to = g.valid_to ? new Date(g.valid_to) : null;
-      const d = new Date(refDate);
-      return (!from || d >= from) && (!to || d <= to);
-    });
+  // 3. Find correct feeSet in financialDef for assigned group and date
+  let feeSetsArr = [];
+  if (financialDef?.fee_sets && Array.isArray(financialDef.fee_sets)) {
+    feeSetsArr = financialDef.fee_sets;
   }
-
-
-
-  if (!feeGroup || !Array.isArray(feeGroup.fees)) {
-    console.warn("[getValidFee] No matching feeGroup or fees array");
+  let feeSet = null;
+  if (feeSetsArr.length > 0) {
+    feeSet = feeSetsArr.find(set =>
+      set.groupref === assignedGroupId &&
+      (!set.valid_from || set.valid_from <= refDate) &&
+      (!set.valid_to || set.valid_to >= refDate)
+    );
+  }
+  if (!feeSet || !Array.isArray(feeSet.fees)) {
     return null;
   }
 
-  // Find the fee for the booking hours (maxHours >= bookingHours, lowest maxHours that fits)
-  const sortedFees = [...feeGroup.fees].sort((a, b) => a.maxHours - b.maxHours);
+  // 4. Sum booking hours for the child at refDate
+  let bookingHours = 0;
+  if (Array.isArray(bookings)) {
+    bookings.forEach(booking => {
+      const startOk = !booking.startdate || booking.startdate <= refDate;
+      const endOk = !booking.enddate || booking.enddate >= refDate;
+      if (startOk && endOk) {
+        // Sum all hours in booking.times
+        if (Array.isArray(booking.times)) {
+          booking.times.forEach(dayObj => {
+            if (Array.isArray(dayObj.segments)) {
+              dayObj.segments.forEach(seg => {
+                // Assume booking_start and booking_end are in "HH:MM" format
+                const [startH, startM] = seg.booking_start.split(':').map(Number);
+                const [endH, endM] = seg.booking_end.split(':').map(Number);
+                let hours = (endH + endM / 60) - (startH + startM / 60);
+                if (hours > 0) bookingHours += hours;
+              });
+            }
+          });
+        }
+      }
+    });
+  }
+
+  // 5. Find the fee for the booking hours (maxHours >= bookingHours, lowest maxHours that fits)
+  const sortedFees = [...feeSet.fees].sort((a, b) => a.maxHours - b.maxHours);
   for (const fee of sortedFees) {
     if (bookingHours <= fee.maxHours) {
       return fee;
@@ -117,7 +143,7 @@ export function getValidFee(financial, financialDef, feeGroups, refDate, booking
   if (sortedFees.length > 0) {
     return sortedFees[sortedFees.length - 1];
   }
-  console.warn("[getValidFee] No fee found at all");
+  //console.warn("[getValidFee] No fee found at all");
   return null;
 }
 
@@ -147,6 +173,13 @@ export function collectRelevantDatesFromObjects(sources, minDate) {
       if (obj.enddate) addDate(obj.enddate);
       if (obj.valid_from) addDate(obj.valid_from);
       if (obj.valid_to) addDate(obj.valid_to);
+      // Also check for nested fee_sets
+      if (Array.isArray(obj.fee_sets)) {
+        obj.fee_sets.forEach(fs => {
+          if (fs.valid_from) addDate(fs.valid_from);
+          if (fs.valid_to) addDate(fs.valid_to);
+        });
+      }
     });
   });
 
@@ -156,4 +189,20 @@ export function collectRelevantDatesFromObjects(sources, minDate) {
     result = result.filter(d => d >= minDate);
   }
   return [...new Set(result)].sort();
+}
+
+/**
+ * Utility to find a financialDef by id from an array or object.
+ * Returns the matching def or the first one if not found, or null if none.
+ */
+export function getFinancialDefById(financialDefs, financialDefId) {
+  if (Array.isArray(financialDefs)) {
+    if (!financialDefId && financialDefs.length > 0) return financialDefs[0];
+    return financialDefs.find(def => def.id === financialDefId) || financialDefs[0] || null;
+  } else if (financialDefs && typeof financialDefs === "object") {
+    if (!financialDefId && financialDefs.id) return financialDefs;
+    if (financialDefs.id === financialDefId) return financialDefs;
+    return null;
+  }
+  return null;
 }

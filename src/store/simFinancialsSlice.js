@@ -59,11 +59,11 @@ const simFinancialsSlice = createSlice({
     addFinancialDef(state, action) {
       const { scenarioId, financialDef } = action.payload;
       if (!state.financialDefsByScenario[scenarioId]) state.financialDefsByScenario[scenarioId] = [];
-      // Ensure fee_groups is present and is an array, and each group has valid_from/valid_to
+      // Ensure fee_sets is present and is an array, and each group has valid_from/valid_to
       const cleanedDef = {
         ...financialDef,
-        fee_groups: Array.isArray(financialDef.fee_groups)
-          ? financialDef.fee_groups.map(g => ({
+        fee_sets: Array.isArray(financialDef.fee_sets)
+          ? financialDef.fee_sets.map(g => ({
               ...g,
               valid_from: g.valid_from || '',
               valid_to: g.valid_to || '',
@@ -77,11 +77,11 @@ const simFinancialsSlice = createSlice({
       const defs = state.financialDefsByScenario[scenarioId] || [];
       const idx = defs.findIndex(def => def.id === financialDefId);
       if (idx !== -1) {
-        // Ensure fee_groups is present and is an array, and each group has valid_from/valid_to
+        // Ensure fee_sets is present and is an array, and each group has valid_from/valid_to
         const cleanedUpdates = {
           ...updates,
-          fee_groups: Array.isArray(updates.fee_groups)
-            ? updates.fee_groups.map(g => ({
+          fee_sets: Array.isArray(updates.fee_sets)
+            ? updates.fee_sets.map(g => ({
                 ...g,
                 valid_from: g.valid_from || '',
                 valid_to: g.valid_to || '',

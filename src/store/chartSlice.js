@@ -298,24 +298,19 @@ export const updatePaymentsThunk = (scenarioId) => async (dispatch, getState) =>
     const dataItem = effectiveDataItems[financial.dataItemId];
     const bookings = effectiveBookingsByItem[financial.dataItemId];
     const avrStageUpgrades = financial.type_details?.stage_upgrades || [];
-    
     // Get group assignments for this data item
     const groupAssignments = effectiveGroupAssignmentsByItem[financial.dataItemId];
-    const feeGroups = groupAssignments ? Object.values(groupAssignments) : [];
-    
     // Get financial definitions (array)
     const financialDefs = Array.isArray(effectiveFinancialDefs) ? effectiveFinancialDefs : Object.values(effectiveFinancialDefs || {});
 
     try {
       const calculatorLoader = getCalculatorForType(financial.type);
       if (!calculatorLoader) return financial;
-      
       const updatePayments = await calculatorLoader();
-      
-      // Pass the correct parameters based on financial type
+
       let newPayments;
       if (financial.type === 'income-fee') {
-        newPayments = updatePayments(financial, dataItem, bookings, feeGroups, financialDefs);
+        newPayments = updatePayments(financial, dataItem, bookings, groupAssignments, financialDefs);
       } else {
         newPayments = updatePayments(financial, dataItem, bookings, avrStageUpgrades, allFinancials);
       }

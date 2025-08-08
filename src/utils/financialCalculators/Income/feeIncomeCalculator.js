@@ -1,32 +1,36 @@
-import { getValidFee, collectRelevantDatesFromObjects } from "../financialUtils";
+import { getValidFee, collectRelevantDatesFromObjects, getFinancialDefById } from "../financialUtils";
 import { buildPeriodsFromDates } from "../../dateUtils";
-import { sumBookingHoursForPeriod } from "../../bookingUtils";
 
 // financial: the Financial object (income-fee)
 // dataItem: the child or entity assigned
 // bookings: booking objects (by id or array)
-// feeGroups: array of fee group assignments (with valid_from/to)
+// feeSets: array of fee set assignments (with valid_from/to)
 // financialDef: the FinancialDef object for this fee income
 
 /**
  * updatePayments for income-fee
  * @param {Object} financial - The Financial object (income-fee)
  * @param {Object} dataItem - The child or entity assigned
- * @param {Object|Array} bookings - Booking objects (by id or array)
- * @param {Array} feeGroups - Array of fee group assignments (with valid_from/to)
+ * @param {Array} bookings - Booking objects (array)
+ * @param {Object} groupAssignments - Group assignments for the child (object)
  * @param {Object|Array} financialDefs - Array of FinancialDef objects for this fee income
  * @returns {Array} payments
  */
-export function updatePayments(financial, dataItem, bookings, feeGroups, financialDefs) {
-  
+export function updatePayments(financial, dataItem, bookings, groupAssignments, financialDefs) {
 
   // Collect all relevant change dates (do NOT filter by minDate here)
   const dates = collectRelevantDatesFromObjects([
     [dataItem],
     bookings,
-    feeGroups,
+    groupAssignments,
     [financial],
-    Array.isArray(financialDefs) ? financialDefs.flatMap(def => def.fee_groups) : financialDefs?.fee_groups
+    Array.isArray(financialDefs)
+      ? financialDefs.flatMap(def => [
+          ...(def.fee_sets || [])
+        ])
+      : [
+          ...(financialDefs?.fee_sets || [])
+        ]
   ]);
 
   let periods = buildPeriodsFromDates(dates);
@@ -37,35 +41,26 @@ export function updatePayments(financial, dataItem, bookings, feeGroups, financi
 
   // Determine financialDefId as a string (do NOT mutate financial)
   let financialDefId = financial?.type_details?.financialDefId;
-  if (typeof financialDefId !== "string" || !financialDefId) {
-    // Try to pick the first available financialDef if not set
-    if (Array.isArray(financialDefs) && financialDefs.length > 0) {
-      financialDefId = financialDefs[0].id;
-    } else {
-      financialDefId = "";
-    }
+  if (typeof financialDefId !== 'string') {
+    financialDefId = financialDefId?.toString() || '';
   }
 
-  // Find the correct financialDef object by id
-  let financialDef = null;
-  if (Array.isArray(financialDefs)) {
-    financialDef = financialDefs.find(def => def.id === financialDefId) || financialDefs[0] || null;
-  } else if (financialDefs && typeof financialDefs === "object") {
-    financialDef = financialDefs;
-  }
+  // Use utility function to find the correct financialDef object by id
+  const financialDef = getFinancialDefById(financialDefs, financialDefId);
 
-  // For each period, determine booking hours and fee
+  // For each period, determine fee
   const payments = periods.map(period => {
     const { valid_from, valid_to } = period;
-    const bookingHours = sumBookingHoursForPeriod(bookings, valid_from, valid_to);
-    // Pass financialDefId as override in a shallow copy of financial
+    // Use refDate as valid_from for fee calculation
     const fee = getValidFee(
-      { ...financial, type_details: { ...financial.type_details, financialDefId } },
-      financialDef,
-      feeGroups,
       valid_from,
-      bookingHours
+      dataItem,
+      financial,
+      financialDef,
+      groupAssignments,
+      bookings
     );
+    console.log('Calculated fee for period:', period, 'Fee:', fee);
     return {
       valid_from,
       valid_to,
@@ -78,4 +73,3 @@ export function updatePayments(financial, dataItem, bookings, feeGroups, financi
 
   return payments;
 }
-

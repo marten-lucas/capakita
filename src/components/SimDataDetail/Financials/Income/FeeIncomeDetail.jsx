@@ -48,7 +48,7 @@ function FeeIncomeDetail({ financial, onChange, onDelete, item }) {
 
   // Only show financialDefs that have a fee_group for the current groupRef
   const matchingDefs = financialDefs.filter(def =>
-    Array.isArray(def.fee_groups) && def.fee_groups.some(g => g.groupref === groupRef)
+    Array.isArray(def.fee_sets) && def.fee_sets.some(g => g.groupref === groupRef)
   );
 
   // Auto-select the first available option if none is selected
