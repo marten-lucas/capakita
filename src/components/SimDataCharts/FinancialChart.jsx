@@ -6,7 +6,7 @@ import Box from '@mui/material/Box';
 import { updateFinancialChartData } from '../../store/chartSlice';
 import { generateFinancialChartTooltip } from '../../utils/chartUtils/chartUtilsFinancial';
 
-export default function FinancialChart({ scenarioId }) {
+export default function FinancialChart({ scenarioId, timedimension }) {
   // Colors (adjust as needed)
   const expenseColor = '#f45b5b';
   const incomeColor = '#90ed7d';
@@ -19,9 +19,9 @@ export default function FinancialChart({ scenarioId }) {
 
   useEffect(() => {
     if (scenarioId) {
-      dispatch(updateFinancialChartData(scenarioId));
+      dispatch(updateFinancialChartData(scenarioId, timedimension));
     }
-  }, [dispatch, scenarioId]);
+  }, [dispatch, scenarioId, timedimension]);
 
   // Chart options
   const financialOptions = useMemo(() => ({

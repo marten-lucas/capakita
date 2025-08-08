@@ -44,7 +44,7 @@ const MenuProps = {
 const EMPTY_GROUP_DEFS = Object.freeze([]);
 const EMPTY_QUALI_DEFS = Object.freeze([]);
 
-function ChartFilterForm({ showStichtag = false, scenarioId }) {
+function ChartFilterForm({ showStichtag = false, scenarioId, onTimedimensionChange }) {
   const dispatch = useDispatch();
 
   // Ensure scenario chart state exists
@@ -167,6 +167,7 @@ function ChartFilterForm({ showStichtag = false, scenarioId }) {
 
   const handleTimedimensionChange = (e) => {
     dispatch(setTimedimension({ scenarioId, timedimension: e.target.value }));
+    if (onTimedimensionChange) onTimedimensionChange(e.target.value);
     // Use setTimeout to ensure state update is processed first
     setTimeout(() => {
       dispatch(updateMidTermChartData(scenarioId));
@@ -176,6 +177,7 @@ function ChartFilterForm({ showStichtag = false, scenarioId }) {
   // UI
   const showWeekly = chartToggles.includes('weekly');
   const showMidterm = chartToggles.includes('midterm');
+  const showFinancial = chartToggles.includes('financial');
   const validTimeDimensions = ['week', 'month', 'quarter', 'year'];
   const safeTimedimension = validTimeDimensions.includes(timedimension)
     ? timedimension
@@ -267,8 +269,8 @@ function ChartFilterForm({ showStichtag = false, scenarioId }) {
             ))}
           </Select>
         </FormControl>
-        {/* Zeitdimension (nur wenn showMidterm) */}
-        {showMidterm && (
+        {/* Zeitdimension (wenn showMidterm oder showFinancial) */}
+        {(showMidterm || showFinancial) && (
           <FormControl sx={{ minWidth: 140 }} size="small">
             <InputLabel>Zeitdimension</InputLabel>
             <Select

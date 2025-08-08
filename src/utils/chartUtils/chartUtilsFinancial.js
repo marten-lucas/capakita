@@ -1,3 +1,5 @@
+import { getPaymentSum4Period } from "../financialCalculators/financialUtils";
+
 // Generate a tooltip for the financial chart
 export function generateFinancialChartTooltip(points, x) {
   let s = `<b>${x}</b><br/>`;
@@ -9,28 +11,75 @@ export function generateFinancialChartTooltip(points, x) {
 
 // Generate categories for the financial chart (similar to midterm)
 export function generateFinancialCategories(timedimension, events) {
-  // For now, just reuse the logic from midterm (e.g., months, quarters, etc.)
-  // You can later customize this for financial-specific needs.
-  // If you want to avoid a dependency, copy the logic from generateMidtermCategories here.
-  // Otherwise, import and use it.
-  // Example (assuming you want to keep it simple for now):
-  if (!Array.isArray(events)) return [];
-  // Find all unique periods based on timedimension
-  const periods = new Set();
-  events.forEach(event => {
-    if (event.periods && Array.isArray(event.periods)) {
-      event.periods.forEach(period => {
-        if (period[timedimension]) periods.add(period[timedimension]);
-      });
+  // Use the same logic as generateMidtermCategories
+  // Find the earliest and latest event date
+  if (!Array.isArray(events) || events.length === 0) return [];
+  const dates = events
+    .map(ev => ev.effectiveDate)
+    .filter(Boolean)
+    .sort();
+  if (dates.length === 0) return [];
+  const firstDate = new Date(dates[0]);
+  const lastDate = new Date(dates[dates.length - 1]);
+
+  // Helper: format label for each timedimension
+  function formatLabel(date) {
+    switch (timedimension) {
+      case 'week': {
+        const d = new Date(date.getTime());
+        d.setHours(0, 0, 0, 0);
+        d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7));
+        const week1 = new Date(d.getFullYear(), 0, 4);
+        const weekNum = 1 + Math.round(((d.getTime() - week1.getTime()) / 86400000 - 3 + ((week1.getDay() + 6) % 7)) / 7);
+        return `${d.getFullYear()}-W${weekNum}`;
+      }
+      case 'month':
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      case 'quarter': {
+        const q = Math.floor(date.getMonth() / 3) + 1;
+        return `${date.getFullYear()}-Q${q}`;
+      }
+      case 'year':
+        return `${date.getFullYear()}`;
+      default:
+        return date.toISOString().slice(0, 10);
     }
-  });
-  return Array.from(periods).sort();
+  }
+
+  // Helper: step date forward by timedimension
+  function stepDate(date) {
+    const d = new Date(date.getTime());
+    switch (timedimension) {
+      case 'week':
+        d.setDate(d.getDate() + 7);
+        break;
+      case 'month':
+        d.setMonth(d.getMonth() + 1);
+        break;
+      case 'quarter':
+        d.setMonth(d.getMonth() + 3);
+        break;
+      case 'year':
+        d.setFullYear(d.getFullYear() + 1);
+        break;
+      default:
+        d.setDate(d.getDate() + 1);
+    }
+    return d;
+  }
+
+  // Generate categories from firstDate to lastDate
+  const categories = [];
+  let current = new Date(firstDate.getFullYear(), firstDate.getMonth(), firstDate.getDate());
+  let lastLabel = formatLabel(lastDate);
+  while (formatLabel(current) <= lastLabel) {
+    categories.push(formatLabel(current));
+    current = stepDate(current);
+  }
+  return categories;
 }
 
-// Helper to check if two periods overlap (inclusive)
-function periodsOverlap(startA, endA, startB, endB) {
-  return !(endA < startB || endB < startA);
-}
+
 
 // Helper to get period start/end for a category label
 function getCategoryPeriod(category, timedimension) {
@@ -45,6 +94,12 @@ function getCategoryPeriod(category, timedimension) {
   } else if (timedimension === 'year') {
     start = new Date(category + '-01-01');
     end = new Date(category + '-12-31');
+  } else if (timedimension === 'quarter') {
+    // Assume category is "YYYY-Qn"
+    const [year, q] = category.split('-Q');
+    const quarter = Number(q);
+    start = new Date(Number(year), (quarter - 1) * 3, 1);
+    end = new Date(Number(year), quarter * 3, 0); // last day of quarter
   } else if (timedimension === 'week') {
     // Assume category is ISO week string: "2024-W01"
     const [year, week] = category.split('-W').map(Number);
@@ -66,38 +121,33 @@ function getCategoryPeriod(category, timedimension) {
 export function calculateChartDataFinancial({
   categories,
   financialEntries,
-  financialDefs,
-  dataItems,
   timedimension
 }) {
   const expenses = [];
   const income = [];
 
   categories.forEach(category => {
-    let expenseSum = 0;
-    let incomeSum = 0;
+    
     const { start: catStart, end: catEnd } = getCategoryPeriod(category, timedimension);
 
-    financialEntries.forEach(financial => {
-      if (!Array.isArray(financial.payments)) return;
-      financial.payments.forEach(payment => {
-        // Parse payment period
-        const payStart = new Date(payment.valid_from);
-        const payEnd = new Date(payment.valid_to);
-        if (periodsOverlap(catStart, catEnd, payStart, payEnd)) {
-          if (payment.type === 'income') {
-            incomeSum += payment.amount || 0;
-          } else if (payment.type === 'expense') {
-            expenseSum += payment.amount || 0;
-          }
-        }
-      });
-    });
+    // Use getPaymentSum4Period with all financialEntries at once for each type
+    const { sum: expenseTotal } = getPaymentSum4Period(
+      catStart.toISOString().slice(0, 10),
+      catEnd.toISOString().slice(0, 10),
+      financialEntries,
+      { types: ['expense'] }
+    );
+    const { sum: incomeTotal } = getPaymentSum4Period(
+      catStart.toISOString().slice(0, 10),
+      catEnd.toISOString().slice(0, 10),
+      financialEntries,
+      { types: ['income'] }
+    );
 
-    expenses.push(expenseSum);
-    income.push(incomeSum);
+    expenses.push(expenseTotal);
+    income.push(incomeTotal);
   });
-
+  console.log("[calculateChartDataFinancial] categories:", categories, "expenses:", expenses, "income:", income);
   return {
     categories: [...categories],
     expenses,

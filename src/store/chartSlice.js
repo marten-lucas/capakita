@@ -356,10 +356,10 @@ export const updatePaymentsThunk = (scenarioId) => async (dispatch, getState) =>
 };
 
 // Thunk to update financial chart data for a scenario
-export const updateFinancialChartData = (scenarioId) => async (dispatch, getState) => {
+export const updateFinancialChartData = (scenarioId, timedimensionArg) => async (dispatch, getState) => {
   const state = getState();
   const chartState = state.chart[scenarioId] || {};
-  const timedimension = chartState.timedimension || 'month';
+  const timedimension = timedimensionArg || chartState.timedimension || 'month';
 
   // 1. First update all payments
   await dispatch(updatePaymentsThunk(scenarioId));

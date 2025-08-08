@@ -30,6 +30,10 @@ function VisuPage() {
     (left, right) => JSON.stringify(left) === JSON.stringify(right)
   );
 
+  // Track timedimension for financial chart
+  const chartState = useSelector(state => state.chart[selectedScenarioId] || {});
+  const timedimension = chartState.timedimension || 'month';
+
   // Check if selected scenario still exists, if not select the first available one
   React.useEffect(() => {
     if (selectedScenarioId && scenarios.length > 0) {
@@ -107,7 +111,7 @@ function VisuPage() {
             <Typography variant="h6" sx={{ mb: 2, color: 'text.secondary' }}>
               Financial Chart
             </Typography>
-            <FinancialChart scenarioId={selectedScenarioId} />
+            <FinancialChart scenarioId={selectedScenarioId} timedimension={timedimension} />
           </Box>
         )}
         {chartToggles.length === 0 && (
