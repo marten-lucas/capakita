@@ -15,7 +15,8 @@ import {
 } from '@mui/material';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import TimelineIcon from '@mui/icons-material/Timeline';
-import PaidIcon from '@mui/icons-material/Paid'; // Add icon for financial chart
+import PaidIcon from '@mui/icons-material/Paid';
+import HistogramIcon from '@mui/icons-material/BarChart'; // Use BarChart icon for histogram
 import { useSelector, useDispatch } from 'react-redux';
 import {
   setTimedimension,
@@ -24,7 +25,8 @@ import {
   setFilterQualifications,
   ensureScenario,
   updateWeeklyChartData,
-  updateMidTermChartData
+  updateMidTermChartData,
+  updateHistogramChartData
 } from '../../store/chartSlice';
 import { useOverlayData } from '../../hooks/useOverlayData';
 import EventPicker from '../EventCalendar/EventPicker';
@@ -146,6 +148,7 @@ function ChartFilterForm({ showStichtag = false, scenarioId, onTimedimensionChan
     // Use setTimeout to ensure state update is processed first
     setTimeout(() => {
       dispatch(updateWeeklyChartData(scenarioId));
+      dispatch(updateHistogramChartData(scenarioId));
     }, 0);
   };
 
@@ -157,6 +160,7 @@ function ChartFilterForm({ showStichtag = false, scenarioId, onTimedimensionChan
     // Use setTimeout to ensure state update is processed first
     setTimeout(() => {
       dispatch(updateWeeklyChartData(scenarioId));
+      dispatch(updateHistogramChartData(scenarioId));
     }, 0);
   };
 
@@ -178,6 +182,7 @@ function ChartFilterForm({ showStichtag = false, scenarioId, onTimedimensionChan
   const showWeekly = chartToggles.includes('weekly');
   const showMidterm = chartToggles.includes('midterm');
   const showFinancial = chartToggles.includes('financial');
+  const showHistogram = chartToggles.includes('histogram');
   const validTimeDimensions = ['week', 'month', 'quarter', 'year'];
   const safeTimedimension = validTimeDimensions.includes(timedimension)
     ? timedimension
@@ -203,7 +208,7 @@ function ChartFilterForm({ showStichtag = false, scenarioId, onTimedimensionChan
           onChange={handleToggle}
           aria-label="Chart selection"
           size="small"
-          sx={{ minWidth: 180 }}
+          sx={{ minWidth: 240 }}
         >
           <ToggleButton value="weekly" aria-label="Weekly Chart">
             <BarChartIcon sx={{ mr: 1 }} /> Woche
@@ -213,6 +218,9 @@ function ChartFilterForm({ showStichtag = false, scenarioId, onTimedimensionChan
           </ToggleButton>
           <ToggleButton value="financial" aria-label="Financial Chart">
             <PaidIcon sx={{ mr: 1 }} /> Finanzen
+          </ToggleButton>
+          <ToggleButton value="histogram" aria-label="Histogram Chart">
+            <HistogramIcon sx={{ mr: 1 }} /> Histogram
           </ToggleButton>
         </ToggleButtonGroup>
 
@@ -286,8 +294,8 @@ function ChartFilterForm({ showStichtag = false, scenarioId, onTimedimensionChan
           </FormControl>
         )}
 
-        {/* Stichtag (nur wenn showWeekly && showStichtag) - EventPicker bleibt in der Reihe */}
-        {showWeekly && showStichtag && (
+        {/* Stichtag (nur wenn showWeekly oder showHistogram && showStichtag) - EventPicker bleibt in der Reihe */}
+        {(showWeekly || showHistogram) && showStichtag && (
           <EventPicker scenarioId={scenarioId} />
         )}
       </Box>

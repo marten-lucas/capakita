@@ -1,6 +1,7 @@
 import { createSlice } from '@reduxjs/toolkit';
 import { calculateChartDataWeekly } from '../utils/chartUtils/chartUtilsWeekly';
 import { calculateChartDataMidterm, generateMidtermCategories } from '../utils/chartUtils/chartUtilsMidterm';
+import { calculateChartDataHistogram } from '../utils/chartUtils/chartUtilsHistogram';
 import { buildOverlayAwareData } from '../utils/overlayUtils';
 import { calculateChartDataFinancial, generateFinancialCategories } from '../utils/chartUtils/chartUtilsFinancial';
 import { FINANCIAL_TYPE_REGISTRY, FINANCIAL_BONUS_REGISTRY, getCalculatorForType } from '../config/financialTypeRegistry';
@@ -11,7 +12,7 @@ function getInitialChartState() {
   return {
     referenceDate: new Date().toISOString().slice(0, 10),
     timedimension: 'month',
-    chartToggles: ['weekly', 'midterm'],
+    chartToggles: ['weekly', 'midterm'], // removed 'histogram'
     filter: {
       Groups: [],
       Qualifications: [],
@@ -30,6 +31,13 @@ function getInitialChartState() {
       },
       midterm: {
         categories: [],
+      },
+      histogram: {
+        categories: [],
+        demand: [],
+        maxdemand: "",
+        capacity: [],
+        maxcapacity: "",
       }
     }
   };
@@ -237,6 +245,68 @@ export const updateMidTermChartData = (scenarioId) => (dispatch, getState) => {
   dispatch(setChartData({
     scenarioId,
     chartType: 'midterm',
+    data: clonedData
+  }));
+};
+
+// Thunk to update histogram chart data for a scenario
+export const updateHistogramChartData = (scenarioId) => (dispatch, getState) => {
+  const state = getState();
+  const chartState = state.chart[scenarioId] || {};
+  const referenceDate = chartState.referenceDate || '';
+  const selectedGroups = [...(chartState.filter?.Groups || [])];
+  const selectedQualifications = [...(chartState.filter?.Qualifications || [])];
+
+  // Use utility to build overlay-aware data
+  const {
+    effectiveDataItems,
+    effectiveBookingsByItem,
+    effectiveGroupAssignmentsByItem,
+    effectiveQualificationAssignmentsByItem,
+    effectiveGroupDefs,
+    effectiveQualificationDefs
+  } = buildOverlayAwareData(scenarioId, state);
+
+  // Wrap by scenarioId for chartUtils compatibility
+  const bookingsByScenarioWrapped = { [scenarioId]: effectiveBookingsByItem };
+  const groupsByScenarioWrapped = { [scenarioId]: effectiveGroupAssignmentsByItem };
+  const qualificationAssignmentsByScenarioWrapped = { [scenarioId]: effectiveQualificationAssignmentsByItem };
+  const dataByScenarioWrapped = { [scenarioId]: effectiveDataItems };
+
+  // Calculate histogram chart data
+  let chartData;
+  try {
+    chartData = calculateChartDataHistogram(
+      referenceDate,
+      selectedGroups,
+      selectedQualifications,
+      {
+        bookingsByScenario: bookingsByScenarioWrapped,
+        dataByScenario: dataByScenarioWrapped,
+        groupDefs: effectiveGroupDefs,
+        qualificationDefs: effectiveQualificationDefs,
+        groupsByScenario: groupsByScenarioWrapped,
+        qualificationAssignmentsByScenario: qualificationAssignmentsByScenarioWrapped,
+        overlaysByScenario: {},
+        scenarioId
+      }
+    );
+  } catch {
+    chartData = {};
+  }
+
+  // Ensure all arrays are deeply cloned and completely mutable
+  const clonedData = {
+    categories: chartData?.categories ? [...chartData.categories] : [],
+    demand: chartData?.demand ? chartData.demand.map(val => typeof val === 'number' ? val : 0) : [],
+    maxdemand: chartData?.maxdemand || "",
+    capacity: chartData?.capacity ? chartData.capacity.map(val => typeof val === 'number' ? val : 0) : [],
+    maxcapacity: chartData?.maxcapacity || "",
+  };
+
+  dispatch(setChartData({
+    scenarioId,
+    chartType: 'histogram',
     data: clonedData
   }));
 };

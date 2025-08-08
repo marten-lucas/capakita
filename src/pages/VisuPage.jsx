@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import WeeklyChart from '../components/SimDataCharts/WeeklyChart'
 import MidtermChart from '../components/SimDataCharts/MidtermChart'
 import FinancialChart from '../components/SimDataCharts/FinancialChart'
+import BookingHistogram from '../components/SimDataCharts/BookingHistogram'
 import { useSelector, useDispatch } from 'react-redux';
 import { setSelectedScenarioId } from '../store/simScenarioSlice';
 import React from 'react'
@@ -123,6 +124,14 @@ function VisuPage() {
               Financial Chart
             </Typography>
             <FinancialChart scenarioId={selectedScenarioId} timedimension={timedimension} />
+          </Box>
+        )}
+        {chartToggles.includes('histogram') && (
+          <Box sx={{ minHeight: '400px' }}>
+            <Typography variant="h6" sx={{ mb: 2, color: 'text.secondary' }}>
+              Booking Histogram
+            </Typography>
+            <BookingHistogram />
           </Box>
         )}
         {chartToggles.length === 0 && (
