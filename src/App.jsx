@@ -8,7 +8,6 @@ import WelcomePage from './pages/WelcomePage';
 import { useSelector } from 'react-redux';
 import theme from './theme';
 import './App.css'
-import ScenarioPicker from './components/ScenarioManager/ScenarioPicker'
 
 function App() {
   const scenarios = useSelector(state => state.simScenario.scenarios);
@@ -23,7 +22,6 @@ function App() {
         width: "100vw"
       }}>
         <TopNav />
-        {hasScenarios && <ScenarioPicker />}
         <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
           <Container maxWidth='l'>
             {!hasScenarios ? (

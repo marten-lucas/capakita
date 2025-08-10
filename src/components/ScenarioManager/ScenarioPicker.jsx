@@ -1,24 +1,23 @@
 import React, { useState } from 'react';
-import { Box, Accordion, AccordionSummary, AccordionDetails, Typography, List, IconButton, InputLabel, Paper } from '@mui/material';
+import { Box, Accordion, AccordionSummary, AccordionDetails, Typography, IconButton, Paper } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import EditIcon from '@mui/icons-material/Edit';
 import AddIcon from '@mui/icons-material/Add';
-import DeleteIcon from '@mui/icons-material/Delete';
 import { useSelector, useDispatch } from 'react-redux';
 import { addScenario, setSelectedScenarioId } from '../../store/simScenarioSlice';
-import ScenarioTree from './ScenarioTree';
-import ScenarioDialog from './ScenarioDialog';
+import { useNavigate } from 'react-router-dom';
 import store from '../../store/store';
+import ScenarioTree from './ScenarioTree';
+
+// Helper to build tree structure for TreeView
 
 function ScenarioPicker() {
     const dispatch = useDispatch();
+    const navigate = useNavigate();
     const scenarios = useSelector(state => state.simScenario.scenarios);
     const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
 
-    const [expanded, setExpanded] = useState(false);
-    const [dialogOpen, setDialogOpen] = useState(false);
-    const [dialogScenarioId, setDialogScenarioId] = useState(null);
-    const [dialogIsNew, setDialogIsNew] = useState(false);
+    const [expanded, setExpanded] = useState(false); // Default to expanded
 
     const selectedScenario = scenarios.find(s => s.id === selectedScenarioId);
     const baseScenario = selectedScenario?.baseScenarioId
@@ -27,11 +26,15 @@ function ScenarioPicker() {
 
     // Handlers for dialog
     const handleEdit = (scenario) => {
-        setDialogScenarioId(scenario.id);
-        setDialogIsNew(false);
-        setDialogOpen(true);
+        // Instead of opening dialog, navigate to OrgaPage scenario tab
+        navigate('/orga?tab=scenarios');
+        // Optionally, select scenario in redux
+        dispatch(setSelectedScenarioId(scenario.id));
     };
     const handleAdd = (baseScenario) => {
+        // Instead of opening dialog, navigate to OrgaPage scenario tab with add param
+        navigate('/orga?tab=scenarios&add=1');
+        // Optionally, add scenario and select it in redux
         dispatch(addScenario({
             name: 'Neues Szenario',
             baseScenarioId: baseScenario?.id || null,
@@ -41,153 +44,141 @@ function ScenarioPicker() {
             const allScenarios = [...store.getState().simScenario.scenarios];
             const lastScenario = allScenarios[allScenarios.length - 1];
             if (lastScenario) {
-                setDialogScenarioId(lastScenario.id);
-                setDialogIsNew(true);
-                setDialogOpen(true);
                 dispatch(setSelectedScenarioId(lastScenario.id));
             }
         }, 0);
         setExpanded(false);
     };
-    const handleDelete = (scenario) => {
-        setDialogScenarioId(scenario.id);
-        setDialogIsNew(false);
-        setDialogOpen('delete');
-    };
+   
+
 
     return (
         <Paper
             variant="outlined"
             sx={{
-                p: 2,
+                p: 0,
                 ml: 0,
-                mr: 3,
-                mt: 2,
-                mb: 1,
+                mr: 0,
+                mt: 0,
+                mb: 0,
                 borderRadius: 2,
                 borderColor: 'divider',
                 bgcolor: 'background.paper',
-                minWidth: 320
+                minWidth: 220,
+                boxShadow: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                height: 48,
+                position: 'relative'
             }}
         >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <InputLabel sx={{ mb: 0.5, fontSize: '0.75rem', color: 'text.secondary' }}>
-                        Szenario
-                    </InputLabel>
-                    <Accordion
-                        expanded={expanded}
-                        onChange={() => setExpanded(!expanded)}
-                        sx={{
-                            minWidth: 0,
-                            flex: 1,
-                            boxShadow: 'none',
-                            '&:before': { display: 'none' },
-                            border: '1px solid',
-                            borderColor: 'divider',
-                            borderRadius: 1
-                        }}
-                    >
-                        <AccordionSummary
-                            expandIcon={<ExpandMoreIcon />}
-                            aria-controls="scenario-list-content"
-                            id="scenario-list-header"
+            <Accordion
+                expanded={expanded}
+                onChange={() => setExpanded(!expanded)}
+                sx={{
+                    minWidth: 0,
+                    flex: 1,
+                    boxShadow: 'none',
+                    '&:before': { display: 'none' },
+                    border: 'none',
+                    borderRadius: 2,
+                    m: 0,
+                    background: 'none'
+                }}
+            >
+                <AccordionSummary
+                    expandIcon={<ExpandMoreIcon />}
+                    aria-controls="scenario-list-content"
+                    id="scenario-list-header"
+                    sx={{
+                        minHeight: 48,
+                        height: 48,
+                        px: 2,
+                        '& .MuiAccordionSummary-content': {
+                            my: 0,
+                            alignItems: 'center',
+                            margin: 0
+                        },
+                        '& .MuiAccordionSummary-expandIconWrapper': {
+                            color: 'action.active'
+                        }
+                    }}
+                >
+                    <Box sx={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center' }}>
+                        <Typography
+                            component="span"
                             sx={{
-                                minHeight: 40,
-                                height: 40,
-                                '& .MuiAccordionSummary-content': {
-                                    my: 0,
-                                    alignItems: 'center',
-                                    margin: 0
-                                },
-                                '& .MuiAccordionSummary-expandIconWrapper': {
-                                    color: 'action.active'
-                                }
+                                color: 'text.primary',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                flex: 1,
+                                fontSize: '0.95rem'
                             }}
                         >
-                            <Box sx={{ flex: 1, minWidth: 0 }}>
-                                <Typography
-                                    component="span"
-                                    sx={{
-                                        color: 'text.primary',
-                                        whiteSpace: 'nowrap',
-                                        overflow: 'hidden',
-                                        textOverflow: 'ellipsis',
-                                        flex: 1,
-                                        fontSize: '0.875rem'
-                                    }}
-                                >
-                                    {selectedScenario
-                                        ? `${selectedScenario.name || `Szenario ${selectedScenario.id}`}`
-                                        : 'Szenario auswählen'}
+                            {selectedScenario
+                                ? `${selectedScenario.name || `Szenario ${selectedScenario.id}`}`
+                                : 'Szenario auswählen'}
+                        </Typography>
+                        {selectedScenario?.baseScenarioId && (
+                            <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem', ml: 1 }}>
+                                Basiert auf: {baseScenario?.name || 'Unbekannt'}
+                            </Typography>
+                        )}
+                    </Box>
+                </AccordionSummary>
+                <AccordionDetails
+                    sx={{
+                        p: 0,
+                        minWidth: 380,
+                        maxWidth: 480,
+                        maxHeight: 360,
+                        overflowY: 'auto',
+                        position: 'absolute',
+                        top: 48,
+                        left: 0,
+                        right: 'auto',
+                        zIndex: 1301,
+                        boxShadow: 3,
+                        bgcolor: 'background.paper',
+                        borderRadius: 2,
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        display: 'flex',
+                        flexDirection: 'column'
+                    }}
+                >
+                    <Box sx={{ minHeight: 200, minWidth: 360, px: 1, py: 1 }}>
+                        <ScenarioTree
+                            onEdit={handleEdit}
+                            onAdd={handleAdd}
+                            // Do not pass onDelete, as delete is handled in TabbedListDetail
+                        />
+                        {/* Add base scenario button below the tree */}
+                        <Box sx={{ display: 'flex', justifyContent: 'flex-start', mt: 1 }}>
+                            <IconButton
+                                size="small"
+                                aria-label="add-base"
+                                color="primary"
+                                onClick={() => handleAdd(null)}
+                                sx={{
+                                    border: '1px solid',
+                                    borderColor: 'divider',
+                                    borderRadius: 1,
+                                    px: 1,
+                                    py: 0.5,
+                                    mr: 1
+                                }}
+                            >
+                                <AddIcon fontSize="small" sx={{ mr: 1 }} />
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                    Szenario hinzufügen
                                 </Typography>
-                                {/* Show base scenario name if present */}
-                                {selectedScenario?.baseScenarioId && (
-                                    <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem', mt: 0.2 }}>
-                                        Basiert auf: {baseScenario?.name || 'Unbekannt'}
-                                    </Typography>
-                                )}
-                            </Box>
-                        </AccordionSummary>
-                        <AccordionDetails sx={{ p: 0 }}>
-                            <List dense disablePadding>
-                                <ScenarioTree
-                                    onEdit={handleEdit}
-                                    onAdd={handleAdd}
-                                    onDelete={handleDelete}
-                                />
-                            </List>
-                        </AccordionDetails>
-                    </Accordion>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, height: 40 }}>
-                    <IconButton
-                        size="small"
-                        aria-label="edit"
-                        onClick={e => {
-                            e.stopPropagation();
-                            if (selectedScenario) handleEdit(selectedScenario);
-                        }}
-                        disabled={!selectedScenario}
-                        sx={{ width: 32, height: 32, mt: 3 }}
-                    >
-                        <EditIcon fontSize="small" />
-                    </IconButton>
-                    <IconButton
-                        size="small"
-                        aria-label="add"
-                        onClick={e => {
-                            e.stopPropagation();
-                            if (selectedScenario) handleAdd(selectedScenario);
-                        }}
-                        disabled={!selectedScenario}
-                        sx={{ width: 32, height: 32, mt: 3 }}
-                    >
-                        <AddIcon fontSize="small" />
-                    </IconButton>
-                    <IconButton
-                        size="small"
-                        aria-label="delete"
-                        onClick={e => {
-                            e.stopPropagation();
-                            if (selectedScenario) handleDelete(selectedScenario);
-                        }}
-                        disabled={!selectedScenario}
-                        sx={{ width: 32, height: 32, mt: 3 }}
-                    >
-                        <DeleteIcon fontSize="small" />
-                    </IconButton>
-                </Box>
-            </Box>
-            {/* Dialog for edit/add/delete */}
-            {dialogOpen && (
-                <ScenarioDialog
-                    scenarioId={dialogScenarioId}
-                    isNew={dialogIsNew}
-                    mode={dialogOpen === 'delete' ? 'delete' : 'edit'}
-                    onClose={() => setDialogOpen(false)}
-                />
-            )}
+                            </IconButton>
+                        </Box>
+                    </Box>
+                </AccordionDetails>
+            </Accordion>
         </Paper>
     );
 }

@@ -20,6 +20,7 @@ import DataImportModal from './modals/DataImportModal';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
 import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 import SaveIcon from '@mui/icons-material/Save';
+import ScenarioPicker from './ScenarioManager/ScenarioPicker';
 
 const pages = [
   { label: 'Szenarien & Daten', path: '/data', icon: <StorageIcon sx={{ mr: 1 }} /> },
@@ -94,6 +95,8 @@ function TopNav() {
               CapaKita
             </Typography>
           </Box>
+          {/* ScenarioPicker inserted here */}
+
           <Box sx={{ flexGrow: 1, display: 'flex' }}>
             {pages.map((page) => (
               <Button
@@ -116,6 +119,9 @@ function TopNav() {
                 {page.label}
               </Button>
             ))}
+          </Box>
+          <Box sx={{ mr: 3, flexShrink: 0 }}>
+            <ScenarioPicker />
           </Box>
           {/* Dot menu for save */}
           <Box>

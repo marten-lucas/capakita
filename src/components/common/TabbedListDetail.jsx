@@ -23,7 +23,8 @@ function TabbedListDetail({
   ItemHoverIcons = () => [],
   ItemAddButton = { label: 'Hinzufügen', onClick: () => {} },
   Detail = () => null,
-  emptyText = 'Keine Einträge vorhanden.'
+  emptyText = 'Keine Einträge vorhanden.',
+  getLevel // <-- now truly optional
 }) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [hoveredTabId, setHoveredTabId] = useState(null);
@@ -63,74 +64,78 @@ function TabbedListDetail({
               onChange={(_, idx) => setSelectedIndex(idx)}
               sx={{ minHeight: 48 }}
             >
-              {items.map((item, idx) => (
-                <RemoveDomProps
-                  key={item.id || idx}
-                  style={{ position: 'relative', minWidth: 220, maxWidth: 320 }}
-                >
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 1,
-                      pr: 4,
-                      minHeight: 48,
-                      '&:hover .hover-icons': { opacity: 1 }
-                    }}
-                    onMouseEnter={() => setHoveredTabId(item.id || idx)}
-                    onMouseLeave={() => setHoveredTabId(null)}
+              {items.map((item, idx) => {
+                const level = typeof getLevel === 'function' ? getLevel(item) || 0 : 0;
+                return (
+                  <RemoveDomProps
+                    key={item.id || idx}
+                    style={{ position: 'relative', minWidth: 220, maxWidth: 320 }}
                   >
-                    <Tab
-                      label={
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
-                          {ItemAvatar(item)}
-                          <Box sx={{ flex: 1, minWidth: 0 }}>
-                            <Typography variant="body2" sx={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {ItemTitle(item)}
-                            </Typography>
-                            <Typography variant="caption" sx={{ color: 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {ItemSubTitle(item)}
-                            </Typography>
-                            <Box sx={{ display: 'flex', gap: 0.5, mt: 0.2, flexWrap: 'wrap' }}>
-                              {ItemChips(item)}
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                        pr: 4,
+                        minHeight: 48,
+                        pl: `${level * 24}px`, // <-- Indent based on hierarchy level
+                        '&:hover .hover-icons': { opacity: 1 }
+                      }}
+                      onMouseEnter={() => setHoveredTabId(item.id || idx)}
+                      onMouseLeave={() => setHoveredTabId(null)}
+                    >
+                      <Tab
+                        label={
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
+                            {ItemAvatar(item)}
+                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                              <Typography variant="body2" sx={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {ItemTitle(item)}
+                              </Typography>
+                              <Typography variant="caption" sx={{ color: 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {ItemSubTitle(item)}
+                              </Typography>
+                              <Box sx={{ display: 'flex', gap: 0.5, mt: 0.2, flexWrap: 'wrap' }}>
+                                {ItemChips(item)}
+                              </Box>
                             </Box>
                           </Box>
-                        </Box>
-                      }
-                      value={idx}
-                      sx={{ minHeight: 48, alignItems: 'flex-start', textAlign: 'left', maxWidth: 320 }}
-                    />
-                    <Box
-                      className="hover-icons"
-                      sx={{
-                        position: 'absolute',
-                        right: 8,
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        display: 'flex',
-                        gap: 0.5,
-                        opacity: hoveredTabId === (item.id || idx) ? 1 : 0,
-                        transition: 'opacity 0.2s'
-                      }}
-                    >
-                      {ItemHoverIcons(item).map(({ icon, onClick, title }, i) => (
-                        <IconButton
-                          key={i}
-                          size="small"
-                          onClick={e => {
-                            e.stopPropagation();
-                            onClick?.(item);
-                          }}
-                          title={title}
-                          sx={{ p: 0.5 }}
-                        >
-                          {icon}
-                        </IconButton>
-                      ))}
+                        }
+                        value={idx}
+                        sx={{ minHeight: 48, alignItems: 'flex-start', textAlign: 'left', maxWidth: 320 }}
+                      />
+                      <Box
+                        className="hover-icons"
+                        sx={{
+                          position: 'absolute',
+                          right: 8,
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          display: 'flex',
+                          gap: 0.5,
+                          opacity: hoveredTabId === (item.id || idx) ? 1 : 0,
+                          transition: 'opacity 0.2s'
+                        }}
+                      >
+                        {ItemHoverIcons(item).map(({ icon, onClick, title }, i) => (
+                          <IconButton
+                            key={i}
+                            size="small"
+                            onClick={e => {
+                              e.stopPropagation();
+                              onClick?.(item);
+                            }}
+                            title={title}
+                            sx={{ p: 0.5 }}
+                          >
+                            {icon}
+                          </IconButton>
+                        ))}
+                      </Box>
                     </Box>
-                  </Box>
-                </RemoveDomProps>
-              ))}
+                  </RemoveDomProps>
+                );
+              })}
             </Tabs>
             {/* Add button below tabs */}
             <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>

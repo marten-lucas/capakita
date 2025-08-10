@@ -13,7 +13,11 @@ const simScenarioSlice = createSlice({
   initialState,
   reducers: {
     setSelectedScenarioId(state, action) {
-      state.selectedScenarioId = String(action.payload);
+      // Always use string comparison for scenario ids
+      const id = String(action.payload);
+      // Only set if the scenario exists
+      const exists = state.scenarios.some(s => String(s.id) === id);
+      state.selectedScenarioId = exists ? id : (state.scenarios[0]?.id || null);
     },
     setSelectedItem(state, action) {
       const scenarioId = state.selectedScenarioId;
