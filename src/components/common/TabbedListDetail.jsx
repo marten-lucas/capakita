@@ -26,10 +26,19 @@ function TabbedListDetail({
   emptyText = 'Keine Einträge vorhanden.',
   getLevel // <-- now truly optional
 }) {
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  // Use id-based selection for stability
+  const [selectedId, setSelectedId] = useState(items[0]?.id || null);
   const [hoveredTabId, setHoveredTabId] = useState(null);
 
-  const selectedItem = items[selectedIndex] || null;
+  // Update selectedId if items change and selectedId is no longer present
+  React.useEffect(() => {
+    if (!items.some(item => item.id === selectedId)) {
+      setSelectedId(items[0]?.id || null);
+    }
+  }, [items, selectedId]);
+
+  const selectedIndex = items.findIndex(item => item.id === selectedId);
+  const selectedItem = selectedIndex !== -1 ? items[selectedIndex] : null;
 
   return (
     <Box sx={{ display: 'flex', gap: 2 }}>
@@ -61,7 +70,9 @@ function TabbedListDetail({
               orientation="vertical"
               variant="fullWidth"
               value={selectedIndex}
-              onChange={(_, idx) => setSelectedIndex(idx)}
+              onChange={(_, idx) => {
+                setSelectedId(items[idx]?.id);
+              }}
               sx={{ minHeight: 48 }}
             >
               {items.map((item, idx) => {
@@ -78,11 +89,12 @@ function TabbedListDetail({
                         gap: 1,
                         pr: 4,
                         minHeight: 48,
-                        pl: `${level * 24}px`, // <-- Indent based on hierarchy level
+                        pl: `${level * 24}px`,
                         '&:hover .hover-icons': { opacity: 1 }
                       }}
                       onMouseEnter={() => setHoveredTabId(item.id || idx)}
                       onMouseLeave={() => setHoveredTabId(null)}
+                      onClick={() => setSelectedId(item.id)} // <-- Fix: clicking the tab area selects the item
                     >
                       <Tab
                         label={

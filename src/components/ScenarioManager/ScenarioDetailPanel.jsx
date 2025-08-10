@@ -6,17 +6,19 @@ import { useSelector, useDispatch } from 'react-redux';
 import { updateScenario } from '../../store/simScenarioSlice';
 
 // Recursive component for rendering individual scenarios in the tree
-function ScenarioTreeItem({ scenario, selectedId, onSelect, expandedMap, setExpandedMap, level = 0 }) {
+function ScenarioTreeItem({ scenario, selectedId, onSelect, expandedMap, setExpandedMap, level = 0, disabledIds = [] }) {
     const hasChildren = scenario.children && scenario.children.length > 0;
     const expanded = expandedMap[scenario.id] ?? true;
     const isSelected = selectedId === scenario.id;
+    const isDisabled = disabledIds.includes(scenario.id);
 
     return (
         <React.Fragment>
             <ListItemButton
                 selected={isSelected}
-                onClick={() => onSelect(scenario)}
-                sx={{ pl: 2 + level * 2 }}
+                disabled={isDisabled}
+                onClick={() => !isDisabled && onSelect(scenario)}
+                sx={{ pl: 2 + level * 2, opacity: isDisabled ? 0.5 : 1 }}
             >
                 {hasChildren && (
                     <IconButton
@@ -26,6 +28,7 @@ function ScenarioTreeItem({ scenario, selectedId, onSelect, expandedMap, setExpa
                             setExpandedMap(map => ({ ...map, [scenario.id]: !expanded }));
                         }}
                         sx={{ mr: 1 }}
+                        disabled={isDisabled}
                     >
                         {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
                     </IconButton>
@@ -44,6 +47,7 @@ function ScenarioTreeItem({ scenario, selectedId, onSelect, expandedMap, setExpa
                             expandedMap={expandedMap}
                             setExpandedMap={setExpandedMap}
                             level={level + 1}
+                            disabledIds={disabledIds}
                         />
                     ))}
                 </Collapse>
@@ -137,6 +141,33 @@ function ScenarioDetailPanel({ scenario }) {
     const [baseScenarioAccordionOpen, setBaseScenarioAccordionOpen] = useState(false);
 
 
+    // Helper to collect all descendant ids (including self)
+    const collectDescendantIds = React.useCallback((id, allScenarios) => {
+        const map = {};
+        allScenarios.forEach(s => { map[s.id] = { ...s, children: [] }; });
+        allScenarios.forEach(s => {
+            if (s.baseScenarioId && map[s.baseScenarioId]) {
+                map[s.baseScenarioId].children.push(map[s.id]);
+            }
+        });
+        const descendants = [];
+        function walk(nodeId) {
+            descendants.push(nodeId);
+            const node = map[nodeId];
+            if (node && node.children) {
+                node.children.forEach(child => walk(child.id));
+            }
+        }
+        walk(id);
+        return descendants;
+    }, []);
+
+    // Compute disabled ids for base scenario selection (self + all descendants)
+    const disabledBaseIds = React.useMemo(() => {
+        if (!scenario) return [];
+        return collectDescendantIds(scenario.id, scenarios);
+    }, [scenario, scenarios, collectDescendantIds]);
+
     // Nested scenario selection for base scenario
 
     if (!scenario) {
@@ -192,6 +223,7 @@ function ScenarioDetailPanel({ scenario }) {
                                     onSelect={selected => handleBaseScenarioChange(selected.id)}
                                     expandedMap={treeExpandedMap}
                                     setExpandedMap={setTreeExpandedMap}
+                                    disabledIds={disabledBaseIds}
                                 />
                             ))}
                         </List>
