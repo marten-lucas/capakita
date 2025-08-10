@@ -42,10 +42,6 @@ function buildPayments(financial, dataItem, bookings) {
   let periods = buildPeriodsFromDates(uniqueDates);
   console.log('CustomExpenseCalculator: initial periods', periods);
 
-  // Filter out periods that end before today (but keep open-ended periods)
-  periods = periods.filter(p => !p.valid_to || p.valid_to >= today);
-  console.log('CustomExpenseCalculator: filtered periods', periods);
-
   // Get custom amount from type_details
   const customAmount = Number(financial?.type_details?.Amount) || 0;
   console.log('CustomExpenseCalculator: customAmount', customAmount);

@@ -122,3 +122,23 @@ export function sumBookingHoursForPeriod(bookings, from, to) {
   }
   return total;
 }
+
+/**
+ * Calculate the average daily booking hours for a period, assuming 5 days per week.
+ * @param {Object|Array} bookings - booking objects (array or object)
+ * @param {string} from - Period start (inclusive, ISO string)
+ * @param {string} to - Period end (inclusive, ISO string)
+ * @returns {number} - average daily hours (Mo-Fr)
+ */
+export function getAverageWeeklyBookingTimes(bookings, from, to) {
+  const totalHours = sumBookingHoursForPeriod(bookings, from, to);
+  // Calculate number of weeks in period
+  const start = from ? new Date(from) : null;
+  const end = to ? new Date(to) : null;
+  if (!start || !end || end < start) return 0;
+  const msPerWeek = 7 * 24 * 60 * 60 * 1000;
+  const weeks = Math.max(1, Math.round((end - start) / msPerWeek) + 1);
+  // Average per week, then per day (5 days/week)
+  const avgPerWeek = totalHours / weeks;
+  return avgPerWeek / 5;
+}

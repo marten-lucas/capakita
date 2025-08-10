@@ -35,10 +35,6 @@ export function updatePayments(financial, dataItem, bookings, groupAssignments, 
 
   let periods = buildPeriodsFromDates(dates);
 
-  // Filter out periods that end before today
-  const today = new Date().toISOString().slice(0, 10);
-  periods = periods.filter(p => !p.valid_to || p.valid_to >= today);
-
   // Determine financialDefId as a string (do NOT mutate financial)
   let financialDefId = financial?.type_details?.financialDefId;
   if (typeof financialDefId !== 'string') {

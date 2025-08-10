@@ -46,9 +46,7 @@ function buildPayments(financial, dataItem, bookings, avrStageUpgrades) {
 
   let periods = buildPeriodsFromDates(uniqueDates);
 
-  // Filter out periods that end before today
-  periods = periods.filter(p => !p.valid_to || p.valid_to >= today);
-
+  
   const group = Number(financial?.type_details?.group);
   const initialStage = Number(financial?.type_details?.stage);
 

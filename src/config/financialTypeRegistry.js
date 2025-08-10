@@ -25,6 +25,14 @@ export const FINANCIAL_TYPE_REGISTRY = [
     calculator: () => import('../utils/financialCalculators/Income/feeIncomeCalculator').then(mod => mod.updatePayments),
     typeDetailsDefinition: Financial.typeDetailsDefinitions['income-fee'],
   },
+  {
+    value: 'income-baykibig',
+    label: 'Einnahme: BayKiBiG-Förderung',
+    allowed: ['demand'],
+    component: () => import('../components/SimDataDetail/Financials/Income/BaykibigIncomeDetail'),
+    calculator: () => import('../utils/financialCalculators/Income/baykibigIncomeCalculator').then(mod => mod.updatePayments),
+    typeDetailsDefinition: Financial.typeDetailsDefinitions['income-baykibig'],
+  },
   // ...other types...
 ];
 

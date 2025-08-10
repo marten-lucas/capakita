@@ -49,6 +49,9 @@ export class Financial {
       groupRef: { type: 'string', required: false },
       // ...other fee-specific fields...
     },
+    'income-baykibig': {
+      // For now, no required fields. Add more as needed.
+    },
     'bonus-yearly': {
       payable: { type: 'string', required: true },
       due_month: { type: 'number', required: true },
