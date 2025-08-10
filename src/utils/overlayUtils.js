@@ -265,3 +265,20 @@ export function buildOverlayAwareData(scenarioId, state) {
   };
 }
 
+// Helper: collect all descendant scenario IDs (including self) to prevent circular dependencies
+export function getDescendantScenarioIds(scenarioId, scenarios) {
+  const descendants = new Set([scenarioId]); // Include self
+  
+  function collectChildren(parentId) {
+    scenarios.forEach(scenario => {
+      if (scenario.baseScenarioId === parentId && !descendants.has(scenario.id)) {
+        descendants.add(scenario.id);
+        collectChildren(scenario.id); // Recursively collect children
+      }
+    });
+  }
+  
+  collectChildren(scenarioId);
+  return Array.from(descendants);
+}
+

@@ -4,6 +4,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import { useSelector, useDispatch } from 'react-redux';
 import { updateScenario } from '../../store/simScenarioSlice';
+import { getDescendantScenarioIds } from '../../utils/overlayUtils';
 
 // Recursive component for rendering individual scenarios in the tree
 function ScenarioTreeItem({ scenario, selectedId, onSelect, expandedMap, setExpandedMap, level = 0, disabledIds = [] }) {
@@ -141,32 +142,11 @@ function ScenarioDetailPanel({ scenario }) {
     const [baseScenarioAccordionOpen, setBaseScenarioAccordionOpen] = useState(false);
 
 
-    // Helper to collect all descendant ids (including self)
-    const collectDescendantIds = React.useCallback((id, allScenarios) => {
-        const map = {};
-        allScenarios.forEach(s => { map[s.id] = { ...s, children: [] }; });
-        allScenarios.forEach(s => {
-            if (s.baseScenarioId && map[s.baseScenarioId]) {
-                map[s.baseScenarioId].children.push(map[s.id]);
-            }
-        });
-        const descendants = [];
-        function walk(nodeId) {
-            descendants.push(nodeId);
-            const node = map[nodeId];
-            if (node && node.children) {
-                node.children.forEach(child => walk(child.id));
-            }
-        }
-        walk(id);
-        return descendants;
-    }, []);
-
     // Compute disabled ids for base scenario selection (self + all descendants)
     const disabledBaseIds = React.useMemo(() => {
         if (!scenario) return [];
-        return collectDescendantIds(scenario.id, scenarios);
-    }, [scenario, scenarios, collectDescendantIds]);
+        return getDescendantScenarioIds(scenario.id, scenarios);
+    }, [scenario, scenarios]);
 
     // Nested scenario selection for base scenario
 
@@ -286,3 +266,4 @@ function ScenarioDetailPanel({ scenario }) {
 }
 
 export default ScenarioDetailPanel;
+     

@@ -26,19 +26,22 @@ import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import { useSelector, useDispatch } from 'react-redux';
 import TabbedListDetail from '../common/TabbedListDetail';
 import { addScenario, updateScenario, deleteScenario, setSelectedScenarioId } from '../../store/simScenarioSlice';
+import { getDescendantScenarioIds } from '../../utils/overlayUtils';
 
 // Recursive tree for base scenario selection
-function ScenarioTreeItem({ scenario, selectedId, onSelect, expandedMap, setExpandedMap, level = 0 }) {
+function ScenarioTreeItem({ scenario, selectedId, onSelect, expandedMap, setExpandedMap, level = 0, disabledIds = [] }) {
   const hasChildren = scenario.children && scenario.children.length > 0;
   const expanded = expandedMap[scenario.id] ?? true;
   const isSelected = selectedId === scenario.id;
+  const isDisabled = disabledIds.includes(scenario.id);
 
   return (
     <>
       <ListItemButton
         selected={isSelected}
-        onClick={() => onSelect(scenario)}
-        sx={{ pl: 2 + level * 2 }}
+        disabled={isDisabled}
+        onClick={() => !isDisabled && onSelect(scenario)}
+        sx={{ pl: 2 + level * 2, opacity: isDisabled ? 0.5 : 1 }}
       >
         {hasChildren && (
           <IconButton
@@ -48,6 +51,7 @@ function ScenarioTreeItem({ scenario, selectedId, onSelect, expandedMap, setExpa
               setExpandedMap(map => ({ ...map, [scenario.id]: !expanded }));
             }}
             sx={{ mr: 1 }}
+            disabled={isDisabled}
           >
             {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
           </IconButton>
@@ -66,6 +70,7 @@ function ScenarioTreeItem({ scenario, selectedId, onSelect, expandedMap, setExpa
               expandedMap={expandedMap}
               setExpandedMap={setExpandedMap}
               level={level + 1}
+              disabledIds={disabledIds}
             />
           ))}
         </Collapse>
@@ -142,6 +147,13 @@ function ScenarioDetail({ item: scenario }) {
     });
     return roots;
   }, [scenarios, scenario]);
+
+  // Compute disabled ids for base scenario selection (self + all descendants)
+  const disabledBaseIds = React.useMemo(() => {
+    if (!scenario) return [];
+    return getDescendantScenarioIds(scenario.id, scenarios);
+  }, [scenario, scenarios]);
+
   const [treeExpandedMap, setTreeExpandedMap] = React.useState({});
   const [baseScenarioAccordionOpen, setBaseScenarioAccordionOpen] = React.useState(false);
 
@@ -198,6 +210,7 @@ function ScenarioDetail({ item: scenario }) {
                   onSelect={selected => handleBaseScenarioChange(selected.id)}
                   expandedMap={treeExpandedMap}
                   setExpandedMap={setTreeExpandedMap}
+                  disabledIds={disabledBaseIds}
                 />
               ))}
             </List>
