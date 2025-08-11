@@ -100,13 +100,13 @@ function TailgridDateRangePicker({ value, onChange }) {
   const toggleDatepicker = () => setIsOpen((v) => !v);
 
   return (
-    <Box sx={{ position: 'relative', mb: 1 }}>
+    <Box sx={{ position: 'relative', mb: 1, width: '100%' }}>
       <TextField
         label=""
         value={updateInput()}
         onClick={toggleDatepicker}
         size="small"
-        sx={{ width: 220 }}
+        sx={{ width: '100%' }}
         placeholder="Zeitraum wählen"
         InputProps={{ readOnly: true }}
       />
@@ -360,100 +360,106 @@ function SimDataGeneralTab() {
       flexDirection="column"
       sx={{ overflowY: 'auto', gap: 0, height: '100%', minHeight: 0 }}
     >
-      {/* Name */}
-      <Box sx={{ mb: 2 }}>
-        <Typography variant="body2" sx={{ mb: 0.5 }}>Name</Typography>
-        <TextField
-          value={localName}
-          onChange={(e) => setLocalName(e.target.value)}
-          onBlur={() => {
-            if (localName !== item.name) {
-              handleUpdateDataItem({ name: localName });
-            }
-          }}
-          size="small"
-          sx={{ width: 355 }}
-          InputLabelProps={{ shrink: true }}
-        />
-      </Box>
-
-      {/* Bemerkungen */}
-      <Box sx={{ mb: 2 }}>
-        <Typography variant="body2" sx={{ mb: 0.5 }}>Bemerkungen</Typography>
-        <TextField
-          value={localNote}
-          onChange={(e) => setLocalNote(e.target.value)}
-          onBlur={() => {
-            if (localNote !== item.remark) {
-              handleUpdateDataItem({ remark: localNote });
-            }
-          }}
-          size="small"
-          sx={{ width: 355 }}
-          multiline
-          minRows={2}
-          maxRows={4}
-          InputLabelProps={{ shrink: true }}
-        />
-      </Box>
-
-      {/* Date of Birth */}
-      {item.type === 'demand' && (
-        <Box sx={{ mb: 2 }}>
-          <Typography variant="body2" sx={{ mb: 0.5 }}>Geburtsdatum</Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+      <Box sx={{ display: 'flex', flex: 1, gap: 4, minHeight: 0 }}>
+        {/* Left column */}
+        <Box sx={{ flex: 1, minWidth: 0, maxWidth: '33%', display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {/* Name */}
+          <Box>
+            <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 700 }}>Name</Typography>
             <TextField
-              type="date"
-              value={localDateOfBirth}
-              onChange={(e) => {
-                setLocalDateOfBirth(e.target.value);
-                handleUpdateDataItem({ dateofbirth: e.target.value });
+              value={localName}
+              onChange={(e) => setLocalName(e.target.value)}
+              onBlur={() => {
+                if (localName !== item.name) {
+                  handleUpdateDataItem({ name: localName });
+                }
               }}
               size="small"
-              sx={{ width: 355 }}
+              sx={{ width: '100%' }}
               InputLabelProps={{ shrink: true }}
             />
           </Box>
-        </Box>
-      )}
 
-      {/* Zeitraum */}
-      <Box sx={{ mb: 2 }}>
-        <Typography variant="body2" sx={{ mt: 1, mb: 1.5 }}>Anwesenheit</Typography>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <TailgridDateRangePicker
-            value={{ start: localStartDate, end: localEndDate }}
-            onChange={handleMainRangeChange}
-          />
-        </Box>
-      </Box>
-      
-      {/* Qualification Picker for capacity items */}
-      {item.type === 'capacity' && qualiDefs.length > 0 && (
-        <Box sx={{ mb: 2 }}>
-          <Typography variant="body2" sx={{ mb: 0.5 }}>Qualifikation</Typography>
-          <QualificationPicker
-            qualificationDefs={qualiDefs}
-            value={assignedQualification}
-            onChange={handleQualificationChange}
-          />
-        </Box>
-      )}
+          {/* Bemerkungen */}
+          <Box>
+            <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 700 }}>Bemerkungen</Typography>
+            <TextField
+              value={localNote}
+              onChange={(e) => setLocalNote(e.target.value)}
+              onBlur={() => {
+                if (localNote !== item.remark) {
+                  handleUpdateDataItem({ remark: localNote });
+                }
+              }}
+              size="small"
+              sx={{ width: '100%' }}
+              multiline
+              minRows={4}
+              maxRows={8}
+              InputLabelProps={{ shrink: true }}
+            />
+          </Box>
 
-      {/* Abwesenheiten */}
-      <Box sx={{ mt: 4, mb: 2 }}>
-        <Typography variant="body2" sx={{ mb: 1 }}>
-          Abwesenheit
-        </Typography>
-        <AccordionListDetail
-          items={localAbsences}
-          SummaryComponent={AbsenceSummary}
-          DetailComponent={AbsenceDetail}
-          AddButtonLabel="Abwesenheit hinzufügen"
-          onAdd={handleAddAbsence}
-          onDelete={(_, item, idx) => handleDeleteAbsence(idx)}
-          emptyText="Keine Abwesenheiten vorhanden."
-        />
+          {/* Date of Birth */}
+          {item.type === 'demand' && (
+            <Box>
+              <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 700 }}>Geburtsdatum</Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <TextField
+                  type="date"
+                  value={localDateOfBirth}
+                  onChange={(e) => {
+                    setLocalDateOfBirth(e.target.value);
+                    handleUpdateDataItem({ dateofbirth: e.target.value });
+                  }}
+                  size="small"
+                  sx={{ width: '100%' }}
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Box>
+            </Box>
+          )}
+
+          {/* Zeitraum */}
+          <Box>
+            <Typography variant="body2" sx={{ mt: 1, mb: 0.5, fontWeight: 700 }}>Anwesenheit</Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2,  }}>
+              <TailgridDateRangePicker
+                value={{ start: localStartDate, end: localEndDate }}
+                onChange={handleMainRangeChange}
+              />
+            </Box>
+          </Box>
+          
+          {/* Qualification Picker for capacity items */}
+          {item.type === 'capacity' && qualiDefs.length > 0 && (
+            <Box>
+              <Typography variant="body2" sx={{ mb: 0.5 }}>Qualifikation</Typography>
+              <QualificationPicker
+                qualificationDefs={qualiDefs}
+                value={assignedQualification}
+                onChange={handleQualificationChange}
+              />
+            </Box>
+          )}
+        </Box>
+        {/* Right column */}
+        <Box sx={{ flex: 2, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <Box sx={{ mb: 2, pr: 2 }}>
+            <Typography variant="body2" sx={{ mb: 1, fontWeight: 700 }}>
+              Abwesenheit
+            </Typography>
+            <AccordionListDetail
+              items={localAbsences}
+              SummaryComponent={AbsenceSummary}
+              DetailComponent={AbsenceDetail}
+              AddButtonLabel="Abwesenheit hinzufügen"
+              onAdd={handleAddAbsence}
+              onDelete={(_, item, idx) => handleDeleteAbsence(idx)}
+              emptyText="Keine Abwesenheiten vorhanden."
+            />
+          </Box>
+        </Box>
       </Box>
     </Box>
   );

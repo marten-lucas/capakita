@@ -63,7 +63,7 @@ function SimDataTabs() {
         <Tab icon={<EuroIcon />} label="Finanzen" />
       </Tabs>
       
-      <Box sx={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
+      <Box sx={{ flex: 1, overflow: 'auto', minHeight: 0, mt: 2 }}>
         {activeTab === 0 && <SimDataGeneralTab />}
         {activeTab === 1 && <SimDataBookingTab />}
         {activeTab === 2 && <SimDataGroupsTab />}
