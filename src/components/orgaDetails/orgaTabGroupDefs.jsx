@@ -1,14 +1,66 @@
 import React, { useState } from 'react';
 import {
-  Box, Typography, Button, IconButton, TextField, Checkbox, FormControlLabel, Chip
+  Box, Typography, Button, IconButton, TextField, Checkbox, FormControlLabel, Chip, Popover
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import { useSelector, useDispatch } from 'react-redux';
 import { addGroupDef, updateGroupDef, deleteGroupDef } from '../../store/simGroupSlice';
-import IconPicker from './IconPicker';
 import { useOverlayData } from '../../hooks/useOverlayData';
 import TabbedListDetail from '../common/TabbedListDetail';
+import EmojiPicker from 'emoji-picker-react';
+
+function IconPicker({ value, onChange }) {
+  const [anchorEl, setAnchorEl] = useState(null);
+
+  const handleOpen = (event) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleClose = () => {
+    setAnchorEl(null);
+  };
+
+  const handleEmojiClick = (emojiData) => {
+    onChange(emojiData.emoji);
+    handleClose();
+  };
+
+  return (
+    <>
+      <Button
+        variant="outlined"
+        onClick={handleOpen}
+        startIcon={<span style={{ fontSize: '1.5em' }}>{value || '👥'}</span>}
+        sx={{ width: 120, justifyContent: 'flex-start' }}
+      >
+        Icon wählen
+      </Button>
+      <Popover
+        open={Boolean(anchorEl)}
+        anchorEl={anchorEl}
+        onClose={handleClose}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+      >
+        <Box sx={{ p: 1 }}>
+          <EmojiPicker
+            onEmojiClick={handleEmojiClick}
+            height={300}
+            width={260}
+            lazyLoadEmojis={true}
+            emojiStyle="native"
+            previewConfig={{ showPreview: false }}
+            reactionsDefaultOpen={false}
+            allowExpandReactions={false}
+            searchDisabled={false}
+            autoFocusSearch={true}
+            theme="light"
+          />
+        </Box>
+      </Popover>
+    </>
+  );
+}
 
 function GroupDetail({ item: group }) {
   const dispatch = useDispatch();
@@ -62,22 +114,7 @@ function GroupDetail({ item: group }) {
   return (
     <Box sx={{ pt: 1, display: 'flex', flexDirection: 'column', gap: 3, maxWidth: 480 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-        <Box
-          sx={{
-            width: 48,
-            height: 48,
-            border: '1px solid',
-            borderColor: 'divider',
-            borderRadius: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '2em',
-            backgroundColor: 'background.paper'
-          }}
-        >
-          {form.icon || '👥'}
-        </Box>
+
         <TextField
           label="Gruppenname"
           value={form.name}
@@ -89,7 +126,6 @@ function GroupDetail({ item: group }) {
           autoFocus
         />
       </Box>
-      <Typography variant="body2" sx={{ mb: 1 }}>Icon auswählen:</Typography>
       <IconPicker
         value={form.icon}
         onChange={handleIconChange}
