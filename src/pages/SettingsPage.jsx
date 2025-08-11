@@ -17,7 +17,7 @@ import OrgaTabRateDefs from '../components/orgaDetails/orgaTabRateDefs';
 import OrgaTabScenarioDefs from '../components/orgaDetails/orgaTabScenarioDefs';
 
 
-function OrgaPage() {
+function SettingsPage() {
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -36,17 +36,16 @@ function OrgaPage() {
   const handleTabChange = (_, newTab) => {
     setActiveTab(newTab);
     if (newTab === 0) {
-      navigate('/orga?tab=scenarios', { replace: true });
+      navigate('/settings?tab=scenarios', { replace: true });
     } else {
-      navigate('/orga', { replace: true });
+      navigate('/settings', { replace: true });
     }
   };
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#f0f2f5' }}>
-      <Box sx={{ p: 3 }}>
-        <Typography variant="h4" sx={{ mb: 3 }}>Einstellungen</Typography>
-        <Paper sx={{ p: 0 }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '88vh' }}>
+      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', p: 0 }}>
+        <Paper sx={{ p: 0, flex: 1, display: 'flex', flexDirection: 'column' }} elevation={3}>
           <Tabs
             value={activeTab}
             onChange={handleTabChange}
@@ -57,7 +56,7 @@ function OrgaPage() {
             <Tab icon={<PersonIcon />} label="Qualifikationen" />
             <Tab icon={<EuroIcon />} label="Beiträge" />
           </Tabs>
-          <Box sx={{ p: 3 }}>
+          <Box sx={{ p: 3, flex: 1, display: 'flex', flexDirection: 'column' }}>
             {activeTab === 0 && <OrgaTabScenarioDefs />}
             {activeTab === 1 && <OrgaTabGroupDefs />}
             {activeTab === 2 && <OrgaTabQualificationDefs />}
@@ -69,5 +68,5 @@ function OrgaPage() {
   );
 }
 
-export default OrgaPage;
+export default SettingsPage;
 

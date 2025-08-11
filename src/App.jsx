@@ -3,7 +3,7 @@ import { Box, Container, ThemeProvider, CssBaseline } from '@mui/material'
 import TopNav from './components/TopNav'
 import DataPage from './pages/DataPage'
 import VisuPage from './pages/VisuPage'
-import OrgaPage from './pages/OrgaPage'
+import SettingsPage from './pages/SettingsPage'
 import WelcomePage from './pages/WelcomePage';
 import { useSelector } from 'react-redux';
 import theme from './theme';
@@ -23,7 +23,7 @@ function App() {
       }}>
         <TopNav />
         <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
-          <Container maxWidth='l'>
+          <Container maxWidth='l' >
             {!hasScenarios ? (
               <WelcomePage />
             ) : (
@@ -31,7 +31,7 @@ function App() {
                 <Route path="/" element={<Navigate to="/data" replace />} />
                 <Route path="/visu" element={<VisuPage />} />
                 <Route path="/data" element={<DataPage />} />
-                <Route path="/orga" element={<OrgaPage />} />
+                <Route path="/settings" element={<SettingsPage />} />
               </Routes>
             )}
           </Container>

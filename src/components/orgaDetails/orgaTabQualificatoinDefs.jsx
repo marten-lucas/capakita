@@ -36,16 +36,6 @@ function QualificationDetail({ item: qualification }) {
   }, [qualification]);
 
   // Save key onBlur (only if new/empty)
-  const handleKeyBlur = () => {
-    if (!form.key.trim()) {
-      setError('ID ist erforderlich');
-      return;
-    }
-    if (form.key !== qualification.key && qualification.key.startsWith('NEU')) {
-      dispatch(updateQualificationDef({ scenarioId: selectedScenarioId, qualiKey: qualification.key, updates: { key: form.key } }));
-    }
-    setError('');
-  };
 
   // Save initial onBlur
   const handleInitialBlur = () => {
@@ -80,7 +70,6 @@ function QualificationDetail({ item: qualification }) {
     }
   };
 
-  const isNew = qualification.key.startsWith('NEU');
 
   return (
     <Box sx={{ pt: 1, display: 'flex', flexDirection: 'column', gap: 3, maxWidth: 480 }}>
@@ -193,9 +182,7 @@ function OrgaTabQualificationDefs() {
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h5">Qualifikationen verwalten</Typography>
-      </Box>
+
       <TabbedListDetail
         items={items}
         ItemTitle={ItemTitle}

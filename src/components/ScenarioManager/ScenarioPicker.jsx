@@ -26,14 +26,14 @@ function ScenarioPicker() {
 
     // Handlers for dialog
     const handleEdit = (scenario) => {
-        // Instead of opening dialog, navigate to OrgaPage scenario tab
-        navigate('/orga?tab=scenarios');
+        // Instead of opening dialog, navigate to SettingsPage scenario tab
+        navigate('/settings?tab=scenarios');
         // Optionally, select scenario in redux
         dispatch(setSelectedScenarioId(scenario.id));
     };
     const handleAdd = (baseScenario) => {
         // Always navigate to Szenarien tab (now index 0)
-        navigate('/orga?tab=scenarios');
+        navigate('/settings?tab=scenarios');
         dispatch(addScenario({
             name: 'Neues Szenario',
             baseScenarioId: baseScenario?.id || null,

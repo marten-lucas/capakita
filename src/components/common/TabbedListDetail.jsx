@@ -93,6 +93,7 @@ function TabbedListDetail({
               >
                 {items.map((item, idx) => {
                   const level = typeof getLevel === 'function' ? getLevel(item) || 0 : 0;
+                  const isSelected = selectedId === item.id;
                   return (
                     <RemoveDomProps
                       key={item.id || idx}
@@ -106,7 +107,10 @@ function TabbedListDetail({
                           pr: 4,
                           minHeight: 48,
                           pl: `${level * 24}px`,
-                          '&:hover .hover-icons': { opacity: 1 }
+                          '&:hover .hover-icons': { opacity: 1 },
+                          bgcolor: isSelected ? 'action.selected' : undefined,
+                          borderRadius: 1,
+                          transition: 'background 0.2s'
                         }}
                         onMouseEnter={() => setHoveredTabId(item.id || idx)}
                         onMouseLeave={() => setHoveredTabId(null)}
@@ -183,7 +187,11 @@ function TabbedListDetail({
       </Paper>
       {/* Detail Area */}
       <Box sx={{ flex: 1, minWidth: 0 }}>
-        {selectedItem ? <DetailComponent item={selectedItem} /> : null}
+        {selectedItem ? (
+          <Paper sx={{ p: 3, height: '100%' }}>
+            <DetailComponent item={selectedItem} />
+          </Paper>
+        ) : null}
       </Box>
     </Box>
   );

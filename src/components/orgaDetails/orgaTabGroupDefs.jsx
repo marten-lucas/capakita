@@ -148,27 +148,12 @@ function OrgaTabGroupDefs() {
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
 
   // Use overlay hook to get base scenario info and effective group defs
-  const { baseScenario, isBasedScenario, getEffectiveGroupDefs } = useOverlayData();
+  const { getEffectiveGroupDefs } = useOverlayData();
   const groupDefs = getEffectiveGroupDefs();
 
   // Memoize the current scenario definitions selector to prevent new array creation
-  const currentScenarioDefs = useSelector(state => {
-    if (!selectedScenarioId) return [];
-    return state.simGroup.groupDefsByScenario[selectedScenarioId] || [];
-  }, (left, right) => {
-    if (left.length !== right.length) return false;
-    return left.every((item, index) => item.id === right[index]?.id);
-  });
 
   // Memoize the function to check if group is from base scenario
-  const isFromBaseScenario = React.useMemo(() => {
-    if (!isBasedScenario || !baseScenario) {
-      return () => false;
-    }
-    return (group) => {
-      return !currentScenarioDefs.some(def => def.id === group.id);
-    };
-  }, [isBasedScenario, baseScenario, currentScenarioDefs]);
 
   const handleAddGroup = () => {
     dispatch(addGroupDef({
@@ -183,7 +168,6 @@ function OrgaTabGroupDefs() {
     }
   };
 
-  const isAdebisGroup = (group) => /^\d+$/.test(group.id);
 
   // TabbedListDetail props
   const items = groupDefs;
@@ -211,9 +195,7 @@ function OrgaTabGroupDefs() {
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h5">Gruppen verwalten</Typography>
-      </Box>
+
       <TabbedListDetail
         items={items}
         ItemTitle={ItemTitle}

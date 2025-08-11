@@ -25,7 +25,7 @@ import ScenarioPicker from './ScenarioManager/ScenarioPicker';
 const pages = [
   { label: 'Szenarien & Daten', path: '/data', icon: <StorageIcon sx={{ mr: 1 }} /> },
   { label: 'Visualisierung', path: '/visu', icon: <BarChartIcon sx={{ mr: 1 }} /> },
-  { label: 'Organisation', path: '/orga', icon: <SettingsIcon sx={{ mr: 1 }} /> },
+  { label: 'Einstellungen', path: '/settings', icon: <SettingsIcon sx={{ mr: 1 }} /> },
 ];
 
 function TopNav() {
