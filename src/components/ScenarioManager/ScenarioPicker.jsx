@@ -32,9 +32,8 @@ function ScenarioPicker() {
         dispatch(setSelectedScenarioId(scenario.id));
     };
     const handleAdd = (baseScenario) => {
-        // Instead of opening dialog, navigate to OrgaPage scenario tab with add param
-        navigate('/orga?tab=scenarios&add=1');
-        // Optionally, add scenario and select it in redux
+        // Always navigate to Szenarien tab (now index 0)
+        navigate('/orga?tab=scenarios');
         dispatch(addScenario({
             name: 'Neues Szenario',
             baseScenarioId: baseScenario?.id || null,

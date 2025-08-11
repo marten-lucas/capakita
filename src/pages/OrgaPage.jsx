@@ -23,18 +23,19 @@ function OrgaPage() {
 
   // Parse tab from query string
   const tabFromQuery = new URLSearchParams(location.search).get('tab');
-  const [activeTab, setActiveTab] = useState(tabFromQuery === 'scenarios' ? 3 : 0);
+  // Szenarien tab is now at index 0
+  const [activeTab, setActiveTab] = useState(tabFromQuery === 'scenarios' ? 0 : 1);
 
   // Keep tab in sync with query
   React.useEffect(() => {
-    if (tabFromQuery === 'scenarios' && activeTab !== 3) setActiveTab(3);
-    if (tabFromQuery !== 'scenarios' && activeTab === 3) setActiveTab(0);
+    if (tabFromQuery === 'scenarios' && activeTab !== 0) setActiveTab(0);
+    if (tabFromQuery !== 'scenarios' && activeTab === 0) setActiveTab(1);
   }, [tabFromQuery, activeTab]);
 
   // Handle tab change and update query
   const handleTabChange = (_, newTab) => {
     setActiveTab(newTab);
-    if (newTab === 3) {
+    if (newTab === 0) {
       navigate('/orga?tab=scenarios', { replace: true });
     } else {
       navigate('/orga', { replace: true });
@@ -51,16 +52,16 @@ function OrgaPage() {
             onChange={handleTabChange}
             sx={{ borderBottom: 1, borderColor: 'divider' }}
           >
+            <Tab icon={<AccountTreeIcon />} label="Szenarien" />
             <Tab icon={<GroupIcon />} label="Gruppen" />
             <Tab icon={<PersonIcon />} label="Qualifikationen" />
             <Tab icon={<EuroIcon />} label="Beiträge" />
-            <Tab icon={<AccountTreeIcon />} label="Szenarien" />
           </Tabs>
           <Box sx={{ p: 3 }}>
-            {activeTab === 0 && <OrgaTabGroupDefs />}
-            {activeTab === 1 && <OrgaTabQualificationDefs />}
-            {activeTab === 2 && <OrgaTabRateDefs />}
-            {activeTab === 3 && <OrgaTabScenarioDefs />}
+            {activeTab === 0 && <OrgaTabScenarioDefs />}
+            {activeTab === 1 && <OrgaTabGroupDefs />}
+            {activeTab === 2 && <OrgaTabQualificationDefs />}
+            {activeTab === 3 && <OrgaTabRateDefs />}
           </Box>
         </Paper>
       </Box>
