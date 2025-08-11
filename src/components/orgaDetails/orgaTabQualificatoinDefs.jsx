@@ -153,13 +153,30 @@ function OrgaTabQualificationDefs() {
   };
 
   // TabbedListDetail props
-  const items = qualiDefs;
-  const ItemTitle = item => item.key || 'Qualifikation';
+  // Map qualiDefs to add id property for TabbedListDetail selection
+  const items = qualiDefs.map(q => ({ ...q, id: q.key }));
+  // Show initial as avatar and name as title
+  const ItemTitle = item => item.name || 'Qualifikation';
   const ItemSubTitle = () => ''; // No subtitle
   const ItemChips = item => item.IsExpert !== false
     ? <Chip label="Fachkraft" color="primary" size="small" sx={{ ml: 1 }} />
     : null;
-  const ItemAvatar = () => null;
+  const ItemAvatar = item => (
+    <span style={{
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      width: 32,
+      height: 32,
+      borderRadius: '50%',
+      background: '#e3e3e3',
+      fontWeight: 600,
+      fontSize: '1.1em',
+      marginRight: 8
+    }}>
+      {item.initial || (item.name ? item.name[0] : '')}
+    </span>
+  );
   const ItemHoverIcons = item => [
     {
       icon: <DeleteIcon fontSize="small" />,

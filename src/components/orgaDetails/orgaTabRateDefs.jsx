@@ -4,6 +4,7 @@ import {
   FormControl, InputLabel, Select, MenuItem, OutlinedInput, InputAdornment
 } from '@mui/material';
 import { useSelector, useDispatch } from 'react-redux';
+import { createSelector } from '@reduxjs/toolkit';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import {
@@ -27,6 +28,14 @@ const GroupPicker = ({ groupDefs, value, onChange }) => (
       ))}
     </Select>
   </FormControl>
+);
+
+// Memoized selector for financial definitions
+const selectFinancialDefs = createSelector(
+  [
+    (state, scenarioId) => state.simFinancials.financialDefsByScenario[scenarioId]
+  ],
+  (financialDefs) => financialDefs || []
 );
 
 function RateDefDetail({ item: currentDef }) {
@@ -243,8 +252,8 @@ function RateDefDetail({ item: currentDef }) {
 function OrgaTabRateDefs() {
   const dispatch = useDispatch();
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
-  const financialDefs = useSelector(state => state.simFinancials.financialDefsByScenario[selectedScenarioId] || []);
-
+  const financialDefs = useSelector(state => selectFinancialDefs(state, selectedScenarioId));
+  
   // TabbedListDetail props
   const items = financialDefs;
   const ItemTitle = item => item.description || 'Beitragsordnung';
