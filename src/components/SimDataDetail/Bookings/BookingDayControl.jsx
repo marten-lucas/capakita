@@ -28,15 +28,15 @@ function DayControl({ dayLabel, dayAbbr, dayData, onToggle, onTimeChange, onAddS
   }, [segments, segments.length]);
 
   return (
-    <Box display="flex" alignItems="flex-start" gap={2} sx={{ mb: 1 }}>
+    <Box display="flex" alignItems="flex-start" gap={2} sx={{ mb: 1, width: '100%' }}>
       <Typography sx={{ width: 80, mt: 1 }}>{dayLabel}</Typography>
       <Switch checked={isActive} onChange={(e) => onToggle(dayAbbr, e.target.checked)} />
-      <Box sx={{ flex: 1, px: 2 }}>
+      <Box sx={{ flex: 1, px: 2, width: '100%' }}>
         {isActive && (
-          <Box>
+          <Box sx={{ width: '100%' }}>
             {segments.map((seg, idx) => (
-              <Box key={idx} display="flex" alignItems="center" gap={1} sx={{ mb: 1 }}>
-                <Box sx={{ flex: 1, minWidth: 220, maxWidth: 400 }}>
+              <Box key={idx} display="flex" alignItems="center" gap={1} sx={{ mb: 1, width: '100%' }}>
+                <Box sx={{ flex: 1, minWidth: 0, width: '100%' }}>
                   <Slider
                     value={sliderValues[idx] || [
                       timeToValue(seg.booking_start),
@@ -62,6 +62,7 @@ function DayControl({ dayLabel, dayAbbr, dayData, onToggle, onTimeChange, onAddS
                       { value: 24, label: '12:00' },
                       { value: 33, label: '16:30' },
                     ]}
+                    sx={{ width: '100%' }}
                   />
                 </Box>
                 {segments.length > 1 && (

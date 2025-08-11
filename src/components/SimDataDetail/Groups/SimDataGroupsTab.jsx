@@ -66,11 +66,7 @@ function SimDataGroupsTab() {
 
   return (
     <Box flex={1} display="flex" flexDirection="column" gap={2} sx={{ overflowY: 'auto' }}>
-      <Box display="flex" alignItems="center" gap={2} sx={{ mt: 2, mb: 1 }}>
-        <Typography variant="h6" sx={{ flex: 1 }}>
-          Gruppen:
-        </Typography>
-      </Box>
+
       <AccordionListDetail
         items={groups}
         SummaryComponent={GroupCards}

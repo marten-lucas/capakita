@@ -1,10 +1,12 @@
 import React from 'react';
-import { Box, Button } from '@mui/material';
+import { Box } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import BookingCards from './BookingCards';
 import { useSelector, useDispatch } from 'react-redux';
 import { useOverlayData } from '../../../hooks/useOverlayData';
-import { addBookingThunk } from '../../../store/simBookingSlice';
+import { addBookingThunk, deleteBookingThunk } from '../../../store/simBookingSlice';
+import AccordionListDetail from '../../common/AccordionListDetail';
+import BookingCards from './BookingCards';
+import BookingDetail from './BookingDetail';
 
 function SimDataBookingTab() {
   const dispatch = useDispatch();
@@ -28,7 +30,6 @@ function SimDataBookingTab() {
       times: [],
       rawdata: {}
     };
-    
     dispatch(addBookingThunk({
       scenarioId: selectedScenarioId,
       dataItemId: selectedItemId,
@@ -36,21 +37,30 @@ function SimDataBookingTab() {
     }));
   };
 
+  // Handler to delete a booking
+  const handleDeleteBooking = (idx, booking) => {
+    if (!selectedScenarioId || !selectedItemId || !booking?.id) return;
+    dispatch(deleteBookingThunk({
+      scenarioId: selectedScenarioId,
+      dataItemId: selectedItemId,
+      bookingId: booking.id
+    }));
+  };
+
   if (!selectedItem) return null;
 
   return (
     <Box flex={1} display="flex" flexDirection="column" gap={2} sx={{ overflowY: 'auto' }}>
-      <Box display="flex" alignItems="center" gap={2} sx={{ mb: 1 }}>
-        <Button
-          variant="outlined"
-          size="small"
-          startIcon={<AddIcon />}
-          onClick={handleAddBooking}
-        >
-          Buchungszeitraum hinzufügen
-        </Button>
-      </Box>
-      <BookingCards bookings={bookings} />
+      <AccordionListDetail
+        items={bookings}
+        SummaryComponent={BookingCards}
+        DetailComponent={({ item, index }) => <BookingDetail index={index} booking={item} />}
+        AddButtonLabel="Buchungszeitraum hinzufügen"
+        onAdd={handleAddBooking}
+        onDelete={handleDeleteBooking}
+        AddButtonProps={{ startIcon: <AddIcon /> }}
+        emptyText="Keine Buchungszeiten vorhanden."
+      />
     </Box>
   );
 }

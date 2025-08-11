@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react';
 import { Box, Typography, IconButton, Button, RadioGroup, FormControlLabel, Radio, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField } from '@mui/material';
-import DeleteIcon from '@mui/icons-material/Delete';
 import { useSelector } from 'react-redux';
 import { useOverlayData } from '../../../../hooks/useOverlayData';
 
@@ -88,14 +87,7 @@ function FeeIncomeDetail({ financial, onChange, onDelete, item }) {
           sx={{ maxWidth: 180 }}
         />
       </Box>
-      <IconButton
-        aria-label="Entfernen"
-        onClick={onDelete}
-        size="small"
-        sx={{ position: 'absolute', top: 0, right: 0 }}
-      >
-        <DeleteIcon fontSize="small" />
-      </IconButton>
+
       <Typography variant="body2">{financial.label}</Typography>
       <Typography variant="body2" color="text.secondary">
         Wählen Sie die passende Beitragsordnung für die Gruppe.

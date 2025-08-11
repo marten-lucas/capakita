@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Accordion, AccordionSummary, AccordionDetails, Typography, Button, IconButton } from '@mui/material';
+import { Box, Accordion, AccordionSummary, AccordionDetails, Typography, Button, IconButton, Menu, MenuItem } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import DeleteIcon from '@mui/icons-material/Delete';
 
@@ -13,7 +13,9 @@ function AccordionListDetail({
   getItemKey = (item, idx) => item.id || idx,
   AddButtonProps = {},
   DeleteButtonComponent, // optional custom delete button
-  emptyText = 'Keine Einträge vorhanden.'
+  emptyText = 'Keine Einträge vorhanden.',
+  // New: AddButtonMenuOptions: [{label, value, onClick}]
+  AddButtonMenuOptions = [],
 }) {
   // Track expanded accordion index
   const [expandedIdx, setExpandedIdx] = React.useState(items && items.length > 0 ? 0 : null);
@@ -33,6 +35,17 @@ function AccordionListDetail({
 
   // Satisfy linter for unused vars
   const _satisfyLinter = [SummaryComponent, DetailComponent];
+
+  // Add button menu state
+  const [anchorEl, setAnchorEl] = React.useState(null);
+  const handleAddButtonClick = (e) => {
+    if (AddButtonMenuOptions && AddButtonMenuOptions.length > 0) {
+      setAnchorEl(e.currentTarget);
+    } else {
+      onAdd?.(e);
+    }
+  };
+  const handleMenuClose = () => setAnchorEl(null);
 
   return (
     <Box>
@@ -71,16 +84,35 @@ function AccordionListDetail({
           </Accordion>
         ))
       )}
-      {/* Add button below accordions, left-aligned */}
+      {/* Add button below accordions, left-aligned, with optional menu */}
       <Box sx={{ display: 'flex', justifyContent: 'flex-start', mt: 2 }}>
         <Button
           variant="outlined"
           size="small"
-          onClick={onAdd}
+          onClick={handleAddButtonClick}
           {...AddButtonProps}
         >
           {AddButtonLabel}
         </Button>
+        {AddButtonMenuOptions && AddButtonMenuOptions.length > 0 && (
+          <Menu
+            anchorEl={anchorEl}
+            open={Boolean(anchorEl)}
+            onClose={handleMenuClose}
+          >
+            {AddButtonMenuOptions.map(opt => (
+              <MenuItem
+                key={opt.value ?? opt.label}
+                onClick={e => {
+                  handleMenuClose();
+                  opt.onClick?.(opt.value, e);
+                }}
+              >
+                {opt.label}
+              </MenuItem>
+            ))}
+          </Menu>
+        )}
       </Box>
     </Box>
   );

@@ -1,7 +1,5 @@
 import React from 'react';
-import { Typography, Box, Accordion, AccordionSummary, AccordionDetails } from '@mui/material';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import BookingDetail from './BookingDetail';
+import { Typography, Box } from '@mui/material';
 import { consolidateBookingSummary } from '../../../utils/bookingUtils';
 
 
@@ -24,65 +22,25 @@ function getBookingHours(times) {
   return `${(totalMinutes / 60).toFixed(1)} h`;
 }
 
-function BookingCards({ bookings }) {
-  // Track expanded accordion index
-  const [expandedIdx, setExpandedIdx] = React.useState(bookings && bookings.length > 0 ? 0 : null);
-
-  // Expand last booking when bookings length increases
-  const prevLengthRef = React.useRef(bookings ? bookings.length : 0);
-  React.useEffect(() => {
-    if (bookings && bookings.length > prevLengthRef.current) {
-      setExpandedIdx(bookings.length - 1);
-    }
-    prevLengthRef.current = bookings ? bookings.length : 0;
-  }, [bookings]);
-
-  const handleAccordionChange = (idx) => (event, expanded) => {
-    setExpandedIdx(expanded ? idx : null);
-  };
-
-
-  if (!bookings || bookings.length === 0) {
-    return <Typography variant="body2" color="text.secondary">Keine Buchungszeiten vorhanden.</Typography>;
+// Summary component for a booking
+function BookingCards({ item, index }) {
+  const booking = item;
+  // Zeitraum-Text
+  let dateRangeText = '';
+  if (booking.startdate && booking.enddate) {
+    dateRangeText = `von ${booking.startdate} bis ${booking.enddate}`;
+  } else if (booking.startdate) {
+    dateRangeText = `ab ${booking.startdate}`;
+  } else if (booking.enddate) {
+    dateRangeText = `bis ${booking.enddate}`;
   }
+  // Stunden-Summe
+  const hoursText = getBookingHours(booking.times);
 
   return (
     <Box>
-      {bookings.map((booking, idx) => {
-        // Zeitraum-Text
-        let dateRangeText = '';
-        if (booking.startdate && booking.enddate) {
-          dateRangeText = `von ${booking.startdate} bis ${booking.enddate}`;
-        } else if (booking.startdate) {
-          dateRangeText = `ab ${booking.startdate}`;
-        } else if (booking.enddate) {
-          dateRangeText = `bis ${booking.enddate}`;
-        }
-
-        // Stunden-Summe
-        const hoursText = getBookingHours(booking.times);
-
-        return (
-          <Accordion
-            key={booking.id || idx}
-            expanded={expandedIdx === idx}
-            onChange={handleAccordionChange(idx)}
-          >
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Box>
-                <Typography variant="subtitle1">{`Buchung ${idx + 1}:`}  <Box component="span" fontWeight='fontWeightMedium'>{hoursText} {dateRangeText}</Box></Typography>
-                <Typography variant="caption">{consolidateBookingSummary(booking.times)}</Typography>
-              </Box>
-            </AccordionSummary>
-            <AccordionDetails>
-              <BookingDetail
-                index={idx}
-                booking={booking}
-              />
-            </AccordionDetails>
-          </Accordion>
-        );
-      })}
+      <Typography variant="subtitle1">{`Buchung ${index + 1}:`} <Box component="span" fontWeight='fontWeightMedium'>{hoursText} {dateRangeText}</Box></Typography>
+      <Typography variant="caption">{consolidateBookingSummary(booking.times)}</Typography>
     </Box>
   );
 }

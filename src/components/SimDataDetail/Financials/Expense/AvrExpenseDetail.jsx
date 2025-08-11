@@ -1,11 +1,12 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { Box, TextField, Typography, MenuItem, Button, IconButton, Menu, List, ListItem } from '@mui/material';
-import DeleteIcon from '@mui/icons-material/Delete';
+import { Box, TextField, Typography, MenuItem, Button, IconButton } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import DeleteIcon from '@mui/icons-material/Delete';
 import { useOverlayData } from '../../../../hooks/useOverlayData';
 import { calculateWorktimeFromBookings } from '../../../../utils/bookingUtils';
-import { getAllStagesForGroup, getAllAvrGroups } from "../../../../utils/financialCalculators/avrUtils";
+import { getAllStagesForGroup, getAllAvrGroups } from '../../../../utils/financialCalculators/avrUtils';
 import { FINANCIAL_BONUS_REGISTRY as BONUS_REGISTRY } from '../../../../config/financialTypeRegistry';
+import AccordionListDetail from '../../../common/AccordionListDetail'; // <-- fix import path
 
 function AvrExpenseDetail({ financial, onChange, item }) {
   // Load all AVR groups for the group dropdown
@@ -142,53 +143,6 @@ function AvrExpenseDetail({ financial, onChange, item }) {
     });
   };
 
-  // Local state for bonus menu anchor
-  const [bonusMenuAnchor, setBonusMenuAnchor] = useState(null);
-
-  // Handler for stacking bonuses as nested financials
-  const handleAddBonus = (bonusType) => {
-    // Use typeDetailsDefinition from registry if available
-    const registry = BONUS_REGISTRY.find(b => b.value === bonusType);
-    const defaultTypeDetails = registry?.typeDetailsDefinition ? { ...registry.typeDetailsDefinition } : {};
-    const newBonus = {
-      id: `${Date.now()}-${Math.random()}`,
-      type: bonusType,
-      label: registry?.label || bonusType,
-      type_details: defaultTypeDetails,
-      financial: [],
-      parentId: financial.id,
-      parentType: financial.type // <-- add this line
-    };
-    onChange({
-      ...financial,
-      financial: [...(Array.isArray(financial.financial) ? financial.financial : []), newBonus]
-    });
-  };
-
-  // Handler for opening bonus menu
-  const handleBonusMenuOpen = (event) => {
-    setBonusMenuAnchor(event.currentTarget);
-  };
-
-  // Handler for closing bonus menu
-  const handleBonusMenuClose = () => {
-    setBonusMenuAnchor(null);
-  };
-
-  // Handler for selecting a bonus type
-  const handleSelectBonusType = (type) => {
-    handleAddBonus(type);
-    handleBonusMenuClose();
-  };
-
-  const handleDeleteBonus = (bonusId) => {
-    const updatedBonuses = (financial.financial || []).filter(b => b.id !== bonusId);
-    onChange({
-      ...financial,
-      financial: updatedBonuses
-    });
-  };
-
   // --- NEW: Sync Eintrittsdatum with data item's startdate if not set ---
   const effectiveStartDate = typeDetails.StartDate || item?.startdate || '';
   // --- NEW: Use calculated working hours unless user overrides ---
@@ -233,8 +187,8 @@ function AvrExpenseDetail({ financial, onChange, item }) {
     return (
       <BonusDetail
         financial={bonus}
-        parent={financial} // Pass parent prop correctly
-        parentFinancial={financial} // For compatibility if needed
+        parent={financial}
+        parentFinancial={financial}
         onChange={updatedBonus => {
           const updatedBonuses = (financial.financial || []).map(b => b.id === bonus.id ? updatedBonus : b);
           onChange({
@@ -245,6 +199,51 @@ function AvrExpenseDetail({ financial, onChange, item }) {
       />
     );
   };
+
+  // Handler for stacking bonuses as nested financials
+  const handleAddBonus = (bonusType) => {
+    // Use typeDetailsDefinition from registry if available
+    const registry = BONUS_REGISTRY.find(b => b.value === bonusType);
+    const defaultTypeDetails = registry?.typeDetailsDefinition ? { ...registry.typeDetailsDefinition } : {};
+    const newBonus = {
+      id: `${Date.now()}-${Math.random()}`,
+      type: bonusType,
+      label: registry?.label || bonusType,
+      type_details: defaultTypeDetails,
+      financial: [],
+      parentId: financial.id,
+      parentType: financial.type // <-- add this line
+    };
+    onChange({
+      ...financial,
+      financial: [...(Array.isArray(financial.financial) ? financial.financial : []), newBonus]
+    });
+  };
+
+  // Handler for deleting a bonus
+  const handleDeleteBonus = (idx, bonus) => {
+    const updatedBonuses = (financial.financial || []).filter(b => b.id !== bonus.id);
+    onChange({
+      ...financial,
+      financial: updatedBonuses
+    });
+  };
+
+  // Build menu options for add button
+  const addButtonMenuOptions = bonusTypeRegistry.map(bonusType => ({
+    label: bonusType.label,
+    value: bonusType.value,
+    onClick: () => handleAddBonus(bonusType.value),
+    disabled: bonusType.disabled
+  }));
+
+  // Summary component for a bonus
+  const BonusSummary = ({ item }) => (
+    <Typography variant="subtitle2">{item.label || item.type}</Typography>
+  );
+
+  // Detail component for a bonus
+  const BonusDetailComponent = ({ item }) => renderBonusDetail(item);
 
   return (
     <Box display="flex" flexDirection="column" gap={2} position="relative">
@@ -344,61 +343,19 @@ function AvrExpenseDetail({ financial, onChange, item }) {
 
       {/* Bonus-Tabelle */}
       <Box>
-        <Box display="flex" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-          <Typography variant="subtitle2">Boni</Typography>
-          <Button
-            variant="outlined"
-            size="small"
-            startIcon={<AddIcon />}
-            onClick={handleBonusMenuOpen}
-          >
-            Bonus hinzufügen
-          </Button>
-          <Menu
-            anchorEl={bonusMenuAnchor}
-            open={Boolean(bonusMenuAnchor)}
-            onClose={handleBonusMenuClose}
-          >
-            {bonusTypeRegistry.map(bonusType => (
-              <MenuItem
-                key={bonusType.value}
-                onClick={() => handleSelectBonusType(bonusType.value)}
-                disabled={bonusType.disabled}
-              >
-                {bonusType.label}
-              </MenuItem>
-            ))}
-          </Menu>
-        </Box>
-        <List dense>
-          {(Array.isArray(financial.financial) ? financial.financial : []).map(bonus => {
-            const registry = BONUS_REGISTRY.find(b => b.value === bonus.type);
-            const deleteable = registry?.deleteable !== false;
-            return (
-              <ListItem key={bonus.id} alignItems="flex-start" sx={{ pl: 0, flexDirection: 'column', alignItems: 'stretch' }}>
-                <Box display="flex" alignItems="center" width="100%">
-                  <Typography variant="subtitle2" sx={{ flexGrow: 1 }}>
-                    {bonus.label || bonus.type}
-                  </Typography>
-                  <IconButton
-                    edge="end"
-                    aria-label="delete"
-                    size="small"
-                    onClick={() => handleDeleteBonus(bonus.id)}
-                    disabled={!deleteable}
-                  >
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                </Box>
-                <Box mt={1}>
-                  {renderBonusDetail(bonus)}
-                </Box>
-              </ListItem>
-            );
-          })}
-        </List>
+        <Typography variant="subtitle2" sx={{ mb: 1 }}>Boni</Typography>
+        <AccordionListDetail
+          items={Array.isArray(financial.financial) ? financial.financial : []}
+          SummaryComponent={BonusSummary}
+          DetailComponent={BonusDetailComponent}
+          AddButtonLabel="Bonus hinzufügen"
+          onAdd={() => {}} // handled by menu
+          AddButtonProps={{ startIcon: <AddIcon /> }}
+          AddButtonMenuOptions={addButtonMenuOptions.filter(opt => !opt.disabled)}
+          onDelete={handleDeleteBonus}
+          emptyText="Keine Boni vorhanden."
+        />
       </Box>
-     
     </Box>
   );
 }

@@ -1,13 +1,12 @@
 import {
-  Typography, Box, Button,
-  FormControl, FormLabel, RadioGroup, FormControlLabel, Radio, TextField,
+  Typography, Box, 
+  FormLabel, RadioGroup, FormControlLabel, Radio, TextField,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper
 } from '@mui/material';
 import React, { useMemo, useEffect } from 'react';
 import { convertDDMMYYYYtoYYYYMMDD } from '../../../utils/dateUtils';
 import { useSelector, useDispatch } from 'react-redux';
 import { getBookings } from '../../../store/simBookingSlice';
-import { deleteGroupThunk } from '../../../store/simGroupSlice';
 import { useOverlayData } from '../../../hooks/useOverlayData';
 
 const EMPTY_GROUP_DEFS = [];
@@ -139,14 +138,6 @@ function GroupDetail({ group }) {
   // Handler to add a new group assignment (for based scenarios, create overlay)
 
   // Handler to delete group in store
-  const handleDeleteGroup = () => {
-    if (!group) return;
-    dispatch(deleteGroupThunk({
-      scenarioId: selectedScenarioId,
-      dataItemId: selectedItemId,
-      groupId: group.id
-    }));
-  };
 
   const handleDateChange = (field, value) => {
     // value from date picker is always YYYY-MM-DD, store as such
@@ -215,17 +206,7 @@ function GroupDetail({ group }) {
 
   return (
     <Box sx={{ mb: 2 }}>
-      <Box alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
-        <Box alignItems="center" gap={1}>
-          <Button
-            size="small"
-            color="error"
-            onClick={handleDeleteGroup}
-          >
-            Löschen
-          </Button>
-        </Box>
-      </Box>
+
       {/* Start/Enddatum section at the top */}
       <Box display="flex" gap={2} sx={{ mb: 2, alignItems: 'center' }}>
         <Typography>gültig von</Typography>
