@@ -115,7 +115,7 @@ function DataPage() {
   // Show notice if no scenario exists
   if (!scenarios || scenarios.length === 0) {
     return (
-      <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#f0f2f5' }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 85px)', bgcolor: '#f0f2f5' }}>
         <Paper
           sx={{
             m: 'auto',
@@ -151,7 +151,7 @@ function DataPage() {
   }
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#f0f2f5' }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 85px)', overflow: 'hidden' }}>
       <SpeedDial
         ariaLabel="SpeedDial for data actions"
         sx={{ position: 'fixed', bottom: 32, right: 32 }}
@@ -174,7 +174,7 @@ function DataPage() {
       />
       <ScenarioSaveDialog />
       <ScenarioLoadDialog onLoaded={handleLoadDone} />
-      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', pt: 0 }}>
+      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', pt: 0, minHeight: 0 }}>
         <SimDataList />
       </Box>
     </Box>

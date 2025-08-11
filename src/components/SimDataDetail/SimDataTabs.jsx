@@ -50,14 +50,14 @@ function SimDataTabs() {
         height: '100%', 
         display: 'flex', 
         flexDirection: 'column',
-        overflow: 'auto'
+        minHeight: 0
       }}
     >
       <Tabs
         value={activeTab}
         onChange={(_, newTab) => setActiveTab(newTab)}
         variant="fullWidth"
-        sx={{ mb: 2 }}
+        sx={{ mb: 2, flex: '0 0 auto' }}
       >
         <Tab icon={<PersonIcon />} label="Allgemein" />
         <Tab icon={<AccessTimeIcon />} label="Zeiten" />
@@ -65,7 +65,7 @@ function SimDataTabs() {
         <Tab icon={<EuroIcon />} label="Finanzen" />
       </Tabs>
       
-      <Box sx={{ flex: 1, overflow: 'auto' }}>
+      <Box sx={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
         {activeTab === 0 && <SimDataGeneralTab />}
         {activeTab === 1 && <SimDataBookingTab />}
         {activeTab === 2 && <SimDataGroupsTab />}

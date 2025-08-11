@@ -43,20 +43,20 @@ function SettingsPage() {
   };
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '88vh' }}>
-      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', p: 0 }}>
-        <Paper sx={{ p: 0, flex: 1, display: 'flex', flexDirection: 'column' }} elevation={3}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 85px)', overflow: 'hidden' }}>
+      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', p: 0, minHeight: 0 }}>
+        <Paper sx={{ p: 0, flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }} elevation={3}>
           <Tabs
             value={activeTab}
             onChange={handleTabChange}
-            sx={{ borderBottom: 1, borderColor: 'divider' }}
+            sx={{ borderBottom: 1, borderColor: 'divider', flex: '0 0 auto' }}
           >
             <Tab icon={<AccountTreeIcon />} label="Szenarien" />
             <Tab icon={<GroupIcon />} label="Gruppen" />
             <Tab icon={<PersonIcon />} label="Qualifikationen" />
             <Tab icon={<EuroIcon />} label="Beiträge" />
           </Tabs>
-          <Box sx={{ p: 3, flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <Box sx={{ p: 3, flex: 1, display: 'flex', flexDirection: 'column', overflow: 'auto', minHeight: 0 }}>
             {activeTab === 0 && <OrgaTabScenarioDefs />}
             {activeTab === 1 && <OrgaTabGroupDefs />}
             {activeTab === 2 && <OrgaTabQualificationDefs />}

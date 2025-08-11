@@ -61,16 +61,17 @@ function TabbedListDetail({
   };
 
   return (
-    <Box sx={{ display: 'flex', gap: 2 }}>
+    <Box sx={{ display: 'flex', gap: 2, height: '100%' }}>
       {/* Tabs List */}
       <Paper
+        elevation={4}
         sx={{
           minWidth: 320,
+          maxWidth: 320,
           p: 2,
           display: 'flex',
           flexDirection: 'column',
           height: '100%',
-          minHeight: 400,
           boxSizing: 'border-box',
           // make sure there is no blur
           filter: 'none',
@@ -81,7 +82,7 @@ function TabbedListDetail({
       >
         {/* Optional title */}
         {ItemAddButton.title && (
-          <Typography variant="h6" sx={{ mb: 1 }}>
+          <Typography variant="h6" sx={{ mb: 1, flex: '0 0 auto' }}>
             {ItemAddButton.title}
           </Typography>
         )}
@@ -102,7 +103,7 @@ function TabbedListDetail({
           </>
         ) : (
           <>
-            <Box sx={{ flex: '0 0 auto' }}>
+            <Box sx={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
               <Tabs
                 orientation="vertical"
                 variant="fullWidth"
@@ -198,7 +199,6 @@ function TabbedListDetail({
                 })}
               </Tabs>
             </Box>
-            <Box sx={{ flex: 1 }} />
             {/* Add button always at the bottom */}
             <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center', flex: '0 0 auto' }}>
               <Button
@@ -214,9 +214,9 @@ function TabbedListDetail({
         )}
       </Paper>
       {/* Detail Area */}
-      <Box sx={{ flex: 1, minWidth: 0 }}>
+      <Box sx={{ flex: 1, minWidth: 0, height: '100%' }}>
         {selectedItem ? (
-          <Paper sx={{ p: 3, height: '100%', filter: 'none', backdropFilter: 'none', WebkitBackdropFilter: 'none', bgcolor: 'background.paper' }}>
+          <Paper elevation={4} sx={{ p: 3, height: '100%', overflow: 'auto', filter: 'none', backdropFilter: 'none', WebkitBackdropFilter: 'none', bgcolor: 'background.paper' }}>
             <DetailComponent item={selectedItem} />
           </Paper>
         ) : null}

@@ -64,7 +64,7 @@ function VisuPage() {
   // Prüfe ob Szenarien vorhanden sind
   if (!scenarios || scenarios.length === 0) {
     return (
-      <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#f0f2f5' }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 85px)', bgcolor: '#f0f2f5' }}>
         <Paper
           sx={{
             m: 'auto',
@@ -95,13 +95,13 @@ function VisuPage() {
   }
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#f0f2f5' }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 85px)', bgcolor: '#f0f2f5', overflow: 'hidden' }}>
       {/* Chart Filter Form added here */}
-      <Box sx={{ px: 3, pt: 2 }}>
+      <Box sx={{ px: 3, pt: 2, flex: '0 0 auto' }}>
         <ChartFilterForm showStichtag scenarioId={selectedScenarioId} />
       </Box>
 
-      <Box sx={{ flex: 1, p: 3, display: 'flex', flexDirection: 'column', gap: 3, overflow: 'auto' }}>
+      <Box sx={{ flex: 1, p: 3, display: 'flex', flexDirection: 'column', gap: 3, overflow: 'auto', minHeight: 0 }}>
         {chartToggles.includes('weekly') && (
           <Box sx={{ minHeight: '400px' }}>
             <Typography variant="h6" sx={{ mb: 2, color: 'text.secondary' }}>
