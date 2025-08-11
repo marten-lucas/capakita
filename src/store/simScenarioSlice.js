@@ -219,6 +219,30 @@ export const importScenario = ({
 
   // 10. Select the new scenario
   dispatch(setSelectedScenarioId(scenarioId));
+
+  // 11. Select the first item in the simDataList (if any)
+  if (simDataList && simDataList.length > 0) {
+    // Find the store key for the first imported item
+    const firstRawId = simDataList[0].id;
+    const stateAfterImport = getState();
+    const importedItems = stateAfterImport.simData.dataByScenario[scenarioId] || {};
+    // Find the first item by matching rawdata or name if id is not stable
+    let firstStoreKey = null;
+    // Try to match by name and type (fallback)
+    for (const [storeKey, item] of Object.entries(importedItems)) {
+      if (item.id === firstRawId || item.name === simDataList[0].name) {
+        firstStoreKey = storeKey;
+        break;
+      }
+    }
+    // Fallback: just pick the first key
+    if (!firstStoreKey) {
+      firstStoreKey = Object.keys(importedItems)[0];
+    }
+    if (firstStoreKey) {
+      dispatch({ type: 'simScenario/setSelectedItem', payload: firstStoreKey });
+    }
+  }
 };
 
 // Thunk: delete a scenario and all related data

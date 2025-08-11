@@ -70,7 +70,7 @@ function WelcomePage() {
       </Typography>
       {/* Wertversprechen */}
       <Typography variant="h6" sx={{ maxWidth: "80%", textAlign: 'center', color: 'text.secondary', mb: 0 }}>
-        CapaKita hilft Ihnen, Personalkapazitäten und Betreuungsbedarf in Ihrer Kita einfach und flexibel zu simulieren. Importieren Sie Ihre Daten, spielen Sie verschiedene Szenarien durch und treffen Sie fundierte Entscheidungen für die Zukunft.
+        CapaKita hilft Ihnen als Träger oder Leitung eines Kindergartens in Bayern, Personalkapazitäten und Betreuungsbedarf in Ihrer Kita einfach und flexibel zu simulieren. Importieren Sie Ihre Daten, spielen Sie verschiedene Szenarien durch und treffen Sie fundierte Entscheidungen für die Zukunft.
       </Typography>
       {/* Cards statt Buttons */}
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={3} sx={{ mt: 2, width: '100%', justifyContent: 'center' }}>

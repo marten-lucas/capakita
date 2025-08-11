@@ -383,7 +383,6 @@ function SimDataGeneralTab() {
               InputLabelProps={{ shrink: true }}
             />
           </Box>
-
           {/* Bemerkungen */}
           <Box>
             <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 700 }}>Bemerkungen</Typography>
@@ -403,7 +402,6 @@ function SimDataGeneralTab() {
               InputLabelProps={{ shrink: true }}
             />
           </Box>
-
           {/* Date of Birth */}
           {item.type === 'demand' && (
             <Box>
@@ -423,22 +421,23 @@ function SimDataGeneralTab() {
               </Box>
             </Box>
           )}
-
           {/* Zeitraum */}
           <Box>
             <Typography variant="body2" sx={{ mt: 1, mb: 0.5, fontWeight: 700 }}>Anwesenheit</Typography>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2,  }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               <TailgridDateRangePicker
                 value={{ start: localStartDate, end: localEndDate }}
                 onChange={handleMainRangeChange}
               />
             </Box>
           </Box>
-          
+        </Box>
+        {/* Right column */}
+        <Box sx={{ flex: 2, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
           {/* Qualification Picker for capacity items */}
           {item.type === 'capacity' && qualiDefs.length > 0 && (
             <Box>
-              <Typography variant="body2" sx={{ mb: 0.5 }}>Qualifikation</Typography>
+              <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 700 }}>Qualifikation</Typography>
               <QualificationPicker
                 qualificationDefs={qualiDefs}
                 value={assignedQualification}
@@ -446,9 +445,6 @@ function SimDataGeneralTab() {
               />
             </Box>
           )}
-        </Box>
-        {/* Right column */}
-        <Box sx={{ flex: 2, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
           <Box sx={{ mb: 2, pr: 2 }}>
             <Typography variant="body2" sx={{ mb: 1, fontWeight: 700 }}>
               Abwesenheit
@@ -470,3 +466,4 @@ function SimDataGeneralTab() {
 }
 
 export default SimDataGeneralTab;
+
