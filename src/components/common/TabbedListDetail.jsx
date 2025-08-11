@@ -111,7 +111,7 @@ function TabbedListDetail({
                   const id = items[idx]?.id;
                   if (id) handleSelect(id);
                 }}
-                sx={{ minHeight: 48 }}
+                sx={{ minHeight: 48, '& .MuiTabs-indicator': { display: 'none' } }}
               >
                 {items.map((item, idx) => {
                   const level = typeof getLevel === 'function' ? getLevel(item) || 0 : 0;
@@ -132,31 +132,36 @@ function TabbedListDetail({
                           '&:hover .hover-icons': { opacity: 1 },
                           bgcolor: isSelected ? 'action.selected' : undefined,
                           borderRadius: 1,
-                          transition: 'background 0.2s'
+                          transition: 'background 0.2s',
+                          cursor: 'pointer',
+                          '&:hover': {
+                            bgcolor: isSelected ? 'action.selected' : 'action.hover'
+                          },
+                          mb: 1 // Add margin-bottom for spacing between tabs
                         }}
                         onMouseEnter={() => setHoveredTabId(item.id || idx)}
                         onMouseLeave={() => setHoveredTabId(null)}
                         onClick={() => handleSelect(item.id)}
                       >
-                        <Tab
-                          label={
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
-                              {ItemAvatar(item)}
-                              <Box sx={{ flex: 1, minWidth: 0 }}>
-                                <Typography variant="body2" sx={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  {ItemTitle(item)}
-                                </Typography>
-                                <Typography variant="caption" sx={{ color: 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  {ItemSubTitle(item)}
-                                </Typography>
-                                <Box sx={{ display: 'flex', gap: 0.5, mt: 0.2, flexWrap: 'wrap' }}>
-                                  {ItemChips(item)}
-                                </Box>
-                              </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0, flex: 1 }}>
+                          {ItemAvatar(item)}
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {ItemTitle(item)}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {ItemSubTitle(item)}
+                            </Typography>
+                            <Box sx={{ display: 'flex', gap: 0.5, mt: 0.2, flexWrap: 'wrap' }}>
+                              {ItemChips(item)}
                             </Box>
-                          }
+                          </Box>
+                        </Box>
+                        <Tab
                           value={idx}
-                          sx={{ minHeight: 48, alignItems: 'flex-start', textAlign: 'left', maxWidth: 320 }}
+                          sx={{ 
+                            display: 'none' // Hide the actual Tab but keep it for MUI Tabs functionality
+                          }}
                         />
                         <Box
                           className="hover-icons"
