@@ -17,13 +17,11 @@ import SimDataBookingTab from './Bookings/SimDataBookingTab';
 import SimDataGroupsTab from './Groups/SimDataGroupsTab';
 import SimDataFinanceTab from './Financials/SimDataFinanceTab';
 import React, { useState } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { useOverlayData } from '../../hooks/useOverlayData';
-import { deleteDataItemThunk } from '../../store/simDataSlice';
 
 function SimDataTabs() {
   const [activeTab, setActiveTab] = useState(0);
-  const dispatch = useDispatch();
 
   // Get selected scenario and item id from Redux
   const scenarioId = useSelector(state => state.simScenario.selectedScenarioId);
@@ -72,20 +70,7 @@ function SimDataTabs() {
         {activeTab === 3 && <SimDataFinanceTab item={item} />}
       </Box>
 
-      {/* Show delete button if manual entry */}
-      {item?.rawdata?.source === 'manual entry' && (
-        <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
-          <Button
-            variant="outlined"
-            color="error"
-            size="small"
-            fullWidth
-            onClick={() => dispatch(deleteDataItemThunk({ scenarioId, itemId: selectedItemId }))}
-          >
-            Eintrag löschen
-          </Button>
-        </Box>
-      )}
+      
     </Box>
   );
 }

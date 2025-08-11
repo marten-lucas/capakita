@@ -209,12 +209,7 @@ function SimDataList() {
       onClick: () => dispatch(deleteDataItemThunk({ scenarioId: selectedScenarioId, itemId: item._key }))
     }
   ];
-  const ItemAddButton = {
-    label: 'Neuer Eintrag',
-    icon: null,
-    onClick: () => {},
-    title: 'Simulationsdaten'
-  };
+  const ItemAddButton = null; // No add button
 
   return (
     <TabbedListDetail
@@ -236,3 +231,4 @@ function SimDataList() {
 }
 
 export default SimDataList;
+ 

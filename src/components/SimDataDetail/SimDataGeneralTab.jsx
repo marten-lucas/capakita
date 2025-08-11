@@ -354,7 +354,12 @@ function SimDataGeneralTab() {
   }
 
   return (
-    <Box flex={1} display="flex" flexDirection="column" sx={{ overflowY: 'auto', gap: 0 }}>
+    <Box
+      flex={1}
+      display="flex"
+      flexDirection="column"
+      sx={{ overflowY: 'auto', gap: 0, height: '100%', minHeight: 0 }}
+    >
       {/* Name */}
       <Box sx={{ mb: 2 }}>
         <Typography variant="body2" sx={{ mb: 0.5 }}>Name</Typography>

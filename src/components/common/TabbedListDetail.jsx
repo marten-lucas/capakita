@@ -21,11 +21,10 @@ function TabbedListDetail({
   ItemChips = () => null,
   ItemAvatar = () => null,
   ItemHoverIcons = () => [],
-  ItemAddButton = { label: 'Hinzufügen', onClick: () => {} },
+  ItemAddButton, // allow undefined/null for no add button
   Detail: DetailComponent = () => null,
   emptyText = 'Keine Einträge vorhanden.',
   getLevel,
-  // NEW: controlled selection support
   selectedId: controlledSelectedId,
   onSelect
 }) {
@@ -69,11 +68,11 @@ function TabbedListDetail({
           minWidth: 320,
           maxWidth: 320,
           p: 2,
+          m: 1.5, // Add margin for shadow visibility
           display: 'flex',
           flexDirection: 'column',
-          height: '100%',
+          height: 'calc(100% - 24px)', // Adjust height to account for margin (2 * 12px)
           boxSizing: 'border-box',
-          // make sure there is no blur
           filter: 'none',
           backdropFilter: 'none',
           WebkitBackdropFilter: 'none',
@@ -81,7 +80,7 @@ function TabbedListDetail({
         }}
       >
         {/* Optional title */}
-        {ItemAddButton.title && (
+        {ItemAddButton?.title && (
           <Typography variant="h6" sx={{ mb: 1, flex: '0 0 auto' }}>
             {ItemAddButton.title}
           </Typography>
@@ -90,16 +89,18 @@ function TabbedListDetail({
         {items.length === 0 ? (
           <>
             <Typography color="text.secondary" sx={{ p: 2 }}>{emptyText}</Typography>
-            <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
-              <Button
-                variant="contained"
-                onClick={ItemAddButton.onClick}
-                startIcon={ItemAddButton.icon}
-                size="small"
-              >
-                {ItemAddButton.label}
-              </Button>
-            </Box>
+            {ItemAddButton && (
+              <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
+                <Button
+                  variant="contained"
+                  onClick={ItemAddButton.onClick}
+                  startIcon={ItemAddButton.icon}
+                  size="small"
+                >
+                  {ItemAddButton.label}
+                </Button>
+              </Box>
+            )}
           </>
         ) : (
           <>
@@ -200,27 +201,42 @@ function TabbedListDetail({
               </Tabs>
             </Box>
             {/* Add button always at the bottom */}
-            <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center', flex: '0 0 auto' }}>
-              <Button
-                variant="contained"
-                onClick={ItemAddButton.onClick}
-                startIcon={ItemAddButton.icon}
-                size="small"
-              >
-                {ItemAddButton.label}
-              </Button>
-            </Box>
+            {ItemAddButton && (
+              <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center', flex: '0 0 auto' }}>
+                <Button
+                  variant="contained"
+                  onClick={ItemAddButton.onClick}
+                  startIcon={ItemAddButton.icon}
+                  size="small"
+                >
+                  {ItemAddButton.label}
+                </Button>
+              </Box>
+            )}
           </>
         )}
       </Paper>
       {/* Detail Area */}
-      <Box sx={{ flex: 1, minWidth: 0, height: '100%' }}>
+      <Paper
+        elevation={4}
+        sx={{
+          flex: 1,
+          minWidth: 0,
+          height: 'calc(100% - 24px)', // Match height and margin to tabs list
+          m: 1.5,
+          p: 3,
+          overflow: 'auto',
+          filter: 'none',
+          backdropFilter: 'none',
+          WebkitBackdropFilter: 'none',
+          bgcolor: 'background.paper',
+          boxSizing: 'border-box'
+        }}
+      >
         {selectedItem ? (
-          <Paper elevation={4} sx={{ p: 3, height: '100%', overflow: 'auto', filter: 'none', backdropFilter: 'none', WebkitBackdropFilter: 'none', bgcolor: 'background.paper' }}>
-            <DetailComponent item={selectedItem} />
-          </Paper>
+          <DetailComponent item={selectedItem} />
         ) : null}
-      </Box>
+      </Paper>
     </Box>
   );
 }
