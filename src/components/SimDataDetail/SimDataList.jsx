@@ -110,7 +110,7 @@ function SimDataList() {
 
     return qualificationAssignments.map((assignment, index) => {
       const qualificationDef = qualificationDefs.find(def => def.key === assignment.qualification);
-      const displayName = qualificationDef?.name || assignment.qualification;
+      const displayName = qualificationDef?.initial || qualificationDef?.name || assignment.qualification;
       const isExpert = qualificationDef?.IsExpert !== false;
       
       return (

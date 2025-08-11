@@ -15,7 +15,7 @@ function QualificationPicker({ qualificationDefs, value, onChange }) {
             key={`${q.key}-${idx}`}
             value={q.key}
             control={<Radio />}
-            label={q.name}
+            label={q.initial || q.name}
           />
         ))}
       </RadioGroup>
