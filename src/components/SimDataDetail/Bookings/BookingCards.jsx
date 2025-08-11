@@ -1,5 +1,5 @@
 import React from 'react';
-import { Typography, Box } from '@mui/material';
+import { Typography, Box, Avatar } from '@mui/material';
 import { consolidateBookingSummary } from '../../../utils/bookingUtils';
 
 
@@ -38,9 +38,16 @@ function BookingCards({ item, index }) {
   const hoursText = getBookingHours(booking.times);
 
   return (
-    <Box>
-      <Typography variant="subtitle1">{`Buchung ${index + 1}:`} <Box component="span" fontWeight='fontWeightMedium'>{hoursText} {dateRangeText}</Box></Typography>
-      <Typography variant="caption">{consolidateBookingSummary(booking.times)}</Typography>
+    <Box display="flex" alignItems="center" gap={2}>
+      <Avatar sx={{ bgcolor: 'primary.main', color: 'white', width: 32, height: 32, fontWeight: 700 }}>
+        {index + 1}
+      </Avatar>
+      <Box>
+        <Typography variant="subtitle1">
+          <Box component="span" fontWeight='fontWeightMedium'>{hoursText} {dateRangeText}</Box>
+        </Typography>
+        <Typography variant="caption">{consolidateBookingSummary(booking.times)}</Typography>
+      </Box>
     </Box>
   );
 }

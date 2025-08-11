@@ -1,12 +1,161 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Typography, Box, Button, Divider, TextField, Switch, Slider,
 } from '@mui/material';
-import { convertDDMMYYYYtoYYYYMMDD } from '../../../utils/dateUtils';
 import { valueToTime } from '../../../utils/timeUtils';
 import { useSelector, useDispatch } from 'react-redux';
 import DayControl from './BookingDayControl';
 import { useOverlayData } from '../../../hooks/useOverlayData';
+
+// --- Tailgrids-style DateRangePicker (minimal, local, copied from SimDataGeneralTab) ---
+function TailgridDateRangePicker({ value, onChange }) {
+  const [currentDate, setCurrentDate] = useState(() => {
+    if (value?.start) return new Date(value.start);
+    return new Date();
+  });
+  const [selectedStartDate, setSelectedStartDate] = useState(value?.start || null);
+  const [selectedEndDate, setSelectedEndDate] = useState(value?.end || null);
+  const [isOpen, setIsOpen] = useState(false);
+  const datepickerRef = React.useRef(null);
+
+  React.useEffect(() => {
+    setSelectedStartDate(value?.start || null);
+    setSelectedEndDate(value?.end || null);
+  }, [value?.start, value?.end]);
+
+  const handleDayClick = (dayString) => {
+    if (!selectedStartDate || (selectedStartDate && selectedEndDate)) {
+      setSelectedStartDate(dayString);
+      setSelectedEndDate(null);
+      onChange({ start: dayString, end: '' });
+    } else {
+      if (new Date(dayString) < new Date(selectedStartDate)) {
+        setSelectedEndDate(selectedStartDate);
+        setSelectedStartDate(dayString);
+        onChange({ start: dayString, end: selectedStartDate });
+      } else {
+        setSelectedEndDate(dayString);
+        onChange({ start: selectedStartDate, end: dayString });
+      }
+    }
+  };
+
+  const renderCalendar = () => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const firstDayOfMonth = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const daysArray = [];
+
+    for (let i = 0; i < firstDayOfMonth; i++) {
+      daysArray.push(<div key={`empty-${i}`}></div>);
+    }
+
+    for (let i = 1; i <= daysInMonth; i++) {
+      const day = new Date(year, month, i);
+      const dayString = day.toISOString().slice(0, 10);
+      let className =
+        "flex h-[32px] w-[32px] items-center justify-center rounded-full hover:bg-gray-200 mb-1 cursor-pointer";
+      if (selectedStartDate && dayString === selectedStartDate) {
+        className += " bg-primary text-white rounded-r-none";
+      }
+      if (selectedEndDate && dayString === selectedEndDate) {
+        className += " bg-primary text-white rounded-l-none";
+      }
+      if (
+        selectedStartDate &&
+        selectedEndDate &&
+        new Date(day) > new Date(selectedStartDate) &&
+        new Date(day) < new Date(selectedEndDate)
+      ) {
+        className += " bg-gray-300 rounded-none";
+      }
+      daysArray.push(
+        <div
+          key={i}
+          className={className}
+          data-date={dayString}
+          onClick={() => handleDayClick(dayString)}
+        >
+          {i}
+        </div>
+      );
+    }
+    return daysArray;
+  };
+
+  const updateInput = () => {
+    if (selectedStartDate && selectedEndDate) {
+      return `${selectedStartDate} - ${selectedEndDate}`;
+    } else if (selectedStartDate) {
+      return selectedStartDate;
+    } else {
+      return "";
+    }
+  };
+
+  const toggleDatepicker = () => setIsOpen((v) => !v);
+
+  return (
+    <Box sx={{ position: 'relative', mb: 1, width: '100%' }}>
+      <TextField
+        label=""
+        value={updateInput()}
+        onClick={toggleDatepicker}
+        size="small"
+        sx={{ width: '100%' }}
+        placeholder="Zeitraum wählen"
+        InputProps={{ readOnly: true }}
+      />
+      {isOpen && (
+        <Box
+          ref={datepickerRef}
+          sx={{
+            position: 'absolute',
+            zIndex: 10,
+            bgcolor: 'background.paper',
+            border: '1px solid #eee',
+            borderRadius: 2,
+            boxShadow: 3,
+            p: 2,
+            mt: 1,
+            minWidth: 260,
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+            <Button
+              size="small"
+              onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))}
+            >{"<"}</Button>
+            <Typography variant="body2">
+              {currentDate.toLocaleString("default", { month: "long" })} {currentDate.getFullYear()}
+            </Typography>
+            <Button
+              size="small"
+              onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))}
+            >{">"}</Button>
+          </Box>
+          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', mb: 1 }}>
+            {["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"].map((day) => (
+              <Typography key={day} variant="caption" sx={{ textAlign: 'center' }}>{day}</Typography>
+            ))}
+          </Box>
+          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
+            {renderCalendar()}
+          </Box>
+          <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, mt: 1 }}>
+            <Button size="small" variant="outlined">
+              {selectedStartDate || "Start"}
+            </Button>
+            <Button size="small" variant="outlined">
+              {selectedEndDate || "Ende"}
+            </Button>
+          </Box>
+        </Box>
+      )}
+    </Box>
+  );
+}
 
 // BookingDetail component
 function BookingDetail({ index, booking }) {
@@ -144,14 +293,6 @@ function BookingDetail({ index, booking }) {
     handleUpdateBooking(updatedBooking);
   };
 
-  const handleDateChange = (field, value) => {
-    // value from date picker is always YYYY-MM-DD, store as such
-    const updatedBooking = {
-      ...booking,
-      [field]: value,
-    };
-    handleUpdateBooking(updatedBooking);
-  };
 
   // Prüft, ob ein einzelner Tag (Mo, Di, ...) im Booking geändert wurde
 
@@ -164,35 +305,24 @@ function BookingDetail({ index, booking }) {
 
 
   // Helper to ensure date is valid for date picker
-  const getDatePickerValue = (dateStr) => {
-    if (!dateStr) return '';
-    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
-    if (/^\d{2}\.\d{2}\.\d{4}$/.test(dateStr)) return convertDDMMYYYYtoYYYYMMDD(dateStr);
-    return '';
+
+  // DateRangePicker handler
+  const handleDateRangeChange = (range) => {
+    handleUpdateBooking({
+      ...booking,
+      startdate: range.start || '',
+      enddate: range.end || ''
+    });
   };
 
   return (
     <Box sx={{ mb: 3 }}>
-
       <Box>
-        <Box display="flex" gap={2} sx={{ mb: 2, alignItems: 'center' }}>
-          <Typography>gültig von</Typography>
-          <TextField
-            label="Startdatum"
-            type="date"
-            size="small"
-            InputLabelProps={{ shrink: true }}
-            value={getDatePickerValue(booking.startdate)}
-            onChange={(e) => handleDateChange('startdate', e.target.value)}
-          />
-          <Typography>bis</Typography>
-          <TextField
-            label="Enddatum"
-            type="date"
-            size="small"
-            InputLabelProps={{ shrink: true }}
-            value={getDatePickerValue(booking.enddate)}
-            onChange={(e) => handleDateChange('enddate', e.target.value)}
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="body2" sx={{ fontWeight: 700, mb: 0.5 }}>Gültigkeit</Typography>
+          <TailgridDateRangePicker
+            value={{ start: booking.startdate, end: booking.enddate }}
+            onChange={handleDateRangeChange}
           />
         </Box>
         {daysOfWeek.map(day => {
@@ -208,12 +338,10 @@ function BookingDetail({ index, booking }) {
                 onRemoveSegment={handleRemoveSegment}
                 type={type}
               />
-              
             </Box>
           );
         })}
       </Box>
-      
     </Box>
   );
 }

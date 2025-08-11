@@ -202,9 +202,10 @@ function SimDataGeneralTab() {
   useEffect(() => { setLocalNote(item?.remark ?? ''); }, [item?.remark, selectedItemId]);
   useEffect(() => { setLocalStartDate(item?.startdate ?? ''); }, [item?.startdate, selectedItemId]);
   useEffect(() => { setLocalEndDate(item?.enddate ?? ''); }, [item?.enddate, selectedItemId]);
+  const absencesString = JSON.stringify(item?.absences);
   useEffect(() => { 
     setLocalAbsences(Array.isArray(item?.absences) ? item.absences : []); 
-  }, [item?.absences, selectedItemId, JSON.stringify(item?.absences)]);
+  }, [item?.absences, selectedItemId, absencesString]);
   useEffect(() => { setLocalDateOfBirth(item?.dateofbirth ?? ''); }, [item?.dateofbirth, selectedItemId]);
 
   // Handlers
