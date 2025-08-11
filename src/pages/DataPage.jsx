@@ -13,7 +13,6 @@ import SaveIcon from '@mui/icons-material/Save';
 import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 import DataImportModal from '../components/modals/DataImportModal';
 import SimDataList from '../components/SimDataDetail/SimDataList';
-import SimDataDetailForm from '../components/SimDataDetail/SimDataDetailForm';
 import { useSelector, useDispatch } from 'react-redux';
 import { setSelectedScenarioId, addScenario, isSaveAllowed, setSaveDialogOpen, setLoadDialogOpen } from '../store/simScenarioSlice';
 import { addDataItemAndSelect } from '../store/simDataSlice';
@@ -32,15 +31,11 @@ function DataPage() {
   const isSaveAllowedValue = useSelector(isSaveAllowed);
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const scenarios = useSelector(state => state.simScenario.scenarios);
-  const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
   
   // Use overlay hook to get effective data
-  const { getEffectiveDataItems, getEffectiveDataItem } = useOverlayData();
-  const effectiveDataItems = getEffectiveDataItems();
-  const selectedItem = getEffectiveDataItem(selectedItemId);
+  useOverlayData();
   
   // Convert effective data items to array for checking length
-  const simulationData = Object.values(effectiveDataItems || {});
 
   const { importScenario } = useScenarioImport();
 
@@ -179,29 +174,8 @@ function DataPage() {
       />
       <ScenarioSaveDialog />
       <ScenarioLoadDialog onLoaded={handleLoadDone} />
-      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'row', pt: 0 }}>
-        <>
-          <Box sx={{ width: 320, flexShrink: 0, borderRight: 1, borderColor: 'divider', bgcolor: 'background.paper', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-            {simulationData.length === 0 && (
-              <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider', bgcolor: 'background.paper' }}>
-                <Button
-                  variant="outlined"
-                  startIcon={<FileUploadIcon />}
-                  fullWidth
-                  onClick={handleOpenModal}
-                >
-                  Importieren
-                </Button>
-              </Box>
-            )}
-            <SimDataList/>
-          </Box>
-          <Box sx={{ flex: 1, p: 3, overflow: 'auto', height: '100vh', maxHeight: '100vh' }}>
-            {simulationData.length > 0 && selectedItem && (
-              <SimDataDetailForm/>
-            )}
-          </Box>
-        </>
+      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', pt: 0 }}>
+        <SimDataList />
       </Box>
     </Box>
   );

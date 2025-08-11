@@ -2,7 +2,8 @@ import {
   Typography,
   Box,
   Tabs,
-  Tab
+  Tab,
+  Button
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -16,11 +17,13 @@ import SimDataBookingTab from './Bookings/SimDataBookingTab';
 import SimDataGroupsTab from './Groups/SimDataGroupsTab';
 import SimDataFinanceTab from './Financials/SimDataFinanceTab';
 import React, { useState } from 'react';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { useOverlayData } from '../../hooks/useOverlayData';
+import { deleteDataItemThunk } from '../../store/simDataSlice';
 
 function SimDataTabs() {
   const [activeTab, setActiveTab] = useState(0);
+  const dispatch = useDispatch();
 
   // Get selected scenario and item id from Redux
   const scenarioId = useSelector(state => state.simScenario.selectedScenarioId);
@@ -42,7 +45,14 @@ function SimDataTabs() {
   }
 
   return (
-    <Box flex={1} display="flex" flexDirection="column">
+    <Box 
+      sx={{ 
+        height: '100%', 
+        display: 'flex', 
+        flexDirection: 'column',
+        overflow: 'auto'
+      }}
+    >
       <Tabs
         value={activeTab}
         onChange={(_, newTab) => setActiveTab(newTab)}
@@ -54,20 +64,27 @@ function SimDataTabs() {
         <Tab icon={<GroupIcon />} label="Gruppen" />
         <Tab icon={<EuroIcon />} label="Finanzen" />
       </Tabs>
-      {activeTab === 0 && (
-        <SimDataGeneralTab />
-      )}
-      {activeTab === 1 && (
-        <SimDataBookingTab />
-      )}
-      {activeTab === 2 && (
-        <SimDataGroupsTab />
-      )}
       
-      {activeTab === 3 && (
-        <SimDataFinanceTab
-          item={item}
-        />
+      <Box sx={{ flex: 1, overflow: 'auto' }}>
+        {activeTab === 0 && <SimDataGeneralTab />}
+        {activeTab === 1 && <SimDataBookingTab />}
+        {activeTab === 2 && <SimDataGroupsTab />}
+        {activeTab === 3 && <SimDataFinanceTab item={item} />}
+      </Box>
+
+      {/* Show delete button if manual entry */}
+      {item?.rawdata?.source === 'manual entry' && (
+        <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
+          <Button
+            variant="outlined"
+            color="error"
+            size="small"
+            fullWidth
+            onClick={() => dispatch(deleteDataItemThunk({ scenarioId, itemId: selectedItemId }))}
+          >
+            Eintrag löschen
+          </Button>
+        </Box>
       )}
     </Box>
   );

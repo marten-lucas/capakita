@@ -24,25 +24,41 @@ function TabbedListDetail({
   ItemAddButton = { label: 'Hinzufügen', onClick: () => {} },
   Detail: DetailComponent = () => null,
   emptyText = 'Keine Einträge vorhanden.',
-  getLevel
+  getLevel,
+  // NEW: controlled selection support
+  selectedId: controlledSelectedId,
+  onSelect
 }) {
   // Use id-based selection for stability
-  const [selectedId, setSelectedId] = useState(items[0]?.id || null);
+  const [uncontrolledSelectedId, setUncontrolledSelectedId] = useState(items[0]?.id || null);
+  const selectedId = controlledSelectedId ?? uncontrolledSelectedId;
+
   const [hoveredTabId, setHoveredTabId] = useState(null);
 
   // Update selectedId if items change and selectedId is no longer present
   React.useEffect(() => {
     if (!items.some(item => item.id === selectedId)) {
-      setSelectedId(items[0]?.id || null);
+      const nextId = items[0]?.id || null;
+      if (controlledSelectedId === undefined) {
+        setUncontrolledSelectedId(nextId);
+      } else {
+        onSelect?.(nextId);
+      }
     }
-  }, [items, selectedId]);
+  }, [items, selectedId, controlledSelectedId, onSelect]);
 
   const selectedIndex = items.findIndex(item => item.id === selectedId);
   const selectedItem = selectedIndex !== -1 ? items[selectedIndex] : null;
 
   // Use the variable so the linter does not warn
-   
   const _satisfyLinter = DetailComponent;
+
+  const handleSelect = (id) => {
+    if (controlledSelectedId === undefined) {
+      setUncontrolledSelectedId(id);
+    }
+    onSelect?.(id);
+  };
 
   return (
     <Box sx={{ display: 'flex', gap: 2 }}>
@@ -55,7 +71,12 @@ function TabbedListDetail({
           flexDirection: 'column',
           height: '100%',
           minHeight: 400,
-          boxSizing: 'border-box'
+          boxSizing: 'border-box',
+          // make sure there is no blur
+          filter: 'none',
+          backdropFilter: 'none',
+          WebkitBackdropFilter: 'none',
+          bgcolor: 'background.paper'
         }}
       >
         {/* Optional title */}
@@ -87,7 +108,8 @@ function TabbedListDetail({
                 variant="fullWidth"
                 value={selectedIndex}
                 onChange={(_, idx) => {
-                  setSelectedId(items[idx]?.id);
+                  const id = items[idx]?.id;
+                  if (id) handleSelect(id);
                 }}
                 sx={{ minHeight: 48 }}
               >
@@ -114,7 +136,7 @@ function TabbedListDetail({
                         }}
                         onMouseEnter={() => setHoveredTabId(item.id || idx)}
                         onMouseLeave={() => setHoveredTabId(null)}
-                        onClick={() => setSelectedId(item.id)}
+                        onClick={() => handleSelect(item.id)}
                       >
                         <Tab
                           label={
@@ -144,6 +166,7 @@ function TabbedListDetail({
                             top: '50%',
                             transform: 'translateY(-50%)',
                             display: 'flex',
+                            flexDirection: 'column', // vertical stack for icons
                             gap: 0.5,
                             opacity: hoveredTabId === (item.id || idx) ? 1 : 0,
                             transition: 'opacity 0.2s'
@@ -188,7 +211,7 @@ function TabbedListDetail({
       {/* Detail Area */}
       <Box sx={{ flex: 1, minWidth: 0 }}>
         {selectedItem ? (
-          <Paper sx={{ p: 3, height: '100%' }}>
+          <Paper sx={{ p: 3, height: '100%', filter: 'none', backdropFilter: 'none', WebkitBackdropFilter: 'none', bgcolor: 'background.paper' }}>
             <DetailComponent item={selectedItem} />
           </Paper>
         ) : null}

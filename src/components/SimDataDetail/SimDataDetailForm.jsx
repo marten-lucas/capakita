@@ -34,8 +34,8 @@ function SimDataDetailForm() {
       bgcolor="background.paper"
       boxShadow={3}
       borderRadius={2}
-      p={3}
-      height="90%"
+      p={0}
+      height="100%"
       display="flex"
       flexDirection="column"
       overflow="auto"
