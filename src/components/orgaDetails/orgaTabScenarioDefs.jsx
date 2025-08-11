@@ -304,7 +304,6 @@ function OrgaTabScenarioDefs() {
   const scenarioItems = React.useMemo(() => flattenScenarioTree(scenarios), [scenarios]);
 
   // TabbedListDetail props
-  const items = scenarios;
   const ItemTitle = item => item.name || 'Szenario';
   const ItemSubTitle = item => item.remark || '';
   const ItemChips = () => null;
