@@ -181,8 +181,7 @@ function OrgaTabQualificationDefs() {
   };
 
   return (
-    <Box>
-
+    <Box sx={{ height: '100%' }}>
       <TabbedListDetail
         items={items}
         ItemTitle={ItemTitle}
