@@ -14,7 +14,6 @@ function AccordionListDetail({
   AddButtonProps = {},
   DeleteButtonComponent, // optional custom delete button
   emptyText = 'Keine Einträge vorhanden.',
-  // New: AddButtonMenuOptions: [{label, value, onClick}]
   AddButtonMenuOptions = [],
 }) {
   // Track expanded accordion index
@@ -47,6 +46,9 @@ function AccordionListDetail({
   };
   const handleMenuClose = () => setAnchorEl(null);
 
+  // Track which accordion is hovered for delete button visibility
+  const [hoveredIdx, setHoveredIdx] = React.useState(null);
+
   return (
     <Box>
       {/* Accordions */}
@@ -58,23 +60,36 @@ function AccordionListDetail({
             key={getItemKey(item, idx)}
             expanded={expandedIdx === idx}
             onChange={handleAccordionChange(idx)}
+            onMouseEnter={() => setHoveredIdx(idx)}
+            onMouseLeave={() => setHoveredIdx(null)}
           >
             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', position: 'relative' }}>
                 <Box sx={{ flex: 1 }}>
                   <SummaryComponent item={item} index={idx} />
                 </Box>
                 {onDelete && (
-                  DeleteButtonComponent
-                    ? <DeleteButtonComponent item={item} index={idx} onDelete={() => onDelete(idx, item)} />
-                    : <IconButton
-                        size="small"
-                        onClick={e => { e.stopPropagation(); onDelete(idx, item); }}
-                        title="Löschen"
-                        sx={{ ml: 1 }}
-                      >
-                        <DeleteIcon />
-                      </IconButton>
+                  <Box
+                    className="hover-icons"
+                    sx={{
+                      opacity: hoveredIdx === idx ? 1 : 0,
+                      transition: 'opacity 0.2s',
+                      ml: 1,
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                  >
+                    {DeleteButtonComponent
+                      ? <DeleteButtonComponent item={item} index={idx} onDelete={() => onDelete(idx, item)} />
+                      : <IconButton
+                          size="small"
+                          onClick={e => { e.stopPropagation(); onDelete(idx, item); }}
+                          title="Löschen"
+                        >
+                          <DeleteIcon />
+                        </IconButton>
+                    }
+                  </Box>
                 )}
               </Box>
             </AccordionSummary>

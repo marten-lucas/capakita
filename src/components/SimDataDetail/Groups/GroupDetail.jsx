@@ -212,8 +212,8 @@ function GroupDetail({ group }) {
   return (
     <Box sx={{ mb: 2 }}>
       {/* Start/Enddatum section at the top */}
-      <Box display="flex" gap={2} sx={{ mb: 2, alignItems: 'center' }}>
-        <Typography>gültig von/bis</Typography>
+      <Box sx={{ mb: 2 }}>
+        <Typography variant="body2" sx={{ fontWeight: 700, mb: 0.5 }}>Gültigkeit</Typography>
         <DateRangePicker
           value={{ start: getDatePickerValue(group.start), end: getDatePickerValue(group.end) }}
           onChange={handleDateRangeChange}
@@ -221,9 +221,7 @@ function GroupDetail({ group }) {
       </Box>
       {/* Group Selection Section */}
       <Box sx={{ mb: 3 }}>
-        <Box display="flex" alignItems="center" sx={{ mb: 2 }}>
-          <FormLabel component="legend" sx={{ mr: 2 }}>Gruppe auswählen:</FormLabel>
-        </Box>
+        <Typography variant="body2" sx={{ fontWeight: 700, mb: 0.5 }}>Gruppe</Typography>
         <RadioGroup
           row
           value={group.groupId === 'multiple' ? 'multiple' : (group.groupId ? String(group.groupId) : '')}
@@ -249,6 +247,7 @@ function GroupDetail({ group }) {
       {/* Segment Override Section - Only shown when "multiple" is selected */}
       {group.groupId === 'multiple' && (
         <Box sx={{ mb: 3 }}>
+          <Typography variant="body2" sx={{ fontWeight: 700, mb: 0.5 }}>Segment-Zuordnung</Typography>
           <TableContainer component={Paper} variant="outlined">
             <Table size="small">
               <TableHead>

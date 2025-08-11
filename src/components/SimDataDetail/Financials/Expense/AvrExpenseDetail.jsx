@@ -1,13 +1,12 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { Box, TextField, Typography, MenuItem, Button, IconButton } from '@mui/material';
+import { Box, TextField, Typography, MenuItem } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import DeleteIcon from '@mui/icons-material/Delete';
+import AccordionListDetail from '../../../common/AccordionListDetail';
+import DateRangePicker from '../../../../components/common/DateRangePicker';
 import { useOverlayData } from '../../../../hooks/useOverlayData';
 import { calculateWorktimeFromBookings } from '../../../../utils/bookingUtils';
 import { getAllStagesForGroup, getAllAvrGroups } from '../../../../utils/financialCalculators/avrUtils';
 import { FINANCIAL_BONUS_REGISTRY as BONUS_REGISTRY } from '../../../../config/financialTypeRegistry';
-import AccordionListDetail from '../../../common/AccordionListDetail'; // <-- fix import path
-import DateRangePicker from '../../../../components/common/DateRangePicker';
 
 function AvrExpenseDetail({ financial, onChange, item }) {
   // Load all AVR groups for the group dropdown
@@ -152,8 +151,6 @@ function AvrExpenseDetail({ financial, onChange, item }) {
     });
   };
 
-  // --- NEW: Sync Eintrittsdatum with data item's startdate if not set ---
-  const effectiveStartDate = typeDetails.StartDate || item?.startdate || '';
   // --- NEW: Use calculated working hours unless user overrides ---
   const effectiveWorkingHours = typeDetails.WorkingHours !== undefined && typeDetails.WorkingHours !== ''
     ? typeDetails.WorkingHours
@@ -247,104 +244,140 @@ function AvrExpenseDetail({ financial, onChange, item }) {
   }));
 
   // Summary component for a bonus
-  const BonusSummary = ({ item }) => (
-    <Typography variant="subtitle2">{item.label || item.type}</Typography>
-  );
+  const BonusSummary = ({ item }) => {
+    // Show Gruppe and Stufe in summary if available
+    let gruppe = '';
+    let stufe = '';
+    if (typeDetails.group) {
+      const groupObj = groupOptions.find(opt => String(opt.group_id) === String(typeDetails.group));
+      gruppe = groupObj ? groupObj.group_name : typeDetails.group;
+    }
+    if (typeDetails.stage) {
+      stufe = `Stufe ${typeDetails.stage}`;
+    }
+    return (
+      <Typography variant="subtitle2">
+        {(item.label || item.type)}
+        {gruppe && ` | Gruppe: ${gruppe}`}
+        {stufe && ` | ${stufe}`}
+      </Typography>
+    );
+  };
 
   // Detail component for a bonus
   const BonusDetailComponent = ({ item }) => renderBonusDetail(item);
 
-  return (
-    <Box display="flex" flexDirection="column" gap={2} position="relative">
-      {/* Valid from/to fields */}
-      <Box display="flex" gap={2}>
-        <DateRangePicker
-          value={{ start: financial.valid_from || '', end: financial.valid_to || '' }}
-          onChange={handleDateRangeChange}
-        />
-      </Box>
-      {/* Group selection */}
-      <TextField
-        select
-        label="Gruppe"
-        value={typeof typeDetails.group === 'object' ? '' : typeDetails.group || ''}
-        onChange={e => updateTypeDetails({ group: Number(e.target.value), stage: '' })}
-      >
-        {groupOptions.map(opt => (
-          <MenuItem key={opt.group_id} value={opt.group_id}>
-            {opt.group_name}
-          </MenuItem>
-        ))}
-      </TextField>
-      {/* Stage selection */}
-      <TextField
-        select
-        label="Stufe"
-        value={typeof typeDetails.stage === 'object' ? '' : typeDetails.stage || ''}
-        onChange={e => updateTypeDetails({ stage: Number(e.target.value) })}
-        disabled={!typeDetails.group}
-      >
-        {stageDropdownOptions.map(opt => (
-          <MenuItem key={opt.value} value={opt.value}>
-            {opt.label}
-          </MenuItem>
-        ))}
-      </TextField>
-      {/* Eintrittsdatum as datepicker, synced with data item */}
-      <TextField
-        label="Eintrittsdatum"
-        type="date"
-        value={effectiveStartDate}
-        onChange={e => updateTypeDetails({ StartDate: e.target.value })}
-        InputLabelProps={{ shrink: true }}
-        size="small"
-        sx={{ maxWidth: 180 }}
-      />
-      <TextField
-          label="Enddatum"
-          type="date"
-          value={financial.enddate || ''}
-          onChange={e => updateRootFields({ enddate: e.target.value })}
-          InputLabelProps={{ shrink: true }}
-          size="small"
-          sx={{ maxWidth: 180 }}
-        />
-      {/* NoOfChildren */}
-      <TextField
-        label="Anzahl Kinder"
-        type="number"
-        size="small"
-        value={typeDetails.NoOfChildren || ''}
-        onChange={e => updateTypeDetails({ NoOfChildren: e.target.value })}
-        sx={{ maxWidth: 180 }}
-        inputProps={{ min: 0 }}
-      />
-      {/* Wochenstunden, calculated from bookings */}
-      <TextField
-        label="Wochenstunden"
-        type="number"
-        size="small"
-        value={effectiveWorkingHours}
-        onChange={e => updateTypeDetails({ WorkingHours: e.target.value })}
-        sx={{ maxWidth: 180 }}
-        inputProps={{ min: 0 }}
-        helperText={
-          calculatedWorkingHours !== undefined && calculatedWorkingHours !== ''
-            ? `Berechnet aus Buchungen: ${calculatedWorkingHours} h/Woche`
-            : undefined
-        }
-      />
+  // --- NEW: Handlers for Beschäftigung (Eintritt/Austritt) via DateRangePicker ---
+  const handleEmploymentRangeChange = (range) => {
+    onChange({
+      ...financial,
+      type_details: {
+        ...typeDetails,
+        StartDate: range.start || '',
+        EndDate: range.end || ''
+      }
+    });
+  };
 
-      {/* Bonus-Tabelle */}
+  // Prepare values for DateRangePicker for Beschäftigung
+  const employmentStart = typeDetails.StartDate || '';
+  const employmentEnd = typeDetails.EndDate || '';
+
+  return (
+    <Box display="flex" flexDirection="column" gap={3} position="relative">
+      {/* 2-column layout */}
+      <Box display="flex" flexDirection={{ xs: 'column', md: 'row' }} gap={3}>
+        {/* Left column */}
+        <Box flex={1} display="flex" flexDirection="column" gap={2}>
+          <Box>
+            <Typography fontWeight={700} variant="body2" sx={{ mb: 0.5 }}>Zeitraum</Typography>
+            <DateRangePicker
+              value={{ start: financial.valid_from || '', end: financial.valid_to || '' }}
+              onChange={handleDateRangeChange}
+            />
+          </Box>
+          <Box>
+            <Typography fontWeight={700} variant="body2" sx={{ mb: 0.5 }}>Gruppe</Typography>
+            <TextField
+              select
+              value={typeof typeDetails.group === 'object' ? '' : typeDetails.group || ''}
+              onChange={e => updateTypeDetails({ group: Number(e.target.value), stage: '' })}
+              size="small"
+              sx={{ width: '100%' }}
+            >
+              {groupOptions.map(opt => (
+                <MenuItem key={opt.group_id} value={opt.group_id}>
+                  {opt.group_name}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Box>
+          <Box>
+            <Typography fontWeight={700} variant="body2" sx={{ mb: 0.5 }}>Stufe</Typography>
+            <TextField
+              select
+              value={typeof typeDetails.stage === 'object' ? '' : typeDetails.stage || ''}
+              onChange={e => updateTypeDetails({ stage: Number(e.target.value) })}
+              disabled={!typeDetails.group}
+              size="small"
+              sx={{ width: '100%' }}
+            >
+              {stageDropdownOptions.map(opt => (
+                <MenuItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Box>
+        </Box>
+        {/* Right column */}
+        <Box flex={1} display="flex" flexDirection="column" gap={2}>
+          <Box>
+            <Typography fontWeight={700} variant="body2" sx={{ mb: 0.5 }}>Beschäftigung</Typography>
+            <DateRangePicker
+              value={{ start: employmentStart, end: employmentEnd }}
+              onChange={handleEmploymentRangeChange}
+            />
+          </Box>
+          <Box>
+            <Typography fontWeight={700} variant="body2" sx={{ mb: 0.5 }}>Anzahl Kinder</Typography>
+            <TextField
+              type="number"
+              size="small"
+              value={typeDetails.NoOfChildren || ''}
+              onChange={e => updateTypeDetails({ NoOfChildren: e.target.value })}
+              sx={{ width: '100%' }}
+              inputProps={{ min: 0 }}
+            />
+          </Box>
+          <Box>
+            <Typography fontWeight={700} variant="body2" sx={{ mb: 0.5 }}>Wochenstunden</Typography>
+            <TextField
+              type="number"
+              size="small"
+              value={effectiveWorkingHours}
+              onChange={e => updateTypeDetails({ WorkingHours: e.target.value })}
+              sx={{ width: '100%' }}
+              inputProps={{ min: 0 }}
+              helperText={
+                calculatedWorkingHours !== undefined && calculatedWorkingHours !== ''
+                  ? `Berechnet aus Buchungen: ${calculatedWorkingHours} h/Woche`
+                  : undefined
+              }
+            />
+          </Box>
+        </Box>
+      </Box>
+      {/* Boni section full width */}
       <Box>
-        <Typography variant="subtitle2" sx={{ mb: 1 }}>Boni</Typography>
+        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Boni</Typography>
         <AccordionListDetail
           items={Array.isArray(financial.financial) ? financial.financial : []}
           SummaryComponent={BonusSummary}
           DetailComponent={BonusDetailComponent}
           AddButtonLabel="Bonus hinzufügen"
           onAdd={() => {}} // handled by menu
-          AddButtonProps={{ startIcon: <AddIcon /> }}
+          AddButtonProps={{ startIcon: <AddIcon />, color: "secondary" }}
           AddButtonMenuOptions={addButtonMenuOptions.filter(opt => !opt.disabled)}
           onDelete={handleDeleteBonus}
           emptyText="Keine Boni vorhanden."
