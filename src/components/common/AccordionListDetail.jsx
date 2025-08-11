@@ -55,52 +55,54 @@ function AccordionListDetail({
       {(!items || items.length === 0) ? (
         <Typography variant="body2" color="text.secondary">{emptyText}</Typography>
       ) : (
-        items.map((item, idx) => (
-          <Accordion
-            key={getItemKey(item, idx)}
-            expanded={expandedIdx === idx}
-            onChange={handleAccordionChange(idx)}
-            onMouseEnter={() => setHoveredIdx(idx)}
-            onMouseLeave={() => setHoveredIdx(null)}
-          >
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', position: 'relative' }}>
-                <Box sx={{ flex: 1 }}>
-                  <SummaryComponent item={item} index={idx} />
-                </Box>
-                {onDelete && (
-                  <Box
-                    className="hover-icons"
-                    sx={{
-                      opacity: hoveredIdx === idx ? 1 : 0,
-                      transition: 'opacity 0.2s',
-                      ml: 1,
-                      display: 'flex',
-                      alignItems: 'center'
-                    }}
-                  >
-                    {DeleteButtonComponent
-                      ? <DeleteButtonComponent item={item} index={idx} onDelete={() => onDelete(idx, item)} />
-                      : <IconButton
-                          size="small"
-                          onClick={e => { e.stopPropagation(); onDelete(idx, item); }}
-                          title="Löschen"
-                        >
-                          <DeleteIcon />
-                        </IconButton>
-                    }
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, p:1 }}>
+          {items.map((item, idx) => (
+            <Accordion
+              key={getItemKey(item, idx)}
+              expanded={expandedIdx === idx}
+              onChange={handleAccordionChange(idx)}
+              onMouseEnter={() => setHoveredIdx(idx)}
+              onMouseLeave={() => setHoveredIdx(null)}
+            >
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', position: 'relative' }}>
+                  <Box sx={{ flex: 1 }}>
+                    <SummaryComponent item={item} index={idx} />
                   </Box>
-                )}
-              </Box>
-            </AccordionSummary>
-            <AccordionDetails>
-              <DetailComponent item={item} index={idx} />
-            </AccordionDetails>
-          </Accordion>
-        ))
+                  {onDelete && (
+                    <Box
+                      className="hover-icons"
+                      sx={{
+                        opacity: hoveredIdx === idx ? 1 : 0,
+                        transition: 'opacity 0.2s',
+                        ml: 1,
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}
+                    >
+                      {DeleteButtonComponent
+                        ? <DeleteButtonComponent item={item} index={idx} onDelete={() => onDelete(idx, item)} />
+                        : <IconButton
+                            size="small"
+                            onClick={e => { e.stopPropagation(); onDelete(idx, item); }}
+                            title="Löschen"
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                      }
+                    </Box>
+                  )}
+                </Box>
+              </AccordionSummary>
+              <AccordionDetails>
+                <DetailComponent item={item} index={idx} />
+              </AccordionDetails>
+            </Accordion>
+          ))}
+        </Box>
       )}
       {/* Add button below accordions, left-aligned, with optional menu */}
-      <Box sx={{ display: 'flex', justifyContent: 'flex-start', mt: 2 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'flex-start', ml: 1, mt:2 }}>
         <Button
           variant="outlined"
           size="small"
