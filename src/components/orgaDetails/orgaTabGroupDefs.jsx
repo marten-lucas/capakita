@@ -1,16 +1,111 @@
 import React, { useState } from 'react';
 import {
-  Box, Typography, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
-  IconButton, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Alert, Checkbox, FormControlLabel
+  Box, Typography, Button, IconButton, TextField, Checkbox, FormControlLabel, Chip
 } from '@mui/material';
-import GroupIcon from '@mui/icons-material/Group';
-import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import { useSelector, useDispatch } from 'react-redux';
 import { addGroupDef, updateGroupDef, deleteGroupDef } from '../../store/simGroupSlice';
 import IconPicker from './IconPicker';
 import { useOverlayData } from '../../hooks/useOverlayData';
+import TabbedListDetail from '../common/TabbedListDetail';
+
+function GroupDetail({ item: group }) {
+  const dispatch = useDispatch();
+  const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
+
+  const [form, setForm] = useState(() => ({
+    name: group?.name || '',
+    icon: group?.icon || '👥',
+    IsSchool: !!group?.IsSchool
+  }));
+  const [error, setError] = useState('');
+
+  React.useEffect(() => {
+    setForm({
+      name: group?.name || '',
+      icon: group?.icon || '👥',
+      IsSchool: !!group?.IsSchool
+    });
+    setError('');
+  }, [group]);
+
+  // Save name onBlur
+  const handleTextBlur = () => {
+    if (!form.name.trim()) {
+      setError('Gruppenname ist erforderlich');
+      return;
+    }
+    if (form.name !== group.name) {
+      dispatch(updateGroupDef({ scenarioId: selectedScenarioId, groupId: group.id, updates: { name: form.name } }));
+    }
+    setError('');
+  };
+
+  // Save icon on change
+  const handleIconChange = (icon) => {
+    setForm(f => ({ ...f, icon }));
+    if (icon !== group.icon) {
+      dispatch(updateGroupDef({ scenarioId: selectedScenarioId, groupId: group.id, updates: { icon } }));
+    }
+  };
+
+  // Save IsSchool on change
+  const handleIsSchoolChange = (e) => {
+    const IsSchool = e.target.checked;
+    setForm(f => ({ ...f, IsSchool }));
+    if (IsSchool !== group.IsSchool) {
+      dispatch(updateGroupDef({ scenarioId: selectedScenarioId, groupId: group.id, updates: { IsSchool } }));
+    }
+  };
+
+  return (
+    <Box sx={{ pt: 1, display: 'flex', flexDirection: 'column', gap: 3, maxWidth: 480 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Box
+          sx={{
+            width: 48,
+            height: 48,
+            border: '1px solid',
+            borderColor: 'divider',
+            borderRadius: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '2em',
+            backgroundColor: 'background.paper'
+          }}
+        >
+          {form.icon || '👥'}
+        </Box>
+        <TextField
+          label="Gruppenname"
+          value={form.name}
+          onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+          onBlur={handleTextBlur}
+          fullWidth
+          error={!!error}
+          helperText={error}
+          autoFocus
+        />
+      </Box>
+      <Typography variant="body2" sx={{ mb: 1 }}>Icon auswählen:</Typography>
+      <IconPicker
+        value={form.icon}
+        onChange={handleIconChange}
+      />
+      <FormControlLabel
+        control={
+          <Checkbox
+            checked={!!form.IsSchool}
+            onChange={handleIsSchoolChange}
+          />
+        }
+        label="Schulkind-Gruppe"
+      />
+    </Box>
+  );
+}
 
 function OrgaTabGroupDefs() {
   const dispatch = useDispatch();
@@ -25,7 +120,6 @@ function OrgaTabGroupDefs() {
     if (!selectedScenarioId) return [];
     return state.simGroup.groupDefsByScenario[selectedScenarioId] || [];
   }, (left, right) => {
-    // Custom equality check to prevent re-renders when arrays are equal
     if (left.length !== right.length) return false;
     return left.every((item, index) => item.id === right[index]?.id);
   });
@@ -40,185 +134,61 @@ function OrgaTabGroupDefs() {
     };
   }, [isBasedScenario, baseScenario, currentScenarioDefs]);
 
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingGroup, setEditingGroup] = useState(null);
-  const [groupForm, setGroupForm] = useState({ name: '', icon: '👥', IsSchool: false });
-  const [error, setError] = useState('');
-
-  const handleOpenDialog = (group = null) => {
-    setEditingGroup(group);
-    setGroupForm(group ? { name: group.name, icon: group.icon, IsSchool: !!group.IsSchool } : { name: '', icon: '👥', IsSchool: false });
-    setError('');
-    setDialogOpen(true);
-  };
-
-  const handleCloseDialog = () => {
-    setDialogOpen(false);
-    setEditingGroup(null);
-    setGroupForm({ name: '', icon: '👥', IsSchool: false });
-    setError('');
-  };
-
-  const handleSaveGroup = () => {
-    if (!groupForm.name.trim()) {
-      setError('Gruppenname ist erforderlich');
-      return;
-    }
-    if (editingGroup) {
-      dispatch(updateGroupDef({ scenarioId: selectedScenarioId, groupId: editingGroup.id, updates: groupForm }));
-    } else {
-      dispatch(addGroupDef({
-        scenarioId: selectedScenarioId,
-        groupDef: { ...groupForm, id: Date.now().toString() }
-      }));
-    }
-    handleCloseDialog();
-  };
-
-  // Add this handler for Enter key
-  const handleDialogKeyDown = (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleSaveGroup();
-    }
+  const handleAddGroup = () => {
+    dispatch(addGroupDef({
+      scenarioId: selectedScenarioId,
+      groupDef: { name: '', icon: '👥', IsSchool: false, id: Date.now().toString() }
+    }));
   };
 
   const handleDeleteGroup = (group) => {
     if (window.confirm(`Möchten Sie die Gruppe "${group.name}" wirklich löschen?`)) {
-      // Always delete from current scenario
       dispatch(deleteGroupDef({ scenarioId: selectedScenarioId, groupId: group.id }));
     }
   };
 
   const isAdebisGroup = (group) => /^\d+$/.test(group.id);
 
+  // TabbedListDetail props
+  const items = groupDefs;
+  const ItemTitle = item => item.name || 'Gruppe';
+  const ItemSubTitle = () => ''; // No subtitle
+  const ItemChips = item => item.IsSchool
+    ? <Chip label="Schulkind-Gruppe" color="primary" size="small" sx={{ ml: 1 }} />
+    : null;
+  const ItemAvatar = item => (
+    <span style={{ fontSize: '1.5em', marginRight: 8 }}>{item.icon}</span>
+  );
+  const ItemHoverIcons = item => [
+    {
+      icon: <DeleteIcon fontSize="small" />,
+      title: 'Löschen',
+      onClick: () => handleDeleteGroup(item)
+    }
+  ];
+  const ItemAddButton = {
+    label: 'Neue Gruppe',
+    icon: <AddIcon />,
+    onClick: handleAddGroup,
+    title: 'Gruppen'
+  };
+
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h5">Gruppen verwalten</Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => handleOpenDialog()}
-        >
-          Gruppe hinzufügen
-        </Button>
       </Box>
-      {groupDefs.length === 0 ? (
-        <Alert severity="info">
-          Keine Gruppen definiert. Fügen Sie Gruppen hinzu oder importieren Sie Adebis-Daten.
-        </Alert>
-      ) : (
-        <TableContainer component={Paper}>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Icon</TableCell>
-                <TableCell>Name</TableCell>
-                <TableCell>ID</TableCell>
-                <TableCell>Quelle</TableCell>
-                <TableCell>Schulkind-Gruppe</TableCell>
-                <TableCell align="right">Aktionen</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {groupDefs.map((group) => {
-                const fromBase = isFromBaseScenario(group);
-                return (
-                  <TableRow key={group.id} sx={{ opacity: fromBase ? 0.7 : 1 }}>
-                    <TableCell sx={{ fontSize: '1.5em' }}>{group.icon}</TableCell>
-                    <TableCell>
-                      {group.name}
-                      {fromBase && <Typography variant="caption" color="text.secondary"> (von Basis)</Typography>}
-                    </TableCell>
-                    <TableCell>{group.id}</TableCell>
-                    <TableCell>
-                      {isAdebisGroup(group) ? 'Adebis Import' : 'Manuell erstellt'}
-                    </TableCell>
-                    <TableCell>
-                      <Checkbox checked={!!group.IsSchool} disabled />
-                    </TableCell>
-                    <TableCell align="right">
-                      <IconButton
-                        size="small"
-                        onClick={() => handleOpenDialog(group)}
-                        title="Bearbeiten"
-                      >
-                        <EditIcon />
-                      </IconButton>
-                      <IconButton
-                        size="small"
-                        onClick={() => handleDeleteGroup(group)}
-                        title="Löschen"
-                        color="error"
-                      >
-                        <DeleteIcon />
-                      </IconButton>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      )}
-      <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          {editingGroup ? 'Gruppe bearbeiten' : 'Neue Gruppe hinzufügen'}
-        </DialogTitle>
-        <DialogContent>
-          <Box sx={{ pt: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Box
-                sx={{
-                  width: 48,
-                  height: 48,
-                  border: '1px solid',
-                  borderColor: 'divider',
-                  borderRadius: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '2em',
-                  backgroundColor: 'background.paper'
-                }}
-              >
-                {groupForm.icon || '👥'}
-              </Box>
-              <TextField
-                label="Gruppenname"
-                value={groupForm.name}
-                onChange={(e) => setGroupForm({ ...groupForm, name: e.target.value })}
-                fullWidth
-                error={!!error}
-                helperText={error}
-                autoFocus
-                onKeyDown={handleDialogKeyDown}
-              />
-            </Box>
-            <Typography variant="body2" sx={{ mb: 1 }}>Icon auswählen:</Typography>
-            <IconPicker
-              value={groupForm.icon}
-              onChange={(icon) => setGroupForm(form => ({ ...form, icon }))}
-            />
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={!!groupForm.IsSchool}
-                  onChange={e => setGroupForm(form => ({ ...form, IsSchool: e.target.checked }))}
-                />
-              }
-              label="Schulkind-Gruppe"
-            />
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDialog}>Abbrechen</Button>
-          <Button onClick={handleSaveGroup} variant="contained">
-            {editingGroup ? 'Speichern' : 'Hinzufügen'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <TabbedListDetail
+        items={items}
+        ItemTitle={ItemTitle}
+        ItemSubTitle={ItemSubTitle}
+        ItemChips={ItemChips}
+        ItemAvatar={ItemAvatar}
+        ItemHoverIcons={ItemHoverIcons}
+        ItemAddButton={ItemAddButton}
+        Detail={GroupDetail}
+        emptyText="Keine Gruppen vorhanden."
+      />
     </Box>
   );
 }
