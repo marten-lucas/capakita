@@ -202,7 +202,9 @@ function SimDataGeneralTab() {
   useEffect(() => { setLocalNote(item?.remark ?? ''); }, [item?.remark, selectedItemId]);
   useEffect(() => { setLocalStartDate(item?.startdate ?? ''); }, [item?.startdate, selectedItemId]);
   useEffect(() => { setLocalEndDate(item?.enddate ?? ''); }, [item?.enddate, selectedItemId]);
-  useEffect(() => { setLocalAbsences(Array.isArray(item?.absences) ? item.absences : []); }, [item?.absences, selectedItemId]);
+  useEffect(() => { 
+    setLocalAbsences(Array.isArray(item?.absences) ? item.absences : []); 
+  }, [item?.absences, selectedItemId, JSON.stringify(item?.absences)]);
   useEffect(() => { setLocalDateOfBirth(item?.dateofbirth ?? ''); }, [item?.dateofbirth, selectedItemId]);
 
   // Handlers
@@ -261,7 +263,7 @@ function SimDataGeneralTab() {
   // Handler for adding a new absence
   const handleAddAbsence = () => {
     const absences = Array.isArray(localAbsences) ? localAbsences : [];
-    const newAbsence = { start: '', end: '' };
+    const newAbsence = { start: '', end: '', id: `${selectedItemId}-absence-${Date.now()}-${Math.random().toString(36).slice(2)}` };
     const newList = [...absences, newAbsence];
     setLocalAbsences(newList);
     handleUpdateDataItem({ absences: newList });
@@ -273,18 +275,20 @@ function SimDataGeneralTab() {
     if (updates.range) {
       const { start, end } = updates.range;
       newList = localAbsences.map((a, i) =>
-        i === idx ? { ...a, start, end } : a
+        i === idx ? { ...a, start, end, id: a.id || `${selectedItemId}-absence-${Date.now()}-${Math.random().toString(36).slice(2)}` } : a
       );
     } else {
-      newList = localAbsences.map((a, i) => (i === idx ? { ...a, ...updates } : a));
+      newList = localAbsences.map((a, i) =>
+        i === idx ? { ...a, ...updates, id: a.id || `${selectedItemId}-absence-${Date.now()}-${Math.random().toString(36).slice(2)}` } : a
+      );
     }
     setLocalAbsences(newList);
     handleUpdateDataItem({ absences: newList });
   };
 
-  // Handler for deleting an absence
-  const handleDeleteAbsence = (idx) => {
-    const newList = localAbsences.filter((_, i) => i !== idx);
+  // Handler for deleting an absence by id
+  const handleDeleteAbsence = (absenceId) => {
+    const newList = localAbsences.filter(a => a.id !== absenceId);
     setLocalAbsences(newList);
     handleUpdateDataItem({ absences: newList });
   };
@@ -455,7 +459,7 @@ function SimDataGeneralTab() {
               DetailComponent={AbsenceDetail}
               AddButtonLabel="Abwesenheit hinzufügen"
               onAdd={handleAddAbsence}
-              onDelete={(_, item, idx) => handleDeleteAbsence(idx)}
+              onDelete={(_, item) => handleDeleteAbsence(item.id)}
               emptyText="Keine Abwesenheiten vorhanden."
             />
           </Box>

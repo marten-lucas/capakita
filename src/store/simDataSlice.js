@@ -17,7 +17,11 @@ const simDataSlice = createSlice({
         ...item,
         id: key,
         absences: Array.isArray(item.absences)
-          ? item.absences.map(a => ({ ...a, payType: a.payType || 'fully_paid' }))
+          ? item.absences.map(a => ({
+              ...a,
+              payType: a.payType || 'fully_paid',
+              id: a.id || `${key}-absence-${Math.random().toString(36).slice(2)}`
+            }))
           : [],
       };
     },
@@ -28,12 +32,13 @@ const simDataSlice = createSlice({
       state.dataByScenario[scenarioId][id] = {
         ...state.dataByScenario[scenarioId][id],
         ...updates,
-        // Ensure absences have payType if updated
+        // Ensure absences have payType and id if updated
         ...(updates.absences
           ? {
               absences: updates.absences.map(a => ({
                 ...a,
-                payType: a.payType || 'fully_paid'
+                payType: a.payType || 'fully_paid',
+                id: a.id || `${id}-absence-${Math.random().toString(36).slice(2)}`
               }))
             }
           : {})
@@ -48,7 +53,8 @@ const simDataSlice = createSlice({
         if (key === 'absences' && Array.isArray(value)) {
           item.absences = value.map(a => ({
             ...a,
-            payType: a.payType || 'fully_paid'
+            payType: a.payType || 'fully_paid',
+            id: a.id || `${id}-absence-${Math.random().toString(36).slice(2)}`
           }));
         } else {
           item[key] = value;

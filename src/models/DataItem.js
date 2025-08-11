@@ -42,9 +42,13 @@ export class DataItem {
     this.dateofbirth = dateofbirth;
     this.groupId = groupId;
     this.rawdata = rawdata;
-    // Ensure absences have payType
+    // Ensure absences have payType and id
     this.absences = Array.isArray(absences)
-      ? absences.map(a => ({ ...a, payType: a.payType || 'fully_paid' }))
+      ? absences.map(a => ({
+          ...a,
+          payType: a.payType || 'fully_paid',
+          id: a.id || `${this.id}-absence-${Math.random().toString(36).slice(2)}`
+        }))
       : [];
     Object.assign(this, rest);
   }
