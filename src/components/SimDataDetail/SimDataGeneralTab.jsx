@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Typography, Box, TextField, Button,
   FormControl, RadioGroup, FormControlLabel, Radio
@@ -8,6 +8,157 @@ import QualificationPicker from './QualificationPicker';
 import { useSelector, useDispatch } from 'react-redux';
 import { useOverlayData } from '../../hooks/useOverlayData';
 import { updateDataItemThunk } from '../../store/simDataSlice';
+import AccordionListDetail from '../common/AccordionListDetail';
+
+// --- Tailgrids-style DateRangePicker (minimal, local) ---
+function TailgridDateRangePicker({ value, onChange }) {
+  const [currentDate, setCurrentDate] = useState(() => {
+    if (value?.start) return new Date(value.start);
+    return new Date();
+  });
+  const [selectedStartDate, setSelectedStartDate] = useState(value?.start || null);
+  const [selectedEndDate, setSelectedEndDate] = useState(value?.end || null);
+  const [isOpen, setIsOpen] = useState(false);
+  const datepickerRef = useRef(null);
+
+  useEffect(() => {
+    setSelectedStartDate(value?.start || null);
+    setSelectedEndDate(value?.end || null);
+  }, [value?.start, value?.end]);
+
+  const handleDayClick = (dayString) => {
+    if (!selectedStartDate || (selectedStartDate && selectedEndDate)) {
+      setSelectedStartDate(dayString);
+      setSelectedEndDate(null);
+      onChange({ start: dayString, end: '' });
+    } else {
+      if (new Date(dayString) < new Date(selectedStartDate)) {
+        setSelectedEndDate(selectedStartDate);
+        setSelectedStartDate(dayString);
+        onChange({ start: dayString, end: selectedStartDate });
+      } else {
+        setSelectedEndDate(dayString);
+        onChange({ start: selectedStartDate, end: dayString });
+      }
+    }
+  };
+
+  const renderCalendar = () => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const firstDayOfMonth = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const daysArray = [];
+
+    for (let i = 0; i < firstDayOfMonth; i++) {
+      daysArray.push(<div key={`empty-${i}`}></div>);
+    }
+
+    for (let i = 1; i <= daysInMonth; i++) {
+      const day = new Date(year, month, i);
+      const dayString = day.toISOString().slice(0, 10);
+      let className =
+        "flex h-[32px] w-[32px] items-center justify-center rounded-full hover:bg-gray-200 mb-1 cursor-pointer";
+      if (selectedStartDate && dayString === selectedStartDate) {
+        className += " bg-primary text-white rounded-r-none";
+      }
+      if (selectedEndDate && dayString === selectedEndDate) {
+        className += " bg-primary text-white rounded-l-none";
+      }
+      if (
+        selectedStartDate &&
+        selectedEndDate &&
+        new Date(day) > new Date(selectedStartDate) &&
+        new Date(day) < new Date(selectedEndDate)
+      ) {
+        className += " bg-gray-300 rounded-none";
+      }
+      daysArray.push(
+        <div
+          key={i}
+          className={className}
+          data-date={dayString}
+          onClick={() => handleDayClick(dayString)}
+        >
+          {i}
+        </div>
+      );
+    }
+    return daysArray;
+  };
+
+  const updateInput = () => {
+    if (selectedStartDate && selectedEndDate) {
+      return `${selectedStartDate} - ${selectedEndDate}`;
+    } else if (selectedStartDate) {
+      return selectedStartDate;
+    } else {
+      return "";
+    }
+  };
+
+  const toggleDatepicker = () => setIsOpen((v) => !v);
+
+  return (
+    <Box sx={{ position: 'relative', mb: 1 }}>
+      <TextField
+        label=""
+        value={updateInput()}
+        onClick={toggleDatepicker}
+        size="small"
+        sx={{ width: 220 }}
+        placeholder="Zeitraum wählen"
+        InputProps={{ readOnly: true }}
+      />
+      {isOpen && (
+        <Box
+          ref={datepickerRef}
+          sx={{
+            position: 'absolute',
+            zIndex: 10,
+            bgcolor: 'background.paper',
+            border: '1px solid #eee',
+            borderRadius: 2,
+            boxShadow: 3,
+            p: 2,
+            mt: 1,
+            minWidth: 260,
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+            <Button
+              size="small"
+              onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))}
+            >{"<"}</Button>
+            <Typography variant="body2">
+              {currentDate.toLocaleString("default", { month: "long" })} {currentDate.getFullYear()}
+            </Typography>
+            <Button
+              size="small"
+              onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))}
+            >{">"}</Button>
+          </Box>
+          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', mb: 1 }}>
+            {["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"].map((day) => (
+              <Typography key={day} variant="caption" sx={{ textAlign: 'center' }}>{day}</Typography>
+            ))}
+          </Box>
+          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
+            {renderCalendar()}
+          </Box>
+          <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, mt: 1 }}>
+            <Button size="small" variant="outlined">
+              {selectedStartDate || "Start"}
+            </Button>
+            <Button size="small" variant="outlined">
+              {selectedEndDate || "Ende"}
+            </Button>
+          </Box>
+        </Box>
+      )}
+    </Box>
+  );
+}
 
 function SimDataGeneralTab() {
   // Get scenario and item selection
@@ -107,6 +258,92 @@ function SimDataGeneralTab() {
     }));
   };
 
+  // Handler for adding a new absence
+  const handleAddAbsence = () => {
+    const absences = Array.isArray(localAbsences) ? localAbsences : [];
+    const newAbsence = { start: '', end: '' };
+    const newList = [...absences, newAbsence];
+    setLocalAbsences(newList);
+    handleUpdateDataItem({ absences: newList });
+  };
+
+  // Handler for updating an absence (with TailgridDateRangePicker)
+  const handleUpdateAbsence = (idx, updates) => {
+    let newList;
+    if (updates.range) {
+      const { start, end } = updates.range;
+      newList = localAbsences.map((a, i) =>
+        i === idx ? { ...a, start, end } : a
+      );
+    } else {
+      newList = localAbsences.map((a, i) => (i === idx ? { ...a, ...updates } : a));
+    }
+    setLocalAbsences(newList);
+    handleUpdateDataItem({ absences: newList });
+  };
+
+  // Handler for deleting an absence
+  const handleDeleteAbsence = (idx) => {
+    const newList = localAbsences.filter((_, i) => i !== idx);
+    setLocalAbsences(newList);
+    handleUpdateDataItem({ absences: newList });
+  };
+
+  // Absence summary and detail components for AccordionListDetail
+  const AbsenceSummary = ({ item }) => {
+    let workdays = 0;
+    if (item.start && item.end) {
+      const start = new Date(item.start);
+      const end = new Date(item.end);
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        const day = d.getDay();
+        if (day >= 1 && day <= 5) workdays++;
+      }
+    }
+    return (
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Typography variant="body2">
+          {item.start || 'von'} - {item.end || 'bis'}
+        </Typography>
+        <Typography variant="body2" sx={{ minWidth: 80 }}>
+          {workdays > 0 ? `${workdays} Arbeitstage` : ''}
+        </Typography>
+        <Typography variant="body2">
+          {item.payType === 'limited_paid' && 'Lohnfortzahlung'}
+          {item.payType === 'fully_paid' && 'Voll bezahlt'}
+          {item.payType === 'unpaid' && 'Unbezahlt'}
+        </Typography>
+      </Box>
+    );
+  };
+
+  const AbsenceDetail = ({ item, index }) => (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+      <TailgridDateRangePicker
+        value={{ start: item.start, end: item.end }}
+        onChange={range => handleUpdateAbsence(index, { range })}
+      />
+      <FormControl component="fieldset" sx={{ ml: 2 }}>
+        <RadioGroup
+          row
+          value={item.payType || 'fully_paid'}
+          onChange={e => handleUpdateAbsence(index, { payType: e.target.value })}
+        >
+          <FormControlLabel value="limited_paid" control={<Radio size="small" />} label="Lohnfortzahlung" />
+          <FormControlLabel value="fully_paid" control={<Radio size="small" />} label="Voll bezahlt" />
+          <FormControlLabel value="unpaid" control={<Radio size="small" />} label="Unbezahlt" />
+        </RadioGroup>
+      </FormControl>
+    </Box>
+  );
+
+  // For main "Anwesenheit" (presence) range
+  const handleMainRangeChange = (range) => {
+    setLocalStartDate(range.start || '');
+    setLocalEndDate(range.end || '');
+    handleUpdateDataItem({ startdate: range.start || '', enddate: range.end || '' });
+  };
+
   // Guard: If item is null, show a placeholder and return
   if (!item) {
     return (
@@ -178,31 +415,10 @@ function SimDataGeneralTab() {
       {/* Zeitraum */}
       <Box sx={{ mb: 2 }}>
         <Typography variant="body2" sx={{ mt: 1, mb: 1.5 }}>Anwesenheit</Typography>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <TextField
-            label="von"
-            type="date"
-            size="small"
-            InputLabelProps={{ shrink: true }}
-            value={localStartDate}
-            onChange={(e) => {
-              setLocalStartDate(e.target.value);
-              handleUpdateDataItem({ startdate: e.target.value });
-            }}
-            sx={{ width: 150 }}
-          />
-          <Typography variant="body2" sx={{ minWidth: 24, textAlign: 'center' }}>bis</Typography>
-          <TextField
-            label="bis"
-            type="date"
-            size="small"
-            InputLabelProps={{ shrink: true }}
-            value={localEndDate}
-            onChange={(e) => {
-              setLocalEndDate(e.target.value);
-              handleUpdateDataItem({ enddate: e.target.value });
-            }}
-            sx={{ width: 150 }}
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <TailgridDateRangePicker
+            value={{ start: localStartDate, end: localEndDate }}
+            onChange={handleMainRangeChange}
           />
         </Box>
       </Box>
@@ -221,103 +437,18 @@ function SimDataGeneralTab() {
 
       {/* Abwesenheiten */}
       <Box sx={{ mt: 4, mb: 2 }}>
-        <Button
-          variant="outlined"
-          size="small"
-          onClick={() => {
-            const absences = Array.isArray(localAbsences) ? localAbsences : [];
-            const newAbsence = { start: '', end: '' };
-            const newList = [...absences, newAbsence];
-            setLocalAbsences(newList);
-            handleUpdateDataItem({ absences: newList });
-          }}
-          sx={{ mb: 1 }}
-        >
-          Abwesenheit hinzufügen
-        </Button>
-        {localAbsences && localAbsences.length > 0 && (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            {localAbsences.map((absence, idx) => {
-              let workdays = 0;
-              if (absence.start && absence.end) {
-                const start = new Date(absence.start);
-                const end = new Date(absence.end);
-                for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-                  const day = d.getDay();
-                  if (day >= 1 && day <= 5) workdays++;
-                }
-              }
-              return (
-                <Box key={idx} sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                  <TextField
-                    label="von"
-                    type="date"
-                    size="small"
-                    InputLabelProps={{ shrink: true }}
-                    value={absence.start}
-                    onChange={(e) => {
-                      const newAbsence = { ...absence, start: e.target.value };
-                      const newList = localAbsences.map((a, i) => (i === idx ? newAbsence : a));
-                      setLocalAbsences(newList);
-                      handleUpdateDataItem({ absences: newList });
-                    }}
-                    sx={{ width: 130 }}
-                    inputProps={{ min: new Date().toISOString().split('T')[0] }}
-                  />
-                  <Typography variant="body2" sx={{ minWidth: 24, textAlign: 'center' }}>bis</Typography>
-                  <TextField
-                    label="bis"
-                    type="date"
-                    size="small"
-                    InputLabelProps={{ shrink: true }}
-                    value={absence.end}
-                    onChange={(e) => {
-                      const newAbsence = { ...absence, end: e.target.value };
-                      const newList = localAbsences.map((a, i) => (i === idx ? newAbsence : a));
-                      setLocalAbsences(newList);
-                      handleUpdateDataItem({ absences: newList });
-                    }}
-                    sx={{ width: 130 }}
-                    inputProps={{ min: new Date().toISOString().split('T')[0] }}
-                  />
-                  <Typography variant="body2" sx={{ minWidth: 80 }}>
-                    {workdays > 0 ? `${workdays} Arbeitstage` : ''}
-                  </Typography>
-                  {/* Pay type radio group */}
-                  <FormControl component="fieldset" sx={{ ml: 2 }}>
-                    <RadioGroup
-                      row
-                      value={absence.payType || 'fully_paid'}
-                      onChange={e => {
-                        const newAbsence = { ...absence, payType: e.target.value };
-                        const newList = localAbsences.map((a, i) => (i === idx ? newAbsence : a));
-                        setLocalAbsences(newList);
-                        handleUpdateDataItem({ absences: newList });
-                      }}
-                    >
-                      <FormControlLabel value="limited_paid" control={<Radio size="small" />} label="Lohnfortzahlung" />
-                      <FormControlLabel value="fully_paid" control={<Radio size="small" />} label="Voll bezahlt" />
-                      <FormControlLabel value="unpaid" control={<Radio size="small" />} label="Unbezahlt" />
-                    </RadioGroup>
-                  </FormControl>
-                  <Button
-                    variant="outlined"
-                    color="error"
-                    size="small"
-                    onClick={() => {
-                      const newList = localAbsences.filter((_, i) => i !== idx);
-                      setLocalAbsences(newList);
-                      handleUpdateDataItem({ absences: newList });
-                    }}
-                    sx={{ ml: 1 }}
-                  >
-                    Entfernen
-                  </Button>
-                </Box>
-              );
-            })}
-          </Box>
-        )}
+        <Typography variant="body2" sx={{ mb: 1 }}>
+          Abwesenheit
+        </Typography>
+        <AccordionListDetail
+          items={localAbsences}
+          SummaryComponent={AbsenceSummary}
+          DetailComponent={AbsenceDetail}
+          AddButtonLabel="Abwesenheit hinzufügen"
+          onAdd={handleAddAbsence}
+          onDelete={(_, item, idx) => handleDeleteAbsence(idx)}
+          emptyText="Keine Abwesenheiten vorhanden."
+        />
       </Box>
     </Box>
   );
