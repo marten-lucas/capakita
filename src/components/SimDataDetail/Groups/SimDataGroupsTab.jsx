@@ -75,7 +75,7 @@ function SimDataGroupsTab() {
         items={groups}
         SummaryComponent={GroupCards}
         DetailComponent={({ item, index }) => <GroupDetail group={item} index={index} />}
-        AddButtonLabel="Gruppe hinzufügen"
+        AddButtonLabel="Gruppe zuweisen"
         onAdd={handleAddGroup}
         onDelete={handleDeleteGroup}
         AddButtonProps={{ startIcon: <AddIcon /> }}

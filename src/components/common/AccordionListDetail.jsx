@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Accordion, AccordionSummary, AccordionDetails, Typography, Button, IconButton } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import DeleteIcon from '@mui/icons-material/Delete';
 
 function AccordionListDetail({
   items = [],
@@ -35,16 +36,7 @@ function AccordionListDetail({
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
-        <Button
-          variant="outlined"
-          size="small"
-          onClick={onAdd}
-          {...AddButtonProps}
-        >
-          {AddButtonLabel}
-        </Button>
-      </Box>
+      {/* Accordions */}
       {(!items || items.length === 0) ? (
         <Typography variant="body2" color="text.secondary">{emptyText}</Typography>
       ) : (
@@ -62,9 +54,13 @@ function AccordionListDetail({
                 {onDelete && (
                   DeleteButtonComponent
                     ? <DeleteButtonComponent item={item} index={idx} onDelete={() => onDelete(idx, item)} />
-                    : <IconButton size="small" onClick={e => { e.stopPropagation(); onDelete(idx, item); }}>
-                        {/* Default delete icon */}
-                        <span role="img" aria-label="delete">🗑️</span>
+                    : <IconButton
+                        size="small"
+                        onClick={e => { e.stopPropagation(); onDelete(idx, item); }}
+                        title="Löschen"
+                        sx={{ ml: 1 }}
+                      >
+                        <DeleteIcon />
                       </IconButton>
                 )}
               </Box>
@@ -75,6 +71,17 @@ function AccordionListDetail({
           </Accordion>
         ))
       )}
+      {/* Add button below accordions, left-aligned */}
+      <Box sx={{ display: 'flex', justifyContent: 'flex-start', mt: 2 }}>
+        <Button
+          variant="outlined"
+          size="small"
+          onClick={onAdd}
+          {...AddButtonProps}
+        >
+          {AddButtonLabel}
+        </Button>
+      </Box>
     </Box>
   );
 }
