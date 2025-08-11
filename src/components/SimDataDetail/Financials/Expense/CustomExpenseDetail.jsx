@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Box, TextField } from '@mui/material';
+import DateRangePicker from '../../../../components/common/DateRangePicker';
 
 function CustomExpenseDetail({ financial, onChange }) {
   // Extract type_details for editing
@@ -37,29 +38,26 @@ function CustomExpenseDetail({ financial, onChange }) {
     });
   };
 
+  // Handler for updating both valid_from and valid_to via DateRangePicker
+  const handleDateRangeChange = (range) => {
+    setLocalValues(prev => ({
+      ...prev,
+      valid_from: range.start || '',
+      valid_to: range.end || ''
+    }));
+    updateRootFields({
+      valid_from: range.start || '',
+      valid_to: range.end || ''
+    });
+  };
+
   return (
     <Box display="flex" flexDirection="column" gap={2}>
       {/* Valid from/to fields */}
       <Box display="flex" gap={2}>
-        <TextField
-          label="Gültig von"
-          type="date"
-          value={localValues.valid_from}
-          onChange={e => setLocalValues(prev => ({ ...prev, valid_from: e.target.value }))}
-          onBlur={e => updateRootFields({ valid_from: e.target.value })}
-          InputLabelProps={{ shrink: true }}
-          size="small"
-          sx={{ maxWidth: 180 }}
-        />
-        <TextField
-          label="Gültig bis"
-          type="date"
-          value={localValues.valid_to}
-          onChange={e => setLocalValues(prev => ({ ...prev, valid_to: e.target.value }))}
-          onBlur={e => updateRootFields({ valid_to: e.target.value })}
-          InputLabelProps={{ shrink: true }}
-          size="small"
-          sx={{ maxWidth: 180 }}
+        <DateRangePicker
+          value={{ start: localValues.valid_from, end: localValues.valid_to }}
+          onChange={handleDateRangeChange}
         />
       </Box>
 

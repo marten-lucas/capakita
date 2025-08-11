@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { Box, Typography, IconButton, Button, RadioGroup, FormControlLabel, Radio, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField } from '@mui/material';
 import { useSelector } from 'react-redux';
 import { useOverlayData } from '../../../../hooks/useOverlayData';
+import DateRangePicker from '../../../../components/common/DateRangePicker';
 
 function FeeIncomeDetail({ financial, onChange, onDelete, item }) {
   // Get effective financial defs and group assignments
@@ -45,6 +46,14 @@ function FeeIncomeDetail({ financial, onChange, onDelete, item }) {
     });
   };
 
+  // Handler for updating both valid_from and valid_to via DateRangePicker
+  const handleDateRangeChange = (range) => {
+    updateRootFields({
+      valid_from: range.start || '',
+      valid_to: range.end || ''
+    });
+  };
+
   // Only show financialDefs that have a fee_group for the current groupRef
   const matchingDefs = financialDefs.filter(def =>
     Array.isArray(def.fee_sets) && def.fee_sets.some(g => g.groupref === groupRef)
@@ -68,23 +77,9 @@ function FeeIncomeDetail({ financial, onChange, onDelete, item }) {
     <Box display="flex" flexDirection="column" gap={2} position="relative">
       {/* Valid from/to fields */}
       <Box display="flex" gap={2}>
-        <TextField
-          label="Gültig von"
-          type="date"
-          value={financial.valid_from || ''}
-          onChange={e => updateRootFields({ valid_from: e.target.value })}
-          InputLabelProps={{ shrink: true }}
-          size="small"
-          sx={{ maxWidth: 180 }}
-        />
-        <TextField
-          label="Gültig bis"
-          type="date"
-          value={financial.valid_to || ''}
-          onChange={e => updateRootFields({ valid_to: e.target.value })}
-          InputLabelProps={{ shrink: true }}
-          size="small"
-          sx={{ maxWidth: 180 }}
+        <DateRangePicker
+          value={{ start: financial.valid_from || '', end: financial.valid_to || '' }}
+          onChange={handleDateRangeChange}
         />
       </Box>
 

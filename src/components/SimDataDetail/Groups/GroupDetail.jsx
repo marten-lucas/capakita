@@ -8,6 +8,7 @@ import { convertDDMMYYYYtoYYYYMMDD } from '../../../utils/dateUtils';
 import { useSelector, useDispatch } from 'react-redux';
 import { getBookings } from '../../../store/simBookingSlice';
 import { useOverlayData } from '../../../hooks/useOverlayData';
+import DateRangePicker from '../../common/DateRangePicker';
 
 const EMPTY_GROUP_DEFS = [];
 
@@ -139,11 +140,6 @@ function GroupDetail({ group }) {
 
   // Handler to delete group in store
 
-  const handleDateChange = (field, value) => {
-    // value from date picker is always YYYY-MM-DD, store as such
-    const updatedGroup = { ...group, [field]: value };
-    handleUpdateGroup(updatedGroup);
-  };
 
 
   // Restore für Gruppen-ID
@@ -202,30 +198,25 @@ function GroupDetail({ group }) {
     return '';
   };
 
+  // Handler for updating both start and end via DateRangePicker
+  const handleDateRangeChange = (range) => {
+    handleUpdateGroup({
+      ...group,
+      start: range.start || '',
+      end: range.end || ''
+    });
+  };
+
   if (!group) return null;
 
   return (
     <Box sx={{ mb: 2 }}>
-
       {/* Start/Enddatum section at the top */}
       <Box display="flex" gap={2} sx={{ mb: 2, alignItems: 'center' }}>
-        <Typography>gültig von</Typography>
-        <TextField
-          label="Startdatum"
-          type="date"
-          size="small"
-          InputLabelProps={{ shrink: true }}
-          value={getDatePickerValue(group.start)}
-          onChange={(e) => handleDateChange('start', e.target.value)}
-        />
-        <Typography>bis</Typography>
-        <TextField
-          label="Enddatum"
-          type="date"
-          size="small"
-          InputLabelProps={{ shrink: true }}
-          value={getDatePickerValue(group.end)}
-          onChange={(e) => handleDateChange('end', e.target.value)}
+        <Typography>gültig von/bis</Typography>
+        <DateRangePicker
+          value={{ start: getDatePickerValue(group.start), end: getDatePickerValue(group.end) }}
+          onChange={handleDateRangeChange}
         />
       </Box>
       {/* Group Selection Section */}

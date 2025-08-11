@@ -7,6 +7,7 @@ import { calculateWorktimeFromBookings } from '../../../../utils/bookingUtils';
 import { getAllStagesForGroup, getAllAvrGroups } from '../../../../utils/financialCalculators/avrUtils';
 import { FINANCIAL_BONUS_REGISTRY as BONUS_REGISTRY } from '../../../../config/financialTypeRegistry';
 import AccordionListDetail from '../../../common/AccordionListDetail'; // <-- fix import path
+import DateRangePicker from '../../../../components/common/DateRangePicker';
 
 function AvrExpenseDetail({ financial, onChange, item }) {
   // Load all AVR groups for the group dropdown
@@ -122,6 +123,14 @@ function AvrExpenseDetail({ financial, onChange, item }) {
     onChange({
       ...financial,
       ...updates
+    });
+  };
+
+  // Handler for updating both valid_from and valid_to via DateRangePicker
+  const handleDateRangeChange = (range) => {
+    updateRootFields({
+      valid_from: range.start || '',
+      valid_to: range.end || ''
     });
   };
 
@@ -249,25 +258,10 @@ function AvrExpenseDetail({ financial, onChange, item }) {
     <Box display="flex" flexDirection="column" gap={2} position="relative">
       {/* Valid from/to fields */}
       <Box display="flex" gap={2}>
-        <TextField
-          label="Gültig von"
-          type="date"
-          value={financial.valid_from || ''}
-          onChange={e => updateRootFields({ valid_from: e.target.value })}
-          InputLabelProps={{ shrink: true }}
-          size="small"
-          sx={{ maxWidth: 180 }}
+        <DateRangePicker
+          value={{ start: financial.valid_from || '', end: financial.valid_to || '' }}
+          onChange={handleDateRangeChange}
         />
-        <TextField
-          label="Gültig bis"
-          type="date"
-          value={financial.valid_to || ''}
-          onChange={e => updateRootFields({ valid_to: e.target.value })}
-          InputLabelProps={{ shrink: true }}
-          size="small"
-          sx={{ maxWidth: 180 }}
-        />
-        
       </Box>
       {/* Group selection */}
       <TextField

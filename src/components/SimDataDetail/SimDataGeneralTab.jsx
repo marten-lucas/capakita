@@ -9,6 +9,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { useOverlayData } from '../../hooks/useOverlayData';
 import { updateDataItemThunk } from '../../store/simDataSlice';
 import AccordionListDetail from '../common/AccordionListDetail';
+import DateRangePicker from '../common/DateRangePicker';
 
 // --- Tailgrids-style DateRangePicker (minimal, local) ---
 function TailgridDateRangePicker({ value, onChange }) {
@@ -324,7 +325,7 @@ function SimDataGeneralTab() {
 
   const AbsenceDetail = ({ item, index }) => (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-      <TailgridDateRangePicker
+      <DateRangePicker
         value={{ start: item.start, end: item.end }}
         onChange={range => handleUpdateAbsence(index, { range })}
       />
@@ -426,7 +427,7 @@ function SimDataGeneralTab() {
           <Box>
             <Typography variant="body2" sx={{ mt: 1, mb: 0.5, fontWeight: 700 }}>Anwesenheit</Typography>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <TailgridDateRangePicker
+              <DateRangePicker
                 value={{ start: localStartDate, end: localEndDate }}
                 onChange={handleMainRangeChange}
               />
