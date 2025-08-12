@@ -1,34 +1,14 @@
 import React, { useEffect } from 'react';
-import { Box, Typography, IconButton, Button, RadioGroup, FormControlLabel, Radio, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField } from '@mui/material';
+import { Box, Typography, RadioGroup, FormControlLabel, Radio } from '@mui/material';
 import { useSelector } from 'react-redux';
-import { useOverlayData } from '../../../../hooks/useOverlayData';
 import DateRangePicker from '../../../../components/common/DateRangePicker';
 
-function FeeIncomeDetail({ financial, onChange, item }) {
-  // Get effective financial defs and group assignments
-  const { getEffectiveGroupAssignments } = useOverlayData();
-  const groupAssignments = getEffectiveGroupAssignments(item.id);
+function FeeIncomeDetail({ financial, onChange }) {
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const financialDefs = useSelector(state => state.simFinancials.financialDefsByScenario[selectedScenarioId]) || [];
 
-  // Use type_details for group_ref and financialDefId
+  // Defensive: ensure type_details is always an object
   const typeDetails = financial.type_details || {};
-
-  // Find groupRef from type_details or group assignments (first active group)
-  const now = new Date().toISOString().slice(0, 10);
-  let groupRef = typeDetails.group_ref;
-  if (!groupRef) {
-    if (groupAssignments) {
-      const activeAssignment = Object.values(groupAssignments).find(a => {
-        const startOk = !a.start || a.start <= now;
-        const endOk = !a.end || !a.end || a.end >= now;
-        return startOk && endOk;
-      });
-      groupRef = activeAssignment?.groupId || item.groupId || null;
-    } else {
-      groupRef = item.groupId || null;
-    }
-  }
 
   // Handler for updating type_details
   const updateTypeDetails = (updates) => {
@@ -54,24 +34,16 @@ function FeeIncomeDetail({ financial, onChange, item }) {
     });
   };
 
-  // Only show financialDefs that have a fee_group for the current groupRef
-  const matchingDefs = financialDefs.filter(def =>
-    Array.isArray(def.fee_sets) && def.fee_sets.some(g => g.groupref === groupRef)
-  );
-
   // Auto-select the first available option if none is selected
   useEffect(() => {
     if (
-      matchingDefs.length > 0 &&
-      (!typeDetails.financialDefId || !matchingDefs.some(def => def.id === typeDetails.financialDefId))
+      financialDefs.length > 0 &&
+      (!typeDetails.financialDefId || !financialDefs.some(def => def.id === typeDetails.financialDefId))
     ) {
-      onChange({
-        ...financial,
-        type_details: { ...typeDetails, financialDefId: matchingDefs[0].id }
-      });
+      updateTypeDetails({ financialDefId: financialDefs[0].id });
     }
     // eslint-disable-next-line
-  }, [matchingDefs.length]);
+  }, [financialDefs.length, typeDetails.financialDefId]);
 
   return (
     <Box display="flex" flexDirection="column" gap={2} position="relative">
@@ -83,30 +55,31 @@ function FeeIncomeDetail({ financial, onChange, item }) {
         />
       </Box>
 
-      <Typography variant="body2" sx={{ fontWeight: 700, mb: 0.5 }}>Beitragsordnung</Typography>
+      <Typography variant="body2" sx={{ fontWeight: 700, mb: 0.5 }}>
+        Beitragsordnung
+      </Typography>
 
       <RadioGroup
         value={typeDetails.financialDefId || ''}
         onChange={e => updateTypeDetails({ financialDefId: e.target.value })}
       >
-        {matchingDefs.length === 0 && (
+        {financialDefs.length === 0 && (
           <Typography variant="caption" color="error">
-            Keine passende Beitragsordnung gefunden.
+            Keine Beitragsordnung gefunden.
           </Typography>
         )}
-        {matchingDefs.map(def => (
+        {financialDefs.map(def => (
           <FormControlLabel
             key={def.id}
             value={def.id}
             control={<Radio />}
-            label={def.description || def.id}
+            label={def.description || def.name || def.id}
           />
         ))}
       </RadioGroup>
-
-
     </Box>
   );
 }
 
 export default FeeIncomeDetail;
+   

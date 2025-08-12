@@ -49,6 +49,9 @@ function TabbedListDetail({
   const selectedIndex = items.findIndex(item => item.id === selectedId);
   const selectedItem = selectedIndex !== -1 ? items[selectedIndex] : null;
 
+  // Fix: Ensure Tabs value is always a valid index
+  const tabsValue = items.length === 0 ? false : (selectedIndex === -1 ? 0 : selectedIndex);
+
   // Use the variable so the linter does not warn
   const _satisfyLinter = DetailComponent;
 
@@ -108,7 +111,7 @@ function TabbedListDetail({
               <Tabs
                 orientation="vertical"
                 variant="fullWidth"
-                value={selectedIndex}
+                value={tabsValue}
                 onChange={(_, idx) => {
                   const id = items[idx]?.id;
                   if (id) handleSelect(id);

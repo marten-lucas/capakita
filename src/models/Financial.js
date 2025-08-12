@@ -25,74 +25,133 @@
  * // ...add other properties as needed
  */
 
-
 /**
  * Financial model class
  */
 export class Financial {
-  // Static type_details definitions for registry reference
-  static typeDetailsDefinitions = {
-    'expense-avr': {
-      group: { type: 'number', required: true },
-      stage: { type: 'number', required: true },
-      startDate: { type: 'string', required: false },
-      endDate: { type: 'string', required: false },
-      NoOfChildren: { type: 'number', required: false },
-      // ...other AVR-specific fields...
-    },
-    'expense-custom': {
-      Amount: { type: 'number', required: true },
-    },
-    'income-fee': {
-      financialDefId: { type: 'string', required: true },
-      groupRef: { type: 'string', required: false },
-      // ...other fee-specific fields...
-    },
-    'income-baykibig': {
-      // For now, no required fields. Add more as needed.
-    },
-    'bonus-yearly': {
-      payable: { type: 'string', required: true },
-      due_month: { type: 'number', required: true },
-      continue_on_absence: { type: 'boolean', required: false },
-      base_month_average: { type: 'array', required: false },
-      percentage: { type: 'array', required: false },
-      reduce_parttime: { type: 'boolean', required: false },
-      reduce_partyear: { type: 'boolean', required: false },
-      // ...other bonus fields...
-    },
-    // ...add definitions for other types...
-  };
-
   constructor({
     id,
-    dataItemId,
-    parentId = '', // Optional parent reference for hierarchical financials
-    type = '', // e.g. avr, fee, etc.
-    name = '',
+    type = '',
+    label = '',
+    amount = '',
+    from = '',
+    to = '',
+    note = '',
     valid_from = '',
     valid_to = '',
-    type_details = {}, // User-editable fields
-    financial = [],    // Stacked financials (e.g. bonuses)
-    payments = [], // Array of Payment objects
+    type_details = {},
     ...rest
   }) {
     this.id = String(id);
-    this.dataItemId = String(dataItemId);
-    // Only set parentId if parent type starts with "expense-"
-    if (rest.parentType && typeof rest.parentType === 'string' && rest.parentType.startsWith('expense-')) {
-      this.parentId = String(parentId);
-    } else {
-      this.parentId = '';
-    }
     this.type = type;
-    this.name = name;
+    this.label = label;
+    this.amount = amount;
+    this.from = from;
+    this.to = to;
+    this.note = note;
     this.valid_from = valid_from;
     this.valid_to = valid_to;
-    this.type_details = type_details;
-    this.payments = Array.isArray(payments) ? payments : [];
-    this.financial = Array.isArray(financial) ? financial : [];
+    // Defensive: ensure type_details is always an object
+    this.type_details = type_details && typeof type_details === 'object' ? { ...type_details } : {};
     Object.assign(this, rest);
   }
+
+
+  initializeTypeDetails(type, existingDetails = {}) {
+    const defaultDetails = Financial.getDefaultTypeDetails(type);
+    
+    // If existingDetails is empty or invalid, return defaults
+    if (!existingDetails || typeof existingDetails !== 'object') {
+      return { ...defaultDetails };
+    }
+    
+    // Merge existing details with defaults, ensuring we have actual values not schemas
+    const merged = { ...defaultDetails };
+    
+    Object.keys(existingDetails).forEach(key => {
+      const value = existingDetails[key];
+      // If value is a schema object (has type, required, label properties), skip it
+      if (value && typeof value === 'object' && 
+          (Object.prototype.hasOwnProperty.call(value, 'type') || 
+           Object.prototype.hasOwnProperty.call(value, 'required') || 
+           Object.prototype.hasOwnProperty.call(value, 'label'))) {
+        // This is a schema definition, use default value instead
+        merged[key] = defaultDetails[key] !== undefined ? defaultDetails[key] : '';
+      } else {
+        // This is an actual value, use it
+        merged[key] = value;
+      }
+    });
+    
+    return merged;
+  }
+
+  static getDefaultTypeDetails(type) {
+    const defaults = {
+      'income-fee': {
+        financialDefId: '',
+        group_ref: ''
+      },
+      'expense-avr': {
+        employeeId: '',
+        payGrade: '',
+        workingHours: 0
+      },
+      'expense-custom': {
+        customAmount: 0,
+        description: ''
+      },
+      'income-baykibig': {
+        fundingType: '',
+        ratePerChild: 0
+      },
+      'bonus-yearly': {
+        bonusAmount: 0,
+        paymentMonth: 12
+      },
+      'bonus-children': {
+        bonusPerChild: 0,
+        maxChildren: 0
+      },
+      'bonus-instructor': {
+        bonusAmount: 0,
+        instructorLevel: ''
+      }
+    };
+    
+    return defaults[type] || {};
+  }
+
+  static typeDetailsDefinitions = {
+    'income-fee': {
+      financialDefId: { type: 'string', required: true, label: 'Beitragsordnung' },
+      group_ref: { type: 'string', required: false, label: 'Gruppenreferenz' }
+    },
+    'expense-avr': {
+      employeeId: { type: 'string', required: true, label: 'Mitarbeiter' },
+      payGrade: { type: 'string', required: true, label: 'Entgeltgruppe' },
+      workingHours: { type: 'number', required: true, label: 'Arbeitszeit' }
+    },
+    'expense-custom': {
+      customAmount: { type: 'number', required: true, label: 'Betrag' },
+      description: { type: 'string', required: false, label: 'Beschreibung' }
+    },
+    'income-baykibig': {
+      fundingType: { type: 'string', required: true, label: 'Förderart' },
+      ratePerChild: { type: 'number', required: true, label: 'Satz pro Kind' }
+    },
+    'bonus-yearly': {
+      bonusAmount: { type: 'number', required: true, label: 'Bonushöhe' },
+      paymentMonth: { type: 'number', required: true, label: 'Auszahlungsmonat' }
+    },
+    'bonus-children': {
+      bonusPerChild: { type: 'number', required: true, label: 'Bonus pro Kind' },
+      maxChildren: { type: 'number', required: false, label: 'Max. Kinder' }
+    },
+    'bonus-instructor': {
+      bonusAmount: { type: 'number', required: true, label: 'Bonushöhe' },
+      instructorLevel: { type: 'string', required: true, label: 'Anleiterstufe' }
+    }
+  };
 }
 
