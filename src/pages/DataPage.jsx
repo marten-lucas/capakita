@@ -9,12 +9,10 @@ import {
   Button, 
 } from '@mui/material';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
-import SaveIcon from '@mui/icons-material/Save';
-import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 import DataImportModal from '../components/modals/DataImportModal';
 import SimDataList from '../components/SimDataDetail/SimDataList';
 import { useSelector, useDispatch } from 'react-redux';
-import { setSelectedScenarioId, addScenario, isSaveAllowed, setSaveDialogOpen, setLoadDialogOpen } from '../store/simScenarioSlice';
+import { setSelectedScenarioId, addScenario } from '../store/simScenarioSlice';
 import { addDataItemAndSelect } from '../store/simDataSlice';
 import ScenarioSaveDialog from '../components/modals/ScenarioSaveDialog';
 import ScenarioLoadDialog from '../components/modals/ScenarioLoadDialog';
@@ -28,7 +26,6 @@ function DataPage() {
   const [modalOpen, setModalOpen] = useState(false);
 
   const dispatch = useDispatch();
-  const isSaveAllowedValue = useSelector(isSaveAllowed);
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const scenarios = useSelector(state => state.simScenario.scenarios);
   
@@ -48,9 +45,6 @@ function DataPage() {
     // Dialog will be closed by the component itself
   };
 
-  const handleOpenModal = () => {
-    setModalOpen(true);
-  };
 
   const handleCloseModal = () => {
     setModalOpen(false);
@@ -79,22 +73,6 @@ function DataPage() {
           baseScenarioId: selectedScenarioId || null
         }));
       }
-    },
-    {
-      icon: <FileUploadIcon />,
-      name: 'Import',
-      onClick: handleOpenModal
-    },
-    {
-      icon: <SaveIcon />,
-      name: 'Speichern',
-      onClick: () => dispatch(setSaveDialogOpen(true)),
-      disabled: !isSaveAllowedValue
-    },
-    {
-      icon: <FolderOpenIcon />,
-      name: 'Laden',
-      onClick: () => dispatch(setLoadDialogOpen(true))
     }
   ];
 

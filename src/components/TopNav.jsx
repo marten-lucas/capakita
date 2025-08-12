@@ -140,11 +140,11 @@ function TopNav() {
             >
               <MenuItem onClick={handleImportClick}>
                 <FileUploadIcon sx={{ mr: 1 }} />
-                Importieren
+                Adebis-Daten importieren
               </MenuItem>
               <MenuItem onClick={handleLoadClick}>
                 <FolderOpenIcon sx={{ mr: 1 }} />
-                Laden
+                Szenarien laden
               </MenuItem>
               <MenuItem
                 onClick={handleSaveClick}

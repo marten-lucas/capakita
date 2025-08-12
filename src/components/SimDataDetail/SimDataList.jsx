@@ -83,8 +83,8 @@ function SimDataList() {
     const assignments = groupAssignments ? Object.values(groupAssignments) : [];
     const groupAssignment = assignments.length === 0 ? null : assignments.find(a => !a.end) || assignments[0];
     const groupDef = groupAssignment ? getGroupDef(groupAssignment.groupId) : null;
-    const DEMAND_COLOR = '#c0d9f3ff';
-    const CAPACITY_COLOR = '#a3c7a5ff';
+    const DEMAND_COLOR = '#ced7d9ff';
+    const CAPACITY_COLOR = '#d9ddd9dd';
     const color = item.type === 'demand' ? DEMAND_COLOR : CAPACITY_COLOR;
     let icon = null;
     if (groupDef && groupDef.icon) {
