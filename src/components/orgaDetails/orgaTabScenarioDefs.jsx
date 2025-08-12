@@ -163,17 +163,19 @@ function ScenarioDetail({ item: scenario }) {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
-      <TextField
-        label="Szenarioname"
-        value={form.name}
-        onChange={e => handleTextChange('name', e.target.value)}
-        onBlur={() => handleTextBlur('name')}
-        fullWidth
-        autoFocus
-        size="small"
-      />
       <Box>
-        <Typography variant="subtitle2" sx={{ mb: 1 }}>
+        <Typography variant="body2" sx={{ fontWeight: 700, mb: 0.5 }}>Name</Typography>
+        <TextField
+          value={form.name}
+          onChange={e => handleTextChange('name', e.target.value)}
+          onBlur={() => handleTextBlur('name')}
+          fullWidth
+          autoFocus
+          size="small"
+        />
+      </Box>
+      <Box>
+        <Typography variant="body2" sx={{ fontWeight: 700, mb: 0.5 }}>
           Basis-Szenario
         </Typography>
         <Accordion
@@ -217,19 +219,21 @@ function ScenarioDetail({ item: scenario }) {
           </AccordionDetails>
         </Accordion>
       </Box>
-      <TextField
-        label="Bemerkung"
-        value={form.remark}
-        onChange={e => handleTextChange('remark', e.target.value)}
-        onBlur={() => handleTextBlur('remark')}
-        fullWidth
-        multiline
-        minRows={2}
-        maxRows={4}
-        size="small"
-      />
       <Box>
-        <Typography gutterBottom>Wahrscheinlichkeit: {form.likelihood}%</Typography>
+        <Typography variant="body2" sx={{ fontWeight: 700, mb: 0.5 }}>Bemerkung</Typography>
+        <TextField
+          value={form.remark}
+          onChange={e => handleTextChange('remark', e.target.value)}
+          onBlur={() => handleTextBlur('remark')}
+          fullWidth
+          multiline
+          minRows={4}
+          maxRows={8}
+          size="small"
+        />
+      </Box>
+      <Box>
+        <Typography variant="body2"  sx={{ fontWeight: 700, mb: 0.5 }}>Wahrscheinlichkeit: {form.likelihood}%</Typography>
         <Slider
           value={Number(form.likelihood)}
           min={0}
@@ -242,7 +246,7 @@ function ScenarioDetail({ item: scenario }) {
         />
       </Box>
       <Box>
-        <Typography gutterBottom>Gewünschtheit: {form.desirability}%</Typography>
+        <Typography variant="body2"  sx={{ fontWeight: 700, mb: 0.5 }}>Gewünschtheit: {form.desirability}%</Typography>
         <Slider
           value={Number(form.desirability)}
           min={0}
@@ -255,7 +259,7 @@ function ScenarioDetail({ item: scenario }) {
         />
       </Box>
       <Box>
-        <Typography gutterBottom>Belastbarkeit: {form.confidence}%</Typography>
+        <Typography sx={{ fontWeight: 700, mb: 0.5 }} variant="body2" >Belastbarkeit: {form.confidence}%</Typography>
         <Slider
           value={Number(form.confidence)}
           min={0}
