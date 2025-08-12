@@ -459,6 +459,7 @@ function SimDataGeneralTab() {
               onAdd={handleAddAbsence}
               onDelete={(_, item) => handleDeleteAbsence(item.id)}
               emptyText="Keine Abwesenheiten vorhanden."
+              emptyAlertSeverity='info'
             />
           </Box>
         </Box>

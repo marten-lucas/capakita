@@ -60,6 +60,7 @@ function SimDataBookingTab() {
         onDelete={handleDeleteBooking}
         AddButtonProps={{ startIcon: <AddIcon /> }}
         emptyText="Keine Buchungszeiten vorhanden."
+        emptyAlertSeverity='warning'
       />
     </Box>
   );

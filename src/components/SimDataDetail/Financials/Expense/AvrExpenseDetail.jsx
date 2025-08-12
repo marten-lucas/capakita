@@ -381,6 +381,7 @@ function AvrExpenseDetail({ financial, onChange, item }) {
           AddButtonMenuOptions={addButtonMenuOptions.filter(opt => !opt.disabled)}
           onDelete={handleDeleteBonus}
           emptyText="Keine Boni vorhanden."
+          emptyAlertSeverity='info'
         />
       </Box>
     </Box>

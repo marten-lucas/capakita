@@ -81,6 +81,7 @@ function SimDataGroupsTab() {
         onDelete={handleDeleteGroup}
         AddButtonProps={{ startIcon: <AddIcon /> }}
         emptyText="Keine Gruppenzuordnungen vorhanden."
+        emptyAlertSeverity='warning'
       />
     </Box>
   );

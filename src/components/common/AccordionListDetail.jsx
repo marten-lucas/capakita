@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Accordion, AccordionSummary, AccordionDetails, Typography, Button, IconButton, Menu, MenuItem } from '@mui/material';
+import { Box, Accordion, AccordionSummary, AccordionDetails, Typography, Button, IconButton, Menu, MenuItem, Alert } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import DeleteIcon from '@mui/icons-material/Delete';
 
@@ -15,6 +15,7 @@ function AccordionListDetail({
   DeleteButtonComponent, // optional custom delete button
   emptyText = 'Keine Einträge vorhanden.',
   AddButtonMenuOptions = [],
+  emptyAlertSeverity = 'info', // 'info' or 'warning'
 }) {
   // Track expanded accordion index
   const [expandedIdx, setExpandedIdx] = React.useState(items && items.length > 0 ? 0 : null);
@@ -53,7 +54,9 @@ function AccordionListDetail({
     <Box>
       {/* Accordions */}
       {(!items || items.length === 0) ? (
-        <Typography variant="body2" color="text.secondary">{emptyText}</Typography>
+        <Alert severity={emptyAlertSeverity} sx={{ mb: 2 }}>
+          {emptyText}
+        </Alert>
       ) : (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, p:1 }}>
           {items.map((item, idx) => (

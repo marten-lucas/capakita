@@ -71,6 +71,7 @@ function SimDataFinanceTab({ item }) {
         AddButtonMenuOptions={addButtonMenuOptions}
         onDelete={handleDeleteFinancial}
         emptyText="Keine Finanzobjekte vorhanden."
+        emptyAlertSeverity='info'
       />
 
     </Box>

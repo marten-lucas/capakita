@@ -54,7 +54,7 @@ export const FINANCIAL_BONUS_REGISTRY = [
     allowed: ['capacity'],
     component: () => import('../components/SimDataDetail/Financials/Expense/Bonus/BonusChildrenDetail'),
     calculator: () => import('../utils/financialCalculators/Expense/avrCalculator/Bonus/avrChildBonusCalc').then(mod => mod.updatePayments),
-    unique: false,
+    unique: true,
     deleteable: false,
     typeDetailsDefinition: Financial.typeDetailsDefinitions['bonus-children'],
   },
