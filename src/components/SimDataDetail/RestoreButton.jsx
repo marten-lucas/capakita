@@ -1,5 +1,5 @@
 import React from 'react';
-import { IconButton, Tooltip, Dialog, DialogTitle, DialogActions, Button } from '@mui/material';
+import { Tooltip, Dialog, DialogTitle, DialogActions, Button } from '@mui/material';
 import RestoreIcon from '@mui/icons-material/Restore';
 import { useIsRestorable } from '../../hooks/useIsRestorable';
 import { useDispatch } from 'react-redux';
@@ -14,17 +14,37 @@ function RestoreButton({ scenarioId, itemId, onRestore }) {
 
   return (
     <>
-      <Tooltip title="Auf Original zurücksetzen">
-        <IconButton
-          size="small"
+      <Tooltip title="Auf Original zurücksetzen" placement="right">
+        <div
+          role="button"
+          tabIndex={0}
           onClick={e => {
             e.stopPropagation();
             setOpen(true);
           }}
-          sx={{ ml: 1 }}
+          onKeyPress={e => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.stopPropagation();
+              setOpen(true);
+            }
+          }}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginLeft: 8,
+            width: 32,
+            height: 32,
+            borderRadius: '50%',
+            cursor: 'pointer',
+            transition: 'background 0.2s',
+            background: 'none',
+            outline: 'none',
+          }}
+          aria-label="Auf Original zurücksetzen"
         >
           <RestoreIcon fontSize="small" />
-        </IconButton>
+        </div>
       </Tooltip>
       <Dialog open={open} onClose={() => setOpen(false)}>
         <DialogTitle>
