@@ -48,7 +48,14 @@ function ScenarioPicker() {
         }, 0);
         setExpanded(false);
     };
-   
+    // Add delete handler
+    const handleDelete = (scenario) => {
+        // Optionally, navigate or update state after delete
+        // You may want to dispatch a deleteScenario action here
+        // Example:
+        // dispatch(deleteScenario(scenario.id));
+        // If you want to update selection after delete, handle it here as well
+    };
 
 
     return (
@@ -151,7 +158,7 @@ function ScenarioPicker() {
                         <ScenarioTree
                             onEdit={handleEdit}
                             onAdd={handleAdd}
-                            // Do not pass onDelete, as delete is handled in TabbedListDetail
+                            onDelete={handleDelete}
                         />
                         {/* Add base scenario button below the tree */}
                         <Box sx={{ display: 'flex', justifyContent: 'flex-start', mt: 1 }}>

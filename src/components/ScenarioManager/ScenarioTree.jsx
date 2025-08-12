@@ -56,6 +56,9 @@ function ScenarioTree({ onEdit, onAdd, onDelete }) {
         <TreeItem
             key={node.id}
             itemId={node.id}
+            sx={{
+                bgcolor: selectedScenarioId === node.id ? 'primary.selected' : 'inherit',
+            }}
             label={
                 <Box
                     sx={{ display: 'flex', alignItems: 'center', minWidth: 0, width: '100%' }}
@@ -71,7 +74,6 @@ function ScenarioTree({ onEdit, onAdd, onDelete }) {
                             flex: 1,
                             fontSize: '0.95rem',
                             fontWeight: selectedScenarioId === node.id ? 700 : undefined,
-                            bgcolor: selectedScenarioId === node.id ? 'action.selected' : undefined,
                             borderRadius: 1,
                             px: selectedScenarioId === node.id ? 1 : 0
                         }}
