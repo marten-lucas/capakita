@@ -73,43 +73,37 @@ function QualificationDetail({ item: qualification }) {
 
   return (
     <Box sx={{ pt: 1, display: 'flex', flexDirection: 'column', gap: 3, maxWidth: 480 }}>
-      {/* ID field removed as per requirement */}
-      {/* <TextField
-        label="ID"
-        value={form.key}
-        onChange={isNew ? e => setForm(f => ({ ...f, key: e.target.value })) : undefined}
-        onBlur={isNew ? handleKeyBlur : undefined}
-        disabled={!isNew}
-        fullWidth
-        sx={{ maxWidth: 120 }}
-      /> */}
-      <TextField
-        label="Kurzname"
-        value={form.initial}
-        onChange={e => setForm(f => ({ ...f, initial: e.target.value }))}
-        onBlur={handleInitialBlur}
-        fullWidth
-        sx={{ maxWidth: 120 }}
-      />
-      <TextField
-        label="Anzeigename"
-        value={form.name}
-        onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-        onBlur={handleNameBlur}
-        fullWidth
-        error={!!error}
-        helperText={error}
-        autoFocus
-      />
-      <FormControlLabel
-        control={
-          <Checkbox
-            checked={!!form.IsExpert}
-            onChange={handleIsExpertChange}
-          />
-        }
-        label="Fachkraft-Qualifikation"
-      />
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        <TextField
+          label="Kurzname"
+          value={form.initial}
+          onChange={e => setForm(f => ({ ...f, initial: e.target.value }))}
+          onBlur={handleInitialBlur}
+          fullWidth
+          sx={{ maxWidth: 120 }}
+        />
+        <TextField
+          label="Anzeigename"
+          value={form.name}
+          onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+          onBlur={handleNameBlur}
+          fullWidth
+          error={!!error}
+          helperText={error}
+          autoFocus
+        />
+      </Box>
+      <Box>
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={!!form.IsExpert}
+              onChange={handleIsExpertChange}
+            />
+          }
+          label="Fachkraft-Qualifikation"
+        />
+      </Box>
     </Box>
   );
 }

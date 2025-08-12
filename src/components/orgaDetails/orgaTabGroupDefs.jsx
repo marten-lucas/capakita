@@ -32,9 +32,15 @@ function IconPicker({ value, onChange }) {
         variant="outlined"
         onClick={handleOpen}
         startIcon={<span style={{ fontSize: '1.5em' }}>{value || '👥'}</span>}
-        sx={{ width: 120, justifyContent: 'flex-start' }}
+        sx={{
+          width: 120,
+          justifyContent: 'flex-start',
+          height: 56,
+          alignItems: 'center', // <-- vertical center
+          textTransform: 'none'
+        }}
       >
-        Icon wählen
+        Icon
       </Button>
       <Popover
         open={Boolean(anchorEl)}
@@ -113,8 +119,11 @@ function GroupDetail({ item: group }) {
 
   return (
     <Box sx={{ pt: 1, display: 'flex', flexDirection: 'column', gap: 3, maxWidth: 480 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-
+      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
+        <IconPicker
+          value={form.icon}
+          onChange={handleIconChange}
+        />
         <TextField
           label="Gruppenname"
           value={form.name}
@@ -124,21 +133,23 @@ function GroupDetail({ item: group }) {
           error={!!error}
           helperText={error}
           autoFocus
+          sx={{
+            height: 56,
+            '.MuiInputBase-root': { height: 56, alignItems: 'flex-start' }
+          }}
         />
       </Box>
-      <IconPicker
-        value={form.icon}
-        onChange={handleIconChange}
-      />
-      <FormControlLabel
-        control={
-          <Checkbox
-            checked={!!form.IsSchool}
-            onChange={handleIsSchoolChange}
-          />
-        }
-        label="Schulkind-Gruppe"
-      />
+      <Box>
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={!!form.IsSchool}
+              onChange={handleIsSchoolChange}
+            />
+          }
+          label="Schulkind-Gruppe"
+        />
+      </Box>
     </Box>
   );
 }
