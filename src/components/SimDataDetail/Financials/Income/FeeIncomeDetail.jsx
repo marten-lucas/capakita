@@ -83,9 +83,8 @@ function FeeIncomeDetail({ financial, onChange, item }) {
         />
       </Box>
 
-      <Typography variant="body2" color="text.secondary">
-        Wählen Sie die passende Beitragsordnung für die Gruppe.
-      </Typography>
+      <Typography variant="body2" sx={{ fontWeight: 700, mb: 0.5 }}>Beitragsordnung</Typography>
+
       <RadioGroup
         value={typeDetails.financialDefId || ''}
         onChange={e => updateTypeDetails({ financialDefId: e.target.value })}
@@ -104,8 +103,8 @@ function FeeIncomeDetail({ financial, onChange, item }) {
           />
         ))}
       </RadioGroup>
-     
-     
+
+
     </Box>
   );
 }
