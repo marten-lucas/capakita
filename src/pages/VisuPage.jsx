@@ -12,6 +12,7 @@ import ScenarioSaveDialog from '../components/modals/ScenarioSaveDialog'
 import ChartFilterForm from '../components/SimDataCharts/ChartFilterForm'
 import { useScenarioEvents } from '../hooks/useScenarioEvents';
 import { createSelector } from '@reduxjs/toolkit';
+import { buildOverlayAwareData } from '../utils/overlayUtils'; // <-- import overlay utils
 
 const EMPTY_TOGGLES = [];
 
@@ -61,8 +62,15 @@ function VisuPage() {
   // Use scenario events hook for selected scenario
   useScenarioEvents(selectedScenarioId);
 
-  // Prüfe ob Szenarien vorhanden sind
-  if (!scenarios || scenarios.length === 0) {
+  // Overlay-aware: get effective data items for selected scenario
+  const effectiveDataItems = useSelector(state => {
+    if (!selectedScenarioId) return [];
+    const overlayData = buildOverlayAwareData(selectedScenarioId, state);
+    return Object.values(overlayData.effectiveDataItems || {});
+  });
+
+  // Prüfe ob Daten vorhanden sind (overlay-aware)
+  if (!effectiveDataItems || effectiveDataItems.length === 0) {
     return (
       <Box sx={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 85px)', bgcolor: '#f0f2f5' }}>
         <Paper
@@ -76,10 +84,10 @@ function VisuPage() {
           }}
         >
           <Typography variant="h6" gutterBottom>
-            Kein Szenario vorhanden
+            Keine Daten vorhanden
           </Typography>
           <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-            Um die Simulation zu starten, müssen Sie zuerst Daten importieren.
+            Um die Simulation zu starten, müssen Sie zuerst Daten importieren oder anlegen.
           </Typography>
           <Button
             variant="contained"
@@ -87,7 +95,7 @@ function VisuPage() {
             onClick={() => navigate('/data')}
             size="large"
           >
-            Zu Sim-Daten wechseln
+            Zu Simulationsdaten wechseln
           </Button>
         </Paper>
       </Box>
