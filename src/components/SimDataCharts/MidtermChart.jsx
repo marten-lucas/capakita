@@ -3,16 +3,19 @@ import HighchartsReact from 'highcharts-react-official';
 import Highcharts from 'highcharts';
 import { useSelector, useDispatch } from 'react-redux';
 import Box from '@mui/material/Box';
+import { useTheme } from '@mui/material/styles'; // <-- import useTheme
 import { updateMidTermChartData } from '../../store/chartSlice';
 import { generateWeeklyChartTooltip } from '../../utils/chartUtils/chartUtilsWeekly';
 
 // MidtermChart component
 export default function MidtermChart() {
-  // Colors
-  const demandColor = 'rgba(124,181,236,0.8)';
-  const capacityColor = '#90ed7d';
-  const careRatioColor = '#f45b5b';
-  const expertRatioColor = '#ff9800';
+  const theme = useTheme(); // <-- get theme
+
+  // Use theme colors
+  const demandColor = theme.palette.primary.main;
+  const capacityColor = theme.palette.success.main;
+  const careRatioColor = theme.palette.error.main;
+  const expertRatioColor = theme.palette.warning.main;
 
   const scenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const dispatch = useDispatch();
@@ -20,7 +23,6 @@ export default function MidtermChart() {
   // Get current filters from chartSlice (per scenario)
   const chartState = useSelector(state => state.chart[scenarioId] || {});
   const chartData = useMemo(() => chartState.chartData?.midterm || {}, [chartState]);
-  const timedimension = chartState.timedimension || 'month';
 
   // Update chart data when filters or simulation data change
   useEffect(() => {
@@ -32,9 +34,9 @@ export default function MidtermChart() {
 
   // Chart options
   const midtermOptions = useMemo(() => ({
-    chart: { type: 'column' },
-    title: { text: `Midterm Simulation - ${timedimension}` },
-    xAxis: { 
+    chart: { type: 'column', zoomType: 'x' }, // <-- enable zoom
+    title: { text: null },
+    xAxis: {
       categories: chartData.categories,
       title: { text: 'Zeitraum' }
     },
@@ -115,15 +117,16 @@ export default function MidtermChart() {
       formatter: function () {
         return generateWeeklyChartTooltip(this.points, this.x);
       }
-    }
-  }), [chartData, timedimension, demandColor, capacityColor, careRatioColor, expertRatioColor]);
+    },
+  }), [chartData, demandColor, capacityColor, careRatioColor, expertRatioColor]);
 
   return (
-    <Box sx={{ flex: 1, p: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-      <Box sx={{ flex: 1, minHeight: 0 }}>
-        <HighchartsReact highcharts={Highcharts} options={midtermOptions} />
+    <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+      <Box sx={{ height: 400 }}>
+        <HighchartsReact highcharts={Highcharts} options={midtermOptions} containerProps={{ style: { height: '100%' } }} />
       </Box>
     </Box>
   );
 }
+
 

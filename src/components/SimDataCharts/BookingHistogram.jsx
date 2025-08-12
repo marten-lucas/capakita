@@ -3,12 +3,16 @@ import HighchartsReact from 'highcharts-react-official';
 import Highcharts from 'highcharts';
 import { useSelector, useDispatch } from 'react-redux';
 import Box from '@mui/material/Box';
+import { useTheme } from '@mui/material/styles'; // <-- import useTheme
 import { updateHistogramChartData } from '../../store/chartSlice';
 import { generateHistogramTooltip } from '../../utils/chartUtils/chartUtilsHistogram';
 
 export default function BookingHistogram() {
-  const demandColor = '#7cb5ec'; // Default color for demand (children)
-  const capacityColor = '#90ed7d'; // Default color for capacity (employees)
+  const theme = useTheme(); // <-- get theme
+
+  // Use theme colors
+  const demandColor = theme.palette.primary.main;
+  const capacityColor = theme.palette.success.main;
 
   const scenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const dispatch = useDispatch();
@@ -19,6 +23,7 @@ export default function BookingHistogram() {
   const referenceDate = chartState.referenceDate;
   const filterGroups = useMemo(() => chartState.filter?.Groups || [], [chartState.filter?.Groups]);
   const filterQualifications = useMemo(() => chartState.filter?.Qualifications || [], [chartState.filter?.Qualifications]);
+  // Remove showNavigator logic
 
   // Update chart data when filters, reference date, or simulation data change
   useEffect(() => {
@@ -35,8 +40,8 @@ export default function BookingHistogram() {
     const safeCapacity = chartData.capacity ? chartData.capacity.map(val => Number(val) || 0) : [];
 
     return {
-      chart: { type: 'column' },
-      title: { text: 'Buchungsstunden Verteilung' },
+      chart: { type: 'column', zoomType: 'x' },
+      title: { text: null },
       xAxis: {
         categories: safeCategories,
         title: { text: 'Stunden pro Woche' },
@@ -79,16 +84,18 @@ export default function BookingHistogram() {
         formatter: function () {
           return generateHistogramTooltip(this.points, this.x);
         }
-      }
+      },
+      // Remove navigator and scrollbar
     };
   }, [chartData, demandColor, capacityColor]);
 
   return (
-    <Box sx={{ flex: 1, p: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column' }}>
       {/* Chart */}
-      <Box sx={{ flex: 1, minHeight: 0 }}>
-        <HighchartsReact highcharts={Highcharts} options={histogramOptions} />
+      <Box sx={{ height: 400 }}>
+        <HighchartsReact highcharts={Highcharts} options={histogramOptions} containerProps={{ style: { height: '100%' } }} />
       </Box>
     </Box>
   );
 }
+

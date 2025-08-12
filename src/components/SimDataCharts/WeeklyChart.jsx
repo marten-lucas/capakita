@@ -3,18 +3,21 @@ import HighchartsReact from 'highcharts-react-official';
 import Highcharts from 'highcharts';
 import { useSelector, useDispatch } from 'react-redux';
 import Box from '@mui/material/Box';
+import { useTheme } from '@mui/material/styles'; // <-- import useTheme
 import { updateWeeklyChartData } from '../../store/chartSlice';
 import { generateWeeklyChartTooltip } from '../../utils/chartUtils/chartUtilsWeekly';
 
 export default function WeeklyChart() {
-  
-  const plotBandColor1 = '#fff2a6ff'; 
-  const plotBandColor2= '#909090ff'; 
-  const plotBandColorLabel = '#000000'; 
-  const demandColor = '#7cb5ec'; // Default color for demand
-  const capacityColor = '#90ed7d'; // Default color for capacity
-  const careRatioColor = '#f45b5b'; // Default color for care ratio
-  const expertRatioColor = '#ff9800'; // Default color for expert ratio
+  const theme = useTheme(); // <-- get theme
+
+  // Use theme colors
+  const plotBandColor1 = theme.palette.action.hover;
+  const plotBandColor2 = theme.palette.action.selected;
+  const plotBandColorLabel = theme.palette.text.primary;
+  const demandColor = theme.palette.primary.main;
+  const capacityColor = theme.palette.success.main;
+  const careRatioColor = theme.palette.error.main;
+  const expertRatioColor = theme.palette.warning.main;
 
   const scenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const dispatch = useDispatch();
@@ -40,7 +43,7 @@ export default function WeeklyChart() {
     const safeExpertRatio = chartData.expert_ratio ? chartData.expert_ratio.map(val => Number(val) || 0) : [];
 
     return {
-      chart: { type: 'line' },
+      chart: { type: 'line', zoomType: 'x' }, // <-- enable zoom
       title: { text: null },
       xAxis: {
         categories: safeCategories,
@@ -163,15 +166,14 @@ export default function WeeklyChart() {
         formatter: function () {
           return generateWeeklyChartTooltip(this.points, this.x);
         }
-      }
+      },
     };
-  }, [chartData, plotBandColor1, plotBandColor2]);
+  }, [chartData, plotBandColor1, plotBandColor2, plotBandColorLabel, demandColor, capacityColor, careRatioColor, expertRatioColor]);
 
   return (
-    <Box sx={{ flex: 1, p: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-      {/* Chart */}
-      <Box sx={{ flex: 1, minHeight: 0 }}>
-        <HighchartsReact highcharts={Highcharts} options={weeklyOptions} />
+    <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+      <Box sx={{ height: 400 }}>
+        <HighchartsReact highcharts={Highcharts} options={weeklyOptions} containerProps={{ style: { height: '100%' } }} />
       </Box>
     </Box>
   );

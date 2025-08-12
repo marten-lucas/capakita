@@ -11,10 +11,12 @@ import {
   OutlinedInput,
   Typography,
   ToggleButton,
-  ToggleButtonGroup
+  ToggleButtonGroup,
+  // Remove Checkbox, FormControlLabel imports
 } from '@mui/material';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import TimelineIcon from '@mui/icons-material/Timeline';
+import ViewWeekIcon from '@mui/icons-material/ViewWeek';
 import PaidIcon from '@mui/icons-material/Paid';
 import HistogramIcon from '@mui/icons-material/BarChart'; // Use BarChart icon for histogram
 import { useSelector, useDispatch } from 'react-redux';
@@ -26,7 +28,8 @@ import {
   ensureScenario,
   updateWeeklyChartData,
   updateMidTermChartData,
-  updateHistogramChartData
+  updateHistogramChartData,
+  // remove setShowNavigator
 } from '../../store/chartSlice';
 import { useOverlayData } from '../../hooks/useOverlayData';
 import EventPicker from '../EventCalendar/EventPicker';
@@ -72,6 +75,7 @@ function ChartFilterForm({ showStichtag = false, scenarioId, onTimedimensionChan
   const chartToggles = chartState.chartToggles || ['weekly', 'midterm'];
   const selectedGroups = chartState.filter?.Groups || [];
   const selectedQualifications = chartState.filter?.Qualifications || [];
+  // Remove showNavigator logic and handler
 
   // Use overlay hook for groupDefs and qualiDefs
   const { getEffectiveGroupDefs, getEffectiveQualificationDefs } = useOverlayData();
@@ -189,119 +193,134 @@ function ChartFilterForm({ showStichtag = false, scenarioId, onTimedimensionChan
     : 'month';
 
   return (
-    <Paper sx={{ p: 2, mb: 2 }}>
+    <Paper sx={{ p: 2 }} elevation={3}>
       <Box
         sx={{
           display: 'flex',
-          flexWrap: 'wrap',
-          gap: 2,
-          alignItems: 'center',
-          justifyContent: 'flex-start'
+          flexDirection: 'row',
+          alignItems: 'flex-start',
+          gap: 2
         }}
       >
-        <Typography variant="h6" sx={{ mr: 2, minWidth: 70 }}>
-          Filter
-        </Typography>
-        {/* Chart toggles */}
-        <ToggleButtonGroup
-          value={chartToggles}
-          onChange={handleToggle}
-          aria-label="Chart selection"
-          size="small"
-          sx={{ minWidth: 240 }}
+        {/* Left column: Filter label */}
+        <Box sx={{ minWidth: 90, flex: '0 0 90px', display: 'flex', alignItems: 'center', height: 48 }}>
+          <Typography variant="h6" sx={{ minWidth: 70 }}>
+            Filter
+          </Typography>
+        </Box>
+        {/* Right column: All form elements */}
+        <Box
+          sx={{
+            flex: 1,
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 3,
+            alignItems: 'center',
+            justifyContent: 'flex-start'
+          }}
         >
-          <ToggleButton value="weekly" aria-label="Weekly Chart">
-            <BarChartIcon sx={{ mr: 1 }} /> Woche
-          </ToggleButton>
-          <ToggleButton value="midterm" aria-label="Midterm Chart">
-            <TimelineIcon sx={{ mr: 1 }} /> Zeitverlauf
-          </ToggleButton>
-          <ToggleButton value="financial" aria-label="Financial Chart">
-            <PaidIcon sx={{ mr: 1 }} /> Finanzen
-          </ToggleButton>
-          <ToggleButton value="histogram" aria-label="Histogram Chart">
-            <HistogramIcon sx={{ mr: 1 }} /> Histogram
-          </ToggleButton>
-        </ToggleButtonGroup>
-
-        {/* Gruppen */}
-        <FormControl sx={{ minWidth: 180 }} size="small">
-          <InputLabel>Gruppen</InputLabel>
-          <Select
-            multiple
-            value={selectedGroups}
-            onChange={handleGroupChange}
-            input={<OutlinedInput label="Gruppen" />}
-            renderValue={(selected) => (
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                {selected
-                  .filter((value) => Object.prototype.hasOwnProperty.call(availableGroups, value))
-                  .map((value) => (
-                    <Chip key={value} label={availableGroups[value]} size="small" />
-                  ))}
-              </Box>
-            )}
-            MenuProps={MenuProps}
+          {/* Chart toggles */}
+          <ToggleButtonGroup
+            value={chartToggles}
+            onChange={handleToggle}
+            aria-label="Chart selection"
+            size="small"
+            sx={{ minWidth: 240 }}
           >
-            {Object.entries(availableGroups).map(([id, name]) => (
-              <MenuItem key={id} value={id}>
-                {name}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+            <ToggleButton value="weekly" aria-label="Weekly Chart">
+              <ViewWeekIcon sx={{ mr: 1 }} /> Regelbetrieb
+            </ToggleButton>
+            <ToggleButton value="midterm" aria-label="Midterm Chart">
+              <TimelineIcon sx={{ mr: 1 }} /> Langzeit
+            </ToggleButton>
+            <ToggleButton value="financial" aria-label="Financial Chart">
+              <PaidIcon sx={{ mr: 1 }} /> Finanzen
+            </ToggleButton>
+            <ToggleButton value="histogram" aria-label="Histogram Chart">
+              <HistogramIcon sx={{ mr: 1 }} /> Buchungsverteilung
+            </ToggleButton>
+          </ToggleButtonGroup>
 
-        {/* Qualifikationen */}
-        <FormControl sx={{ minWidth: 180 }} size="small">
-          <InputLabel>Qualifikationen</InputLabel>
-          <Select
-            multiple
-            value={selectedQualifications}
-            onChange={handleQualificationChange}
-            input={<OutlinedInput label="Qualifikationen" />}
-            renderValue={(selected) => (
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                {selected
-                  .filter((value) => Object.prototype.hasOwnProperty.call(availableQualifications, value))
-                  .map((value) => (
-                    <Chip key={value} label={availableQualifications[value]} size="small" />
-                  ))}
-              </Box>
-            )}
-            MenuProps={MenuProps}
-          >
-            {Object.entries(availableQualifications).map(([key, name]) => (
-              <MenuItem key={key} value={key}>
-                {name}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        {/* Zeitdimension (wenn showMidterm oder showFinancial) */}
-        {(showMidterm || showFinancial) && (
-          <FormControl sx={{ minWidth: 140 }} size="small">
-            <InputLabel>Zeitdimension</InputLabel>
+          {/* Gruppen */}
+          <FormControl sx={{ minWidth: 180 }} size="small">
+            <InputLabel>Gruppen</InputLabel>
             <Select
-              value={safeTimedimension}
-              onChange={handleTimedimensionChange}
-              label="Zeitdimension"
+              multiple
+              value={selectedGroups}
+              onChange={handleGroupChange}
+              input={<OutlinedInput label="Gruppen" />}
+              renderValue={(selected) => (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                  {selected
+                    .filter((value) => Object.prototype.hasOwnProperty.call(availableGroups, value))
+                    .map((value) => (
+                      <Chip key={value} label={availableGroups[value]} size="small" />
+                    ))}
+                </Box>
+              )}
+              MenuProps={MenuProps}
             >
-              <MenuItem value="week">Woche</MenuItem>
-              <MenuItem value="month">Monat</MenuItem>
-              <MenuItem value="quarter">Quartal</MenuItem>
-              <MenuItem value="year">Jahr</MenuItem>
+              {Object.entries(availableGroups).map(([id, name]) => (
+                <MenuItem key={id} value={id}>
+                  {name}
+                </MenuItem>
+              ))}
             </Select>
           </FormControl>
-        )}
 
-        {/* Stichtag (nur wenn showWeekly oder showHistogram && showStichtag) - EventPicker bleibt in der Reihe */}
-        {(showWeekly || showHistogram) && showStichtag && (
-          <EventPicker scenarioId={scenarioId} />
-        )}
+          {/* Qualifikationen */}
+          <FormControl sx={{ minWidth: 180 }} size="small">
+            <InputLabel>Qualifikationen</InputLabel>
+            <Select
+              multiple
+              value={selectedQualifications}
+              onChange={handleQualificationChange}
+              input={<OutlinedInput label="Qualifikationen" />}
+              renderValue={(selected) => (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                  {selected
+                    .filter((value) => Object.prototype.hasOwnProperty.call(availableQualifications, value))
+                    .map((value) => (
+                      <Chip key={value} label={availableQualifications[value]} size="small" />
+                    ))}
+                </Box>
+              )}
+              MenuProps={MenuProps}
+            >
+              {Object.entries(availableQualifications).map(([key, name]) => (
+                <MenuItem key={key} value={key}>
+                  {name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          {/* Zeitdimension (wenn showMidterm oder showFinancial) */}
+          {(showMidterm || showFinancial) && (
+            <FormControl sx={{ minWidth: 140 }} size="small">
+              <InputLabel>Zeitdimension</InputLabel>
+              <Select
+                value={safeTimedimension}
+                onChange={handleTimedimensionChange}
+                label="Zeitdimension"
+              >
+                <MenuItem value="week">Woche</MenuItem>
+                <MenuItem value="month">Monat</MenuItem>
+                <MenuItem value="quarter">Quartal</MenuItem>
+                <MenuItem value="year">Jahr</MenuItem>
+              </Select>
+            </FormControl>
+          )}
+
+          {/* Stichtag (nur wenn showWeekly oder showHistogram && showStichtag) - EventPicker bleibt in der Reihe */}
+          {(showWeekly || showHistogram) && showStichtag && (
+            <EventPicker scenarioId={scenarioId} />
+          )}
+          {/* Remove Navigator Checkbox */}
+        </Box>
       </Box>
     </Paper>
   );
 }
 
 export default ChartFilterForm;
-
+     

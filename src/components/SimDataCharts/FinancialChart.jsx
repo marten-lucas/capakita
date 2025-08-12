@@ -3,13 +3,18 @@ import HighchartsReact from 'highcharts-react-official';
 import Highcharts from 'highcharts';
 import { useSelector, useDispatch } from 'react-redux';
 import Box from '@mui/material/Box';
+import { useTheme } from '@mui/material/styles'; // <-- import useTheme
 import { updateFinancialChartData } from '../../store/chartSlice';
 import { generateFinancialChartTooltip } from '../../utils/chartUtils/chartUtilsFinancial';
 
 export default function FinancialChart({ scenarioId, timedimension }) {
-  // Colors (adjust as needed)
-  const expenseColor = '#f45b5b';
-  const incomeColor = '#90ed7d';
+  const theme = useTheme(); // <-- get theme
+
+  // Use theme colors
+  const expenseColor = theme.palette.error.main;
+  const incomeColor = theme.palette.success.main;
+  const saldoColor = theme.palette.primary.main;
+  const saldoCumColor = theme.palette.warning.main;
 
   const dispatch = useDispatch();
 
@@ -25,9 +30,9 @@ export default function FinancialChart({ scenarioId, timedimension }) {
 
   // Chart options
   const financialOptions = useMemo(() => ({
-    chart: { type: 'column', alignTicks: true },
-    title: { text: 'Finanzen (Prototyp)' },
-    xAxis: { 
+    chart: { type: 'column', alignTicks: true, zoomType: 'x' },
+    title: { text: null },
+    xAxis: {
       categories: chartData.categories || [],
       title: { text: 'Zeitraum' }
     },
@@ -66,7 +71,7 @@ export default function FinancialChart({ scenarioId, timedimension }) {
         name: 'Monatlicher Saldo',
         type: 'line',
         data: (chartData.income || []).map((inc, i) => inc - (chartData.expenses?.[i] || 0)),
-        color: '#0077cc',
+        color: saldoColor,
         yAxis: 1,
         marker: { enabled: true }
       },
@@ -82,7 +87,7 @@ export default function FinancialChart({ scenarioId, timedimension }) {
             return cum;
           });
         })(),
-        color: '#ff9900',
+        color: saldoCumColor,
         yAxis: 1,
         marker: { enabled: true }
       }
@@ -92,13 +97,13 @@ export default function FinancialChart({ scenarioId, timedimension }) {
       shared: true,
       useHTML: true,
       formatter: function () { return generateFinancialChartTooltip(this.points, this.x); }
-    }
-  }), [chartData, expenseColor, incomeColor]);
+    },
+  }), [chartData, expenseColor, incomeColor, saldoColor, saldoCumColor]);
 
   return (
-    <Box sx={{ flex: 1, p: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-      <Box sx={{ flex: 1, minHeight: 0 }}>
-        <HighchartsReact highcharts={Highcharts} options={financialOptions} />
+    <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+      <Box sx={{ height: 400 }}>
+        <HighchartsReact highcharts={Highcharts} options={financialOptions} containerProps={{ style: { height: '100%' } }} />
       </Box>
     </Box>
   );

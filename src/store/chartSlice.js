@@ -39,7 +39,8 @@ function getInitialChartState() {
         capacity: [],
         maxcapacity: "",
       }
-    }
+    },
+    // Remove showNavigator
   };
 }
 
@@ -87,6 +88,7 @@ const chartSlice = createSlice({
       if (!state[scenarioId]) state[scenarioId] = getInitialChartState();
       state[scenarioId].chartData[chartType] = data;
     },
+    // Remove setShowNavigator
     // Optionally, add a reset for a scenario
     resetScenarioChart(state, action) {
       const scenarioId = action.payload;

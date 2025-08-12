@@ -14,6 +14,7 @@ import { useScenarioEvents } from '../hooks/useScenarioEvents';
 import { createSelector } from '@reduxjs/toolkit';
 import { buildOverlayAwareData } from '../utils/overlayUtils'; // <-- import overlay utils
 
+
 const EMPTY_TOGGLES = [];
 
 // Memoized selector for chart toggles
@@ -104,43 +105,48 @@ function VisuPage() {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 85px)', bgcolor: '#f0f2f5', overflow: 'hidden' }}>
-      {/* Chart Filter Form added here */}
-      <Box sx={{ px: 3, pt: 2, flex: '0 0 auto' }}>
+      <Box sx={{ flex: 1, p: 3, display: 'flex', flexDirection: 'column', gap: 3, overflow: 'scroll', minHeight: 0 }}>
+        {/* Chart Filter Form moved here, above the charts */}
         <ChartFilterForm showStichtag scenarioId={selectedScenarioId} />
-      </Box>
-
-      <Box sx={{ flex: 1, p: 3, display: 'flex', flexDirection: 'column', gap: 3, overflow: 'auto', minHeight: 0 }}>
         {chartToggles.includes('weekly') && (
-          <Box sx={{ minHeight: '400px' }}>
+          <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column' }}>
             <Typography variant="h6" sx={{ mb: 2, color: 'text.secondary' }}>
-              Weekly Chart
+              Regelbetrieb
             </Typography>
-            <WeeklyChart  />
-          </Box>
+            <Box sx={{ minHeight: 400, display: 'flex', flexDirection: 'column' }}>
+              <WeeklyChart />
+            </Box>
+          </Paper>
         )}
         {chartToggles.includes('midterm') && (
-          <Box sx={{ minHeight: '400px' }}>
+          <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column' }}>
             <Typography variant="h6" sx={{ mb: 2, color: 'text.secondary' }}>
-              Midterm Chart
+              Langzeit
             </Typography>
-            <MidtermChart hideFilters scenarioId={selectedScenarioId} />
-          </Box>
+            <Box sx={{ minHeight: 400, display: 'flex', flexDirection: 'column' }}>
+              <MidtermChart hideFilters scenarioId={selectedScenarioId} />
+            </Box>
+          </Paper>
         )}
         {chartToggles.includes('financial') && (
-          <Box sx={{ minHeight: '400px' }}>
+          <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column' }}>
             <Typography variant="h6" sx={{ mb: 2, color: 'text.secondary' }}>
-              Financial Chart
+              Finanzen
             </Typography>
-            <FinancialChart scenarioId={selectedScenarioId} timedimension={timedimension} />
-          </Box>
+            <Box sx={{ minHeight: 400, display: 'flex', flexDirection: 'column' }}>
+              <FinancialChart scenarioId={selectedScenarioId} timedimension={timedimension} />
+            </Box>
+          </Paper>
         )}
         {chartToggles.includes('histogram') && (
-          <Box sx={{ minHeight: '400px' }}>
+          <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column' }}>
             <Typography variant="h6" sx={{ mb: 2, color: 'text.secondary' }}>
-              Booking Histogram
+              Buchungsverteilung
             </Typography>
-            <BookingHistogram />
-          </Box>
+            <Box sx={{ minHeight: 400, display: 'flex', flexDirection: 'column' }}>
+              <BookingHistogram />
+            </Box>
+          </Paper>
         )}
         {chartToggles.length === 0 && (
           <Paper sx={{ p: 4, textAlign: 'center', bgcolor: '#f5f5f5' }}>
