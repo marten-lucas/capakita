@@ -119,25 +119,30 @@ function GroupDetail({ item: group }) {
 
   return (
     <Box sx={{ pt: 1, display: 'flex', flexDirection: 'column', gap: 3, maxWidth: 480 }}>
-      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
-        <IconPicker
-          value={form.icon}
-          onChange={handleIconChange}
-        />
-        <TextField
-          label="Gruppenname"
-          value={form.name}
-          onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-          onBlur={handleTextBlur}
-          fullWidth
-          error={!!error}
-          helperText={error}
-          autoFocus
-          sx={{
-            height: 56,
-            '.MuiInputBase-root': { height: 56, alignItems: 'flex-start' }
-          }}
-        />
+      <Box>
+        <Typography variant="body2" sx={{ fontWeight: 700, mb: 0.5 }}>
+          Gruppenname
+        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
+          <IconPicker
+            value={form.icon}
+            onChange={handleIconChange}
+          />
+          <TextField
+            label=""
+            value={form.name}
+            onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+            onBlur={handleTextBlur}
+            fullWidth
+            error={!!error}
+            helperText={error}
+            autoFocus
+            sx={{
+              height: 56,
+              '.MuiInputBase-root': { height: 56, alignItems: 'flex-start' }
+            }}
+          />
+        </Box>
       </Box>
       <Box>
         <FormControlLabel

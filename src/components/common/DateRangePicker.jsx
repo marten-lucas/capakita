@@ -129,13 +129,19 @@ function DateRangePicker({ value, onChange }) {
   const toggleDatepicker = () => setIsOpen((v) => !v);
 
   return (
-    <Box sx={{ position: 'relative', mb: 1, width: '100%' }}>
+    <Box sx={{ position: 'relative', mb: 1, width: '100%', height: '100%' }}>
       <TextField
         label=""
         value={updateInput()}
         onClick={toggleDatepicker}
         size="small"
-        sx={{ width: '100%' }}
+        sx={{ 
+          width: '100%', 
+          height: '100%',
+          '& .MuiInputBase-root': { 
+            height: '100%' 
+          }
+        }}
         placeholder="Zeitraum wählen"
         InputProps={{ readOnly: true }}
       />
