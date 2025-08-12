@@ -1,10 +1,9 @@
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { Box, TextField, Typography, MenuItem } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import AccordionListDetail from '../../../common/AccordionListDetail';
 import DateRangePicker from '../../../../components/common/DateRangePicker';
 import { useOverlayData } from '../../../../hooks/useOverlayData';
-import { calculateWorktimeFromBookings } from '../../../../utils/bookingUtils';
 import { getAllStagesForGroup, getAllAvrGroups } from '../../../../utils/financialCalculators/avrUtils';
 import { FINANCIAL_BONUS_REGISTRY as BONUS_REGISTRY } from '../../../../config/financialTypeRegistry';
 
@@ -13,14 +12,9 @@ function AvrExpenseDetail({ financial, onChange, item }) {
   const groupOptions = useMemo(() => getAllAvrGroups(), []);
 
   // Overlay-aware data access
-  const { getEffectiveBookings } = useOverlayData();
-  const bookingsObj = getEffectiveBookings(item?.id);
-  const bookings = useMemo(() => Object.values(bookingsObj || {}), [bookingsObj]);
+  useOverlayData();
 
   // Calculate working hours from bookings (sum of all booking hours)
-  const calculatedWorkingHours = useMemo(() => {
-    return calculateWorktimeFromBookings(bookings);
-  }, [bookings]);
 
   // Extract type_details for editing
   const typeDetails = financial.type_details || {};
@@ -151,23 +145,6 @@ function AvrExpenseDetail({ financial, onChange, item }) {
     });
   };
 
-  // --- NEW: Use calculated working hours unless user overrides ---
-  const effectiveWorkingHours = typeDetails.WorkingHours !== undefined && typeDetails.WorkingHours !== ''
-    ? typeDetails.WorkingHours
-    : calculatedWorkingHours;
-
-  // Compute available bonus types from bonus registry, disabling unique types already present
-  const bonusTypeRegistry = useMemo(() => {
-    const bonuses = Array.isArray(financial.financial) ? financial.financial : [];
-    return BONUS_REGISTRY.map(t => {
-      const isPresent = !!bonuses.find(b => b.type === t.value);
-      return {
-        ...t,
-        disabled: t.unique && isPresent
-      };
-    });
-  }, [financial.financial]);
-
   // Load bonus components dynamically
   const [loadedBonusComponents, setLoadedBonusComponents] = useState({});
 
@@ -236,7 +213,7 @@ function AvrExpenseDetail({ financial, onChange, item }) {
   };
 
   // Build menu options for add button
-  const addButtonMenuOptions = bonusTypeRegistry.map(bonusType => ({
+  const addButtonMenuOptions = BONUS_REGISTRY.map(bonusType => ({
     label: bonusType.label,
     value: bonusType.value,
     onClick: () => handleAddBonus(bonusType.value),
@@ -245,21 +222,9 @@ function AvrExpenseDetail({ financial, onChange, item }) {
 
   // Summary component for a bonus
   const BonusSummary = ({ item }) => {
-    // Show Gruppe and Stufe in summary if available
-    let gruppe = '';
-    let stufe = '';
-    if (typeDetails.group) {
-      const groupObj = groupOptions.find(opt => String(opt.group_id) === String(typeDetails.group));
-      gruppe = groupObj ? groupObj.group_name : typeDetails.group;
-    }
-    if (typeDetails.stage) {
-      stufe = `Stufe ${typeDetails.stage}`;
-    }
     return (
       <Typography variant="subtitle2">
         {(item.label || item.type)}
-        {gruppe && ` | Gruppe: ${gruppe}`}
-        {stufe && ` | ${stufe}`}
       </Typography>
     );
   };
@@ -350,22 +315,6 @@ function AvrExpenseDetail({ financial, onChange, item }) {
               inputProps={{ min: 0 }}
             />
           </Box>
-          <Box>
-            <Typography fontWeight={700} variant="body2" sx={{ mb: 0.5 }}>Wochenstunden</Typography>
-            <TextField
-              type="number"
-              size="small"
-              value={effectiveWorkingHours}
-              onChange={e => updateTypeDetails({ WorkingHours: e.target.value })}
-              sx={{ width: '100%' }}
-              inputProps={{ min: 0 }}
-              helperText={
-                calculatedWorkingHours !== undefined && calculatedWorkingHours !== ''
-                  ? `Berechnet aus Buchungen: ${calculatedWorkingHours} h/Woche`
-                  : undefined
-              }
-            />
-          </Box>
         </Box>
       </Box>
       {/* Boni section full width */}
@@ -376,7 +325,7 @@ function AvrExpenseDetail({ financial, onChange, item }) {
           SummaryComponent={BonusSummary}
           DetailComponent={BonusDetailComponent}
           AddButtonLabel="Bonus hinzufügen"
-          onAdd={() => {}} // handled by menu
+          onAdd={() => { }} // handled by menu
           AddButtonProps={{ startIcon: <AddIcon />, color: "secondary" }}
           AddButtonMenuOptions={addButtonMenuOptions.filter(opt => !opt.disabled)}
           onDelete={handleDeleteBonus}

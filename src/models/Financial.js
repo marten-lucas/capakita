@@ -37,7 +37,6 @@ export class Financial {
       stage: { type: 'number', required: true },
       startDate: { type: 'string', required: false },
       endDate: { type: 'string', required: false },
-      WorkingHours: { type: 'number', required: false },
       NoOfChildren: { type: 'number', required: false },
       // ...other AVR-specific fields...
     },

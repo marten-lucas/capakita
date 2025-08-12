@@ -54,7 +54,7 @@ function buildPayments(financial, dataItem, bookings, avrStageUpgrades) {
   const employmentStart = dataItem?.startdate || financial?.type_details?.StartDate;
 
   // Use working hours from type_details or fallback to sum of bookings
-  const workingHours = Number(financial?.type_details?.WorkingHours) || sumBookingHoursForPeriod(bookings, null, null);
+  const workingHours = sumBookingHoursForPeriod(bookings, null, null);
 
   return periods.map(period => {
     const { valid_from, valid_to } = period;

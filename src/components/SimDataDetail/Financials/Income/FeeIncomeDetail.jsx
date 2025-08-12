@@ -4,7 +4,7 @@ import { useSelector } from 'react-redux';
 import { useOverlayData } from '../../../../hooks/useOverlayData';
 import DateRangePicker from '../../../../components/common/DateRangePicker';
 
-function FeeIncomeDetail({ financial, onChange, onDelete, item }) {
+function FeeIncomeDetail({ financial, onChange, item }) {
   // Get effective financial defs and group assignments
   const { getEffectiveGroupAssignments } = useOverlayData();
   const groupAssignments = getEffectiveGroupAssignments(item.id);
@@ -83,7 +83,6 @@ function FeeIncomeDetail({ financial, onChange, onDelete, item }) {
         />
       </Box>
 
-      <Typography variant="body2">{financial.label}</Typography>
       <Typography variant="body2" color="text.secondary">
         Wählen Sie die passende Beitragsordnung für die Gruppe.
       </Typography>
@@ -106,14 +105,7 @@ function FeeIncomeDetail({ financial, onChange, onDelete, item }) {
         ))}
       </RadioGroup>
      
-      <Button
-        variant="outlined"
-        color="error"
-        size="small"
-        onClick={onDelete}
-      >
-        Entfernen
-      </Button>
+     
     </Box>
   );
 }
