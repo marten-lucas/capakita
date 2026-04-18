@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Typography, IconButton, InputAdornment } from '@mui/material';
+import React, { useState, useEffect } from 'react';
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Typography, IconButton, InputAdornment, Checkbox, FormControlLabel } from '@mui/material';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import { useSaveLoad } from '../../hooks/useSaveLoad';
@@ -15,12 +15,23 @@ function ScenarioLoadDialog({ onLoaded }) {
   const [showPw, setShowPw] = useState(false);
   const [file, setFile] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isAnonymized, setIsAnonymized] = useState(true);
+
+  useEffect(() => {
+    if (open) {
+      setIsAnonymized(true);
+    }
+  }, [open]);
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
       setPwError('');
     }
+  };
+  
+  const handleCheckboxChange = (e) => {
+    setIsAnonymized(e.target.checked);
   };
 
   const handleLoad = async () => {
@@ -30,12 +41,14 @@ function ScenarioLoadDialog({ onLoaded }) {
     }
 
     setIsLoading(true);
-    const result = await loadData(file, pwValue);
+    // pass anonymization option to the loader
+    const result = await loadData(file, pwValue, { isAnonymized });
     
     if (result.success) {
       setPwError('');
       setPwValue('');
       setFile(null);
+      setIsAnonymized(true);
       dispatch(setLoadDialogOpen(false));
       if (onLoaded) onLoaded();
     } else {
@@ -50,6 +63,7 @@ function ScenarioLoadDialog({ onLoaded }) {
     setPwValue('');
     setFile(null);
     setShowPw(false);
+    setIsAnonymized(true);
     dispatch(setLoadDialogOpen(false));
   };
 
@@ -71,6 +85,12 @@ function ScenarioLoadDialog({ onLoaded }) {
             Ausgewählte Datei: {file.name}
           </Typography>
         )}
+        <FormControlLabel
+          control={
+            <Checkbox checked={isAnonymized} onChange={handleCheckboxChange} disabled={isLoading} />
+          }
+          label="Daten anonymisieren"
+        />
         <TextField
           margin="dense"
           label="Passwort"
