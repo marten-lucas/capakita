@@ -13,7 +13,6 @@ export function useSaveLoad() {
   const simBooking = useSelector(state => state.simBooking);
   const simGroup = useSelector(state => state.simGroup);
   const simQualification = useSelector(state => state.simQualification);
-  const simFinancials = useSelector(state => state.simFinancials);
   const chart = useSelector(state => state.chart);
 
   const saveData = useCallback(async (password) => {
@@ -35,8 +34,8 @@ export function useSaveLoad() {
         groupDefsByScenario: simGroup.groupDefsByScenario,
         qualificationDefsByScenario: simQualification.qualificationDefsByScenario,
         qualificationAssignmentsByScenario: simQualification.qualificationAssignmentsByScenario,
-        financialsByScenario: simFinancials.financialsByScenario,
-        chartStore: chart // Save the whole chart state object
+        chartStore: chart,
+        selectedItems: simScenario.selectedItems,
       };
 
       const json = JSON.stringify(saveData);
@@ -72,7 +71,6 @@ export function useSaveLoad() {
     simBooking,
     simGroup,
     simQualification,
-    simFinancials,
     chart
   ]);
 
@@ -116,23 +114,12 @@ export function useSaveLoad() {
         if (data.qualificationAssignmentsByScenario) {
           dispatch({ type: 'simQualification/loadQualificationAssignmentsByScenario', payload: data.qualificationAssignmentsByScenario });
         }
-        if (data.financialsByScenario) {
-          dispatch({ type: 'simFinancials/loadFinancialsByScenario', payload: data.financialsByScenario });
-        }
 
-        // Load chart store
         if (data.chartStore) {
-          dispatch({ type: 'chart/reset', payload: data.chartStore }); // You may need to implement a 'reset' action in chartSlice
+          dispatch({ type: 'chart/loadChartState', payload: data.chartStore });
         }
 
-        // Load selected items
-        if (data.selectedItems) {
-          Object.entries(data.selectedItems).forEach(([, itemId]) => {
-            dispatch(setSelectedItem(itemId));
-          });
-        } else {
-          dispatch(setSelectedItem(null));
-        }
+        dispatch(setSelectedItem(data.selectedItems?.[data.selectedScenarioId] || null));
 
         return { success: true };
       } catch {

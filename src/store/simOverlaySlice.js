@@ -1,8 +1,16 @@
 import { createSlice } from '@reduxjs/toolkit';
 
 const initialState = {
-  // Structure: { [scenarioId]: { dataItems: { [itemId]: overlayData }, groupDefs: [...], qualificationDefs: [...], etc. } }
   overlaysByScenario: {},
+};
+
+const cleanupScenario = (state, scenarioId) => {
+  if (
+    state.overlaysByScenario[scenarioId] &&
+    Object.keys(state.overlaysByScenario[scenarioId]).length === 0
+  ) {
+    delete state.overlaysByScenario[scenarioId];
+  }
 };
 
 const simOverlaySlice = createSlice({
@@ -23,19 +31,16 @@ const simOverlaySlice = createSlice({
       const { scenarioId, itemId } = action.payload;
       if (state.overlaysByScenario[scenarioId]?.dataItems) {
         delete state.overlaysByScenario[scenarioId].dataItems[itemId];
-        // Clean up empty overlay structure
         if (Object.keys(state.overlaysByScenario[scenarioId].dataItems).length === 0) {
           delete state.overlaysByScenario[scenarioId].dataItems;
-          if (Object.keys(state.overlaysByScenario[scenarioId]).length === 0) {
-            delete state.overlaysByScenario[scenarioId];
-          }
         }
+        cleanupScenario(state, scenarioId);
       }
     },
     setBookingOverlay(state, action) {
       const { scenarioId, itemId, bookingId, overlayData } = action.payload;
       if (!state.overlaysByScenario[scenarioId]) {
-        state.overlaysByScenario[scenarioId] = { bookings: {} };
+        state.overlaysByScenario[scenarioId] = {};
       }
       if (!state.overlaysByScenario[scenarioId].bookings) {
         state.overlaysByScenario[scenarioId].bookings = {};
@@ -49,16 +54,13 @@ const simOverlaySlice = createSlice({
       const { scenarioId, itemId, bookingId } = action.payload;
       if (state.overlaysByScenario[scenarioId]?.bookings?.[itemId]) {
         delete state.overlaysByScenario[scenarioId].bookings[itemId][bookingId];
-        // Clean up empty structures
         if (Object.keys(state.overlaysByScenario[scenarioId].bookings[itemId]).length === 0) {
           delete state.overlaysByScenario[scenarioId].bookings[itemId];
-          if (Object.keys(state.overlaysByScenario[scenarioId].bookings).length === 0) {
-            delete state.overlaysByScenario[scenarioId].bookings;
-            if (Object.keys(state.overlaysByScenario[scenarioId]).length === 0) {
-              delete state.overlaysByScenario[scenarioId];
-            }
-          }
         }
+        if (Object.keys(state.overlaysByScenario[scenarioId].bookings || {}).length === 0) {
+          delete state.overlaysByScenario[scenarioId].bookings;
+        }
+        cleanupScenario(state, scenarioId);
       }
     },
     setGroupDefOverlay(state, action) {
@@ -72,9 +74,7 @@ const simOverlaySlice = createSlice({
       const { scenarioId } = action.payload;
       if (state.overlaysByScenario[scenarioId]) {
         delete state.overlaysByScenario[scenarioId].groupDefs;
-        if (Object.keys(state.overlaysByScenario[scenarioId]).length === 0) {
-          delete state.overlaysByScenario[scenarioId];
-        }
+        cleanupScenario(state, scenarioId);
       }
     },
     setQualificationDefOverlay(state, action) {
@@ -82,20 +82,13 @@ const simOverlaySlice = createSlice({
       if (!state.overlaysByScenario[scenarioId]) {
         state.overlaysByScenario[scenarioId] = {};
       }
-      if (!state.overlaysByScenario[scenarioId].qualificationDefs) {
-        state.overlaysByScenario[scenarioId].qualificationDefs = [];
-      }
-
-      // Merge or replace the overlay data
       state.overlaysByScenario[scenarioId].qualificationDefs = overlayData;
     },
     removeQualificationDefOverlay(state, action) {
       const { scenarioId } = action.payload;
       if (state.overlaysByScenario[scenarioId]) {
         delete state.overlaysByScenario[scenarioId].qualificationDefs;
-        if (Object.keys(state.overlaysByScenario[scenarioId]).length === 0) {
-          delete state.overlaysByScenario[scenarioId];
-        }
+        cleanupScenario(state, scenarioId);
       }
     },
     deleteAllOverlaysForScenario(state, action) {
@@ -120,74 +113,15 @@ const simOverlaySlice = createSlice({
     },
     removeGroupAssignmentOverlay(state, action) {
       const { scenarioId, itemId, groupId } = action.payload;
-      if (
-        state.overlaysByScenario[scenarioId]?.groupassignments?.[itemId]?.[groupId]
-      ) {
+      if (state.overlaysByScenario[scenarioId]?.groupassignments?.[itemId]?.[groupId]) {
         delete state.overlaysByScenario[scenarioId].groupassignments[itemId][groupId];
-        // Clean up empty structures
-        if (
-          Object.keys(state.overlaysByScenario[scenarioId].groupassignments[itemId]).length === 0
-        ) {
+        if (Object.keys(state.overlaysByScenario[scenarioId].groupassignments[itemId]).length === 0) {
           delete state.overlaysByScenario[scenarioId].groupassignments[itemId];
-          if (
-            Object.keys(state.overlaysByScenario[scenarioId].groupassignments).length === 0
-          ) {
-            delete state.overlaysByScenario[scenarioId].groupassignments;
-            if (Object.keys(state.overlaysByScenario[scenarioId]).length === 0) {
-              delete state.overlaysByScenario[scenarioId];
-            }
-          }
         }
-      }
-    },
-    setFinancialOverlay(state, action) {
-      const { scenarioId, itemId, financialId, overlayData } = action.payload;
-      if (!state.overlaysByScenario[scenarioId]) {
-        state.overlaysByScenario[scenarioId] = {};
-      }
-      if (!state.overlaysByScenario[scenarioId].financials) {
-        state.overlaysByScenario[scenarioId].financials = {};
-      }
-      if (!state.overlaysByScenario[scenarioId].financials[itemId]) {
-        state.overlaysByScenario[scenarioId].financials[itemId] = {};
-      }
-      state.overlaysByScenario[scenarioId].financials[itemId][financialId] = overlayData;
-    },
-    removeFinancialOverlay(state, action) {
-      const { scenarioId, itemId, financialId } = action.payload;
-      if (state.overlaysByScenario[scenarioId]?.financials?.[itemId]) {
-        delete state.overlaysByScenario[scenarioId].financials[itemId][financialId];
-        if (Object.keys(state.overlaysByScenario[scenarioId].financials[itemId]).length === 0) {
-          delete state.overlaysByScenario[scenarioId].financials[itemId];
-          if (Object.keys(state.overlaysByScenario[scenarioId].financials).length === 0) {
-            delete state.overlaysByScenario[scenarioId].financials;
-            if (Object.keys(state.overlaysByScenario[scenarioId]).length === 0) {
-              delete state.overlaysByScenario[scenarioId];
-            }
-          }
+        if (Object.keys(state.overlaysByScenario[scenarioId].groupassignments || {}).length === 0) {
+          delete state.overlaysByScenario[scenarioId].groupassignments;
         }
-      }
-    },
-    setFinancialDefOverlay(state, action) {
-      const { scenarioId, financialDefId, overlayData } = action.payload;
-      if (!state.overlaysByScenario[scenarioId]) {
-        state.overlaysByScenario[scenarioId] = {};
-      }
-      if (!state.overlaysByScenario[scenarioId].financialDefs) {
-        state.overlaysByScenario[scenarioId].financialDefs = {};
-      }
-      state.overlaysByScenario[scenarioId].financialDefs[financialDefId] = overlayData;
-    },
-    removeFinancialDefOverlay(state, action) {
-      const { scenarioId, financialDefId } = action.payload;
-      if (state.overlaysByScenario[scenarioId]?.financialDefs) {
-        delete state.overlaysByScenario[scenarioId].financialDefs[financialDefId];
-        if (Object.keys(state.overlaysByScenario[scenarioId].financialDefs).length === 0) {
-          delete state.overlaysByScenario[scenarioId].financialDefs;
-          if (Object.keys(state.overlaysByScenario[scenarioId]).length === 0) {
-            delete state.overlaysByScenario[scenarioId];
-          }
-        }
+        cleanupScenario(state, scenarioId);
       }
     },
   },
@@ -206,10 +140,7 @@ export const {
   loadOverlaysByScenario,
   setGroupAssignmentOverlay,
   removeGroupAssignmentOverlay,
-  setFinancialOverlay,
-  removeFinancialOverlay,
-  setFinancialDefOverlay,
-  removeFinancialDefOverlay,
 } = simOverlaySlice.actions;
 
 export default simOverlaySlice.reducer;
+

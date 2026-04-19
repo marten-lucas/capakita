@@ -1,24 +1,26 @@
-// filepath: /home/marten/Development/kiga-simulator/src/components/SimDataDetail/QualificationPicker.jsx
 import React from 'react';
-import { RadioGroup, FormControlLabel, Radio, Box } from '@mui/material';
+import { Radio, Group, Box } from '@mantine/core';
+import { useSelector } from 'react-redux';
 
-function QualificationPicker({ qualificationDefs, value, onChange }) {
+function QualificationPicker({ value, onChange }) {
+  const scenarioId = useSelector((state) => state.simScenario.selectedScenarioId);
+  const qualificationDefs = useSelector(
+    (state) => state.simQualification.qualificationDefsByScenario[scenarioId] || []
+  );
+
   return (
     <Box>
-      <RadioGroup
-        row
-        value={value || ''}
-        onChange={e => onChange(e.target.value)}
-      >
-        {qualificationDefs.map((q, idx) => (
-          <FormControlLabel
-            key={`${q.key}-${idx}`}
-            value={q.key}
-            control={<Radio />}
-            label={q.initial || q.name}
-          />
-        ))}
-      </RadioGroup>
+      <Radio.Group value={value || ''} onChange={onChange}>
+        <Group mt="xs">
+          {qualificationDefs.map((q, idx) => (
+            <Radio
+              key={`${q.key}-${idx}`}
+              value={q.key}
+              label={q.initial || q.name}
+            />
+          ))}
+        </Group>
+      </Radio.Group>
     </Box>
   );
 }

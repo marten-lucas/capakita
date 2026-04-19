@@ -45,7 +45,7 @@ export function generateBookingDataSeries(referenceDate, filteredBookings, categ
       if (dayObj.day_name !== catDay) return false;
       if (!Array.isArray(dayObj.segments)) return false;
       return dayObj.segments.some(seg =>
-        seg.booking_start <= catTime && seg.booking_end > catTime // exclusive end
+        seg.category !== 'administrative' && seg.booking_start <= catTime && seg.booking_end > catTime // exclusive end
       );
     });
   }

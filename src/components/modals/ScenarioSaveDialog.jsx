@@ -1,27 +1,17 @@
 import React, { useState } from 'react';
-import Dialog from '@mui/material/Dialog';
-import DialogTitle from '@mui/material/DialogTitle';
-import DialogContent from '@mui/material/DialogContent';
-import DialogActions from '@mui/material/DialogActions';
-import TextField from '@mui/material/TextField';
-import Button from '@mui/material/Button';
-import Typography from '@mui/material/Typography';
-import IconButton from '@mui/material/IconButton';
-import InputAdornment from '@mui/material/InputAdornment';
-import Visibility from '@mui/icons-material/Visibility';
-import VisibilityOff from '@mui/icons-material/VisibilityOff';
+import { Modal, Button, Stack, Text, Group, PasswordInput, Loader } from '@mantine/core';
 import { useSaveLoad } from '../../hooks/useSaveLoad';
 import { useSelector, useDispatch } from 'react-redux';
 import { setSaveDialogOpen } from '../../store/simScenarioSlice';
 
 function ScenarioSaveDialog() {
   const dispatch = useDispatch();
-  const open = useSelector(state => state.simScenario.saveDialogOpen);
+  const opened = useSelector(state => state.simScenario.saveDialogOpen);
   const { saveData } = useSaveLoad();
+  
   const [pwValue, setPwValue] = useState('');
   const [pwValue2, setPwValue2] = useState('');
   const [pwError, setPwError] = useState('');
-  const [showPw, setShowPw] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   const handleSubmit = async () => {
@@ -37,7 +27,6 @@ function ScenarioSaveDialog() {
       setPwValue('');
       setPwValue2('');
       setPwError('');
-      setShowPw(false);
       dispatch(setSaveDialogOpen(false));
     } else {
       setPwError(result.error);
@@ -50,67 +39,44 @@ function ScenarioSaveDialog() {
     setPwValue('');
     setPwValue2('');
     setPwError('');
-    setShowPw(false);
     dispatch(setSaveDialogOpen(false));
   };
 
   return (
-    <Dialog open={open} onClose={handleClose}>
-      <DialogTitle>Szenarien speichern</DialogTitle>
-      <DialogContent>
-        <TextField
-          autoFocus
-          margin="dense"
+    <Modal opened={opened} onClose={handleClose} title="Szenarien speichern" centered>
+      <Stack>
+        <PasswordInput
           label="Passwort"
-          type={showPw ? 'text' : 'password'}
-          fullWidth
+          placeholder="Passwort eingeben"
           value={pwValue}
-          onChange={e => setPwValue(e.target.value)}
+          onChange={(event) => setPwValue(event.currentTarget.value)}
           disabled={isSaving}
-          InputProps={{
-            endAdornment: (
-              <InputAdornment position="end">
-                <IconButton
-                  aria-label="Passwort anzeigen"
-                  onClick={() => setShowPw(s => !s)}
-                  edge="end"
-                  disabled={isSaving}
-                >
-                  {showPw ? <VisibilityOff /> : <Visibility />}
-                </IconButton>
-              </InputAdornment>
-            )
-          }}
+          error={pwError && !pwValue2 ? pwError : null}
         />
-        <TextField
-          margin="dense"
+        <PasswordInput
           label="Passwort bestätigen"
-          type={showPw ? 'text' : 'password'}
-          fullWidth
+          placeholder="Passwort bestätigen"
           value={pwValue2}
-          onChange={e => setPwValue2(e.target.value)}
+          onChange={(event) => setPwValue2(event.currentTarget.value)}
           disabled={isSaving}
-          sx={{ mt: 2 }}
+          error={pwError && pwValue2 ? pwError : null}
         />
-        {pwError && (
-          <Typography color="error" variant="body2" sx={{ mt: 1 }}>
-            {pwError}
-          </Typography>
-        )}
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+
+        <Text size="xs" c="dimmed">
           Das Passwort muss mindestens 8 Zeichen lang sein und Groß- und Kleinbuchstaben, 
           Zahlen sowie Sonderzeichen enthalten.
-        </Typography>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={handleClose} disabled={isSaving}>
-          Abbrechen
-        </Button>
-        <Button onClick={handleSubmit} variant="contained" disabled={isSaving}>
-          {isSaving ? 'Speichere...' : 'Speichern'}
-        </Button>
-      </DialogActions>
-    </Dialog>
+        </Text>
+
+        <Group justify="flex-end" mt="md">
+          <Button variant="subtle" onClick={handleClose} disabled={isSaving}>
+            Abbrechen
+          </Button>
+          <Button onClick={handleSubmit} disabled={isSaving || !pwValue || !pwValue2}>
+            {isSaving ? <Loader size="xs" color="white" /> : 'Speichern'}
+          </Button>
+        </Group>
+      </Stack>
+    </Modal>
   );
 }
 

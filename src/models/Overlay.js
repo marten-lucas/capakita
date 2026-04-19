@@ -5,8 +5,6 @@
  * @property {Object} [bookings]
  * @property {Object} [groupassignments]
  * @property {Object} [qualificationDefs]
- * @property {Object} [financials]
- * @property {Object} [financialDefs]
  * // ...add other overlay properties as needed
  */
 
@@ -20,8 +18,6 @@ export class Overlay {
     bookings = {},
     groupassignments = {},
     qualificationDefs = {},
-    financials = {},
-    financialDefs = {},
     ...rest
   }) {
     this.scenarioId = String(scenarioId);
@@ -29,8 +25,6 @@ export class Overlay {
     this.bookings = bookings;
     this.groupassignments = groupassignments;
     this.qualificationDefs = qualificationDefs;
-    this.financials = financials;
-    this.financialDefs = financialDefs;
     Object.assign(this, rest);
   }
 }

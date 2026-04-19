@@ -1,15 +1,15 @@
 import React from 'react';
-import { Typography, Box, Button, Switch, Slider } from '@mui/material';
+import { Group, Box, Text, Switch, RangeSlider, ActionIcon, Stack, Select, Badge } from '@mantine/core';
+import { IconMinus, IconPlus } from '@tabler/icons-react';
 import { timeToValue, valueToTime } from '../../../utils/timeUtils';
 
-function DayControl({ dayLabel, dayAbbr, dayData, onToggle, onTimeChange, onAddSegment, onRemoveSegment, type }) {
+function DayControl({ dayLabel, dayData, onToggle, onTimeChange, onAddSegment, onRemoveSegment, isCapacity = false, onCategoryChange }) {
   const isActive = !!dayData;
   const segments = React.useMemo(
     () => (isActive ? dayData.segments : []),
     [isActive, dayData?.segments]
   );
 
-  // Local state for slider values per segment
   const [sliderValues, setSliderValues] = React.useState(
     segments.map(seg => [
       timeToValue(seg.booking_start),
@@ -17,7 +17,6 @@ function DayControl({ dayLabel, dayAbbr, dayData, onToggle, onTimeChange, onAddS
     ])
   );
 
-  // Sync local slider state if segments change (e.g. add/remove)
   React.useEffect(() => {
     setSliderValues(
       segments.map(seg => [
@@ -25,71 +24,92 @@ function DayControl({ dayLabel, dayAbbr, dayData, onToggle, onTimeChange, onAddS
         timeToValue(seg.booking_end)
       ])
     );
-  }, [segments, segments.length]);
+  }, [segments]);
 
   return (
-    <Box display="flex" alignItems="flex-start" gap={2} sx={{ mb: 1, width: '100%' }}>
-      <Typography sx={{ width: 80, mt: 1 }}>{dayLabel}</Typography>
-      <Switch checked={isActive} onChange={(e) => onToggle(dayAbbr, e.target.checked)} />
-      <Box sx={{ flex: 1, px: 2, width: '100%' }}>
+    <Group wrap="nowrap" align="flex-start" gap="md" py="xs" style={{ borderBottom: '1px solid #f0f0f0' }}>
+      <Text w={80} size="sm" fw={500}>{dayLabel}</Text>
+      <Switch 
+        checked={isActive} 
+        onChange={(e) => onToggle(e.currentTarget.checked)} 
+        size="sm"
+        aria-label={dayLabel}
+      />
+      
+      <Box style={{ flex: 1 }}>
         {isActive && (
-          <Box sx={{ width: '100%' }}>
+          <Stack gap="xl" mt="sm">
             {segments.map((seg, idx) => (
-              <Box key={idx} display="flex" alignItems="center" gap={1} sx={{ mb: 1, width: '100%' }}>
-                <Box sx={{ flex: 1, minWidth: 0, width: '100%' }}>
-                  <Slider
-                    value={sliderValues[idx] || [
-                      timeToValue(seg.booking_start),
-                      timeToValue(seg.booking_end)
-                    ]}
-                    onChange={(_, newValue) => {
-                      setSliderValues(vals => {
-                        const next = [...vals];
-                        next[idx] = newValue;
-                        return next;
-                      });
-                    }}
-                    onChangeCommitted={(_, newValue) => {
-                      onTimeChange(dayAbbr, idx, newValue);
-                    }}
+              <Group key={seg.id || idx} wrap="nowrap" gap="xl" align="flex-start">
+                <Box style={{ flex: 1 }}>
+                  <RangeSlider
                     min={0}
                     max={47}
                     step={1}
-                    valueLabelFormat={valueToTime}
-                    valueLabelDisplay="auto"
+                    label={valueToTime}
+                    value={sliderValues[idx] || [0, 47]}
+                    onChange={(vals) => {
+                      const next = [...sliderValues];
+                      next[idx] = vals;
+                      setSliderValues(next);
+                    }}
+                    onChangeEnd={(vals) => onTimeChange(idx, vals)}
                     marks={[
                       { value: 14, label: '07:00' },
                       { value: 24, label: '12:00' },
-                      { value: 33, label: '16:30' },
+                      { value: 34, label: '17:00' },
                     ]}
-                    sx={{ width: '100%' }}
                   />
+
+                  {isCapacity && (
+                    <Stack gap={4} mt="sm">
+                      <Select
+                        label="Blocktyp"
+                        size="xs"
+                        data={[
+                          { value: 'pedagogical', label: 'Pädagogisch' },
+                          { value: 'administrative', label: 'Administrativ' },
+                        ]}
+                        value={seg.category || 'pedagogical'}
+                        onChange={(value) => value && onCategoryChange?.(idx, value)}
+                        allowDeselect={false}
+                        w={200}
+                      />
+                      {seg.category === 'administrative' && (
+                        <Badge size="xs" color="grape" variant="light">
+                          zählt nicht in Kapazität
+                        </Badge>
+                      )}
+                    </Stack>
+                  )}
                 </Box>
-                {segments.length > 1 && (
-                  <Button
-                    size="small"
-                    color="error"
-                    variant="outlined"
-                    sx={{ minWidth: 32, px: 1, ml: 0.5 }}
-                    onClick={() => onRemoveSegment(dayAbbr, idx)}
-                    title="Segment entfernen"
-                  >−</Button>
-                )}
-                {type === 'capacity' && (
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    sx={{ minWidth: 32, px: 1, ml: 0.5 }}
-                    onClick={() => onAddSegment(dayAbbr)}
-                    title="Zeitbereich hinzufügen"
-                  >+</Button>
-                )}
-              </Box>
+                
+                <Group gap={4}>
+                  {segments.length > 1 && (
+                    <ActionIcon 
+                      variant="light" 
+                      color="red" 
+                      onClick={() => onRemoveSegment(idx)}
+                      size="sm"
+                    >
+                      <IconMinus size={14} />
+                    </ActionIcon>
+                  )}
+                  <ActionIcon 
+                    variant="light" 
+                    color="blue" 
+                    onClick={onAddSegment}
+                    size="sm"
+                  >
+                    <IconPlus size={14} />
+                  </ActionIcon>
+                </Group>
+              </Group>
             ))}
-          </Box>
+          </Stack>
         )}
       </Box>
-    </Box>
+    </Group>
   );
 }
 

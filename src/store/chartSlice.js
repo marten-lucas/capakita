@@ -2,17 +2,15 @@ import { createSlice } from '@reduxjs/toolkit';
 import { calculateChartDataWeekly } from '../utils/chartUtils/chartUtilsWeekly';
 import { calculateChartDataMidterm, generateMidtermCategories } from '../utils/chartUtils/chartUtilsMidterm';
 import { calculateChartDataHistogram } from '../utils/chartUtils/chartUtilsHistogram';
+import { calculateChartDataAgeHistogram } from '../utils/chartUtils/chartUtilsAgeHistogram';
 import { buildOverlayAwareData } from '../utils/overlayUtils';
-import { calculateChartDataFinancial, generateFinancialCategories } from '../utils/chartUtils/chartUtilsFinancial';
-import { FINANCIAL_TYPE_REGISTRY, FINANCIAL_BONUS_REGISTRY, getCalculatorForType } from '../config/financialTypeRegistry';
-import { updateFinancialThunk } from './simFinancialsSlice';
 
 // Helper for initial chart state per scenario
 function getInitialChartState() {
   return {
     referenceDate: new Date().toISOString().slice(0, 10),
     timedimension: 'month',
-    chartToggles: ['weekly', 'midterm'], // removed 'histogram'
+    chartToggles: ['weekly', 'midterm', 'ageHistogram', 'histogram'],
     filter: {
       Groups: [],
       Qualifications: [],
@@ -31,6 +29,11 @@ function getInitialChartState() {
       },
       midterm: {
         categories: [],
+      },
+      ageHistogram: {
+        categories: [],
+        series: [],
+        maxCount: 0,
       },
       histogram: {
         categories: [],
@@ -98,6 +101,9 @@ const chartSlice = createSlice({
     deleteScenarioChart(state, action) {
       const scenarioId = action.payload;
       delete state[scenarioId];
+    },
+    loadChartState(_state, action) {
+      return action.payload || {};
     }
   },
   extraReducers: (builder) => {
@@ -197,7 +203,7 @@ export const updateMidTermChartData = (scenarioId) => (dispatch, getState) => {
   } = buildOverlayAwareData(scenarioId, state);
 
   // Get events for scenario
-  const events = state.events?.eventsByScenario?.[scenarioId] || [];
+  const events = (state.events?.eventsByScenario?.[scenarioId] || []).filter((event) => event.enabled !== false);
   // Generate categories for midterm chart
   const categories = generateMidtermCategories(timedimension, events);
 
@@ -248,6 +254,42 @@ export const updateMidTermChartData = (scenarioId) => (dispatch, getState) => {
     scenarioId,
     chartType: 'midterm',
     data: clonedData
+  }));
+};
+
+export const updateAgeHistogramData = (scenarioId) => (dispatch, getState) => {
+  const state = getState();
+  const chartState = state.chart[scenarioId] || {};
+  const referenceDate = chartState.referenceDate || new Date().toISOString().slice(0, 10);
+  const selectedGroups = [...(chartState.filter?.Groups || [])];
+
+  const {
+    effectiveDataItems,
+    effectiveGroupAssignmentsByItem,
+  } = buildOverlayAwareData(scenarioId, state);
+
+  const dataByScenarioWrapped = { [scenarioId]: effectiveDataItems };
+  const groupsByScenarioWrapped = { [scenarioId]: effectiveGroupAssignmentsByItem };
+
+  let chartData;
+  try {
+    chartData = calculateChartDataAgeHistogram(referenceDate, selectedGroups, {
+      dataByScenario: dataByScenarioWrapped,
+      groupsByScenario: groupsByScenarioWrapped,
+      scenarioId,
+    });
+  } catch {
+    chartData = {};
+  }
+
+  dispatch(setChartData({
+    scenarioId,
+    chartType: 'ageHistogram',
+    data: {
+      categories: chartData?.categories ? [...chartData.categories] : [],
+      series: chartData?.series ? [...chartData.series] : [],
+      maxCount: chartData?.maxCount || 0,
+    },
   }));
 };
 
@@ -313,159 +355,6 @@ export const updateHistogramChartData = (scenarioId) => (dispatch, getState) => 
   }));
 };
 
-// Thunk to update payments for all financials in a scenario
-export const updatePaymentsThunk = (scenarioId) => async (dispatch, getState) => {
-  const state = getState();
-
-  // Get all overlay-aware data
-  const {
-    effectiveFinancialsByItem,
-    effectiveDataItems,
-    effectiveBookingsByItem,
-    effectiveGroupAssignmentsByItem,
-    effectiveFinancialDefs,
-  } = buildOverlayAwareData(scenarioId, state);
-
-  // Flatten all financials across all items, preserving the dataItemId
-  const allFinancials = Object.entries(effectiveFinancialsByItem || {}).flatMap(
-    ([dataItemId, itemFinancials]) =>
-      Object.values(itemFinancials || {}).map(financial => ({
-        ...financial,
-        dataItemId // Add the dataItemId to each financial
-      }))
-  );
-
-  if (allFinancials.length === 0) {
-    console.warn(`No financials found for scenario ${scenarioId}`);
-    return [];
-  }
-
-  // Recursive payment updater for nested financials (bonuses)
-  const updatePaymentsRecursive = async (financial, dataItem, bookings, avrStageUpgrades, allFinancials) => {
-    const calculatorLoader = getCalculatorForType(financial.type);
-    if (!calculatorLoader) return financial;
-    const updatePayments = await calculatorLoader();
-    // Calculate payments for this financial
-    const newPayments = updatePayments(financial, dataItem, bookings, avrStageUpgrades, allFinancials);
-
-    // Update this financial with its payments
-    let updatedFinancial = { ...financial, payments: newPayments };
-
-    // Recursively update payments for nested bonuses, passing updated parent financials
-    if (Array.isArray(financial.financial)) {
-      // Build a new allFinancials array with the updated parent financial
-      const updatedAllFinancials = allFinancials.map(f =>
-        f.id === updatedFinancial.id ? updatedFinancial : f
-      );
-      updatedFinancial.financial = await Promise.all(
-        financial.financial.map(async bonus => {
-          return await updatePaymentsRecursive(bonus, dataItem, bookings, avrStageUpgrades, updatedAllFinancials);
-        })
-      );
-    }
-    return updatedFinancial;
-  };
-
-  const updatePromises = allFinancials.map(async (financial) => {
-    const dataItem = effectiveDataItems[financial.dataItemId];
-    const bookings = effectiveBookingsByItem[financial.dataItemId];
-    const avrStageUpgrades = financial.type_details?.stage_upgrades || [];
-    // Get group assignments for this data item
-    const groupAssignments = effectiveGroupAssignmentsByItem[financial.dataItemId];
-    // Get financial definitions (array)
-    const financialDefs = Array.isArray(effectiveFinancialDefs) ? effectiveFinancialDefs : Object.values(effectiveFinancialDefs || {});
-
-    try {
-      const calculatorLoader = getCalculatorForType(financial.type);
-      if (!calculatorLoader) return financial;
-      const updatePayments = await calculatorLoader();
-
-      let newPayments;
-      if (financial.type === 'income-fee') {
-        newPayments = updatePayments(financial, dataItem, bookings, groupAssignments, financialDefs);
-      } else {
-        newPayments = updatePayments(financial, dataItem, bookings, avrStageUpgrades, allFinancials);
-      }
-
-      // Update this financial with its payments
-      let updatedFinancial = { ...financial, payments: newPayments };
-
-      // Recursively update payments for nested bonuses, passing updated parent financials
-      if (Array.isArray(financial.financial)) {
-        // Build a new allFinancials array with the updated parent financial
-        const updatedAllFinancials = allFinancials.map(f =>
-          f.id === updatedFinancial.id ? updatedFinancial : f
-        );
-        updatedFinancial.financial = await Promise.all(
-          financial.financial.map(async bonus => {
-            return await updatePaymentsRecursive(bonus, dataItem, bookings, avrStageUpgrades, updatedAllFinancials);
-          })
-        );
-      }
-      dispatch(updateFinancialThunk({
-        scenarioId,
-        dataItemId: financial.dataItemId,
-        financialId: financial.id,
-        updates: { payments: updatedFinancial.payments, financial: updatedFinancial.financial }
-      }));
-      return { financialId: financial.id, payments: updatedFinancial.payments };
-    } catch (error) {
-      console.error(`Error updating payments for financial ${financial.id}:`, error);
-      return null;
-    }
-  });
-
-  const results = await Promise.all(updatePromises);
-  const successfulUpdates = results.filter(result => result !== null);
-
-  return successfulUpdates;
-};
-
-// Thunk to update financial chart data for a scenario
-export const updateFinancialChartData = (scenarioId, timedimensionArg) => async (dispatch, getState) => {
-  const state = getState();
-  const chartState = state.chart[scenarioId] || {};
-  const timedimension = timedimensionArg || chartState.timedimension || 'month';
-
-  // 1. First update all payments
-  await dispatch(updatePaymentsThunk(scenarioId));
-  
-  // 2. Get fresh state after payment updates
-  const updatedState = getState();
-  
-  // 3. Use utility to build overlay-aware data with updated payments
-  const {
-    effectiveDataItems,
-    effectiveFinancialDefs,
-    effectiveFinancialsByItem
-  } = buildOverlayAwareData(scenarioId, updatedState);
-
-  // Get events for scenario
-  const events = updatedState.events?.eventsByScenario?.[scenarioId] || [];
-  // Generate categories for financial chart
-  const categories = generateFinancialCategories(timedimension, events);
-
-  // Flatten all financials for chart calculation using overlay utility data
-  const financialEntries = Object.values(effectiveFinancialsByItem || {}).flatMap(
-    itemFinancials => Object.values(itemFinancials || {})
-  );
-
-  // 4. Calculate chart data with updated payments
-  const chartData = calculateChartDataFinancial({
-    categories,
-    financialEntries,
-    financialDefs: effectiveFinancialDefs || {},
-    dataItems: effectiveDataItems || {},
-    timedimension,
-    events
-  });
-
-  dispatch(setChartData({
-    scenarioId,
-    chartType: 'financial',
-    data: chartData
-  }));
-};
 
 export const {
   ensureScenario,
@@ -477,6 +366,7 @@ export const {
   setChartData,
   resetScenarioChart,
   deleteScenarioChart,
+  loadChartState,
 } = chartSlice.actions;
 
 export default chartSlice.reducer;

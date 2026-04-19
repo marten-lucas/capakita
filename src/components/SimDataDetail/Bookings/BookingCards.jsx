@@ -1,9 +1,8 @@
 import React from 'react';
-import { Typography, Box, Avatar } from '@mui/material';
+import { Text, Group, Box, Avatar } from '@mantine/core';
 import { consolidateBookingSummary } from '../../../utils/bookingUtils';
 
-
-// Hilfsfunktion analog zu SimDataList
+// Helper to calculate total hours from booking segments
 function getBookingHours(times) {
   if (!times || times.length === 0) return '0 h';
   let totalMinutes = 0;
@@ -22,10 +21,8 @@ function getBookingHours(times) {
   return `${(totalMinutes / 60).toFixed(1)} h`;
 }
 
-// Summary component for a booking
 function BookingCards({ item, index }) {
   const booking = item;
-  // Zeitraum-Text
   let dateRangeText = '';
   if (booking.startdate && booking.enddate) {
     dateRangeText = `von ${booking.startdate} bis ${booking.enddate}`;
@@ -34,21 +31,23 @@ function BookingCards({ item, index }) {
   } else if (booking.enddate) {
     dateRangeText = `bis ${booking.enddate}`;
   }
-  // Stunden-Summe
+  
   const hoursText = getBookingHours(booking.times);
 
   return (
-    <Box display="flex" alignItems="center" gap={2}>
-      <Avatar sx={{ bgcolor: 'primary.main', color: 'white', width: 32, height: 32, fontWeight: 700 }}>
+    <Group wrap="nowrap" gap="sm">
+      <Avatar color="blue" radius="xl" size="sm">
         {index + 1}
       </Avatar>
       <Box>
-        <Typography variant="subtitle1">
-          <Box component="span" fontWeight='fontWeightMedium'>{hoursText} {dateRangeText}</Box>
-        </Typography>
-        <Typography variant="caption">{consolidateBookingSummary(booking.times)}</Typography>
+        <Text size="sm" fw={500}>
+          {hoursText} {dateRangeText}
+        </Text>
+        <Text size="xs" c="dimmed">
+          {consolidateBookingSummary(booking.times)}
+        </Text>
       </Box>
-    </Box>
+    </Group>
   );
 }
 

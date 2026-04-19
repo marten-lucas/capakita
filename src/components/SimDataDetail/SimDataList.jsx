@@ -1,21 +1,15 @@
 import React, { useMemo } from 'react';
-import { Box, Chip, Avatar, Tooltip } from '@mui/material';
+import { Group, Avatar, Badge, Text, ActionIcon, Stack, Tooltip } from '@mantine/core';
 import { useSelector, useDispatch } from 'react-redux';
 import { setSelectedItem } from '../../store/simScenarioSlice';
 import { deleteDataItemThunk } from '../../store/simDataSlice';
 import { useOverlayData } from '../../hooks/useOverlayData';
-import DeleteIcon from '@mui/icons-material/Delete';
-import PersonIcon from '@mui/icons-material/Person';
-import ChildCareIcon from '@mui/icons-material/ChildCare';
-import RestoreButton from './RestoreButton';
+import { IconTrash, IconUser, IconBabyCarriage, IconChevronRight } from '@tabler/icons-react';
 import { getDateRangeString } from '../../utils/dateUtils';
 import { sumBookingHours } from '../../utils/bookingUtils';
 import { getEffectiveGroupAssignments, getScenarioChain } from '../../utils/overlayUtils';
 import TabbedListDetail from '../common/TabbedListDetail';
 import SimDataTabs from './SimDataTabs';
-
-// Use a constant for empty object to avoid new reference on each render
-const EMPTY_OBJECT = {};
 
 function SimDataList() {
   const dispatch = useDispatch();
@@ -33,7 +27,6 @@ function SimDataList() {
   const {
     getEffectiveDataItems,
     hasOverlay,
-    isBasedScenario,
     getEffectiveGroupDefs,
     getEffectiveBookings,
     getEffectiveQualificationDefs,
@@ -48,187 +41,78 @@ function SimDataList() {
     () =>
       Object.entries(effectiveDataItems).map(([key, item]) => ({
         ...item,
-        id: key,     // required by TabbedListDetail
-        _key: key,   // keep for lookups
+        id: key,
+        _key: key,
       })),
     [effectiveDataItems]
   );
 
-  // Helpers
-  function getGroupDef(groupId) {
-    if (!groupId) return null;
-    return groupDefs.find(g => String(g.id) === String(groupId));
-  }
+  const getGroupDef = (groupId) => groupId ? groupDefs.find(g => String(g.id) === String(groupId)) : null;
 
-  function getBookings(itemId) {
-    const bookingsObj = getEffectiveBookings(itemId);
-    return bookingsObj ? Object.values(bookingsObj) : [];
-  }
-
-  function getSubtitle(item) {
-    const bookings = getBookings(item._key);
-    if (!bookings.length) return '';
-    const booking = bookings[0];
-    const hours = sumBookingHours(booking);
-    return getDateRangeString(booking.startdate, booking.enddate, hours);
-  }
-
-  function getAvatar(item) {
-    const groupAssignments = getEffectiveGroupAssignments(
-      scenarioChain,
-      overlaysByScenario,
-      groupsByScenario,
-      item._key
-    );
+  const renderItem = (item) => {
+    const bookings = Object.values(getEffectiveBookings(item._key));
+    const subtitle = bookings.length > 0 ? getDateRangeString(bookings[0].startdate, bookings[0].enddate, sumBookingHours(bookings[0])) : '';
+    
+    const groupAssignments = getEffectiveGroupAssignments(scenarioChain, overlaysByScenario, groupsByScenario, item._key);
     const assignments = groupAssignments ? Object.values(groupAssignments) : [];
-    const groupAssignment = assignments.length === 0 ? null : assignments.find(a => !a.end) || assignments[0];
+    const groupAssignment = assignments.find(a => !a.end) || assignments[0];
     const groupDef = groupAssignment ? getGroupDef(groupAssignment.groupId) : null;
-    const DEMAND_COLOR = '#ced7d9ff';
-    const CAPACITY_COLOR = '#d9ddd9dd';
-    const color = item.type === 'demand' ? DEMAND_COLOR : CAPACITY_COLOR;
-    let icon = null;
-    if (groupDef && groupDef.icon) {
-      icon = groupDef.icon;
-    } else if (item.type === 'capacity') {
-      icon = <PersonIcon fontSize="small" />;
-    } else if (item.type === 'demand') {
-      icon = <ChildCareIcon fontSize="small" />;
-    }
-    return (
-      <Avatar sx={{ bgcolor: color, color: '#222', width: 32, height: 32, fontSize: 22 }}>
-        {typeof icon === 'string' ? icon : icon}
-      </Avatar>
-    );
-  }
 
-  function getSourceChip(item) {
-    if (item.source && item.source.toLowerCase().includes('adebis')) {
-      return <Chip label="Importiert" size="small" color="info" sx={{ fontSize: '0.7rem', height: 20 }} />;
-    }
-    return <Chip label="Manuell" size="small" color="default" sx={{ fontSize: '0.7rem', height: 20 }} />;
-  }
-
-  function getQualificationChips(item) {
-    if (item.type !== 'capacity') return null;
-    const qualificationAssignments = getEffectiveQualificationAssignments(item._key);
-    if (!qualificationAssignments || qualificationAssignments.length === 0) return null;
-
-    return qualificationAssignments.map((assignment, index) => {
-      const qualificationDef = qualificationDefs.find(def => def.key === assignment.qualification);
-      const displayName = qualificationDef?.initial || qualificationDef?.name || assignment.qualification;
-      const isExpert = qualificationDef?.IsExpert !== false;
-
-      return (
-        <Chip
-          key={`${assignment.qualification}-${index}`}
-          label={displayName}
-          size="small"
-          color={isExpert ? 'primary' : 'secondary'}
-          variant="outlined"
-          sx={{ fontSize: '0.6rem', height: 18, mr: 0.5 }}
-        />
-      );
+    const isExpert = item.type === 'capacity' && getEffectiveQualificationAssignments(item._key).some(a => {
+        const def = qualificationDefs.find(d => d.key === a.qualification);
+        return def?.IsExpert !== false;
     });
-  }
 
-  const handleRestore = (itemId, isBasedScenario, scenarios, data) => {
-    if (isBasedScenario) {
-      dispatch({ type: 'simOverlay/removeDataItemOverlay', payload: { scenarioId: selectedScenarioId, itemId } });
-      dispatch({ type: 'simOverlay/removeBookingOverlay', payload: { scenarioId: selectedScenarioId, itemId } });
-      dispatch({ type: 'simOverlay/removeGroupAssignmentOverlay', payload: { scenarioId: selectedScenarioId, itemId } });
-      dispatch({ type: 'simOverlay/removeQualificationDefOverlay', payload: { scenarioId: selectedScenarioId } });
-    } else {
-      const state = window.store?.getState?.() || {};
-      const allScenarios = state.simScenario?.scenarios || [];
-      const importedScenarios = allScenarios.filter(s => s.imported);
-      let importedItem = null;
-      for (const s of importedScenarios) {
-        importedItem = Object.values(state.simData?.dataByScenario?.[s.id] || {}).find(
-          i =>
-            i.adebisId &&
-            data.find(d => d._key === itemId)?.adebisId &&
-            i.adebisId.id === data.find(d => d._key === itemId)?.adebisId.id &&
-            i.adebisId.source === data.find(d => d._key === itemId)?.adebisId.source
-        );
-        if (importedItem) break;
-      }
-      if (importedItem) {
-        dispatch({
-          type: 'simData/updateDataItem',
-          payload: {
-            scenarioId: selectedScenarioId,
-            itemId,
-            updates: {
-              ...importedItem,
-              id: itemId
-            }
-          }
-        });
-      }
-    }
+    return (
+      <Group justify="space-between" wrap="nowrap" gap="sm">
+        <Group wrap="nowrap">
+          <Avatar color={item.type === 'demand' ? 'cyan' : 'green'} radius="xl">
+            {groupDef?.icon || (item.type === 'demand' ? <IconBabyCarriage size={20} /> : <IconUser size={20} />)}
+          </Avatar>
+          <div>
+            <Group gap={5}>
+                <Text size="sm" fw={500}>{item.name}</Text>
+                {hasOverlay(item._key) && <Badge size="xs" color="orange" variant="light">Neu</Badge>}
+            </Group>
+            <Text size="xs" c="dimmed">{subtitle}</Text>
+          </div>
+        </Group>
+        
+        <Group gap={4}>
+            {item.type === 'capacity' && getEffectiveQualificationAssignments(item._key).map(a => (
+                <Badge key={a.id} size="xs" variant="outline" color={isExpert ? 'blue' : 'gray'}>
+                    {qualificationDefs.find(d => d.key === a.qualification)?.initial || a.qualification}
+                </Badge>
+            ))}
+            <IconChevronRight size={14} color="gray" />
+        </Group>
+      </Group>
+    );
   };
-
-  // Item renderers for TabbedListDetail
-  const ItemTitle = item => item.name || '';
-  const ItemSubTitle = item => getSubtitle(item);
-  const ItemChips = item => (
-    <>
-      {isBasedScenario && hasOverlay(item._key) && (
-        <Chip
-          label="Geändert"
-          size="small"
-          color="warning"
-          variant="outlined"
-          sx={{ fontSize: '0.6rem', height: 20 }}
-        />
-      )}
-      {getSourceChip(item)}
-      {getQualificationChips(item)}
-    </>
-  );
-  const ItemAvatar = item => (
-    <Tooltip title={item.type === 'demand' ? 'Kind' : 'Mitarbeiter'}>
-      {getAvatar(item)}
-    </Tooltip>
-  );
-  const ItemHoverIcons = item => [
-    {
-      icon: (
-        <RestoreButton
-          scenarioId={selectedScenarioId}
-          itemId={item._key}
-          onRestore={() => handleRestore(item._key, isBasedScenario, scenarios, data)}
-        />
-      ),
-      title: 'Zurücksetzen',
-      onClick: () => handleRestore(item._key, isBasedScenario, scenarios, data)
-    },
-    {
-      icon: <DeleteIcon fontSize="small" />,
-      title: 'Löschen',
-      onClick: () => dispatch(deleteDataItemThunk({ scenarioId: selectedScenarioId, itemId: item._key }))
-    }
-  ];
-  const ItemAddButton = null; // No add button
 
   return (
     <TabbedListDetail
-      items={data}
-      ItemTitle={ItemTitle}
-      ItemSubTitle={ItemSubTitle}
-      ItemChips={ItemChips}
-      ItemAvatar={ItemAvatar}
-      ItemHoverIcons={ItemHoverIcons}
-      ItemAddButton={ItemAddButton}
-      Detail={SimDataTabs}
-      emptyText="Importieren Sie Adebis-Daten oder fügen Sie Datensätze manuell hinzu"
-      getLevel={() => 0}
-      // Controlled selection: store and read from Redux
-      selectedId={selectedItemId || data[0]?.id}
+      data={data}
+      selectedId={selectedItemId}
       onSelect={(id) => dispatch(setSelectedItem(id))}
+      renderItem={renderItem}
+      detailTitle={(item) => item?.name || 'Details'}
+      detailContent={() => <SimDataTabs />}
+      actions={(item) => (
+        <Group gap="xs">
+          <Tooltip label="Löschen">
+            <ActionIcon
+              color="red"
+              variant="subtle"
+              onClick={() => dispatch(deleteDataItemThunk({ scenarioId: selectedScenarioId, itemId: item._key }))}
+            >
+              <IconTrash size={18} />
+            </ActionIcon>
+          </Tooltip>
+        </Group>
+      )}
     />
   );
 }
 
 export default SimDataList;
- 

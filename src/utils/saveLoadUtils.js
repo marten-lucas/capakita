@@ -32,7 +32,6 @@ export const extractSaveData = (state) => {
     groupDefsByScenario: state.simGroup.groupDefsByScenario,
     qualificationDefsByScenario: state.simQualification.qualificationDefsByScenario,
     qualificationAssignmentsByScenario: state.simQualification.qualificationAssignmentsByScenario,
-    financialsByScenario: state.simFinancials.financialsByScenario,
     chartStore: {
       stichtag: state.chart.stichtag,
       selectedGroups: state.chart.selectedGroups,

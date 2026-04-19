@@ -1,84 +1,64 @@
-import { useState, useEffect } from 'react';
-import {
-  Modal,
-  Box,
-  Typography,
-  Button,
-  Checkbox,
-  FormControlLabel,
-  Stack,
-} from '@mui/material';
-import FileUploadIcon from '@mui/icons-material/FileUpload';
+import React, { useState, useEffect } from 'react';
+import { Modal, Button, Checkbox, Stack, Text, Group, FileButton } from '@mantine/core';
+import { IconUpload } from '@tabler/icons-react';
+import { useScenarioImport } from '../../hooks/useScenarioImport';
+import { useNavigate } from 'react-router-dom';
 
-const modalStyle = {
-  position: 'absolute',
-  top: '50%',
-  left: '50%',
-  transform: 'translate(-50%, -50%)',
-  width: 400,
-  bgcolor: 'background.paper',
-  borderRadius: 2,
-  boxShadow: 24,
-  p: 4,
-};
-
-function DatenImportModal({ open, onClose, onImport }) {
-  const [selectedFile, setSelectedFile] = useState(null);
+function DataImportModal({ opened, onClose }) {
+  const [file, setFile] = useState(null);
   const [isAnonymized, setIsAnonymized] = useState(true);
+  const { importScenario } = useScenarioImport();
+  const navigate = useNavigate();
 
   useEffect(() => {
-    if (open) {
+    if (opened) {
+      setFile(null);
       setIsAnonymized(true);
-      setSelectedFile(null);
     }
-  }, [open]);
+  }, [opened]);
 
-  const handleFileChange = (event) => {
-    if (event.target.files && event.target.files[0]) {
-      setSelectedFile(event.target.files[0]);
-    }
-  };
-
-  const handleCheckboxChange = (event) => {
-    setIsAnonymized(event.target.checked);
-  };
-
-  const handleInternalClose = () => {
-    setSelectedFile(null);
-    setIsAnonymized(false);
-    onClose();
-  };
-
-  const handleImportClick = () => {
-    if (selectedFile) {
-      onImport({ file: selectedFile, isAnonymized });
-      // Do not call handleInternalClose here, let parent close after import
+  const handleImport = async () => {
+    if (file) {
+      await importScenario({ file, isAnonymized });
+      onClose();
+      navigate('/data');
     }
   };
 
   return (
-    <Modal open={open} onClose={handleInternalClose} aria-labelledby="import-modal-title">
-        <Box sx={modalStyle}>
-            <Typography id="import-modal-title" variant="h6" component="h2">
-                Daten importieren
-            </Typography>
-            <Stack spacing={2} sx={{ mt: 2 }}>
-                <Button variant="contained" component="label" startIcon={<FileUploadIcon />}>
-                    ZIP-Datei auswählen
-                    <input type="file" hidden accept=".zip,application/zip" onChange={handleFileChange} />
-                </Button>
-                {selectedFile && <Typography variant="body2">Ausgewählte Datei: {selectedFile.name}</Typography>}
-                <FormControlLabel control={<Checkbox checked={isAnonymized} onChange={handleCheckboxChange}  />} label="Daten anonymisieren" />
-                <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ pt: 2 }}>
-                    <Button onClick={handleInternalClose}>Abbrechen</Button>
-                    <Button variant="contained" onClick={handleImportClick} disabled={!selectedFile}>
-                        Importieren
-                    </Button>
-                </Stack>
-            </Stack>
-        </Box>
+    <Modal opened={opened} onClose={onClose} title="Daten importieren" centered>
+      <Stack>
+        <FileButton onChange={setFile} accept=".zip,application/zip">
+          {(props) => (
+            <Button {...props} leftSection={<IconUpload size={16} />}>
+              ZIP-Datei auswählen
+            </Button>
+          )}
+        </FileButton>
+
+        {file && (
+          <Text size="sm" c="dimmed">
+            Ausgewählte Datei: {file.name}
+          </Text>
+        )}
+
+        <Checkbox
+          label="Daten anonymisieren"
+          checked={isAnonymized}
+          onChange={(event) => setIsAnonymized(event.currentTarget.checked)}
+        />
+
+        <Group justify="flex-end" mt="md">
+          <Button variant="subtle" onClick={onClose}>
+            Abbrechen
+          </Button>
+          <Button onClick={handleImport} disabled={!file}>
+            Importieren
+          </Button>
+        </Group>
+      </Stack>
     </Modal>
-);
+  );
 }
 
-export default DatenImportModal;
+export default DataImportModal;

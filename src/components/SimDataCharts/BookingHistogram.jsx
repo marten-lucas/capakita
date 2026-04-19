@@ -1,18 +1,16 @@
 import { useMemo, useEffect } from 'react';
 import HighchartsReact from 'highcharts-react-official';
 import Highcharts from 'highcharts';
+import { Box, useMantineTheme } from '@mantine/core';
 import { useSelector, useDispatch } from 'react-redux';
-import Box from '@mui/material/Box';
-import { useTheme } from '@mui/material/styles'; // <-- import useTheme
 import { updateHistogramChartData } from '../../store/chartSlice';
 import { generateHistogramTooltip } from '../../utils/chartUtils/chartUtilsHistogram';
 
 export default function BookingHistogram() {
-  const theme = useTheme(); // <-- get theme
+  const theme = useMantineTheme();
 
-  // Use theme colors
-  const demandColor = theme.palette.primary.main;
-  const capacityColor = theme.palette.success.main;
+  const demandColor = theme.colors.blue[6];
+  const capacityColor = theme.colors.green[6];
 
   const scenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const dispatch = useDispatch();
@@ -90,11 +88,8 @@ export default function BookingHistogram() {
   }, [chartData, demandColor, capacityColor]);
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-      {/* Chart */}
-      <Box sx={{ height: 400 }}>
-        <HighchartsReact highcharts={Highcharts} options={histogramOptions} containerProps={{ style: { height: '100%' } }} />
-      </Box>
+    <Box h={400}>
+      <HighchartsReact highcharts={Highcharts} options={histogramOptions} containerProps={{ style: { height: '100%' } }} />
     </Box>
   );
 }

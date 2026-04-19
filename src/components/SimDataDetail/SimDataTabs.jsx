@@ -1,27 +1,14 @@
-import {
-  Typography,
-  Box,
-  Tabs,
-  Tab,
-  Button
-} from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
-import DeleteIcon from '@mui/icons-material/Delete';
-import PersonIcon from '@mui/icons-material/Person';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import GroupIcon from '@mui/icons-material/Group';
-import EuroIcon from '@mui/icons-material/Euro';
-import BugReportIcon from '@mui/icons-material/BugReport';
+import React, { useEffect, useState } from 'react';
+import { useSelector } from 'react-redux';
+import { Tabs, Box, Text, Center } from '@mantine/core';
+import { IconUser, IconClock, IconUsers, IconTools } from '@tabler/icons-react';
+import { useOverlayData } from '../../hooks/useOverlayData';
 import SimDataGeneralTab from './SimDataGeneralTab';
 import SimDataBookingTab from './Bookings/SimDataBookingTab';
 import SimDataGroupsTab from './Groups/SimDataGroupsTab';
-import SimDataFinanceTab from './Financials/SimDataFinanceTab';
-import React, { useState } from 'react';
-import { useSelector } from 'react-redux';
-import { useOverlayData } from '../../hooks/useOverlayData';
 
 function SimDataTabs() {
-  const [activeTab, setActiveTab] = useState(0);
+  const [activeTab, setActiveTab] = useState('general');
 
   // Get selected scenario and item id from Redux
   const scenarioId = useSelector(state => state.simScenario.selectedScenarioId);
@@ -31,46 +18,48 @@ function SimDataTabs() {
   const { getEffectiveDataItem } = useOverlayData();
   const item = getEffectiveDataItem(selectedItemId);
 
+  useEffect(() => {
+    setActiveTab('general');
+  }, [selectedItemId]);
+
   // Guard: If no item selected or no effective item found
   if (!selectedItemId || !item) {
     return (
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-        <Typography color="text.secondary">
+      <Center mih={200}>
+        <Text c="dimmed">
           Wählen Sie einen Eintrag aus, um Details anzuzeigen.
-        </Typography>
-      </Box>
+        </Text>
+      </Center>
     );
   }
 
   return (
-    <Box 
-      sx={{ 
-        height: '100%', 
-        display: 'flex', 
-        flexDirection: 'column',
-        minHeight: 0
-      }}
-    >
-      <Tabs
-        value={activeTab}
-        onChange={(_, newTab) => setActiveTab(newTab)}
-        variant="fullWidth"
-        sx={{ mb: 2, flex: '0 0 auto' }}
-      >
-        <Tab icon={<PersonIcon />} label="Allgemein" />
-        <Tab icon={<AccessTimeIcon />} label="Zeiten" />
-        <Tab icon={<GroupIcon />} label="Gruppen" />
-        <Tab icon={<EuroIcon />} label="Finanzen" />
-      </Tabs>
-      
-      <Box sx={{ flex: 1, overflow: 'auto', minHeight: 0, mt: 2 }}>
-        {activeTab === 0 && <SimDataGeneralTab />}
-        {activeTab === 1 && <SimDataBookingTab />}
-        {activeTab === 2 && <SimDataGroupsTab />}
-        {activeTab === 3 && <SimDataFinanceTab item={item} />}
-      </Box>
+    <Box h="100%" style={{ display: 'flex', flexDirection: 'column' }}>
+      <Tabs value={activeTab} onChange={setActiveTab} variant="outline">
+        <Tabs.List grow>
+          <Tabs.Tab value="general" leftSection={<IconUser size={16} />}>
+            Allgemein
+          </Tabs.Tab>
+          <Tabs.Tab value="bookings" leftSection={<IconClock size={16} />}>
+            Zeiten
+          </Tabs.Tab>
+          <Tabs.Tab value="groups" leftSection={<IconUsers size={16} />}>
+            Gruppen
+          </Tabs.Tab>
+        </Tabs.List>
 
-      
+        <Box pt="md" style={{ flex: 1, overflow: 'auto' }}>
+          <Tabs.Panel value="general">
+            <SimDataGeneralTab />
+          </Tabs.Panel>
+          <Tabs.Panel value="bookings">
+            <SimDataBookingTab />
+          </Tabs.Panel>
+          <Tabs.Panel value="groups">
+            <SimDataGroupsTab />
+          </Tabs.Panel>
+        </Box>
+      </Tabs>
     </Box>
   );
 }

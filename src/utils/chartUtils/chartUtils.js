@@ -1,5 +1,19 @@
-import { getBayKiBiGWeightForChild } from '../BayKiBiG-calculator';
 import { sumBookingHours } from '../bookingUtils';
+
+function getBayKiBiGWeightForChild(child, groupDef) {
+  if (!child) return 1;
+
+  if (groupDef?.IsSchool) {
+    return 1.2;
+  }
+
+  const age = Number(child.age || child.rawdata?.ALTER || 3);
+  if (Number.isFinite(age) && age < 3) {
+    return 2;
+  }
+
+  return 1;
+}
 
 // REMOVE any getScenarioChain or scenario traversal here!
 // Only use the data passed in for calculations
@@ -32,7 +46,7 @@ export function generateExpertRatioSeries(categories, filteredCapacityBookings, 
         if (dayObj.day_name !== day) return false;
         if (!Array.isArray(dayObj.segments)) return false;
         return dayObj.segments.some(seg =>
-          seg.booking_start <= time && seg.booking_end > time
+          seg.category !== 'administrative' && seg.booking_start <= time && seg.booking_end > time
         );
       });
       if (covers) {
@@ -91,7 +105,7 @@ export function generateCareRatioSeries(categories, filteredDemandBookings, filt
         if (dayObj.day_name !== day) return false;
         if (!Array.isArray(dayObj.segments)) return false;
         return dayObj.segments.some(seg =>
-          seg.booking_start <= time && seg.booking_end > time
+          seg.category !== 'administrative' && seg.booking_start <= time && seg.booking_end > time
         );
       });
       if (covers) {
@@ -215,7 +229,7 @@ export function filterBookings({
     // For demand: only group filter
     if (type === 'demand' && groupMatch) {
       itemBookings.forEach(booking => {
-        if (isActiveAt(booking, referenceDate)) {
+        if (isActiveAt(booking, referenceDate) && sumBookingHours(booking) > 0) {
           demand.push({ ...booking, itemId, groupId });
         }
       });
@@ -237,7 +251,7 @@ export function filterBookings({
 
       if (qualiMatch) {
         itemBookings.forEach(booking => {
-          if (isActiveAt(booking, referenceDate)) {
+          if (isActiveAt(booking, referenceDate) && sumBookingHours(booking, { mode: 'pedagogical' }) > 0) {
             capacity.push({ ...booking, itemId, groupId, qualifications: qualiKeys });
           }
         });
@@ -345,7 +359,7 @@ export function generateExpertRatioTimeDimension(categories, timedimension, filt
     filteredCapacityBookings.forEach(booking => {
       // Check if booking is active during this time period
       if (isBookingActiveInTimePeriod(booking, cat, timedimension)) {
-        const bookingHours = sumBookingHours(booking);
+        const bookingHours = sumBookingHours(booking, { mode: 'pedagogical' });
         totalHours += bookingHours;
 
         // Check if this booking has expert qualifications
@@ -399,7 +413,7 @@ export function generateCareRatioTimeDimension(categories, timedimension, filter
     // Calculate capacity hours for this time period
     filteredCapacityBookings.forEach(booking => {
       if (isBookingActiveInTimePeriod(booking, cat, timedimension)) {
-        capacityHours += sumBookingHours(booking);
+        capacityHours += sumBookingHours(booking, { mode: 'pedagogical' });
       }
     });
 
