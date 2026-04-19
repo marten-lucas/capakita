@@ -1,9 +1,7 @@
-import { Typography } from '@mui/material';
 import React from 'react';
+import { Text } from '@mantine/core';
 
-// This is now just the summary component for a group assignment
 function GroupCards({ item }) {
-  // Accept both {item} and {group} for compatibility
   const group = item || {};
   const { start, end, name } = group;
   let dateRangeText = '';
@@ -16,9 +14,9 @@ function GroupCards({ item }) {
   }
 
   return (
-    <Typography variant="subtitle1">
+    <Text size="sm" fw={500}>
       {(name || 'Gruppenzuordnung')}{dateRangeText ? `: ${dateRangeText}` : ''}
-    </Typography>
+    </Text>
   );
 }
 

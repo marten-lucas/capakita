@@ -1,72 +1,60 @@
 import React, { useState } from 'react';
-import {
-  Box,
-  Typography,
-  Paper,
-  Tabs,
-  Tab,
-} from '@mui/material';
-import GroupIcon from '@mui/icons-material/Group';
-import PersonIcon from '@mui/icons-material/Person';
-import EuroIcon from '@mui/icons-material/Euro';
-import AccountTreeIcon from '@mui/icons-material/AccountTree';
+import { Paper, Tabs, Box } from '@mantine/core';
+import { IconLayersIntersect, IconUsers, IconCertificate, IconCalendarEvent } from '@tabler/icons-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import OrgaTabGroupDefs from '../components/orgaDetails/orgaTabGroupDefs';
 import OrgaTabQualificationDefs from '../components/orgaDetails/orgaTabQualificatoinDefs';
-import OrgaTabRateDefs from '../components/orgaDetails/orgaTabRateDefs';
 import OrgaTabScenarioDefs from '../components/orgaDetails/orgaTabScenarioDefs';
-
+import OrgaTabEvents from '../components/orgaDetails/orgaTabEvents';
 
 function SettingsPage() {
   const location = useLocation();
   const navigate = useNavigate();
 
   // Parse tab from query string
-  const tabFromQuery = new URLSearchParams(location.search).get('tab');
-  // Szenarien tab is now at index 0
-  const [activeTab, setActiveTab] = useState(tabFromQuery === 'scenarios' ? 0 : 1);
+  const tabFromQuery = new URLSearchParams(location.search).get('tab') || 'groups';
+  const [activeTab, setActiveTab] = useState(tabFromQuery);
 
-  // Keep tab in sync with query
-  React.useEffect(() => {
-    if (tabFromQuery === 'scenarios' && activeTab !== 0) setActiveTab(0);
-    if (tabFromQuery !== 'scenarios' && activeTab === 0) setActiveTab(1);
-  }, [tabFromQuery, activeTab]);
-
-  // Handle tab change and update query
-  const handleTabChange = (_, newTab) => {
-    setActiveTab(newTab);
-    if (newTab === 0) {
-      navigate('/settings?tab=scenarios', { replace: true });
-    } else {
-      navigate('/settings', { replace: true });
-    }
+  const handleTabChange = (value) => {
+    setActiveTab(value);
+    navigate(`/settings?tab=${value}`, { replace: true });
   };
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 85px)', overflow: 'hidden' }}>
-      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', p: 0, minHeight: 0 }}>
-        <Paper sx={{ p: 0, flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }} elevation={3}>
-          <Tabs
-            value={activeTab}
-            onChange={handleTabChange}
-            sx={{ borderBottom: 1, borderColor: 'divider', flex: '0 0 auto' }}
-          >
-            <Tab icon={<AccountTreeIcon />} label="Szenarien" />
-            <Tab icon={<GroupIcon />} label="Gruppen" />
-            <Tab icon={<PersonIcon />} label="Qualifikationen" />
-            <Tab icon={<EuroIcon />} label="Beiträge" />
-          </Tabs>
-          <Box sx={{ p: 3, flex: 1, display: 'flex', flexDirection: 'column', overflow: 'auto', minHeight: 0 }}>
-            {activeTab === 0 && <OrgaTabScenarioDefs />}
-            {activeTab === 1 && <OrgaTabGroupDefs />}
-            {activeTab === 2 && <OrgaTabQualificationDefs />}
-            {activeTab === 3 && <OrgaTabRateDefs />}
-          </Box>
-        </Paper>
-      </Box>
-    </Box>
+    <Paper shadow="sm" withBorder p={0}>
+      <Tabs value={activeTab} onChange={handleTabChange}>
+        <Tabs.List>
+          <Tabs.Tab value="scenarios" leftSection={<IconLayersIntersect size={16} />}>
+            Szenarien
+          </Tabs.Tab>
+          <Tabs.Tab value="groups" leftSection={<IconUsers size={16} />}>
+            Gruppen
+          </Tabs.Tab>
+          <Tabs.Tab value="qualifications" leftSection={<IconCertificate size={16} />}>
+            Qualifikationen
+          </Tabs.Tab>
+          <Tabs.Tab value="events" leftSection={<IconCalendarEvent size={16} />}>
+            Ereignisse
+          </Tabs.Tab>
+        </Tabs.List>
+
+        <Box p="md">
+          <Tabs.Panel value="scenarios">
+            <OrgaTabScenarioDefs />
+          </Tabs.Panel>
+          <Tabs.Panel value="groups">
+            <OrgaTabGroupDefs />
+          </Tabs.Panel>
+          <Tabs.Panel value="qualifications">
+            <OrgaTabQualificationDefs />
+          </Tabs.Panel>
+          <Tabs.Panel value="events">
+            <OrgaTabEvents />
+          </Tabs.Panel>
+        </Box>
+      </Tabs>
+    </Paper>
   );
 }
 
 export default SettingsPage;
-

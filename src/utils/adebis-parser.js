@@ -12,6 +12,9 @@ function assignSegmentIdsToBookings(bookings) {
             if (!segment.id) {
               segment.id = `${booking.id}-${day.day_name}-${Date.now()}`;
             }
+            if (!segment.category) {
+              segment.category = 'pedagogical';
+            }
           });
         }
       });
@@ -82,16 +85,23 @@ export function adebis2bookings(belegungRaw, employeesRaw) {
   };
 }
 
+function hasParsedSegments(times) {
+  return Array.isArray(times) && times.some((day) => Array.isArray(day?.segments) && day.segments.length > 0);
+}
+
 function belegung2Booking(belegungRaw) {
   const bookings = [];
   const bookingReference = [];
   (belegungRaw || []).forEach((b) => {
     const bookingId = createId('booking');
-    let booking = {
+    const parsedTimes = Zeiten2Booking(b.ZEITEN, bookingId);
+    if (!hasParsedSegments(parsedTimes)) return;
+
+    const booking = {
       id: bookingId,
       startdate: convertDDMMYYYYtoYYYYMMDD(b.BELVON) || '',
       enddate: convertDDMMYYYYtoYYYYMMDD(b.BELBIS) || '',
-      times: Zeiten2Booking(b.ZEITEN, bookingId),
+      times: parsedTimes,
       rawdata: { ...b },
       adebisId: { id: String(b.IDNR), source: "belegung" }
     };
@@ -111,11 +121,14 @@ function anstell2Booking(employeesRaw) {
   (employeesRaw || []).forEach((e) => {
     if (!e.ZEITEN) return;
     const bookingId = createId('booking');
+    const parsedTimes = Zeiten2Booking(e.ZEITEN, bookingId);
+    if (!hasParsedSegments(parsedTimes)) return;
+
     bookings.push({
       id: bookingId,
       startdate: convertDDMMYYYYtoYYYYMMDD(e.BEGINNDAT) || '',
       enddate: convertDDMMYYYYtoYYYYMMDD(e.ENDDAT) || '',
-      times: Zeiten2Booking(e.ZEITEN, bookingId),
+      times: parsedTimes,
       rawdata: { ...e },
       adebisId: { id: String(e.IDNR), source: "anstell" }
     });
@@ -151,6 +164,7 @@ export function Zeiten2Booking(zeitenString, bookingId) {
           booking_start: start,
           booking_end: end,
           groupId: '',
+          category: 'pedagogical',
           id: `${bookingId}-${dayNames[dayIndex]}-${Date.now()}`
         });
       }

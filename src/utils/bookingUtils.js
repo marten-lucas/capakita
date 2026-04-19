@@ -43,17 +43,26 @@ export function consolidateBookingSummary(times) {
  * @param {Array} bookings - Array of booking objects with times/segments
  * @returns {number} - Total hours per week
  */
-export function calculateWorktimeFromBookings(bookings) {
+export function segmentMatchesMode(segment, mode = 'all') {
+  if (!segment?.booking_start || !segment?.booking_end) return false;
+  if (mode === 'pedagogical') {
+    return segment.category !== 'administrative';
+  }
+  return true;
+}
+
+export function calculateWorktimeFromBookings(bookings, options = {}) {
   if (!Array.isArray(bookings)) return 0;
   
   let totalMinutesPerWeek = 0;
+  const mode = options.mode || 'all';
   
   bookings.forEach(booking => {
     if (Array.isArray(booking.times)) {
       booking.times.forEach(dayTime => {
         if (Array.isArray(dayTime.segments)) {
           dayTime.segments.forEach(segment => {
-            if (segment.booking_start && segment.booking_end) {
+            if (segmentMatchesMode(segment, mode)) {
               const [sh, sm] = segment.booking_start.split(':').map(Number);
               const [eh, em] = segment.booking_end.split(':').map(Number);
               const minutes = (eh * 60 + em) - (sh * 60 + sm);
@@ -73,12 +82,13 @@ export function calculateWorktimeFromBookings(bookings) {
  * @param {Object} booking - Booking object with times/segments
  * @returns {number} - Total hours
  */
-export function sumBookingHours(booking) {
+export function sumBookingHours(booking, options = {}) {
   if (!booking?.times || booking.times.length === 0) return 0;
+  const mode = options.mode || 'all';
   let total = 0;
   booking.times.forEach(day => {
     day.segments.forEach(seg => {
-      if (seg.booking_start && seg.booking_end) {
+      if (segmentMatchesMode(seg, mode)) {
         // Parse times as HH:mm
         const [sh, sm] = seg.booking_start.split(':').map(Number);
         const [eh, em] = seg.booking_end.split(':').map(Number);

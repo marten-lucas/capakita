@@ -1,6 +1,5 @@
 import React from 'react';
-import { Box } from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
+import { Box } from '@mantine/core';
 import { useSelector, useDispatch } from 'react-redux';
 import { useOverlayData } from '../../../hooks/useOverlayData';
 import { addBookingThunk, deleteBookingThunk } from '../../../store/simBookingSlice';
@@ -50,22 +49,18 @@ function SimDataBookingTab() {
   if (!selectedItem) return null;
 
   return (
-    <Box flex={1} display="flex" flexDirection="column" gap={2} sx={{ overflowY: 'auto' }}>
+    <Box>
       <AccordionListDetail
         items={bookings}
-        SummaryComponent={BookingCards}
+        SummaryComponent={({ item }) => <BookingCards item={item} />}
         DetailComponent={({ item, index }) => <BookingDetail index={index} booking={item} />}
         AddButtonLabel="Buchungszeitraum hinzufügen"
         onAdd={handleAddBooking}
         onDelete={handleDeleteBooking}
-        AddButtonProps={{ startIcon: <AddIcon /> }}
         emptyText="Keine Buchungszeiten vorhanden."
-        emptyAlertSeverity='warning'
       />
     </Box>
   );
 }
 
 export default SimDataBookingTab;
-
-

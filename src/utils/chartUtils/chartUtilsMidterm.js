@@ -115,7 +115,7 @@ export function calculateChartDataMidterm(
     });
 
     // Demand/capacity per category: sum booking hours
-    function generateBookingDataSeries(referenceDate, filteredBookings, categories) {
+    function generateBookingDataSeries(referenceDate, filteredBookings, categories, mode = 'all') {
         const series = new Array(categories.length).fill(0);
         if (!categories || categories.length === 0) return [];
         categories.forEach((cat, idx) => {
@@ -125,7 +125,7 @@ export function calculateChartDataMidterm(
                 const isActive = (!booking.startdate || booking.startdate <= cat)
                     && (!booking.enddate || booking.enddate >= cat);
                 if (isActive) {
-                    totalHours += sumBookingHours(booking);
+                    totalHours += sumBookingHours(booking, { mode });
                 }
             });
             series[idx] = totalHours;
@@ -133,8 +133,8 @@ export function calculateChartDataMidterm(
         return series.map(val => val);
     }
 
-    const demand = generateBookingDataSeries(referenceDate, filteredDemandBookings, categories);
-    const capacity = generateBookingDataSeries(referenceDate, filteredCapacityBookings, categories);
+    const demand = generateBookingDataSeries(referenceDate, filteredDemandBookings, categories, 'all');
+    const capacity = generateBookingDataSeries(referenceDate, filteredCapacityBookings, categories, 'pedagogical');
 
     // careRatio and expertRatio per timedimension
     const care_ratio = generateCareRatioTimeDimension(

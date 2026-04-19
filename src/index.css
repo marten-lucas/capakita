@@ -18,6 +18,7 @@ a {
   color: #f26e2e;
   text-decoration: inherit;
 }
+
 a:hover {
   color: #d9571a;
 }
@@ -25,9 +26,14 @@ a:hover {
 body {
   margin: 0;
   min-width: 320px;
-  height: 100vh;
+  min-height: 100vh;
   background-color: #ffffff;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+#root {
+  min-height: 100vh;
 }
 
 h1 {
@@ -48,10 +54,12 @@ button {
   cursor: pointer;
   transition: border-color 0.25s;
 }
+
 button:hover {
   background-color: #d9571a;
   border-color: #083743;
 }
+
 button:focus,
 button:focus-visible {
   outline: 4px auto #faa513;
@@ -62,11 +70,12 @@ button:focus-visible {
     color: #083743;
     background-color: #ffffff;
   }
+
   a:hover {
     color: #d9571a;
   }
+
   button {
     background-color: #f26e2e;
   }
 }
-

@@ -21,8 +21,8 @@ export async function extractAdebisData(file, isAnonymized) {
         kidsRaw = extractObjectListFromXml(
             kindXmlString,
             'KIND',
-            ['KINDNR', 'AUFNDAT', 'AUSTRDAT', 'GRUNR', 'GEBDATUM', 'FNAME'],
-            k => isFutureOrEmptyDate(k.AUSTRDAT),
+            ['KINDNR', 'AUFNDAT', 'AUSTRDAT', 'GRUNR', 'GEBDATUM', 'FNAME', 'STATUS'],
+            k => isFutureOrEmptyDate(k.AUSTRDAT) && k.STATUS === '+',
             { anonymizeFields: ['FNAME'], anonymize: isAnonymized }
         );
     }

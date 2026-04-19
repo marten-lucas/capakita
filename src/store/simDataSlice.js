@@ -196,32 +196,6 @@ export const updateDataItemThunk = ({ scenarioId, itemId, updates }) => (dispatc
   }
 };
 
-// Thunk: update data item and sync AVR expense startdate
-export const updateDataItemAndSyncAvrExpense = ({ scenarioId, itemId, updates }) => (dispatch, getState) => {
-  dispatch(updateDataItemThunk({ scenarioId, itemId, updates }));
-  if ('startdate' in updates) {
-    const state = getState();
-    const financials = state.simFinancials.financialsByScenario?.[scenarioId] || {};
-    Object.entries(financials).forEach(([dataItemKey, expenses]) => {
-      if (dataItemKey === itemId && expenses) {
-        Object.values(expenses).forEach(expense => {
-          if (expense.type === 'expense-avr') {
-            dispatch({
-              type: 'simFinancials/updateFinancial',
-              payload: {
-                scenarioId,
-                dataItemId: itemId,
-                financialId: expense.id,
-                updates: { from: updates.startdate }
-              }
-            });
-          }
-        });
-      }
-    });
-  }
-};
-
 export const selectDataItemsByScenario = createSelector(
   [
     (state, scenarioId) => state.simData.dataByScenario[scenarioId]
@@ -285,7 +259,6 @@ export const deleteDataItemThunk = ({ scenarioId, itemId }) => (dispatch, getSta
   }
   dispatch({ type: 'simBooking/deleteAllBookingsForItem', payload: { scenarioId, itemId } });
   dispatch({ type: 'simGroup/deleteAllGroupAssignmentsForItem', payload: { scenarioId, itemId } });
-  dispatch({ type: 'simFinancials/deleteAllFinancialsForItem', payload: { scenarioId, itemId } });
   dispatch({ type: 'simQualification/deleteAllQualificationAssignmentsForItem', payload: { scenarioId, itemId } });
 };
 

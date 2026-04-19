@@ -1,15 +1,13 @@
 import React from 'react';
-import { Typography, Box } from '@mui/material';
+import { Box } from '@mantine/core';
 import { useSelector, useDispatch } from 'react-redux';
 import { useOverlayData } from '../../../hooks/useOverlayData';
 import AccordionListDetail from '../../common/AccordionListDetail';
 import GroupCards from './GroupCards';
 import GroupDetail from './GroupDetail';
-import AddIcon from '@mui/icons-material/Add';
 import { addGroup } from '../../../store/simGroupSlice';
 
 function SimDataGroupsTab() {
-  // Get scenario and item selection
   const dispatch = useDispatch();
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
@@ -17,11 +15,9 @@ function SimDataGroupsTab() {
 
   if (!selectedItemId) return null;
 
-  // Get overlay-aware group assignments for this item
   const groupAssignmentsObj = getEffectiveGroupAssignments(selectedItemId);
   const groups = Object.values(groupAssignmentsObj || {});
 
-  // Add group handler
   const handleAddGroup = () => {
     if (!selectedItemId || !selectedScenarioId) return;
     const newGroupId = Date.now().toString();
@@ -51,7 +47,6 @@ function SimDataGroupsTab() {
     }
   };
 
-  // Delete group handler
   const handleDeleteGroup = (idx, group) => {
     if (!group) return;
     dispatch({
@@ -65,28 +60,18 @@ function SimDataGroupsTab() {
   };
 
   return (
-    <Box
-      flex={1}
-      display="flex"
-      flexDirection="column"
-      gap={2}
-      sx={{ overflowY: 'auto', height: '100%', minHeight: 0 }}
-    >
+    <Box>
       <AccordionListDetail
         items={groups}
-        SummaryComponent={GroupCards}
+        SummaryComponent={({ item }) => <GroupCards item={item} />}
         DetailComponent={({ item, index }) => <GroupDetail group={item} index={index} />}
         AddButtonLabel="Gruppe zuweisen"
         onAdd={handleAddGroup}
         onDelete={handleDeleteGroup}
-        AddButtonProps={{ startIcon: <AddIcon /> }}
         emptyText="Keine Gruppenzuordnungen vorhanden."
-        emptyAlertSeverity='warning'
       />
     </Box>
   );
 }
 
 export default SimDataGroupsTab;
-
-

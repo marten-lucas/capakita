@@ -1,23 +1,21 @@
 import { useMemo, useEffect } from 'react';
 import HighchartsReact from 'highcharts-react-official';
 import Highcharts from 'highcharts';
+import { Box, useMantineTheme } from '@mantine/core';
 import { useSelector, useDispatch } from 'react-redux';
-import Box from '@mui/material/Box';
-import { useTheme } from '@mui/material/styles'; // <-- import useTheme
 import { updateWeeklyChartData } from '../../store/chartSlice';
 import { generateWeeklyChartTooltip } from '../../utils/chartUtils/chartUtilsWeekly';
 
 export default function WeeklyChart() {
-  const theme = useTheme(); // <-- get theme
+  const theme = useMantineTheme();
 
-  // Use theme colors
-  const plotBandColor1 = theme.palette.action.hover;
-  const plotBandColor2 = theme.palette.action.selected;
-  const plotBandColorLabel = theme.palette.text.primary;
-  const demandColor = theme.palette.primary.main;
-  const capacityColor = theme.palette.success.main;
-  const careRatioColor = theme.palette.error.main;
-  const expertRatioColor = theme.palette.warning.main;
+  const plotBandColor1 = theme.colors.gray[0];
+  const plotBandColor2 = theme.colors.gray[1];
+  const plotBandColorLabel = theme.black;
+  const demandColor = theme.colors.blue[6];
+  const capacityColor = theme.colors.green[6];
+  const careRatioColor = theme.colors.red[6];
+  const expertRatioColor = theme.colors.orange[6];
 
   const scenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const dispatch = useDispatch();
@@ -171,10 +169,8 @@ export default function WeeklyChart() {
   }, [chartData, plotBandColor1, plotBandColor2, plotBandColorLabel, demandColor, capacityColor, careRatioColor, expertRatioColor]);
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-      <Box sx={{ height: 400 }}>
-        <HighchartsReact highcharts={Highcharts} options={weeklyOptions} containerProps={{ style: { height: '100%' } }} />
-      </Box>
+    <Box h={400}>
+      <HighchartsReact highcharts={Highcharts} options={weeklyOptions} containerProps={{ style: { height: '100%' } }} />
     </Box>
   );
 }

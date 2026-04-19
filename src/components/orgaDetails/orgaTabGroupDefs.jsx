@@ -1,228 +1,109 @@
-import React, { useState } from 'react';
-import {
-  Box, Typography, Button, IconButton, TextField, Checkbox, FormControlLabel, Chip, Popover
-} from '@mui/material';
-import DeleteIcon from '@mui/icons-material/Delete';
-import AddIcon from '@mui/icons-material/Add';
+import React from 'react';
+import { Stack, Button, Text, Group, Badge, ActionIcon, TextInput, Checkbox, Select } from '@mantine/core';
+import { IconPlus, IconTrash } from '@tabler/icons-react';
 import { useSelector, useDispatch } from 'react-redux';
 import { addGroupDef, updateGroupDef, deleteGroupDef } from '../../store/simGroupSlice';
 import { useOverlayData } from '../../hooks/useOverlayData';
 import TabbedListDetail from '../common/TabbedListDetail';
-import EmojiPicker from 'emoji-picker-react';
 
-function IconPicker({ value, onChange }) {
-  const [anchorEl, setAnchorEl] = useState(null);
-
-  const handleOpen = (event) => {
-    setAnchorEl(event.currentTarget);
-  };
-
-  const handleClose = () => {
-    setAnchorEl(null);
-  };
-
-  const handleEmojiClick = (emojiData) => {
-    onChange(emojiData.emoji);
-    handleClose();
-  };
-
-  return (
-    <>
-      <Button
-        variant="outlined"
-        onClick={handleOpen}
-        startIcon={<span style={{ fontSize: '1.5em' }}>{value || '👥'}</span>}
-        sx={{
-          width: 120,
-          justifyContent: 'flex-start',
-          height: 56,
-          alignItems: 'center', // <-- vertical center
-          textTransform: 'none'
-        }}
-      >
-        Icon
-      </Button>
-      <Popover
-        open={Boolean(anchorEl)}
-        anchorEl={anchorEl}
-        onClose={handleClose}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-      >
-        <Box sx={{ p: 1 }}>
-          <EmojiPicker
-            onEmojiClick={handleEmojiClick}
-            height={300}
-            width={260}
-            lazyLoadEmojis={true}
-            emojiStyle="native"
-            previewConfig={{ showPreview: false }}
-            reactionsDefaultOpen={false}
-            allowExpandReactions={false}
-            searchDisabled={false}
-            autoFocusSearch={true}
-            theme="light"
-          />
-        </Box>
-      </Popover>
-    </>
-  );
-}
-
-function GroupDetail({ item: group }) {
-  const dispatch = useDispatch();
-  const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
-
-  const [form, setForm] = useState(() => ({
-    name: group?.name || '',
-    icon: group?.icon || '👥',
-    IsSchool: !!group?.IsSchool
-  }));
-  const [error, setError] = useState('');
-
-  React.useEffect(() => {
-    setForm({
-      name: group?.name || '',
-      icon: group?.icon || '👥',
-      IsSchool: !!group?.IsSchool
-    });
-    setError('');
-  }, [group]);
-
-  // Save name onBlur
-  const handleTextBlur = () => {
-    if (!form.name.trim()) {
-      setError('Gruppenname ist erforderlich');
-      return;
-    }
-    if (form.name !== group.name) {
-      dispatch(updateGroupDef({ scenarioId: selectedScenarioId, groupId: group.id, updates: { name: form.name } }));
-    }
-    setError('');
-  };
-
-  // Save icon on change
-  const handleIconChange = (icon) => {
-    setForm(f => ({ ...f, icon }));
-    if (icon !== group.icon) {
-      dispatch(updateGroupDef({ scenarioId: selectedScenarioId, groupId: group.id, updates: { icon } }));
-    }
-  };
-
-  // Save IsSchool on change
-  const handleIsSchoolChange = (e) => {
-    const IsSchool = e.target.checked;
-    setForm(f => ({ ...f, IsSchool }));
-    if (IsSchool !== group.IsSchool) {
-      dispatch(updateGroupDef({ scenarioId: selectedScenarioId, groupId: group.id, updates: { IsSchool } }));
-    }
-  };
-
-  return (
-    <Box sx={{ pt: 1, display: 'flex', flexDirection: 'column', gap: 3, maxWidth: 480 }}>
-      <Box>
-        <Typography variant="body2" sx={{ fontWeight: 700, mb: 0.5 }}>
-          Gruppenname
-        </Typography>
-        <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
-          <IconPicker
-            value={form.icon}
-            onChange={handleIconChange}
-          />
-          <TextField
-            label=""
-            value={form.name}
-            onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-            onBlur={handleTextBlur}
-            fullWidth
-            error={!!error}
-            helperText={error}
-            autoFocus
-            sx={{
-              height: 56,
-              '.MuiInputBase-root': { height: 56, alignItems: 'flex-start' }
-            }}
-          />
-        </Box>
-      </Box>
-      <Box>
-        <FormControlLabel
-          control={
-            <Checkbox
-              checked={!!form.IsSchool}
-              onChange={handleIsSchoolChange}
-            />
-          }
-          label="Schulkind-Gruppe"
-        />
-      </Box>
-    </Box>
-  );
-}
+const ICON_OPTIONS = ['👥', '🧒', '🏫', '⭐', '🌈', '🚀'].map((icon) => ({ value: icon, label: icon }));
 
 function OrgaTabGroupDefs() {
   const dispatch = useDispatch();
-  const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
-
-  // Use overlay hook to get base scenario info and effective group defs
+  const selectedScenarioId = useSelector((state) => state.simScenario.selectedScenarioId);
   const { getEffectiveGroupDefs } = useOverlayData();
   const groupDefs = getEffectiveGroupDefs();
 
-  // Memoize the current scenario definitions selector to prevent new array creation
-
-  // Memoize the function to check if group is from base scenario
-
   const handleAddGroup = () => {
-    dispatch(addGroupDef({
-      scenarioId: selectedScenarioId,
-      groupDef: { name: '', icon: '👥', IsSchool: false, id: Date.now().toString() }
-    }));
-  };
-
-  const handleDeleteGroup = (group) => {
-    if (window.confirm(`Möchten Sie die Gruppe "${group.name}" wirklich löschen?`)) {
-      dispatch(deleteGroupDef({ scenarioId: selectedScenarioId, groupId: group.id }));
-    }
-  };
-
-
-  // TabbedListDetail props
-  const items = groupDefs;
-  const ItemTitle = item => item.name || 'Gruppe';
-  const ItemSubTitle = () => ''; // No subtitle
-  const ItemChips = item => item.IsSchool
-    ? <Chip label="Schulkind-Gruppe" color="primary" size="small" sx={{ ml: 1 }} />
-    : null;
-  const ItemAvatar = item => (
-    <span style={{ fontSize: '1.5em', marginRight: 8 }}>{item.icon}</span>
-  );
-  const ItemHoverIcons = item => [
-    {
-      icon: <DeleteIcon fontSize="small" />,
-      title: 'Löschen',
-      onClick: () => handleDeleteGroup(item)
-    }
-  ];
-  const ItemAddButton = {
-    label: 'Neue Gruppe',
-    icon: <AddIcon />,
-    onClick: handleAddGroup,
-    title: 'Gruppen'
+    dispatch(
+      addGroupDef({
+        scenarioId: selectedScenarioId,
+        groupDef: {
+          id: Date.now().toString(),
+          name: 'Neue Gruppe',
+          icon: '👥',
+          IsSchool: false,
+        },
+      })
+    );
   };
 
   return (
-    <Box sx={{ height: '100%' }}>
+    <Stack gap="md">
+      <Group justify="flex-end">
+        <Button leftSection={<IconPlus size={16} />} onClick={handleAddGroup}>
+          Neue Gruppe
+        </Button>
+      </Group>
+
       <TabbedListDetail
-        items={items}
-        ItemTitle={ItemTitle}
-        ItemSubTitle={ItemSubTitle}
-        ItemChips={ItemChips}
-        ItemAvatar={ItemAvatar}
-        ItemHoverIcons={ItemHoverIcons}
-        ItemAddButton={ItemAddButton}
-        Detail={GroupDetail}
+        data={groupDefs}
         emptyText="Keine Gruppen vorhanden."
+        renderItem={(item) => (
+          <Group gap="sm">
+            <Text size="xl">{item.icon || '👥'}</Text>
+            <div>
+              <Text fw={500}>{item.name || 'Gruppe'}</Text>
+              {item.IsSchool && <Badge size="xs">Schulkind</Badge>}
+            </div>
+          </Group>
+        )}
+        detailTitle={(item) => item?.name || 'Gruppe'}
+        detailContent={(item) => (
+          <Stack gap="md">
+            <TextInput
+              label="Name"
+              value={item?.name || ''}
+              onChange={(event) =>
+                dispatch(
+                  updateGroupDef({
+                    scenarioId: selectedScenarioId,
+                    groupId: item.id,
+                    updates: { name: event.currentTarget.value },
+                  })
+                )
+              }
+            />
+            <Select
+              label="Icon"
+              data={ICON_OPTIONS}
+              value={item?.icon || '👥'}
+              onChange={(value) =>
+                dispatch(
+                  updateGroupDef({
+                    scenarioId: selectedScenarioId,
+                    groupId: item.id,
+                    updates: { icon: value || '👥' },
+                  })
+                )
+              }
+            />
+            <Checkbox
+              label="Schulkind-Gruppe"
+              checked={!!item?.IsSchool}
+              onChange={(event) =>
+                dispatch(
+                  updateGroupDef({
+                    scenarioId: selectedScenarioId,
+                    groupId: item.id,
+                    updates: { IsSchool: event.currentTarget.checked },
+                  })
+                )
+              }
+            />
+          </Stack>
+        )}
+        actions={(item) => (
+          <ActionIcon
+            color="red"
+            variant="subtle"
+            onClick={() => dispatch(deleteGroupDef({ scenarioId: selectedScenarioId, groupId: item.id }))}
+          >
+            <IconTrash size={18} />
+          </ActionIcon>
+        )}
       />
-    </Box>
+    </Stack>
   );
 }
 

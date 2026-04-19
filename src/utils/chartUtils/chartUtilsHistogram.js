@@ -34,11 +34,12 @@ function getBinIndex(totalHours, binSize = 4) {
  * @param {number} binSize - Size of each bin in hours
  * @returns {Array} Array of counts for each bin
  */
-export function calculateHistogramSeries(filteredBookings, bins, binSize = 4) {
+export function calculateHistogramSeries(filteredBookings, bins, binSize = 4, mode = 'all') {
   const series = new Array(bins.length).fill(0);
   
   filteredBookings.forEach(booking => {
-    const totalHours = sumBookingHours(booking);
+    const totalHours = sumBookingHours(booking, { mode });
+    if (totalHours <= 0) return;
     const binIndex = getBinIndex(totalHours, binSize);
     if (binIndex >= 0 && binIndex < series.length) {
       series[binIndex]++;
@@ -77,15 +78,15 @@ export function calculateChartDataHistogram(
   });
 
   // Calculate max hours to determine bin range
-  const allBookings = [...filteredDemandBookings, ...filteredCapacityBookings];
   const maxHours = Math.max(
-    ...allBookings.map(booking => sumBookingHours(booking)),
+    ...filteredDemandBookings.map((booking) => sumBookingHours(booking)),
+    ...filteredCapacityBookings.map((booking) => sumBookingHours(booking, { mode: 'pedagogical' })),
     12 // Minimum range of 12 hours (so at least 0, 1-4, 5-8, 9-12)
   );
   const binSize = 4;
   const categories = generateHistogramBins(maxHours, binSize);
-  const demandSeries = calculateHistogramSeries(filteredDemandBookings, categories, binSize);
-  const capacitySeries = calculateHistogramSeries(filteredCapacityBookings, categories, binSize);
+  const demandSeries = calculateHistogramSeries(filteredDemandBookings, categories, binSize, 'all');
+  const capacitySeries = calculateHistogramSeries(filteredCapacityBookings, categories, binSize, 'pedagogical');
 
   return {
     categories: [...categories],

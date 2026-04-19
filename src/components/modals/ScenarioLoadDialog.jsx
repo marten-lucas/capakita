@@ -1,38 +1,29 @@
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Typography, IconButton, InputAdornment, Checkbox, FormControlLabel } from '@mui/material';
-import Visibility from '@mui/icons-material/Visibility';
-import VisibilityOff from '@mui/icons-material/VisibilityOff';
+import { Modal, Button, Checkbox, Stack, Text, Group, FileButton, PasswordInput, Loader } from '@mantine/core';
+import { IconUpload } from '@tabler/icons-react';
 import { useSaveLoad } from '../../hooks/useSaveLoad';
 import { useSelector, useDispatch } from 'react-redux';
 import { setLoadDialogOpen } from '../../store/simScenarioSlice';
 
 function ScenarioLoadDialog({ onLoaded }) {
   const dispatch = useDispatch();
-  const open = useSelector(state => state.simScenario.loadDialogOpen);
+  const opened = useSelector(state => state.simScenario.loadDialogOpen);
   const { loadData } = useSaveLoad();
+  
   const [pwValue, setPwValue] = useState('');
   const [pwError, setPwError] = useState('');
-  const [showPw, setShowPw] = useState(false);
   const [file, setFile] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isAnonymized, setIsAnonymized] = useState(true);
 
   useEffect(() => {
-    if (open) {
+    if (opened) {
       setIsAnonymized(true);
-    }
-  }, [open]);
-
-  const handleFileChange = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
+      setFile(null);
+      setPwValue('');
       setPwError('');
     }
-  };
-  
-  const handleCheckboxChange = (e) => {
-    setIsAnonymized(e.target.checked);
-  };
+  }, [opened]);
 
   const handleLoad = async () => {
     if (!file || !pwValue) {
@@ -41,14 +32,12 @@ function ScenarioLoadDialog({ onLoaded }) {
     }
 
     setIsLoading(true);
-    // pass anonymization option to the loader
     const result = await loadData(file, pwValue, { isAnonymized });
     
     if (result.success) {
       setPwError('');
       setPwValue('');
       setFile(null);
-      setIsAnonymized(true);
       dispatch(setLoadDialogOpen(false));
       if (onLoaded) onLoaded();
     } else {
@@ -57,79 +46,54 @@ function ScenarioLoadDialog({ onLoaded }) {
     setIsLoading(false);
   };
 
-  const handleDialogClose = () => {
+  const handleClose = () => {
     if (isLoading) return;
-    setPwError('');
-    setPwValue('');
-    setFile(null);
-    setShowPw(false);
-    setIsAnonymized(true);
     dispatch(setLoadDialogOpen(false));
   };
 
   return (
-    <Dialog open={open} onClose={handleDialogClose}>
-      <DialogTitle>CapaKita-Datei laden</DialogTitle>
-      <DialogContent>
-        <Button 
-          variant="contained" 
-          component="label" 
-          sx={{ mb: 2 }}
-          disabled={isLoading}
-        >
-          Datei auswählen
-          <input type="file" hidden accept=".enc,.txt" onChange={handleFileChange} />
-        </Button>
+    <Modal opened={opened} onClose={handleClose} title="Szenario laden" centered>
+      <Stack>
+        <FileButton onChange={setFile} accept=".capakita,.enc,.txt">
+          {(props) => (
+            <Button {...props} leftSection={<IconUpload size={16} />} disabled={isLoading}>
+              Datei auswählen
+            </Button>
+          )}
+        </FileButton>
+
         {file && (
-          <Typography variant="body2" sx={{ mb: 2 }}>
+          <Text size="sm" c="dimmed">
             Ausgewählte Datei: {file.name}
-          </Typography>
+          </Text>
         )}
-        <FormControlLabel
-          control={
-            <Checkbox checked={isAnonymized} onChange={handleCheckboxChange} disabled={isLoading} />
-          }
+
+        <Checkbox
           label="Daten anonymisieren"
-        />
-        <TextField
-          margin="dense"
-          label="Passwort"
-          type={showPw ? 'text' : 'password'}
-          fullWidth
-          value={pwValue}
-          onChange={e => setPwValue(e.target.value)}
+          checked={isAnonymized}
+          onChange={(event) => setIsAnonymized(event.currentTarget.checked)}
           disabled={isLoading}
-          InputProps={{
-            endAdornment: (
-              <InputAdornment position="end">
-                <IconButton
-                  aria-label="Passwort anzeigen"
-                  onClick={() => setShowPw(s => !s)}
-                  edge="end"
-                  disabled={isLoading}
-                >
-                  {showPw ? <VisibilityOff /> : <Visibility />}
-                </IconButton>
-              </InputAdornment>
-            )
-          }}
-          error={!!pwError}
-          helperText={pwError}
         />
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={handleDialogClose} disabled={isLoading}>
-          Abbrechen
-        </Button>
-        <Button 
-          variant="contained" 
-          onClick={handleLoad} 
-          disabled={!file || isLoading}
-        >
-          {isLoading ? 'Lade...' : 'Laden'}
-        </Button>
-      </DialogActions>
-    </Dialog>
+
+        <PasswordInput
+          label="Passwort"
+          placeholder="Passwort eingeben"
+          value={pwValue}
+          onChange={(event) => setPwValue(event.currentTarget.value)}
+          error={pwError}
+          disabled={isLoading}
+        />
+
+        <Group justify="flex-end" mt="md">
+          <Button variant="subtle" onClick={handleClose} disabled={isLoading}>
+            Abbrechen
+          </Button>
+          <Button onClick={handleLoad} disabled={!file || !pwValue || isLoading}>
+            {isLoading ? <Loader size="xs" color="white" /> : 'Laden'}
+          </Button>
+        </Group>
+      </Stack>
+    </Modal>
   );
 }
 
