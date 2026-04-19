@@ -7,7 +7,7 @@ function AppFooter() {
       <Divider my="lg" />
       <Group justify="space-between" gap="xs" pb="md">
         <Text size="sm" c="dimmed">
-          CapaKita – entwickelt vom Vorstand des St. Johannesvereins
+          CapaKita – entwickelt vom St. Johannesvereins Gramschatz e.V.
         </Text>
         <Anchor component={Link} to="/impressum-datenschutz" size="sm">
           Impressum & Datenschutz
