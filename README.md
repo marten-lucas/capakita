@@ -1,5 +1,11 @@
 # CapaKita
 
+## Live-Demo
+
+Die aktuelle Demo ist direkt über GitHub Pages erreichbar:
+
+➡️ [CapaKita ausprobieren](https://marten-lucas.github.io/capakita/)
+
 CapaKita ist eine Anwendung für Kita- und Kindergarten-Szenarien mit Fokus auf Import, Szenarien, Kapazitätsplanung und Visualisierung.
 
 ## Kernfunktionen
