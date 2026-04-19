@@ -2,7 +2,7 @@
 
 ## Zweck der Anwendung
 
-Der KiGa-Simulator unterstützt bei der Planung von Kita- und Kindergarten-Szenarien. Im Mittelpunkt stehen Import, Datenpflege, Szenarien und die Auswertung von Bedarf und Kapazität.
+CapaKita unterstützt bei der Planung von Kita- und Kindergarten-Szenarien. Im Mittelpunkt stehen Import, Datenpflege, Szenarien und die Auswertung von Bedarf und Kapazität.
 
 ## Schnellstart
 

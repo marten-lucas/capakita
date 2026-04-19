@@ -1,4 +1,4 @@
-# Refactor-Plan: Vereinfachter KiGa-Simulator
+# Refactor-Plan: CapaKita
 
 ## Status-Checkliste Stand 19.04.2026
 

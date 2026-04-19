@@ -1,6 +1,6 @@
-# KiGa-Simulator
+# CapaKita
 
-Vereinfachter Simulator für Kita- und Kindergarten-Szenarien mit Fokus auf Import, Szenarien, Kapazitätsplanung und Visualisierung.
+CapaKita ist eine Anwendung für Kita- und Kindergarten-Szenarien mit Fokus auf Import, Szenarien, Kapazitätsplanung und Visualisierung.
 
 ## Kernfunktionen
 
