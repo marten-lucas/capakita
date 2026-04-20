@@ -8,9 +8,11 @@ import simOverlayReducer from './simOverlaySlice';
 import chartReducer from './chartSlice';
 import eventReducer from './eventSlice';
 import datesOfInterestReducer from './datesOfInterestSlice';
+import uiReducer from './uiSlice';
 
 const store = configureStore({
   reducer: {
+    ui: uiReducer,
     simScenario: simScenarioReducer,
     simData: simDataReducer,
     simBooking: simBookingReducer,

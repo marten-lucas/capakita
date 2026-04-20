@@ -1,8 +1,10 @@
 import { Anchor, Button, Card, Container, Group, List, Stack, Text, Title } from '@mantine/core';
 import { IconArrowLeft } from '@tabler/icons-react';
-import { Link } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
+import { setActivePage } from '../store/uiSlice';
 
-function LegalPage() {
+function LegalView() {
+  const dispatch = useDispatch();
   return (
     <Container size="md" py="xl">
       <Stack gap="xl">
@@ -15,8 +17,7 @@ function LegalPage() {
           </div>
 
           <Button
-            component={Link}
-            to="/"
+            onClick={() => dispatch(setActivePage('welcome'))}
             variant="light"
             leftSection={<IconArrowLeft size={16} />}
           >
@@ -104,4 +105,4 @@ function LegalPage() {
   );
 }
 
-export default LegalPage;
+export default LegalView;

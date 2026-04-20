@@ -162,7 +162,9 @@ export default function WeeklyChart() {
         shared: true,
         useHTML: true,
         formatter: function () {
-          return generateWeeklyChartTooltip(this.points, this.x);
+          // Use category (e.g., "Mo 7:00") instead of just index
+          const category = this.points?.[0]?.category || this.x;
+          return generateWeeklyChartTooltip(this.points, category);
         }
       },
     };

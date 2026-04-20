@@ -1,12 +1,12 @@
 import { Box, Paper, Title, Text, Button, Stack, Container } from '@mantine/core';
 import { IconUpload } from '@tabler/icons-react';
-import { useNavigate } from 'react-router-dom';
 import WeeklyChart from '../components/SimDataCharts/WeeklyChart';
 import MidtermChart from '../components/SimDataCharts/MidtermChart';
 import BookingHistogram from '../components/SimDataCharts/BookingHistogram';
 import AgeHistogram from '../components/SimDataCharts/AgeHistogram';
 import { useSelector, useDispatch } from 'react-redux';
 import { setSelectedScenarioId } from '../store/simScenarioSlice';
+import { setActivePage } from '../store/uiSlice';
 import React from 'react';
 import ChartFilterForm from '../components/SimDataCharts/ChartFilterForm';
 import { useScenarioEvents } from '../hooks/useScenarioEvents';
@@ -23,8 +23,7 @@ const selectChartToggles = createSelector(
   (chartToggles) => chartToggles || EMPTY_TOGGLES
 );
 
-function VisuPage() {
-  const navigate = useNavigate();
+function VisuView() {
   const dispatch = useDispatch();
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const scenarios = useSelector(state => state.simScenario.scenarios);
@@ -55,7 +54,7 @@ function VisuPage() {
           <Stack align="center">
             <Title order={3}>Keine Daten vorhanden</Title>
             <Text c="dimmed">Um die Simulation zu starten, müssen Sie zuerst Daten importieren oder anlegen.</Text>
-            <Button leftSection={<IconUpload size={16} />} onClick={() => navigate('/data')}>
+            <Button leftSection={<IconUpload size={16} />} onClick={() => dispatch(setActivePage('data'))}>
               Zu Simulationsdaten wechseln
             </Button>
           </Stack>
@@ -114,4 +113,4 @@ function VisuPage() {
   );
 }
 
-export default VisuPage;
+export default VisuView;

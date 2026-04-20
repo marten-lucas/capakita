@@ -1,8 +1,8 @@
 import React from 'react';
 import { Group, Button, Text, Menu, ActionIcon, Container, Select } from '@mantine/core';
-import { NavLink } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { isSaveAllowed, setSaveDialogOpen, setLoadDialogOpen, setSelectedScenarioId } from '../store/simScenarioSlice';
+import { setActivePage } from '../store/uiSlice';
 import { IconDatabase, IconChartBar, IconSettings, IconDotsVertical, IconUpload, IconDeviceFloppy, IconFolderOpen } from '@tabler/icons-react';
 import DataImportModal from './modals/DataImportModal';
 
@@ -43,24 +43,21 @@ function TopNav() {
 
         <Group gap="xs">
           <Button
-            component={NavLink}
-            to="/data"
+            onClick={() => dispatch(setActivePage('data'))}
             variant="subtle"
             leftSection={<IconDatabase size={20} />}
           >
             Daten
           </Button>
           <Button
-            component={NavLink}
-            to="/visu"
+            onClick={() => dispatch(setActivePage('visu'))}
             variant="subtle"
             leftSection={<IconChartBar size={20} />}
           >
             Analyse
           </Button>
           <Button
-            component={NavLink}
-            to="/settings"
+            onClick={() => dispatch(setActivePage('settings'))}
             variant="subtle"
             leftSection={<IconSettings size={20} />}
           >

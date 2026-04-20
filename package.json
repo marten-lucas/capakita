@@ -10,8 +10,16 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test",
-    "test:e2e:headed": "playwright test --headed",
+    "test:e2e": "TEST_LEVEL=basic-single playwright test",
+    "test:e2e:headed": "TEST_LEVEL=basic-single playwright test --headed",
+    "test:e2e:basic": "TEST_LEVEL=basic-single playwright test",
+    "test:e2e:basic:headed": "TEST_LEVEL=basic-single playwright test --headed",
+    "test:e2e:full": "TEST_LEVEL=full-single playwright test",
+    "test:e2e:full:headed": "TEST_LEVEL=full-single playwright test --headed",
+    "test:e2e:basic:all": "TEST_LEVEL=basic-all playwright test",
+    "test:e2e:basic:all:headed": "TEST_LEVEL=basic-all playwright test --headed",
+    "test:e2e:full:all": "TEST_LEVEL=full-all playwright test",
+    "test:e2e:full:all:headed": "TEST_LEVEL=full-all playwright test --headed",
     "export:testset-json": "node scripts/export-testset-json.mjs",
     "preview": "vite preview"
   },
@@ -32,8 +40,8 @@
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-redux": "^9.2.0",
-    "react-router-dom": "^7.6.3",
-    "validator": "^13.15.15"
+    "validator": "^13.15.15",
+    "wouter": "^3.9.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.30.1",

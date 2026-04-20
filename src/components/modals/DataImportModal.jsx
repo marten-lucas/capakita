@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Modal, Button, Checkbox, Stack, Text, Group, FileButton } from '@mantine/core';
 import { IconUpload } from '@tabler/icons-react';
 import { useScenarioImport } from '../../hooks/useScenarioImport';
-import { useNavigate } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
+import { setActivePage } from '../../store/uiSlice';
 
 function DataImportModal({ opened, onClose }) {
   const [file, setFile] = useState(null);
   const [isAnonymized, setIsAnonymized] = useState(true);
   const { importScenario } = useScenarioImport();
-  const navigate = useNavigate();
+  const dispatch = useDispatch();
 
   useEffect(() => {
     if (opened) {
@@ -21,7 +22,7 @@ function DataImportModal({ opened, onClose }) {
     if (file) {
       await importScenario({ file, isAnonymized });
       onClose();
-      navigate('/data');
+      dispatch(setActivePage('data'));
     }
   };
 

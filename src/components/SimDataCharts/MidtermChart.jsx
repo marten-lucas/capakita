@@ -112,7 +112,9 @@ export default function MidtermChart() {
       shared: true,
       useHTML: true,
       formatter: function () {
-        return generateWeeklyChartTooltip(this.points, this.x);
+        // Use category (e.g., "2026-04") instead of just index
+        const category = this.points?.[0]?.category || this.x;
+        return generateWeeklyChartTooltip(this.points, category);
       }
     },
   }), [chartData, demandColor, capacityColor, careRatioColor, expertRatioColor]);

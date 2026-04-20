@@ -1,14 +1,13 @@
 import React, { useState } from 'react';
 import { Title, Text, Stack, Card, Group, ThemeIcon, Container, Center, Box, Image } from '@mantine/core';
 import { IconUpload, IconFolderOpen, IconPlus } from '@tabler/icons-react';
-import { useNavigate } from 'react-router-dom';
 import DataImportModal from '../components/modals/DataImportModal';
 import { useDispatch } from 'react-redux';
 import { addScenario, setLoadDialogOpen } from '../store/simScenarioSlice';
+import { setActivePage } from '../store/uiSlice';
 
-function WelcomePage() {
+function WelcomeView() {
   const [importOpen, setImportOpen] = useState(false);
-  const navigate = useNavigate();
   const dispatch = useDispatch();
 
   const handleAddEmptyScenario = () => {
@@ -19,7 +18,7 @@ function WelcomePage() {
       likelihood: 50,
       baseScenarioId: null
     }));
-    navigate('/data');
+    dispatch(setActivePage('data'));
   };
 
   return (
@@ -102,4 +101,4 @@ function WelcomePage() {
   );
 }
 
-export default WelcomePage;
+export default WelcomeView;

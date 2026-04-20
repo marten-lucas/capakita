@@ -1,23 +1,16 @@
 import React, { useState } from 'react';
 import { Paper, Tabs, Box } from '@mantine/core';
 import { IconLayersIntersect, IconUsers, IconCertificate, IconCalendarEvent } from '@tabler/icons-react';
-import { useLocation, useNavigate } from 'react-router-dom';
 import OrgaTabGroupDefs from '../components/orgaDetails/orgaTabGroupDefs';
 import OrgaTabQualificationDefs from '../components/orgaDetails/orgaTabQualificatoinDefs';
 import OrgaTabScenarioDefs from '../components/orgaDetails/orgaTabScenarioDefs';
 import OrgaTabEvents from '../components/orgaDetails/orgaTabEvents';
 
-function SettingsPage() {
-  const location = useLocation();
-  const navigate = useNavigate();
-
-  // Parse tab from query string
-  const tabFromQuery = new URLSearchParams(location.search).get('tab') || 'groups';
-  const [activeTab, setActiveTab] = useState(tabFromQuery);
+function SettingsView() {
+  const [activeTab, setActiveTab] = useState('groups');
 
   const handleTabChange = (value) => {
     setActiveTab(value);
-    navigate(`/settings?tab=${value}`, { replace: true });
   };
 
   return (
@@ -57,4 +50,4 @@ function SettingsPage() {
   );
 }
 
-export default SettingsPage;
+export default SettingsView;
