@@ -1,26 +1,11 @@
 import React from 'react';
-import { ActionIcon, Badge, Box, Button, Divider, Group, Paper, Stack, Switch, Text, TextInput, Tooltip } from '@mantine/core';
-import { IconAlertCircle, IconBook2, IconBriefcase, IconClock, IconMinus, IconPlus, IconSparkles, IconTrash } from '@tabler/icons-react';
-import { calculateSegmentMinutes, formatDurationHours, getSegmentOverlapIssues, minutesToTime, normalizeTimeInput, timeToMinutes } from '../../../utils/timeUtils';
+import { ActionIcon, Box, Button, Group, Paper, Stack, Switch, Text, TextInput, Tooltip } from '@mantine/core';
+import { IconChevronDown, IconPlus, IconTrash } from '@tabler/icons-react';
+import { minutesToTime, normalizeTimeInput, timeToMinutes } from '../../../utils/timeUtils';
 
-const PRESETS = [
-  { label: 'Kurz', start: '08:00', end: '10:00' },
-  { label: 'Vormittag', start: '08:00', end: '12:00' },
-  { label: 'Mittag', start: '11:00', end: '14:00' },
-  { label: 'Nachmittag', start: '13:00', end: '16:00' },
-  { label: 'Ganztag', start: '08:00', end: '16:00' },
-];
-
-function getDayMinutes(segments) {
-  return (segments || []).reduce((total, segment) => {
-    const duration = calculateSegmentMinutes(segment);
-    return duration && duration > 0 ? total + duration : total;
-  }, 0);
-}
-
-function getSegmentIssues(segments) {
-  return getSegmentOverlapIssues(segments);
-}
+const TIMELINE_START_MINUTES = 6 * 60;
+const TIMELINE_END_MINUTES = 19 * 60;
+const TIMELINE_TOTAL_MINUTES = TIMELINE_END_MINUTES - TIMELINE_START_MINUTES;
 
 function getTimelineBlocks(segments) {
   return (segments || [])
@@ -30,8 +15,12 @@ function getTimelineBlocks(segments) {
 
       if (start === null || end === null || end <= start) return null;
 
-      const left = (start / (24 * 60)) * 100;
-      const width = ((end - start) / (24 * 60)) * 100;
+      const clippedStart = clampMinutes(start, TIMELINE_START_MINUTES, TIMELINE_END_MINUTES);
+      const clippedEnd = clampMinutes(end, TIMELINE_START_MINUTES, TIMELINE_END_MINUTES);
+      const left = ((clippedStart - TIMELINE_START_MINUTES) / TIMELINE_TOTAL_MINUTES) * 100;
+      const width = ((clippedEnd - clippedStart) / TIMELINE_TOTAL_MINUTES) * 100;
+
+      if (width <= 0) return null;
 
       return {
         index,
@@ -53,8 +42,63 @@ function clampMinutes(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
-function DayControl({ dayLabel, dayData, onToggle, onTimeChange, onAddSegment, onAddSegmentAt, onRemoveSegment, isCapacity = false, onCategoryChange }) {
+const HEADER_CHEVRON_WIDTH = 28;
+const HEADER_ROW_HEIGHT = 44;
+
+function DayHeader({ dayLabel, isActive, onToggle, detailsOpen, onToggleDetails }) {
+  return (
+    <Group
+      justify="space-between"
+      align="center"
+      wrap="nowrap"
+      gap="md"
+      style={{
+        width: '100%',
+        minHeight: HEADER_ROW_HEIGHT,
+        paddingInline: 16,
+      }}
+    >
+      <Group align="center" gap="sm" wrap="nowrap" style={{ minHeight: HEADER_ROW_HEIGHT }}>
+        <Text w={88} size="sm" fw={700} c="dark.8">
+          {dayLabel}
+        </Text>
+        <Box
+          onClick={(event) => event.stopPropagation()}
+          onPointerDown={(event) => event.stopPropagation()}
+        >
+          <Switch
+            checked={isActive}
+            onChange={(e) => onToggle(e.currentTarget.checked)}
+            size="sm"
+            aria-label={dayLabel}
+          />
+        </Box>
+      </Group>
+
+      <Box style={{ width: HEADER_CHEVRON_WIDTH, display: 'flex', justifyContent: 'center' }}>
+        <ActionIcon
+          size="sm"
+          variant="subtle"
+          onClick={onToggleDetails}
+          aria-label={detailsOpen ? 'Details ausblenden' : 'Details einblenden'}
+          style={{ opacity: isActive ? 1 : 0, transition: 'opacity 150ms ease' }}
+        >
+          <IconChevronDown
+            size={16}
+            style={{
+              transform: detailsOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform 150ms ease',
+            }}
+          />
+        </ActionIcon>
+      </Box>
+    </Group>
+  );
+}
+
+function DayControl({ dayLabel, dayData, onToggle, onTimeChange, onAddSegment, onAddSegmentAt, onRemoveSegment }) {
   const isActive = !!dayData;
+  const [detailsOpen, setDetailsOpen] = React.useState(false);
   const segments = React.useMemo(
     () => (isActive ? dayData.segments || [] : []),
     [isActive, dayData?.segments]
@@ -62,9 +106,24 @@ function DayControl({ dayLabel, dayData, onToggle, onTimeChange, onAddSegment, o
 
   const timelineRef = React.useRef(null);
   const dragStateRef = React.useRef(null);
+  const segmentsRef = React.useRef(segments);
+  const onTimeChangeRef = React.useRef(onTimeChange);
   const [draftValues, setDraftValues] = React.useState({});
-  const [openDetails, setOpenDetails] = React.useState({});
-  const lastRangeRef = React.useRef({ start: '08:00', end: '10:00' });
+  const [hoveredBlockIndex, setHoveredBlockIndex] = React.useState(null);
+
+  React.useEffect(() => {
+    segmentsRef.current = segments;
+  }, [segments]);
+
+  React.useEffect(() => {
+    onTimeChangeRef.current = onTimeChange;
+  }, [onTimeChange]);
+
+  React.useEffect(() => {
+    if (!isActive) {
+      setDetailsOpen(false);
+    }
+  }, [isActive]);
 
   React.useEffect(() => {
     const nextDrafts = {};
@@ -78,32 +137,140 @@ function DayControl({ dayLabel, dayData, onToggle, onTimeChange, onAddSegment, o
     setDraftValues(nextDrafts);
   }, [dayLabel, segments]);
 
-  const issues = React.useMemo(() => getSegmentIssues(segments), [segments]);
   const timelineBlocks = React.useMemo(() => getTimelineBlocks(segments), [segments]);
-  const dayMinutes = React.useMemo(() => getDayMinutes(segments), [segments]);
 
-  const getPointerMinutes = React.useCallback((clientX) => {
+  const timelineMarkers = React.useMemo(() => {
+    const markers = [];
+
+    for (let minute = TIMELINE_START_MINUTES; minute <= TIMELINE_END_MINUTES; minute += 30) {
+      markers.push(minute);
+    }
+
+    return markers;
+  }, []);
+
+  const timelineLabels = React.useMemo(() => ([
+    { minute: TIMELINE_START_MINUTES, label: '06:00' },
+    { minute: 9 * 60, label: '09:00' },
+    { minute: 12 * 60, label: '12:00' },
+    { minute: 15 * 60, label: '15:00' },
+    { minute: 18 * 60, label: '18:00' },
+  ]), []);
+
+  const getPointerMinutes = React.useCallback((clientX, snapMinutes = 15, roundMode = 'round') => {
     const rect = timelineRef.current?.getBoundingClientRect();
     if (!rect) return null;
 
     const x = clampMinutes(clientX - rect.left, 0, rect.width);
-    const rawMinutes = (x / rect.width) * 24 * 60;
-    return Math.round(rawMinutes / 15) * 15;
+    const rawMinutes = TIMELINE_START_MINUTES + ((x / rect.width) * TIMELINE_TOTAL_MINUTES);
+    const rounder = roundMode === 'floor' ? Math.floor : Math.round;
+    return rounder(rawMinutes / snapMinutes) * snapMinutes;
   }, []);
 
+  const finishDrag = React.useCallback(() => {
+    if (dragStateRef.current) {
+      console.log('[Drag] finishDrag – mode was:', dragStateRef.current.mode);
+    }
+    dragStateRef.current = null;
+    document.body.style.userSelect = '';
+    document.body.style.cursor = '';
+  }, []);
+
+  const handleDragMove = React.useCallback((event) => {
+    const dragState = dragStateRef.current;
+    if (!dragState) return;
+
+    const nextPointerMinutes = getPointerMinutes(event.clientX);
+    if (nextPointerMinutes === null) {
+      console.log('[Drag] handleDragMove – getPointerMinutes returned null, clientX:', event.clientX);
+      return;
+    }
+
+    const currentSegment = segmentsRef.current[dragState.segmentIndex];
+    if (!currentSegment) {
+      console.log('[Drag] handleDragMove – no segment at index', dragState.segmentIndex);
+      return;
+    }
+
+    const currentStart = timeToMinutes(currentSegment.booking_start);
+    const currentEnd = timeToMinutes(currentSegment.booking_end);
+    if (currentStart === null || currentEnd === null) return;
+
+    let nextStart = currentStart;
+    let nextEnd = currentEnd;
+
+    if (dragState.mode === 'move') {
+      nextStart = clampMinutes(nextPointerMinutes - dragState.offset, TIMELINE_START_MINUTES, TIMELINE_END_MINUTES - dragState.duration);
+      nextEnd = nextStart + dragState.duration;
+    } else if (dragState.mode === 'resize-start') {
+      nextStart = clampMinutes(nextPointerMinutes, TIMELINE_START_MINUTES, currentEnd - 15);
+    } else if (dragState.mode === 'resize-end') {
+      nextEnd = clampMinutes(nextPointerMinutes, currentStart + 15, TIMELINE_END_MINUTES);
+    }
+
+    console.log('[Drag] move – mode:', dragState.mode, 'ptr:', nextPointerMinutes, 'next:', minutesToTime(nextStart), '–', minutesToTime(nextEnd));
+
+    onTimeChangeRef.current(dragState.segmentIndex, {
+      start: minutesToTime(nextStart),
+      end: minutesToTime(nextEnd),
+    });
+  }, [getPointerMinutes]);
+
+  React.useEffect(() => {
+    console.log('[Drag] registering document drag listeners');
+    const handleMouseMove = (event) => handleDragMove(event);
+    const handlePointerMove = (event) => {
+      // skip synthetic pointer events that duplicate mouse events
+      if (event.pointerType === 'mouse') return;
+      handleDragMove(event);
+    };
+    const handleMouseUp = () => finishDrag();
+    const handlePointerUp = (event) => {
+      if (event.pointerType === 'mouse') return;
+      finishDrag();
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('pointermove', handlePointerMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('pointerup', handlePointerUp);
+
+    return () => {
+      console.log('[Drag] removing document drag listeners');
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('pointermove', handlePointerMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('pointerup', handlePointerUp);
+    };
+  }, [finishDrag, handleDragMove]);
+
   const startDrag = React.useCallback((mode, segmentIndex, event) => {
+    // For mouse: pointerdown fires before mousedown – skip duplicate
+    if (event.type === 'pointerdown' && event.pointerType === 'mouse') return;
+    if (dragStateRef.current) return;
     event.preventDefault();
     event.stopPropagation();
 
     const segment = segments[segmentIndex];
-    if (!segment) return;
+    if (!segment) {
+      console.log('[Drag] startDrag – no segment at index', segmentIndex);
+      return;
+    }
 
     const startMinutes = timeToMinutes(segment.booking_start);
     const endMinutes = timeToMinutes(segment.booking_end);
-    if (startMinutes === null || endMinutes === null) return;
+    if (startMinutes === null || endMinutes === null) {
+      console.log('[Drag] startDrag – invalid segment times', segment.booking_start, segment.booking_end);
+      return;
+    }
 
     const pointerMinutes = getPointerMinutes(event.clientX);
-    if (pointerMinutes === null) return;
+    if (pointerMinutes === null) {
+      console.log('[Drag] startDrag – getPointerMinutes returned null, clientX:', event.clientX);
+      return;
+    }
+
+    console.log('[Drag] startDrag – mode:', mode, 'segment:', segmentIndex, 'ptr:', pointerMinutes, 'start:', startMinutes, 'end:', endMinutes);
 
     dragStateRef.current = {
       mode,
@@ -112,54 +279,44 @@ function DayControl({ dayLabel, dayData, onToggle, onTimeChange, onAddSegment, o
       duration: endMinutes - startMinutes,
     };
 
-    const handleMove = (moveEvent) => {
-      const dragState = dragStateRef.current;
-      if (!dragState) return;
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = mode === 'move' ? 'grabbing' : 'ew-resize';
+  }, [getPointerMinutes, segments]);
 
-      const nextPointerMinutes = getPointerMinutes(moveEvent.clientX);
-      if (nextPointerMinutes === null) return;
+  const canAddSegmentAt = React.useCallback((startMinutes) => {
+    const candidateStart = clampMinutes(startMinutes, TIMELINE_START_MINUTES, TIMELINE_END_MINUTES - 30);
+    const candidateEnd = candidateStart + 30;
 
-      const currentSegment = segments[dragState.segmentIndex];
-      if (!currentSegment) return;
+    return !segments.some((segment) => {
+      const start = timeToMinutes(segment.booking_start);
+      const end = timeToMinutes(segment.booking_end);
+      if (start === null || end === null || end <= start) return false;
 
-      const currentStart = timeToMinutes(currentSegment.booking_start);
-      const currentEnd = timeToMinutes(currentSegment.booking_end);
-      if (currentStart === null || currentEnd === null) return;
-
-      let nextStart = currentStart;
-      let nextEnd = currentEnd;
-
-      if (dragState.mode === 'move') {
-        nextStart = clampMinutes(nextPointerMinutes - dragState.offset, 0, (24 * 60) - dragState.duration);
-        nextEnd = nextStart + dragState.duration;
-      } else if (dragState.mode === 'resize-start') {
-        nextStart = clampMinutes(nextPointerMinutes, 0, currentEnd - 15);
-      } else if (dragState.mode === 'resize-end') {
-        nextEnd = clampMinutes(nextPointerMinutes, currentStart + 15, 24 * 60);
-      }
-
-      onTimeChange(dragState.segmentIndex, {
-        start: minutesToTime(nextStart),
-        end: minutesToTime(nextEnd),
-      });
-    };
-
-    const handleUp = () => {
-      dragStateRef.current = null;
-      window.removeEventListener('pointermove', handleMove);
-      window.removeEventListener('pointerup', handleUp);
-    };
-
-    window.addEventListener('pointermove', handleMove);
-    window.addEventListener('pointerup', handleUp);
-  }, [getPointerMinutes, onTimeChange, segments]);
+      // For click-add we disallow overlap and direct adjacency.
+      return candidateStart <= end && candidateEnd >= start;
+    });
+  }, [segments]);
 
   const handleTimelinePointerDown = React.useCallback((event) => {
+    // For mouse, let onMouseDown handle it to avoid double-firing
+    if (event.pointerType === 'mouse') return;
     if (event.target !== event.currentTarget) return;
-    const pointerMinutes = getPointerMinutes(event.clientX);
+    const pointerMinutes = getPointerMinutes(event.clientX, 30, 'floor');
     if (pointerMinutes === null) return;
+    console.log('[Click-add] pointerdown – pointerMinutes:', pointerMinutes, 'canAdd:', canAddSegmentAt(pointerMinutes));
+    if (!canAddSegmentAt(pointerMinutes)) return;
     onAddSegmentAt?.(pointerMinutes);
-  }, [getPointerMinutes, onAddSegmentAt]);
+  }, [canAddSegmentAt, getPointerMinutes, onAddSegmentAt]);
+
+  const handleTimelineMouseDown = React.useCallback((event) => {
+    if (event.target !== event.currentTarget) return;
+    const rect = timelineRef.current?.getBoundingClientRect();
+    const pointerMinutes = getPointerMinutes(event.clientX, 30, 'floor');
+    if (pointerMinutes === null) return;
+    console.log('[Click-add] mousedown – clientX:', event.clientX, 'rect.left:', rect?.left, 'pointerMinutes:', pointerMinutes, 'canAdd:', canAddSegmentAt(pointerMinutes));
+    if (!canAddSegmentAt(pointerMinutes)) return;
+    onAddSegmentAt?.(pointerMinutes);
+  }, [canAddSegmentAt, getPointerMinutes, onAddSegmentAt]);
 
   function getDraftForSegment(segment, index) {
     const key = segment.id || `${dayLabel}-${index}`;
@@ -197,106 +354,55 @@ function DayControl({ dayLabel, dayData, onToggle, onTimeChange, onAddSegment, o
 
     if (startMinutes === null || endMinutes === null || endMinutes <= startMinutes) return;
 
-    lastRangeRef.current = { start: normalizedStart, end: normalizedEnd };
     onTimeChange(index, { start: normalizedStart, end: normalizedEnd });
   }
 
-  function getDaysSummary() {
-    if (!isActive) return 'Tag deaktiviert';
-    if (segments.length === 0) return 'Keine Zeiten definiert';
-
-    const issueCount = issues.length;
-    return issueCount > 0
-      ? `${segments.length} Segmente · ${formatDurationHours(dayMinutes)} · ${issueCount} Hinweis${issueCount > 1 ? 'e' : ''}`
-      : `${segments.length} Segmente · ${formatDurationHours(dayMinutes)}`;
-  }
-
-  function applyPreset(index, preset) {
-    updateDraft(segments[index], index, { start: preset.start, end: preset.end });
-    commitRange(index, preset.start, preset.end);
-  }
-
-  function applyLastRange(index) {
-    const { start, end } = lastRangeRef.current || {};
-    if (!start || !end) return;
-    updateDraft(segments[index], index, { start, end });
-    commitRange(index, start, end);
-  }
-
-  function toggleDetails(segmentKey) {
-    setOpenDetails((previous) => ({
-      ...previous,
-      [segmentKey]: !previous[segmentKey],
-    }));
-  }
+  const toggleDetails = React.useCallback(() => {
+    setDetailsOpen((previous) => !previous);
+  }, []);
 
   return (
-    <Paper
-      withBorder
-      radius="lg"
-      p="md"
+    <Box
+      py="xs"
       style={{
-        borderColor: isActive ? 'var(--mantine-color-blue-2)' : 'var(--mantine-color-gray-3)',
-        background: isActive ? 'linear-gradient(180deg, rgba(34,139,230,0.05), rgba(255,255,255,1))' : '#fff',
+        borderBottom: '1px solid var(--mantine-color-gray-2)',
       }}
     >
-      <Group justify="space-between" align="flex-start" wrap="nowrap" gap="md">
-        <Group align="center" gap="sm" wrap="nowrap">
-          <Text w={88} size="sm" fw={700} c="dark.8">
-            {dayLabel}
-          </Text>
-          <Switch
-            checked={isActive}
-            onChange={(e) => onToggle(e.currentTarget.checked)}
-            size="sm"
-            aria-label={dayLabel}
-          />
-        </Group>
-
-        <Badge
-          leftSection={<IconClock size={12} />}
-          variant={issues.length > 0 ? 'light' : 'filled'}
-          color={issues.length > 0 ? 'yellow' : isActive ? 'blue' : 'gray'}
-        >
-          {getDaysSummary()}
-        </Badge>
-      </Group>
+      <DayHeader
+        dayLabel={dayLabel}
+        isActive={isActive}
+        onToggle={onToggle}
+        detailsOpen={detailsOpen}
+        onToggleDetails={toggleDetails}
+      />
 
       {isActive && (
-        <Stack gap="md" mt="md">
-          <Box>
-            <Group justify="space-between" align="center" mb={6}>
-              <Text size="xs" fw={700} tt="uppercase" c="dimmed">
-                Tagesleiste
-              </Text>
-              <Text size="xs" c="dimmed">
-                00:00 bis 24:00
-              </Text>
-            </Group>
-
+        <Stack gap="md" pt="md">
+          <Stack gap={2}>
             <Box
               ref={timelineRef}
               style={{
                 position: 'relative',
                 height: 42,
-                borderRadius: 999,
+                borderRadius: 12,
                 overflow: 'hidden',
                 border: '1px solid var(--mantine-color-gray-3)',
                 background: 'linear-gradient(90deg, rgba(8,55,67,0.04) 0%, rgba(242,110,46,0.04) 100%)',
                 cursor: 'crosshair',
               }}
               onPointerDown={handleTimelinePointerDown}
+              onMouseDown={handleTimelineMouseDown}
             >
-              {[0, 6, 12, 18].map((hour) => (
+              {timelineMarkers.map((minute) => (
                 <Box
-                  key={hour}
+                  key={minute}
                   style={{
                     position: 'absolute',
-                    left: `${(hour / 24) * 100}%`,
+                    left: `${((minute - TIMELINE_START_MINUTES) / TIMELINE_TOTAL_MINUTES) * 100}%`,
                     top: 0,
                     bottom: 0,
-                    width: 1,
-                    background: 'rgba(8,55,67,0.12)',
+                    width: minute % 60 === 0 ? 1.5 : 1,
+                    background: minute % 60 === 0 ? 'rgba(8,55,67,0.22)' : 'rgba(8,55,67,0.12)',
                   }}
                 />
               ))}
@@ -312,13 +418,16 @@ function DayControl({ dayLabel, dayData, onToggle, onTimeChange, onAddSegment, o
                   withArrow
                 >
                   <Box
+                    onMouseEnter={() => setHoveredBlockIndex(block.index)}
+                    onMouseLeave={() => setHoveredBlockIndex((previous) => (previous === block.index ? null : previous))}
+                    aria-label={`Segment ${block.index + 1} verschieben`}
                     style={{
                       position: 'absolute',
                       left: `${block.left}%`,
                       top: 6,
                       height: 30,
                       width: `${Math.max(block.width, 2)}%`,
-                      borderRadius: 999,
+                      borderRadius: 0,
                       background: block.category === 'administrative'
                         ? 'linear-gradient(135deg, rgba(145,65,172,0.65), rgba(145,65,172,0.35))'
                         : 'linear-gradient(135deg, rgba(34,139,230,0.75), rgba(34,139,230,0.42))',
@@ -329,194 +438,193 @@ function DayControl({ dayLabel, dayData, onToggle, onTimeChange, onAddSegment, o
                       color: '#fff',
                       fontSize: 11,
                       fontWeight: 700,
-                      paddingInline: 8,
+                      paddingInline: 18,
                       whiteSpace: 'nowrap',
-                      overflow: 'hidden',
+                      overflow: 'visible',
                       textOverflow: 'ellipsis',
                       touchAction: 'none',
                       userSelect: 'none',
+                      cursor: 'grab',
                     }}
                     onPointerDown={(event) => startDrag('move', block.index, event)}
+                    onMouseDown={(event) => startDrag('move', block.index, event)}
                   >
+                    {segments.length > 1 && (
+                      <ActionIcon
+                        size="xs"
+                        variant="light"
+                        color="red"
+                        onPointerDown={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                        }}
+                        onMouseDown={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                        }}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+
+                          if (window.confirm(`Segment ${block.index + 1} wirklich löschen?`)) {
+                            onRemoveSegment(block.index);
+                          }
+                        }}
+                        aria-label={`Segment ${block.index + 1} löschen`}
+                        style={{
+                          position: 'absolute',
+                          top: -7,
+                          right: -7,
+                          opacity: hoveredBlockIndex === block.index ? 1 : 0,
+                          pointerEvents: hoveredBlockIndex === block.index ? 'auto' : 'none',
+                          transition: 'opacity 120ms ease',
+                          zIndex: 2,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <IconTrash size={10} />
+                      </ActionIcon>
+                    )}
                     <Box
                       style={{
                         position: 'absolute',
                         left: 0,
                         top: 0,
                         bottom: 0,
-                        width: 10,
+                        width: 12,
                         cursor: 'ew-resize',
                         background: 'rgba(255,255,255,0.15)',
+                        zIndex: 1,
+                        touchAction: 'none',
                       }}
+                      aria-label={`Segment ${block.index + 1} Start ändern`}
                       onPointerDown={(event) => startDrag('resize-start', block.index, event)}
+                      onMouseDown={(event) => startDrag('resize-start', block.index, event)}
                     />
-                    <Text size="inherit" style={{ pointerEvents: 'none' }}>
-                      {block.startLabel}–{block.endLabel}
-                    </Text>
+                    {block.width >= 12 && (
+                      <Text size="inherit" style={{ pointerEvents: 'none' }}>
+                        {block.startLabel}–{block.endLabel}
+                      </Text>
+                    )}
                     <Box
                       style={{
                         position: 'absolute',
                         right: 0,
                         top: 0,
                         bottom: 0,
-                        width: 10,
+                        width: 12,
                         cursor: 'ew-resize',
                         background: 'rgba(255,255,255,0.15)',
+                        zIndex: 1,
+                        touchAction: 'none',
                       }}
+                      aria-label={`Segment ${block.index + 1} Ende ändern`}
                       onPointerDown={(event) => startDrag('resize-end', block.index, event)}
+                      onMouseDown={(event) => startDrag('resize-end', block.index, event)}
                     />
                   </Box>
                 </Tooltip>
               ))}
             </Box>
-          </Box>
 
-          {issues.length > 0 && (
-            <Group gap="xs" wrap="wrap">
-              {issues.map((issue, index) => (
-                <Badge key={`${issue.type}-${issue.index}-${index}`} leftSection={<IconAlertCircle size={12} />} color="yellow" variant="light">
-                  {issue.message}
-                </Badge>
-              ))}
-            </Group>
-          )}
+            <Box
+              style={{
+                position: 'relative',
+                height: 16,
+                marginInline: 2,
+              }}
+            >
+              {timelineLabels.map(({ minute, label }) => {
+                const position = ((minute - TIMELINE_START_MINUTES) / TIMELINE_TOTAL_MINUTES) * 100;
+                const isStart = minute === TIMELINE_START_MINUTES;
+                const isEnd = minute === TIMELINE_END_MINUTES;
 
-          {segments.map((segment, idx) => {
-            const segmentKey = segment.id || `${dayLabel}-${idx}`;
-            const draft = getDraftForSegment(segment, idx);
-            const duration = calculateSegmentMinutes({ booking_start: draft.start, booking_end: draft.end });
-            const isValid = timeToMinutes(draft.start) !== null && timeToMinutes(draft.end) !== null && (timeToMinutes(draft.end) > timeToMinutes(draft.start));
+                return (
+                  <Text
+                    key={minute}
+                    size="10px"
+                    c="dimmed"
+                    style={{
+                      position: 'absolute',
+                      left: `${position}%`,
+                      transform: isStart ? 'translateX(0)' : isEnd ? 'translateX(-100%)' : 'translateX(-50%)',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {label}
+                  </Text>
+                );
+              })}
+            </Box>
+          </Stack>
 
-            return (
-              <Paper key={segment.id || idx} withBorder radius="md" p="sm" bg="white" style={{ borderColor: 'var(--mantine-color-gray-3)' }}>
-                <Stack gap="sm">
-                  <Group justify="space-between" align="center" wrap="nowrap">
-                    <Group gap="xs" wrap="nowrap">
-                      <Badge variant="light" color={isValid ? 'blue' : 'red'}>
+          {detailsOpen && (
+            <Stack gap="sm">
+              {segments.map((segment, idx) => {
+                const draft = getDraftForSegment(segment, idx);
+                const isValid = timeToMinutes(draft.start) !== null && timeToMinutes(draft.end) !== null && (timeToMinutes(draft.end) > timeToMinutes(draft.start));
+
+                return (
+                  <Paper key={segment.id || idx} withBorder radius="md" p="xs" bg="white" style={{ borderColor: 'var(--mantine-color-gray-3)' }}>
+                    <Group justify="space-between" align="center" wrap="nowrap" gap="sm">
+                      <Text size="sm" fw={600} c="dark.8" style={{ whiteSpace: 'nowrap', minWidth: 88, flexShrink: 0 }}>
                         Segment {idx + 1}
-                      </Badge>
-                      <Text size="xs" c={isValid ? 'dimmed' : 'red'}>
-                        {isValid ? formatDurationHours(duration || 0) : 'Zeiten prüfen'}
                       </Text>
-                    </Group>
-
-                    <Group gap={4}>
-                      <Button size="xs" variant="subtle" onClick={() => toggleDetails(segmentKey)}>
-                        {openDetails[segmentKey] ? 'Details schließen' : 'Details'}
-                      </Button>
-                      {segments.length > 1 && (
-                        <ActionIcon variant="light" color="red" onClick={() => onRemoveSegment(idx)} size="sm" aria-label={`Segment ${idx + 1} entfernen`}>
-                          <IconTrash size={14} />
-                        </ActionIcon>
-                      )}
-                      <ActionIcon variant="light" color="blue" onClick={onAddSegment} size="sm" aria-label="Segment hinzufügen">
-                        <IconPlus size={14} />
-                      </ActionIcon>
-                    </Group>
-                  </Group>
-
-                  {openDetails[segmentKey] && (
-                    <Stack gap="sm">
-                      <Group justify="space-between" align="center" wrap="nowrap">
-                        <Text size="xs" fw={700} tt="uppercase" c="dimmed">
-                          Details
-                        </Text>
-                        <Group gap="xs" wrap="wrap">
-                          {PRESETS.map((preset) => (
-                            <Button
-                              key={preset.label}
-                              size="xs"
-                              variant="light"
-                              leftSection={<IconSparkles size={12} />}
-                              onClick={() => applyPreset(idx, preset)}
-                            >
-                              {preset.label}
-                            </Button>
-                          ))}
-                          <Button
-                            size="xs"
-                            variant="subtle"
-                            leftSection={<IconClock size={12} />}
-                            onClick={() => applyLastRange(idx)}
-                          >
-                            Zuletzt
-                          </Button>
-                        </Group>
-                      </Group>
-
-                      <Group grow align="flex-end" wrap="nowrap">
+                      <Group align="center" wrap="nowrap" gap="xs" style={{ flex: 1, minWidth: 0 }}>
                         <TextInput
-                          label="Start"
                           size="xs"
                           value={draft.start}
                           onChange={(event) => updateDraft(segment, idx, { start: event.currentTarget.value })}
                           onBlur={() => commitRange(idx, draft.start, draft.end)}
                           placeholder="08:00"
+                          aria-label={`Segment ${idx + 1} Startzeit`}
                           error={!isValid && draft.start && draft.end ? 'Ungültig' : null}
+                          style={{ width: 116, flexShrink: 0 }}
                         />
+                        <Text size="sm" fw={600} c="dimmed" style={{ whiteSpace: 'nowrap', lineHeight: 1, flexShrink: 0 }}>
+                          -
+                        </Text>
                         <TextInput
-                          label="Ende"
                           size="xs"
                           value={draft.end}
                           onChange={(event) => updateDraft(segment, idx, { end: event.currentTarget.value })}
                           onBlur={() => commitRange(idx, draft.start, draft.end)}
                           placeholder="12:00"
+                          aria-label={`Segment ${idx + 1} Endzeit`}
                           error={!isValid && draft.start && draft.end ? 'Ungültig' : null}
+                          style={{ width: 116, flexShrink: 0 }}
                         />
                       </Group>
-
-                      {isCapacity && (
-                        <Stack gap={4}>
-                          <Text size="xs" fw={700} tt="uppercase" c="dimmed">
-                            Blocktyp
-                          </Text>
-                          <Group gap="xs" wrap="nowrap">
-                            <Button
-                              size="xs"
-                              variant={(segment.category || 'pedagogical') === 'pedagogical' ? 'filled' : 'light'}
-                              color="blue"
-                              leftSection={<IconBook2 size={12} />}
-                              onClick={() => onCategoryChange?.(idx, 'pedagogical')}
-                            >
-                              Pädagogisch
-                            </Button>
-                            <Button
-                              size="xs"
-                              variant={segment.category === 'administrative' ? 'filled' : 'light'}
-                              color="grape"
-                              leftSection={<IconBriefcase size={12} />}
-                              onClick={() => onCategoryChange?.(idx, 'administrative')}
-                            >
-                              Administrativ
-                            </Button>
-                          </Group>
-                          {segment.category === 'administrative' && (
-                            <Badge size="xs" color="grape" variant="light">
-                              zählt nicht in Kapazität
-                            </Badge>
-                          )}
-                        </Stack>
+                      {segments.length > 1 && (
+                        <ActionIcon
+                          variant="light"
+                          color="red"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            if (window.confirm(`Segment ${idx + 1} wirklich löschen?`)) {
+                              onRemoveSegment(idx);
+                            }
+                          }}
+                          size="sm"
+                          aria-label={`Segment ${idx + 1} entfernen`}
+                        >
+                          <IconTrash size={14} />
+                        </ActionIcon>
                       )}
-                    </Stack>
-                  )}
-                </Stack>
-              </Paper>
-            );
-          })}
+                    </Group>
+                  </Paper>
+                );
+              })}
 
-          <Divider />
-
-          <Group justify="space-between" align="center" wrap="wrap">
-            <Text size="xs" c="dimmed">
-              Die Details bleiben eingeklappt, die Tagesleiste ist direkt per Maus oder Touch verschieb- und resizebar.
-            </Text>
-            <Button size="xs" variant="light" leftSection={<IconMinus size={12} />} onClick={() => onToggle(false)}>
-              Tag deaktivieren
-            </Button>
-          </Group>
+              <Button variant="light" leftSection={<IconPlus size={14} />} onClick={onAddSegment} size="sm">
+                Segment hinzufügen
+              </Button>
+            </Stack>
+          )}
         </Stack>
       )}
-    </Paper>
+    </Box>
   );
 }
 

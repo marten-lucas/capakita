@@ -72,6 +72,12 @@ async function seedScenarioWithCapacityBooking(page) {
                   booking_end: '10:00',
                   category: 'pedagogical',
                 },
+                {
+                  id: 'segment-2',
+                  booking_start: '10:30',
+                  booking_end: '11:00',
+                  category: 'pedagogical',
+                },
               ],
             },
           ],
@@ -98,22 +104,56 @@ test('booking editor rejects overlapping times on the same day', async ({ page }
   await page.locator('.mantine-Accordion-control').first().click();
 
   await expect(page.getByText('Montag')).toBeVisible();
-  await expect(page.getByText('Wochenübersicht')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Details' }).first().click();
-  await expect(page.getByRole('button', { name: 'Pädagogisch' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Administrativ' })).toBeVisible();
+  const movableBlock = page.locator('[aria-label="Segment 2 verschieben"]').first();
+  const movableBox = await movableBlock.boundingBox();
+  expect(movableBox).not.toBeNull();
 
-  await page.getByRole('button', { name: 'Segment hinzufügen' }).first().click();
+  await page.mouse.move(movableBox.x + (movableBox.width / 2), movableBox.y + (movableBox.height / 2));
+  await page.mouse.down();
+  await page.mouse.move(movableBox.x + (movableBox.width / 2) + 70, movableBox.y + (movableBox.height / 2), { steps: 10 });
+  await page.mouse.up();
 
-  await page.getByRole('button', { name: 'Details' }).nth(1).click();
+  await expect.poll(async () => page.evaluate(() => {
+    const state = window.__APP_STORE?.getState?.();
+    const scenarioId = state?.simScenario?.selectedScenarioId;
+    const booking = state?.simBooking?.bookingsByScenario?.[scenarioId]?.['overlap-capacity-item']?.['booking-overlap-validation'];
+    const segment = booking?.times?.[0]?.segments?.[1];
+    return segment ? `${segment.booking_start}-${segment.booking_end}` : '';
+  }), { timeout: 5000 }).not.toBe('10:30-11:00');
 
-  const startInputs = page.getByLabel('Start');
-  const endInputs = page.getByLabel('Ende');
+  const beforeResize = await page.evaluate(() => {
+    const state = window.__APP_STORE?.getState?.();
+    const scenarioId = state?.simScenario?.selectedScenarioId;
+    const booking = state?.simBooking?.bookingsByScenario?.[scenarioId]?.['overlap-capacity-item']?.['booking-overlap-validation'];
+    const segment = booking?.times?.[0]?.segments?.[1];
+    return segment ? `${segment.booking_start}-${segment.booking_end}` : '';
+  });
 
-  await startInputs.last().fill('09:00');
-  await endInputs.last().fill('11:00');
-  await endInputs.last().blur();
+  const resizedHandle = page.locator('[aria-label="Segment 2 Start ändern"]').first();
+  const resizedBox = await resizedHandle.boundingBox();
+  expect(resizedBox).not.toBeNull();
+
+  await page.mouse.move(resizedBox.x + (resizedBox.width / 2), resizedBox.y + (resizedBox.height / 2));
+  await page.mouse.down();
+  await page.mouse.move(resizedBox.x - 160, resizedBox.y + (resizedBox.height / 2), { steps: 10 });
+  await page.mouse.up();
+
+  await expect.poll(async () => page.evaluate(() => {
+    const state = window.__APP_STORE?.getState?.();
+    const scenarioId = state?.simScenario?.selectedScenarioId;
+    const booking = state?.simBooking?.bookingsByScenario?.[scenarioId]?.['overlap-capacity-item']?.['booking-overlap-validation'];
+    const segment = booking?.times?.[0]?.segments?.[1];
+    return segment ? `${segment.booking_start}-${segment.booking_end}` : '';
+  }), { timeout: 5000 }).not.toBe(beforeResize);
+
+  await page.getByLabel('Details einblenden').first().click();
+  const startInput = page.getByLabel('Segment 2 Startzeit');
+  const endInput = page.getByLabel('Segment 2 Endzeit');
+
+  await startInput.fill('09:00');
+  await endInput.fill('11:00');
+  await endInput.blur();
 
   await expect(page.locator('.mantine-Notification-title', { hasText: 'Zeit überschneidet sich' }).first()).toBeVisible();
   await expect(page.locator('.mantine-Notification-description', { hasText: 'Am Tag Mo dürfen sich Zeiten nicht überlappen.' }).first()).toBeVisible();

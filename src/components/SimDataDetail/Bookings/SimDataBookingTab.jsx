@@ -39,6 +39,7 @@ function SimDataBookingTab() {
   // Handler to delete a booking
   const handleDeleteBooking = (idx, booking) => {
     if (!selectedScenarioId || !selectedItemId || !booking?.id) return;
+    if (!window.confirm('Diesen Buchungsblock wirklich löschen?')) return;
     dispatch(deleteBookingThunk({
       scenarioId: selectedScenarioId,
       dataItemId: selectedItemId,
@@ -46,14 +47,17 @@ function SimDataBookingTab() {
     }));
   };
 
+  const SummaryComponent = React.useCallback(({ item }) => <BookingCards item={item} />, []);
+  const DetailComponent = React.useCallback(({ item, index }) => <BookingDetail index={index} booking={item} />, []);
+
   if (!selectedItem) return null;
 
   return (
     <Box>
       <AccordionListDetail
         items={bookings}
-        SummaryComponent={({ item }) => <BookingCards item={item} />}
-        DetailComponent={({ item, index }) => <BookingDetail index={index} booking={item} />}
+        SummaryComponent={SummaryComponent}
+        DetailComponent={DetailComponent}
         AddButtonLabel="Buchungszeitraum hinzufügen"
         onAdd={handleAddBooking}
         onDelete={handleDeleteBooking}

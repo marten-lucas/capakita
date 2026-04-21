@@ -24,8 +24,8 @@ function AccordionListDetail({
         <Accordion variant="separated">
           {items.map((item, index) => (
             <Accordion.Item key={item.id || index} value={item.id || index.toString()}>
-              <Group justify="space-between" wrap="nowrap" gap="xs">
-                <Accordion.Control>
+              <Group justify="space-between" align="flex-start" wrap="nowrap" gap="xs">
+                <Accordion.Control style={{ alignItems: 'flex-start', paddingTop: 4 }}>
                   {renderSummary(item, index)}
                 </Accordion.Control>
                 <ActionIcon 
@@ -35,6 +35,7 @@ function AccordionListDetail({
                     e.stopPropagation();
                     onDelete(index, item);
                   }}
+                  style={{ alignSelf: 'center' }}
                   mr="md"
                 >
                   <IconTrash size={16} />
