@@ -106,6 +106,17 @@ export default function MidtermChart() {
         color: expertRatioColor,
         marker: { enabled: false }
       }
+      ,
+      ...(chartData.flags && chartData.flags.length > 0 ? [{
+        type: 'flags',
+        name: 'Ereignisse',
+        data: (chartData.flags || []).map(f => ({ x: f.x, title: f.title, text: f.text })),
+        onSeries: undefined,
+        shape: 'flag',
+        width: 16,
+        allowOverlapX: true,
+        y: -50
+      }] : [])
     ],
     legend: { align: 'center', verticalAlign: 'bottom' },
     tooltip: {

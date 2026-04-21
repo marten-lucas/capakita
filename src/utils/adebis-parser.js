@@ -1,5 +1,6 @@
 import { convertDDMMYYYYtoYYYYMMDD } from './dateUtils';
 import { createId } from './idUtils';
+import { DEFAULT_GROUP_ICON } from './groupIcons';
 
 // Helper to assign unique IDs to all segments in all bookings
 function assignSegmentIdsToBookings(bookings) {
@@ -27,7 +28,7 @@ function assignSegmentIdsToBookings(bookings) {
 export function adebis2simData(kidsRaw, employeesRaw) {
   let simDataList = [];
 
-  // Kids (demand)
+  // Kids (demand) - from kind.xml
   for (const kind of kidsRaw || []) {
     const newId = createId('simdata');
     let item = {
@@ -190,32 +191,33 @@ export function adebis2GroupDefs(groupsRaw) {
   return (groupsRaw || []).map(group => {
     const name = group.BEZ || '';
     const lowerName = name.toLowerCase();
-    let icon = '👥';
+    let icon = DEFAULT_GROUP_ICON;
     let IsSchool = false;
     if (lowerName.includes('schul')) {
-      icon = '🏫';
+      icon = 'school';
       IsSchool = true;
     }
-    else if (lowerName.includes('fuchs')) icon = '🦊';
-    else if (lowerName.includes('bär') || lowerName.includes('baer')) icon = '🐻';
-    else if (lowerName.includes('hase') || lowerName.includes('kaninchen')) icon = '🐰';
-    else if (lowerName.includes('frosch')) icon = '🐸';
-    else if (lowerName.includes('schmetterling')) icon = '🦋';
-    else if (lowerName.includes('marienkäfer') || lowerName.includes('käfer')) icon = '🐞';
-    else if (lowerName.includes('biene')) icon = '🐝';
-    else if (lowerName.includes('schule') || lowerName.includes('schulkind')) icon = '🎒';
-    else if (lowerName.includes('stern')) icon = '⭐';
-    else if (lowerName.includes('sonne')) icon = '☀️';
-    else if (lowerName.includes('mond')) icon = '🌙';
-    else if (lowerName.includes('regenbogen')) icon = '🌈';
-    else if (lowerName.includes('blume')) icon = '🌸';
-    else if (lowerName.includes('baum')) icon = '🌳';
+    else if (lowerName.includes('fuchs')) icon = 'users';
+    else if (lowerName.includes('bär') || lowerName.includes('baer')) icon = 'users';
+    else if (lowerName.includes('hase') || lowerName.includes('kaninchen')) icon = 'users';
+    else if (lowerName.includes('frosch')) icon = 'users';
+    else if (lowerName.includes('schmetterling')) icon = 'users';
+    else if (lowerName.includes('marienkäfer') || lowerName.includes('käfer')) icon = 'users';
+    else if (lowerName.includes('biene')) icon = 'users';
+    else if (lowerName.includes('schule') || lowerName.includes('schulkind')) icon = 'school';
+    else if (lowerName.includes('stern')) icon = 'star';
+    else if (lowerName.includes('sonne')) icon = 'sun';
+    else if (lowerName.includes('mond')) icon = 'moon';
+    else if (lowerName.includes('regenbogen')) icon = 'rainbow';
+    else if (lowerName.includes('blume')) icon = 'flower';
+    else if (lowerName.includes('baum')) icon = 'tree';
 
     let groupDef = {
       id: String(group.GRUNR),
       name,
       icon,
-      IsSchool, 
+      IsSchool,
+      isSchoolKidGroup: IsSchool,
       rawdata: { ...group }
     };
     return addOriginalData(groupDef);

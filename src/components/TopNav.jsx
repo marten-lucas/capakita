@@ -1,9 +1,9 @@
 import React from 'react';
-import { Group, Button, Text, Menu, ActionIcon, Container, Select } from '@mantine/core';
+import { Group, Button, Text, Menu, ActionIcon, Container, Select, Stack, Switch, Modal, Alert } from '@mantine/core';
 import { useSelector, useDispatch } from 'react-redux';
 import { isSaveAllowed, setSaveDialogOpen, setLoadDialogOpen, setSelectedScenarioId } from '../store/simScenarioSlice';
-import { setActivePage } from '../store/uiSlice';
-import { IconDatabase, IconChartBar, IconSettings, IconDotsVertical, IconUpload, IconDeviceFloppy, IconFolderOpen } from '@tabler/icons-react';
+import { setActivePage, setBrowserAutoSaveEnabled } from '../store/uiSlice';
+import { IconDatabase, IconChartBar, IconSettings, IconDotsVertical, IconUpload, IconDeviceFloppy, IconFolderOpen, IconCalendarEvent, IconInfoCircle } from '@tabler/icons-react';
 import DataImportModal from './modals/DataImportModal';
 
 function TopNav() {
@@ -11,7 +11,9 @@ function TopNav() {
   const canSave = useSelector(isSaveAllowed);
   const scenarios = useSelector((state) => state.simScenario.scenarios);
   const selectedScenarioId = useSelector((state) => state.simScenario.selectedScenarioId);
+  const browserAutoSaveEnabled = useSelector((state) => state.ui.browserAutoSaveEnabled);
   const [importModalOpen, setImportModalOpen] = React.useState(false);
+  const [privacyModalOpen, setPrivacyModalOpen] = React.useState(false);
 
   const scenarioOptions = React.useMemo(
     () =>
@@ -21,6 +23,20 @@ function TopNav() {
       })),
     [scenarios]
   );
+
+  const handleAutoSaveToggle = (nextEnabled) => {
+    if (nextEnabled) {
+      setPrivacyModalOpen(true);
+      return;
+    }
+
+    dispatch(setBrowserAutoSaveEnabled(false));
+  };
+
+  const handleConfirmAutoSave = () => {
+    dispatch(setBrowserAutoSaveEnabled(true));
+    setPrivacyModalOpen(false);
+  };
 
   return (
     <Container size="xl" h="100%">
@@ -63,6 +79,13 @@ function TopNav() {
           >
             Optionen
           </Button>
+          <Button
+            onClick={() => dispatch(setActivePage('events'))}
+            variant="subtle"
+            leftSection={<IconCalendarEvent size={20} />}
+          >
+            Ereignisse
+          </Button>
 
           <Menu shadow="md" width={200}>
             <Menu.Target>
@@ -73,6 +96,15 @@ function TopNav() {
 
             <Menu.Dropdown>
               <Menu.Label>Aktionen</Menu.Label>
+              <Menu.Item
+                leftSection={<IconInfoCircle size={16} />}
+                onClick={() => handleAutoSaveToggle(!browserAutoSaveEnabled)}
+              >
+                <Group justify="space-between" w="100%" wrap="nowrap" gap="md">
+                  <span>Auto-Save im Browser</span>
+                  <Switch checked={browserAutoSaveEnabled} readOnly size="xs" />
+                </Group>
+              </Menu.Item>
               <Menu.Item
                 leftSection={<IconUpload size={16} />}
                 onClick={() => setImportModalOpen(true)}
@@ -98,6 +130,32 @@ function TopNav() {
       </Group>
 
       <DataImportModal opened={importModalOpen} onClose={() => setImportModalOpen(false)} />
+
+      <Modal
+        opened={privacyModalOpen}
+        onClose={() => setPrivacyModalOpen(false)}
+        title="Datenschutzhinweis"
+        centered
+      >
+        <Stack gap="md">
+          <Alert icon={<IconInfoCircle size={16} />} color="blue" variant="light">
+            Beim Aktivieren werden Szenarien und Arbeitsdaten unverschlüsselt im lokalen
+            Browser-Speicher abgelegt.
+          </Alert>
+          <Text>
+            Die Daten bleiben auf diesem Gerät und werden bei jeder Änderung automatisch
+            aktualisiert. Deaktiviere die Funktion wieder, wenn keine lokale Speicherung mehr
+            gewünscht ist.
+          </Text>
+
+          <Group justify="flex-end">
+            <Button variant="subtle" onClick={() => setPrivacyModalOpen(false)}>
+              Abbrechen
+            </Button>
+            <Button onClick={handleConfirmAutoSave}>Aktivieren</Button>
+          </Group>
+        </Stack>
+      </Modal>
     </Container>
   );
 }

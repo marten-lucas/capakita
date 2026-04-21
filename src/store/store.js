@@ -9,6 +9,20 @@ import chartReducer from './chartSlice';
 import eventReducer from './eventSlice';
 import datesOfInterestReducer from './datesOfInterestSlice';
 import uiReducer from './uiSlice';
+import { initialUiState } from './uiSlice';
+import { extractSaveData } from '../utils/saveLoadUtils';
+import { loadBrowserAutoSaveEnabled, loadBrowserAutoSaveState, saveBrowserAutoSaveEnabled, saveBrowserAutoSaveState } from '../utils/browserStorage';
+
+const browserAutoSaveEnabled = loadBrowserAutoSaveEnabled();
+const browserAutoSaveState = browserAutoSaveEnabled ? loadBrowserAutoSaveState() : null;
+
+const preloadedState = {
+  ui: {
+    ...initialUiState,
+    browserAutoSaveEnabled,
+  },
+  ...(browserAutoSaveState || {}),
+};
 
 const store = configureStore({
   reducer: {
@@ -23,6 +37,16 @@ const store = configureStore({
     events: eventReducer,
     datesOfInterest: datesOfInterestReducer,
   },
+  preloadedState,
+});
+
+store.subscribe(() => {
+  const state = store.getState();
+  saveBrowserAutoSaveEnabled(state.ui.browserAutoSaveEnabled);
+
+  if (state.ui.browserAutoSaveEnabled) {
+    saveBrowserAutoSaveState(extractSaveData(state));
+  }
 });
 
 export default store;

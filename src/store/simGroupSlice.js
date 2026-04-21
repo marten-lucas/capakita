@@ -1,5 +1,17 @@
 import { createSlice } from '@reduxjs/toolkit';
 import { createId } from '../utils/idUtils';
+import { DEFAULT_GROUP_ICON, normalizeGroupIcon } from '../utils/groupIcons';
+
+function normalizeGroupDefRecord(groupDef = {}) {
+  const isSchoolKidGroup = groupDef?.isSchoolKidGroup ?? groupDef?.IsSchool ?? groupDef?.type === 'Schulkindgruppe';
+
+  return {
+    ...groupDef,
+    icon: normalizeGroupIcon(groupDef?.icon || DEFAULT_GROUP_ICON),
+    isSchoolKidGroup,
+    IsSchool: isSchoolKidGroup,
+  };
+}
 
 const initialState = {
   groupsByScenario: {}, // { [scenarioId]: { [dataItemId]: { [assignmentId]: groupAssignment } } }
@@ -45,8 +57,7 @@ const simGroupSlice = createSlice({
     addGroupDef(state, action) {
       const { scenarioId, groupDef } = action.payload;
       if (!state.groupDefsByScenario[scenarioId]) state.groupDefsByScenario[scenarioId] = [];
-      const defWithKey = { ...groupDef };
-      state.groupDefsByScenario[scenarioId].push(defWithKey);
+      state.groupDefsByScenario[scenarioId].push(normalizeGroupDefRecord(groupDef));
     },
     updateGroupDef(state, action) {
       const { scenarioId, groupId, updates } = action.payload;
@@ -55,7 +66,10 @@ const simGroupSlice = createSlice({
       if (!defs) return;
       const idx = defs.findIndex(g => String(g.id) === id);
       if (idx !== -1) {
-        defs[idx] = { ...defs[idx], ...updates };
+        defs[idx] = normalizeGroupDefRecord({
+          ...defs[idx],
+          ...updates,
+        });
       }
     },
     deleteGroupDef(state, action) {
@@ -69,7 +83,7 @@ const simGroupSlice = createSlice({
       const { scenarioId, defs } = action.payload;
       if (!state.groupDefsByScenario[scenarioId]) state.groupDefsByScenario[scenarioId] = [];
       defs.forEach(def => {
-        state.groupDefsByScenario[scenarioId].push({ ...def });
+        state.groupDefsByScenario[scenarioId].push(normalizeGroupDefRecord(def));
       });
     },
     importGroupAssignments(state, action) {
@@ -98,7 +112,15 @@ const simGroupSlice = createSlice({
       state.groupsByScenario = action.payload || {};
     },
     loadGroupDefsByScenario(state, action) {
-      state.groupDefsByScenario = action.payload || {};
+      const loaded = action.payload || {};
+      state.groupDefsByScenario = Object.fromEntries(
+        Object.entries(loaded).map(([scenarioId, defs]) => [
+          scenarioId,
+          Array.isArray(defs)
+            ? defs.map((def) => normalizeGroupDefRecord(def))
+            : [],
+        ])
+      );
     },
   },
 });

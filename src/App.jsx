@@ -5,6 +5,7 @@ import AppFooter from './components/AppFooter';
 import DataView from './views/DataView'
 import VisuView from './views/VisuView'
 import SettingsView from './views/SettingsView'
+import EventsView from './views/EventsView';
 import WelcomeView from './views/WelcomeView';
 import LegalView from './views/LegalView';
 import { useSelector, useDispatch } from 'react-redux';
@@ -19,6 +20,7 @@ const VIEW_COMPONENTS = {
   data: DataView,
   visu: VisuView,
   settings: SettingsView,
+  events: EventsView,
   legal: LegalView,
 };
 

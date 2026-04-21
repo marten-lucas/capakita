@@ -23,7 +23,7 @@ export default function AgeHistogram() {
     title: { text: null },
     xAxis: {
       categories: chartData.categories || [],
-      title: { text: 'Alter in Monaten (3-Monats-Klassen)' },
+      title: { text: 'Alter in Jahren' },
       labels: {
         rotation: -45,
         style: { fontSize: '10px' },

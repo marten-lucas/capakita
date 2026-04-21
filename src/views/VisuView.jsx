@@ -41,11 +41,20 @@ function VisuView() {
 
   useScenarioEvents(selectedScenarioId);
 
-  const effectiveDataItems = useSelector(state => {
-    if (!selectedScenarioId) return [];
-    const overlayData = buildOverlayAwareData(selectedScenarioId, state);
-    return Object.values(overlayData.effectiveDataItems || {});
-  });
+  // Memoize selector to prevent new array reference each render
+  const effectiveDataItems = useSelector(
+    (state) => {
+      if (!selectedScenarioId) return [];
+      const overlayData = buildOverlayAwareData(selectedScenarioId, state);
+      return Object.values(overlayData.effectiveDataItems || {});
+    },
+    (prev, next) => {
+      // Custom equality: compare by ID if available
+      if (!prev || !next) return prev === next;
+      if (prev.length !== next.length) return false;
+      return prev.every((item, idx) => item?.id === next[idx]?.id);
+    }
+  );
 
   if (!effectiveDataItems || effectiveDataItems.length === 0) {
     return (

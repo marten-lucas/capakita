@@ -78,6 +78,43 @@ export function generateMidtermCategories(timedimension, events) {
     return categories;
 }
 
+/**
+ * Format a single ISO date string into the category label used by generateMidtermCategories
+ * @param {string} timedimension
+ * @param {string} dateStr - ISO date "YYYY-MM-DD"
+ * @returns {string} label matching category format
+ */
+export function formatDateToCategory(timedimension, dateStr) {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return '';
+
+    function formatLabel(d) {
+        switch (timedimension) {
+            case 'week': {
+                const dd = new Date(d.getTime());
+                dd.setHours(0, 0, 0, 0);
+                dd.setDate(dd.getDate() + 3 - ((dd.getDay() + 6) % 7));
+                const week1 = new Date(dd.getFullYear(), 0, 4);
+                const weekNum = 1 + Math.round(((dd.getTime() - week1.getTime()) / 86400000 - 3 + ((week1.getDay() + 6) % 7)) / 7);
+                return `${dd.getFullYear()}-W${weekNum}`;
+            }
+            case 'month':
+                return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+            case 'quarter': {
+                const q = Math.floor(date.getMonth() / 3) + 1;
+                return `${date.getFullYear()}-Q${q}`;
+            }
+            case 'year':
+                return `${date.getFullYear()}`;
+            default:
+                return date.toISOString().slice(0, 10);
+        }
+    }
+
+    return formatLabel(date);
+}
+
 
 
 /**

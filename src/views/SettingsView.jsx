@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Paper, Tabs, Box } from '@mantine/core';
-import { IconLayersIntersect, IconUsers, IconCertificate, IconCalendarEvent } from '@tabler/icons-react';
+import { IconCalendarEvent, IconCertificate, IconLayersIntersect, IconUsers } from '@tabler/icons-react';
 import OrgaTabGroupDefs from '../components/orgaDetails/orgaTabGroupDefs';
 import OrgaTabQualificationDefs from '../components/orgaDetails/orgaTabQualificatoinDefs';
 import OrgaTabScenarioDefs from '../components/orgaDetails/orgaTabScenarioDefs';
@@ -14,39 +14,41 @@ function SettingsView() {
   };
 
   return (
-    <Paper shadow="sm" withBorder p={0}>
-      <Tabs value={activeTab} onChange={handleTabChange}>
-        <Tabs.List>
-          <Tabs.Tab value="scenarios" leftSection={<IconLayersIntersect size={16} />}>
-            Szenarien
-          </Tabs.Tab>
-          <Tabs.Tab value="groups" leftSection={<IconUsers size={16} />}>
-            Gruppen
-          </Tabs.Tab>
-          <Tabs.Tab value="qualifications" leftSection={<IconCertificate size={16} />}>
-            Qualifikationen
-          </Tabs.Tab>
-          <Tabs.Tab value="events" leftSection={<IconCalendarEvent size={16} />}>
-            Ereignisse
-          </Tabs.Tab>
-        </Tabs.List>
+    <>
+      <Paper shadow="sm" withBorder p={0}>
+        <Tabs value={activeTab} onChange={handleTabChange}>
+          <Tabs.List>
+            <Tabs.Tab value="scenarios" leftSection={<IconLayersIntersect size={16} />}>
+              Szenarien
+            </Tabs.Tab>
+            <Tabs.Tab value="groups" leftSection={<IconUsers size={16} />}>
+              Gruppen
+            </Tabs.Tab>
+            <Tabs.Tab value="qualifications" leftSection={<IconCertificate size={16} />}>
+              Qualifikationen
+            </Tabs.Tab>
+            <Tabs.Tab value="events" leftSection={<IconCalendarEvent size={16} />}>
+              Ereignisse
+            </Tabs.Tab>
+          </Tabs.List>
 
-        <Box p="md">
-          <Tabs.Panel value="scenarios">
-            <OrgaTabScenarioDefs />
-          </Tabs.Panel>
-          <Tabs.Panel value="groups">
-            <OrgaTabGroupDefs />
-          </Tabs.Panel>
-          <Tabs.Panel value="qualifications">
-            <OrgaTabQualificationDefs />
-          </Tabs.Panel>
-          <Tabs.Panel value="events">
-            <OrgaTabEvents />
-          </Tabs.Panel>
-        </Box>
-      </Tabs>
-    </Paper>
+          <Box p="md">
+            <Tabs.Panel value="scenarios">
+              <OrgaTabScenarioDefs />
+            </Tabs.Panel>
+            <Tabs.Panel value="groups">
+              <OrgaTabGroupDefs />
+            </Tabs.Panel>
+            <Tabs.Panel value="qualifications">
+              <OrgaTabQualificationDefs />
+            </Tabs.Panel>
+            <Tabs.Panel value="events">
+              <OrgaTabEvents />
+            </Tabs.Panel>
+          </Box>
+        </Tabs>
+      </Paper>
+    </>
   );
 }
 

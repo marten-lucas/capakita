@@ -32,7 +32,7 @@ export function useScenarioImport() {
         groupsRaw = groupsRaw.filter(grp => allowedGroupIds.has(String(grp.GRUNR)));
       }
 
-      const { simDataList } = adebis2simData(kidsRaw, employeesRaw);
+      const { simDataList } = adebis2simData(kidsRaw, employeesRaw, belegungRaw);
       const { bookings, bookingReference } = adebis2bookings(belegungRaw, employeesRaw);
       const groupDefs = adebis2GroupDefs(groupsRaw);
       const qualiDefs = adebis2QualiDefs(employeesRaw);

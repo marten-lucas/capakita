@@ -28,11 +28,13 @@ function ChartFilterForm({ showStichtag = false, scenarioId, onTimedimensionChan
   }, [dispatch, scenarioId]);
 
   const chartState = useSelector((state) => state.chart[scenarioId] || {});
-  const timedimension = chartState.timedimension || 'month';
-  const chartToggles = chartState.chartToggles || DEFAULT_CHART_TOGGLES;
-  const selectedGroups = chartState.filter?.Groups || EMPTY_SELECTION;
-  const selectedQualifications = chartState.filter?.Qualifications || EMPTY_SELECTION;
-  const referenceDate = chartState.referenceDate || '';
+  
+  // Memoize selections to prevent new references every render
+  const timedimension = React.useMemo(() => chartState.timedimension || 'month', [chartState.timedimension]);
+  const chartToggles = React.useMemo(() => chartState.chartToggles || DEFAULT_CHART_TOGGLES, [chartState.chartToggles]);
+  const selectedGroups = React.useMemo(() => chartState.filter?.Groups || EMPTY_SELECTION, [chartState.filter?.Groups]);
+  const selectedQualifications = React.useMemo(() => chartState.filter?.Qualifications || EMPTY_SELECTION, [chartState.filter?.Qualifications]);
+  const referenceDate = React.useMemo(() => chartState.referenceDate || '', [chartState.referenceDate]);
 
   const { getEffectiveGroupDefs, getEffectiveQualificationDefs } = useOverlayData();
   const groupDefs = getEffectiveGroupDefs();

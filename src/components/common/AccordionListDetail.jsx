@@ -21,7 +21,7 @@ function AccordionListDetail({
           <Text c="dimmed">{emptyText}</Text>
         </Center>
       ) : (
-        <Accordion variant="separated" defaultValue={String(items[0]?.id || '0')}>
+        <Accordion variant="separated">
           {items.map((item, index) => (
             <Accordion.Item key={item.id || index} value={item.id || index.toString()}>
               <Group justify="space-between" wrap="nowrap" gap="xs">

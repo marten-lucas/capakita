@@ -1,24 +1,21 @@
 import React from 'react';
 import { Text, Group, Box, Avatar } from '@mantine/core';
 import { consolidateBookingSummary } from '../../../utils/bookingUtils';
+import { calculateSegmentMinutes, formatDurationHours } from '../../../utils/timeUtils';
 
 // Helper to calculate total hours from booking segments
 function getBookingHours(times) {
   if (!times || times.length === 0) return '0 h';
   let totalMinutes = 0;
-  times.forEach(dayTime => {
+  times.forEach((dayTime) => {
     if (Array.isArray(dayTime.segments)) {
-      dayTime.segments.forEach(seg => {
-        if (seg.booking_start && seg.booking_end) {
-          const [sh, sm] = seg.booking_start.split(':').map(Number);
-          const [eh, em] = seg.booking_end.split(':').map(Number);
-          const mins = (eh * 60 + em) - (sh * 60 + sm);
-          if (mins > 0) totalMinutes += mins;
-        }
+      dayTime.segments.forEach((segment) => {
+        const minutes = calculateSegmentMinutes(segment);
+        if (minutes && minutes > 0) totalMinutes += minutes;
       });
     }
   });
-  return `${(totalMinutes / 60).toFixed(1)} h`;
+  return formatDurationHours(totalMinutes);
 }
 
 function BookingCards({ item, index }) {
