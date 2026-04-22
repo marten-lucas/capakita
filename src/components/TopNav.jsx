@@ -98,10 +98,18 @@ function TopNav() {
               <Menu.Label>Aktionen</Menu.Label>
               <Menu.Item
                 leftSection={<IconInfoCircle size={16} />}
+                disabled={!canSave && !browserAutoSaveEnabled}
                 onClick={() => handleAutoSaveToggle(!browserAutoSaveEnabled)}
               >
                 <Group justify="space-between" w="100%" wrap="nowrap" gap="md">
-                  <span>Auto-Save im Browser</span>
+                  <Stack gap={0} miw={0}>
+                    <Text size="sm">Auto-Save im Browser</Text>
+                    {!canSave && (
+                      <Text size="xs" c="dimmed">
+                        Nur für anonymisierte Imports
+                      </Text>
+                    )}
+                  </Stack>
                   <Switch checked={browserAutoSaveEnabled} readOnly size="xs" />
                 </Group>
               </Menu.Item>

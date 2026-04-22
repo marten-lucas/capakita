@@ -171,7 +171,9 @@ export function calculateChartDataMidterm(
     }
 
     const demand = generateBookingDataSeries(referenceDate, filteredDemandBookings, categories, 'all');
-    const capacity = generateBookingDataSeries(referenceDate, filteredCapacityBookings, categories, 'pedagogical');
+    const capacity_pedagogical = generateBookingDataSeries(referenceDate, filteredCapacityBookings, categories, 'pedagogical');
+    const capacity_administrative = generateBookingDataSeries(referenceDate, filteredCapacityBookings, categories, 'administrative');
+    const capacity = capacity_pedagogical.map((value, index) => value + (capacity_administrative[index] || 0));
 
     // careRatio and expertRatio per timedimension
     const care_ratio = generateCareRatioTimeDimension(
@@ -194,6 +196,8 @@ export function calculateChartDataMidterm(
         demand: [...demand],
         maxdemand: Math.max(...demand, 0),
         capacity: [...capacity],
+        capacity_pedagogical: [...capacity_pedagogical],
+        capacity_administrative: [...capacity_administrative],
         maxcapacity: Math.max(...capacity, 0),
         care_ratio: [...care_ratio],
         max_care_ratio: Math.max(...care_ratio, 0),

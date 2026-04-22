@@ -11,7 +11,8 @@ export default function BookingHistogram() {
   const theme = useMantineTheme();
 
   const demandColor = theme.colors.blue[6];
-  const capacityColor = theme.colors.green[6];
+  const capacityPedagogicalColor = theme.colors.green[6];
+  const capacityAdministrativeColor = theme.colors.violet[6];
 
   const chartData = useSelector(selectHistogramChartData);
 
@@ -20,7 +21,8 @@ export default function BookingHistogram() {
     // Ensure all data arrays are mutable copies
     const safeCategories = chartData.categories ? [...chartData.categories] : [];
     const safeDemand = chartData.demand ? chartData.demand.map(val => Number(val) || 0) : [];
-    const safeCapacity = chartData.capacity ? chartData.capacity.map(val => Number(val) || 0) : [];
+    const safeCapacityPedagogical = chartData.capacity_pedagogical ? chartData.capacity_pedagogical.map(val => Number(val) || 0) : [];
+    const safeCapacityAdministrative = chartData.capacity_administrative ? chartData.capacity_administrative.map(val => Number(val) || 0) : [];
 
     return {
       chart: { type: 'column', zoomType: 'x' },
@@ -53,9 +55,14 @@ export default function BookingHistogram() {
           color: demandColor,
         },
         {
-          name: 'Mitarbeiter',
-          data: safeCapacity,
-          color: capacityColor,
+          name: 'Mitarbeiter (pädagogisch)',
+          data: safeCapacityPedagogical,
+          color: capacityPedagogicalColor,
+        },
+        {
+          name: 'Mitarbeiter (administrativ)',
+          data: safeCapacityAdministrative,
+          color: capacityAdministrativeColor,
         }
       ],
       legend: { 
@@ -71,7 +78,7 @@ export default function BookingHistogram() {
       },
       // Remove navigator and scrollbar
     };
-  }, [chartData, demandColor, capacityColor]);
+  }, [chartData, demandColor, capacityPedagogicalColor, capacityAdministrativeColor]);
 
   return (
     <Box h={400}>

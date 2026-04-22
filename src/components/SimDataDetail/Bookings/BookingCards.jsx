@@ -52,6 +52,20 @@ function BookingWeeklyOverview({ bookingTimes }) {
           const duration = start !== null && end !== null ? end - start : 0;
           return duration > 0 ? minutes + duration : minutes;
         }, 0);
+        const pedagogicalMinutes = segments.reduce((minutes, segment) => {
+          const start = timeToMinutes(segment.booking_start);
+          const end = timeToMinutes(segment.booking_end);
+          const duration = start !== null && end !== null ? end - start : 0;
+          if (duration <= 0) return minutes;
+          return segment.category === 'administrative' ? minutes : minutes + duration;
+        }, 0);
+        const administrativeMinutes = segments.reduce((minutes, segment) => {
+          const start = timeToMinutes(segment.booking_start);
+          const end = timeToMinutes(segment.booking_end);
+          const duration = start !== null && end !== null ? end - start : 0;
+          if (duration <= 0) return minutes;
+          return segment.category === 'administrative' ? minutes + duration : minutes;
+        }, 0);
         const hoursLabel = totalMinutes > 0 ? formatDurationHours(totalMinutes) : '';
 
         return (
@@ -71,11 +85,23 @@ function BookingWeeklyOverview({ bookingTimes }) {
               <Text size="10px" fw={700} c="dimmed">
                 {day.abbr}
               </Text>
-              {hoursLabel && (
-                <Badge size="xs" variant="light" color="blue">
-                  {hoursLabel}
-                </Badge>
-              )}
+              <Group gap={3} wrap="nowrap">
+                {hoursLabel && (
+                  <Badge size="xs" variant="light" color="gray">
+                    {hoursLabel}
+                  </Badge>
+                )}
+                {pedagogicalMinutes > 0 && (
+                  <Badge size="xs" variant="light" color="blue">
+                    {formatDurationHours(pedagogicalMinutes)}
+                  </Badge>
+                )}
+                {administrativeMinutes > 0 && (
+                  <Badge size="xs" variant="light" color="violet">
+                    {formatDurationHours(administrativeMinutes)}
+                  </Badge>
+                )}
+              </Group>
             </Group>
             <Box
               style={{

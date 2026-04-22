@@ -96,7 +96,7 @@ function DayHeader({ dayLabel, isActive, onToggle, detailsOpen, onToggleDetails 
   );
 }
 
-function DayControl({ dayLabel, dayData, onToggle, onTimeChange, onAddSegment, onAddSegmentAt, onRemoveSegment, onCategoryChange }) {
+function DayControl({ dayLabel, dayData, onToggle, onTimeChange, onAddSegment, onAddSegmentAt, onRemoveSegment, onCategoryChange, allowCategorySelection = false }) {
   const isActive = !!dayData;
   const [detailsOpen, setDetailsOpen] = React.useState(false);
   const segments = React.useMemo(
@@ -422,37 +422,39 @@ function DayControl({ dayLabel, dayData, onToggle, onTimeChange, onAddSegment, o
                     onPointerDown={(event) => startDrag('move', block.index, event)}
                     onMouseDown={(event) => startDrag('move', block.index, event)}
                   >
-                    <ActionIcon
-                      size={16}
-                      variant="filled"
-                      color={block.category === 'administrative' ? 'violet' : 'blue'}
-                      onPointerDown={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                      }}
-                      onMouseDown={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                      }}
-                      onClick={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        const nextCategory = block.category === 'administrative' ? 'pedagogical' : 'administrative';
-                        onCategoryChange?.(block.index, nextCategory);
-                      }}
-                      aria-label={`Segment ${block.index + 1} Kategorie umschalten`}
-                      style={{
-                        position: 'absolute',
-                        top: -7,
-                        left: -7,
-                        zIndex: 2,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {block.category === 'administrative'
-                        ? <IconBriefcase size={11} />
-                        : <IconUser size={11} />}
-                    </ActionIcon>
+                    {allowCategorySelection && (
+                      <ActionIcon
+                        size={16}
+                        variant="filled"
+                        color={block.category === 'administrative' ? 'violet' : 'blue'}
+                        onPointerDown={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                        }}
+                        onMouseDown={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                        }}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          const nextCategory = block.category === 'administrative' ? 'pedagogical' : 'administrative';
+                          onCategoryChange?.(block.index, nextCategory);
+                        }}
+                        aria-label={`Segment ${block.index + 1} Kategorie umschalten`}
+                        style={{
+                          position: 'absolute',
+                          top: -7,
+                          left: -7,
+                          zIndex: 2,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {block.category === 'administrative'
+                          ? <IconBriefcase size={11} />
+                          : <IconUser size={11} />}
+                      </ActionIcon>
+                    )}
                     {segments.length > 1 && (
                       <ActionIcon
                         size="xs"
@@ -598,16 +600,18 @@ function DayControl({ dayLabel, dayData, onToggle, onTimeChange, onAddSegment, o
                           error={!isValid && draft.start && draft.end ? 'Ungültig' : null}
                           style={{ width: 116, flexShrink: 0 }}
                         />
-                        <SegmentedControl
-                          size="xs"
-                          value={segment.category || 'pedagogical'}
-                          onChange={(value) => onCategoryChange?.(idx, value)}
-                          data={[
-                            { label: <IconUser size={14} />, value: 'pedagogical' },
-                            { label: <IconBriefcase size={14} />, value: 'administrative' },
-                          ]}
-                          aria-label={`Segment ${idx + 1} Kategorie`}
-                        />
+                        {allowCategorySelection && (
+                          <SegmentedControl
+                            size="xs"
+                            value={segment.category || 'pedagogical'}
+                            onChange={(value) => onCategoryChange?.(idx, value)}
+                            data={[
+                              { label: <IconUser size={14} />, value: 'pedagogical' },
+                              { label: <IconBriefcase size={14} />, value: 'administrative' },
+                            ]}
+                            aria-label={`Segment ${idx + 1} Kategorie`}
+                          />
+                        )}
                       </Group>
                       {segments.length > 1 && (
                         <ActionIcon

@@ -13,6 +13,8 @@ const EMPTY_WEEKLY_DATA = {
   demand: [],
   maxdemand: '',
   capacity: [],
+  capacity_pedagogical: [],
+  capacity_administrative: [],
   maxcapacity: '',
   care_ratio: [],
   max_care_ratio: '',
@@ -26,6 +28,8 @@ const EMPTY_MIDTERM_DATA = {
   demand: [],
   maxdemand: '',
   capacity: [],
+  capacity_pedagogical: [],
+  capacity_administrative: [],
   maxcapacity: '',
   care_ratio: [],
   max_care_ratio: '',
@@ -39,6 +43,8 @@ const EMPTY_HISTOGRAM_DATA = {
   demand: [],
   maxdemand: '',
   capacity: [],
+  capacity_pedagogical: [],
+  capacity_administrative: [],
   maxcapacity: '',
 };
 
@@ -152,6 +158,8 @@ export const selectWeeklyChartData = createSelector(
       demand: chartData?.demand ? chartData.demand.map((value) => (typeof value === 'number' ? value : 0)) : [],
       maxdemand: chartData?.maxdemand || '',
       capacity: chartData?.capacity ? chartData.capacity.map((value) => (typeof value === 'number' ? value : 0)) : [],
+      capacity_pedagogical: chartData?.capacity_pedagogical ? chartData.capacity_pedagogical.map((value) => (typeof value === 'number' ? value : 0)) : [],
+      capacity_administrative: chartData?.capacity_administrative ? chartData.capacity_administrative.map((value) => (typeof value === 'number' ? value : 0)) : [],
       maxcapacity: chartData?.maxcapacity || '',
       care_ratio: chartData?.care_ratio ? chartData.care_ratio.map((value) => (typeof value === 'number' ? value : 0)) : [],
       max_care_ratio: chartData?.max_care_ratio || '',
@@ -229,6 +237,8 @@ export const selectMidtermChartData = createSelector(
       demand: chartData?.demand ? chartData.demand.map((value) => (typeof value === 'number' ? value : 0)) : [],
       maxdemand: chartData?.maxdemand || '',
       capacity: chartData?.capacity ? chartData.capacity.map((value) => (typeof value === 'number' ? value : 0)) : [],
+      capacity_pedagogical: chartData?.capacity_pedagogical ? chartData.capacity_pedagogical.map((value) => (typeof value === 'number' ? value : 0)) : [],
+      capacity_administrative: chartData?.capacity_administrative ? chartData.capacity_administrative.map((value) => (typeof value === 'number' ? value : 0)) : [],
       maxcapacity: chartData?.maxcapacity || '',
       care_ratio: chartData?.care_ratio ? chartData.care_ratio.map((value) => (typeof value === 'number' ? value : 0)) : [],
       max_care_ratio: chartData?.max_care_ratio || '',
@@ -278,6 +288,8 @@ export const selectHistogramChartData = createSelector(
       demand: chartData?.demand ? chartData.demand.map((value) => (typeof value === 'number' ? value : 0)) : [],
       maxdemand: chartData?.maxdemand || '',
       capacity: chartData?.capacity ? chartData.capacity.map((value) => (typeof value === 'number' ? value : 0)) : [],
+      capacity_pedagogical: chartData?.capacity_pedagogical ? chartData.capacity_pedagogical.map((value) => (typeof value === 'number' ? value : 0)) : [],
+      capacity_administrative: chartData?.capacity_administrative ? chartData.capacity_administrative.map((value) => (typeof value === 'number' ? value : 0)) : [],
       maxcapacity: chartData?.maxcapacity || '',
     };
   }

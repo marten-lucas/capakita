@@ -77,7 +77,9 @@ function BookingDetail({ index, booking }) {
   const dispatch = useDispatch();
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
-  const { baseScenario, getEffectiveBookings } = useOverlayData();
+  const { baseScenario, getEffectiveDataItem, getEffectiveBookings } = useOverlayData();
+  const selectedItem = getEffectiveDataItem(selectedItemId);
+  const allowCategorySelection = selectedItem?.type === 'capacity';
 
   const baseScenarioId = baseScenario?.id;
   const baseBookingsObj = baseScenarioId ? getEffectiveBookings(selectedItemId) : {};
@@ -223,6 +225,7 @@ function BookingDetail({ index, booking }) {
   };
 
   const handleCategoryChange = (dayAbbr, segIdx, nextCategory) => {
+    if (!allowCategorySelection) return;
     if (nextCategory !== 'pedagogical' && nextCategory !== 'administrative') return;
 
     const newTimes = cloneBookingTimes(booking.times).map((t) => {
@@ -331,6 +334,7 @@ function BookingDetail({ index, booking }) {
               onRemoveSegment={(sIdx) => handleRemoveSegment(day.abbr, sIdx)}
               onTimeChange={(sIdx, vals) => handleTimeChange(day.abbr, sIdx, vals)}
               onCategoryChange={(sIdx, category) => handleCategoryChange(day.abbr, sIdx, category)}
+              allowCategorySelection={allowCategorySelection}
             />
           );
         })}

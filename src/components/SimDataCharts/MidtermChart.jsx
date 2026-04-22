@@ -11,7 +11,8 @@ export default function MidtermChart() {
   const theme = useMantineTheme();
 
   const demandColor = theme.colors.blue[6];
-  const capacityColor = theme.colors.green[6];
+  const capacityPedagogicalColor = theme.colors.green[6];
+  const capacityAdministrativeColor = theme.colors.violet[6];
   const careRatioColor = theme.colors.red[6];
   const expertRatioColor = theme.colors.orange[6];
 
@@ -38,7 +39,7 @@ export default function MidtermChart() {
       }),
       createColoredYAxis({
         title: 'Kapazität (Stunden)',
-        color: capacityColor,
+        color: capacityPedagogicalColor,
         min: 0,
         max: chartData.maxcapacity || null,
         tickInterval: null,
@@ -75,12 +76,21 @@ export default function MidtermChart() {
         marker: { enabled: false }
       },
       {
-        name: 'Kapazität',
-        type: 'area',
-        data: chartData.capacity || [],
+        name: 'Mitarbeiter (pädagogisch)',
+        type: 'column',
+        data: chartData.capacity_pedagogical || [],
         yAxis: 1,
-        color: capacityColor,
-        fillOpacity: 0.6,
+        color: capacityPedagogicalColor,
+        stacking: 'normal',
+        marker: { enabled: false },
+      },
+      {
+        name: 'Mitarbeiter (administrativ)',
+        type: 'column',
+        data: chartData.capacity_administrative || [],
+        yAxis: 1,
+        color: capacityAdministrativeColor,
+        stacking: 'normal',
         marker: { enabled: false }
       },
       {
@@ -121,7 +131,7 @@ export default function MidtermChart() {
         return generateWeeklyChartTooltip(this.points, category);
       }
     },
-  }), [chartData, demandColor, capacityColor, careRatioColor, expertRatioColor]);
+  }), [chartData, demandColor, capacityPedagogicalColor, capacityAdministrativeColor, careRatioColor, expertRatioColor]);
 
   return (
     <Box h={400}>

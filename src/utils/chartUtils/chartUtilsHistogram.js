@@ -81,18 +81,23 @@ export function calculateChartDataHistogram(
   const maxHours = Math.max(
     ...filteredDemandBookings.map((booking) => sumBookingHours(booking)),
     ...filteredCapacityBookings.map((booking) => sumBookingHours(booking, { mode: 'pedagogical' })),
+    ...filteredCapacityBookings.map((booking) => sumBookingHours(booking, { mode: 'administrative' })),
     12 // Minimum range of 12 hours (so at least 0, 1-4, 5-8, 9-12)
   );
   const binSize = 4;
   const categories = generateHistogramBins(maxHours, binSize);
   const demandSeries = calculateHistogramSeries(filteredDemandBookings, categories, binSize, 'all');
-  const capacitySeries = calculateHistogramSeries(filteredCapacityBookings, categories, binSize, 'pedagogical');
+  const capacityPedagogicalSeries = calculateHistogramSeries(filteredCapacityBookings, categories, binSize, 'pedagogical');
+  const capacityAdministrativeSeries = calculateHistogramSeries(filteredCapacityBookings, categories, binSize, 'administrative');
+  const capacitySeries = capacityPedagogicalSeries.map((value, index) => value + (capacityAdministrativeSeries[index] || 0));
 
   return {
     categories: [...categories],
     demand: [...demandSeries],
     maxdemand: Math.max(...demandSeries, 0),
     capacity: [...capacitySeries],
+    capacity_pedagogical: [...capacityPedagogicalSeries],
+    capacity_administrative: [...capacityAdministrativeSeries],
     maxcapacity: Math.max(...capacitySeries, 0),
   };
 }

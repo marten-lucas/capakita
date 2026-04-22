@@ -124,12 +124,12 @@ function ChartFilterForm({ showStichtag = false, scenarioId, onTimedimensionChan
                 onTimedimensionChange?.(value);
               }}
             />
-          )}
+            )}
+        </Group>
 
           {showStichtag && (chartToggles.includes('weekly') || chartToggles.includes('histogram')) && (
             <EventPicker scenarioId={scenarioId} />
           )}
-        </Group>
       </Stack>
     </Paper>
   );

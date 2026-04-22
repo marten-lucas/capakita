@@ -192,25 +192,24 @@ export function adebis2GroupDefs(groupsRaw) {
     const name = group.BEZ || '';
     const lowerName = name.toLowerCase();
     let icon = DEFAULT_GROUP_ICON;
-    let isSchoolKidGroup = false;
-    if (lowerName.includes('schul')) {
-      icon = 'mdi:school';
-      isSchoolKidGroup = true;
+    const isSchoolKidGroup = lowerName.includes('schul') || lowerName.includes('schule') || lowerName.includes('schulkind');
+    if (lowerName.includes('fuchs')) icon = 'openmoji:fox';
+    else if (lowerName.includes('bär') || lowerName.includes('baer')) icon = 'openmoji:bear';
+    else if (lowerName.includes('hase') || lowerName.includes('kaninchen')) icon = 'openmoji:rabbit-face';
+    else if (lowerName.includes('frosch')) icon = 'openmoji:frog';
+    else if (lowerName.includes('schmetterling')) icon = 'openmoji:butterfly';
+    else if (lowerName.includes('marienkäfer') || lowerName.includes('käfer')) icon = 'openmoji:lady-beetle';
+    else if (lowerName.includes('biene')) icon = 'openmoji:bee';
+    else if (lowerName.includes('stern')) icon = 'material-symbols:star';
+    else if (lowerName.includes('sonne')) icon = 'openmoji:sun';
+    else if (lowerName.includes('mond')) icon = 'openmoji:crescent-moon';
+    else if (lowerName.includes('regenbogen')) icon = 'openmoji:rainbow';
+    else if (lowerName.includes('blume')) icon = 'openmoji:flower';
+    else if (lowerName.includes('baum')) icon = 'openmoji:evergreen-tree';
+    else if (isSchoolKidGroup) {
+      icon = 'material-symbols:school';
     }
-    else if (lowerName.includes('fuchs')) icon = 'mdi:fox';
-    else if (lowerName.includes('bär') || lowerName.includes('baer')) icon = 'mdi:bear';
-    else if (lowerName.includes('hase') || lowerName.includes('kaninchen')) icon = 'mdi:rabbit';
-    else if (lowerName.includes('frosch')) icon = 'mdi:frog';
-    else if (lowerName.includes('schmetterling')) icon = 'mdi:butterfly';
-    else if (lowerName.includes('marienkäfer') || lowerName.includes('käfer')) icon = 'mdi:ladybug';
-    else if (lowerName.includes('biene')) icon = 'mdi:bee';
-    else if (lowerName.includes('schule') || lowerName.includes('schulkind')) icon = 'mdi:school';
-    else if (lowerName.includes('stern')) icon = 'mdi:star';
-    else if (lowerName.includes('sonne')) icon = 'mdi:weather-sunny';
-    else if (lowerName.includes('mond')) icon = 'mdi:weather-night';
-    else if (lowerName.includes('regenbogen')) icon = 'mdi:rainbow';
-    else if (lowerName.includes('blume')) icon = 'mdi:flower';
-    else if (lowerName.includes('baum')) icon = 'mdi:tree';
+    else if (lowerName.includes('schule') || lowerName.includes('schulkind')) icon = 'material-symbols:school';
 
     let groupDef = {
       id: String(group.GRUNR),

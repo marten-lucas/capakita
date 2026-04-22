@@ -1,4 +1,5 @@
 import { generateExpertRatioSeries, generateCareRatioSeries, filterBookings } from '../chartUtils/chartUtils';
+import { segmentMatchesMode } from '../bookingUtils';
 import { timeToMinutes } from '../timeUtils';
 
 const WEEKLY_DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr'];
@@ -64,7 +65,7 @@ export function formatWeeklyAxisLabel(value, categories = []) {
  * Generate a data series for the chart by counting bookings per category (time segment).
  * Each booking must have a 'times' array with { day, start, end }.
  */
-export function generateBookingDataSeries(referenceDate, filteredBookings, categories) {
+export function generateBookingDataSeries(referenceDate, filteredBookings, categories, mode = 'all') {
   // categories: e.g. ["Mo 7:00", "Mo 7:30", ...]
   // Always return a new array, not a reference to a constant or reused array
   const series = new Array(categories.length).fill(0);
@@ -93,6 +94,7 @@ export function generateBookingDataSeries(referenceDate, filteredBookings, categ
       return dayObj.segments.some(seg =>
         timeToMinutes(seg.booking_start) !== null
         && timeToMinutes(seg.booking_end) !== null
+        && segmentMatchesMode(seg, mode)
         && timeToMinutes(seg.booking_start) <= categoryMinutes
         && timeToMinutes(seg.booking_end) > categoryMinutes // exclusive end
       );
@@ -176,7 +178,9 @@ export function calculateChartDataWeekly(
 
   const categories = generateTimeSegments();
   const demand = generateBookingDataSeries(referenceDate, filteredDemandBookings, categories);
-  const capacity = generateBookingDataSeries(referenceDate, filteredCapacityBookings, categories);
+  const capacity_pedagogical = generateBookingDataSeries(referenceDate, filteredCapacityBookings, categories, 'pedagogical');
+  const capacity_administrative = generateBookingDataSeries(referenceDate, filteredCapacityBookings, categories, 'administrative');
+  const capacity = capacity_pedagogical.map((value, index) => value + (capacity_administrative[index] || 0));
 
   // Neu: careRatio berechnen
   const care_ratio = generateCareRatioSeries(
@@ -200,6 +204,8 @@ export function calculateChartDataWeekly(
     demand: [...demand],
     maxdemand: Math.max(...demand, 0),
     capacity: [...capacity],
+    capacity_pedagogical: [...capacity_pedagogical],
+    capacity_administrative: [...capacity_administrative],
     maxcapacity: Math.max(...capacity, 0),
     care_ratio: [...care_ratio],
     max_care_ratio: Math.max(...care_ratio, 0),

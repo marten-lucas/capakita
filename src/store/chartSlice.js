@@ -170,6 +170,8 @@ export const updateWeeklyChartData = (scenarioId) => (dispatch, getState) => {
     demand: chartData?.demand ? chartData.demand.map(val => typeof val === 'number' ? val : 0) : [],
     maxdemand: chartData?.maxdemand || "",
     capacity: chartData?.capacity ? chartData.capacity.map(val => typeof val === 'number' ? val : 0) : [],
+    capacity_pedagogical: chartData?.capacity_pedagogical ? chartData.capacity_pedagogical.map(val => typeof val === 'number' ? val : 0) : [],
+    capacity_administrative: chartData?.capacity_administrative ? chartData.capacity_administrative.map(val => typeof val === 'number' ? val : 0) : [],
     maxcapacity: chartData?.maxcapacity || "",
     care_ratio: chartData?.care_ratio ? chartData.care_ratio.map(val => typeof val === 'number' ? val : 0) : [],
     max_care_ratio: chartData?.max_care_ratio || "",
@@ -265,6 +267,8 @@ export const updateMidTermChartData = (scenarioId) => (dispatch, getState) => {
     demand: chartData?.demand ? chartData.demand.map(val => typeof val === 'number' ? val : 0) : [],
     maxdemand: chartData?.maxdemand || "",
     capacity: chartData?.capacity ? chartData.capacity.map(val => typeof val === 'number' ? val : 0) : [],
+    capacity_pedagogical: chartData?.capacity_pedagogical ? chartData.capacity_pedagogical.map(val => typeof val === 'number' ? val : 0) : [],
+    capacity_administrative: chartData?.capacity_administrative ? chartData.capacity_administrative.map(val => typeof val === 'number' ? val : 0) : [],
     maxcapacity: chartData?.maxcapacity || "",
     care_ratio: chartData?.care_ratio ? chartData.care_ratio.map(val => typeof val === 'number' ? val : 0) : [],
     max_care_ratio: chartData?.max_care_ratio || "",
@@ -367,6 +371,8 @@ export const updateHistogramChartData = (scenarioId) => (dispatch, getState) => 
     demand: chartData?.demand ? chartData.demand.map(val => typeof val === 'number' ? val : 0) : [],
     maxdemand: chartData?.maxdemand || "",
     capacity: chartData?.capacity ? chartData.capacity.map(val => typeof val === 'number' ? val : 0) : [],
+    capacity_pedagogical: chartData?.capacity_pedagogical ? chartData.capacity_pedagogical.map(val => typeof val === 'number' ? val : 0) : [],
+    capacity_administrative: chartData?.capacity_administrative ? chartData.capacity_administrative.map(val => typeof val === 'number' ? val : 0) : [],
     maxcapacity: chartData?.maxcapacity || "",
   };
 

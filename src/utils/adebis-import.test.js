@@ -322,6 +322,23 @@ describe('Adebis import regression', () => {
     expect(totalFailed).toBe(0);
   });
 
+  it('maps ADEBIS group names to supported icons', () => {
+    const groupDefs = adebis2GroupDefs([
+      { GRUNR: '1', BEZ: 'Fuchsgruppe' },
+      { GRUNR: '2', BEZ: 'Bärchengruppe' },
+      { GRUNR: '3', BEZ: 'Schulkinder-Fuchsgruppe' },
+      { GRUNR: '4', BEZ: 'Schulgruppe' },
+    ]);
+
+    expect(groupDefs[0].icon).toBe('openmoji:fox');
+    expect(groupDefs[1].icon).toBe('openmoji:bear');
+    expect(groupDefs[2].icon).toBe('openmoji:fox');
+    expect(groupDefs[3].icon).toBe('material-symbols:school');
+    expect(groupDefs[0].type).toBe('Regelgruppe');
+    expect(groupDefs[2].type).toBe('Schulkindgruppe');
+    expect(groupDefs[3].type).toBe('Schulkindgruppe');
+  });
+
   /**
    * Documentative test: validates that orphaned bookings (children with bookings but missing in kind.xml)
    * are ignored and do not create synthetic child entries.

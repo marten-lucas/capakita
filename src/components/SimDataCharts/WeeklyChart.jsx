@@ -1,9 +1,10 @@
-import { useMemo, useEffect, useCallback, useRef } from 'react';
+import { useMemo, useEffect, useCallback, useRef, useState } from 'react';
 import HighchartsReact from 'highcharts-react-official';
 import Highcharts from 'highcharts';
-import { Box, Stack, useMantineTheme } from '@mantine/core';
+import { ActionIcon, Badge, Box, Group, Paper, Stack, Text, useMantineTheme } from '@mantine/core';
+import { IconPin } from '@tabler/icons-react';
 import { useSelector } from 'react-redux';
-import { formatWeeklyAxisLabel, generateWeeklyChartTooltip } from '../../utils/chartUtils/chartUtilsWeekly';
+import { formatWeeklyAxisLabel } from '../../utils/chartUtils/chartUtilsWeekly';
 import { createColoredYAxis } from '../../utils/highchartsAxis';
 import { selectWeeklyChartData } from '../../store/chartSelectors';
 
@@ -16,17 +17,38 @@ export default function WeeklyChart() {
   const syncInProgress = useRef(false);
   const hoveredIndexRef = useRef(null);
   const hoveredPointsRef = useRef([[], []]);
+  const [hoveredIndex, setHoveredIndex] = useState(null);
+  const [pinnedIndex, setPinnedIndex] = useState(null);
 
   const plotBandColor1 = theme.colors.gray[0];
   const plotBandColor2 = theme.colors.gray[1];
   const plotBandColorLabel = theme.black;
   const demandColor = theme.colors.blue[6];
-  const capacityColor = theme.colors.green[6];
+  const capacityPedagogicalColor = theme.colors.green[6];
+  const capacityAdministrativeColor = theme.colors.violet[6];
   const careRatioColor = theme.colors.red[6];
   const expertRatioColor = theme.colors.orange[6];
 
   const chartData = useSelector(selectWeeklyChartData);
-  const categories = chartData.categories || [];
+  const categories = useMemo(() => chartData.categories || [], [chartData.categories]);
+  const displayIndex = pinnedIndex ?? hoveredIndex ?? 0;
+
+  const currentLabel = categories[displayIndex] || '-';
+  const currentDemand = Number(chartData.demand?.[displayIndex] || 0);
+  const currentCapacityPedagogical = Number(chartData.capacity_pedagogical?.[displayIndex] || 0);
+  const currentCapacityAdministrative = Number(chartData.capacity_administrative?.[displayIndex] || 0);
+  const currentCareRatio = Number(chartData.care_ratio?.[displayIndex] || 0);
+  const currentExpertRatio = Number(chartData.expert_ratio?.[displayIndex] || 0);
+
+  const getHeadroomMax = useCallback((maxValue, { factor = 0.08, minAbs = 1, integer = false } = {}) => {
+    const numericMax = Number(maxValue);
+    if (!Number.isFinite(numericMax) || numericMax <= 0) return null;
+
+    const padded = Math.max(numericMax * (1 + factor), numericMax + minAbs);
+    if (integer) return Math.ceil(padded);
+
+    return Math.round(padded * 10) / 10;
+  }, []);
 
   const majorTickPositions = useMemo(() => {
     const slotsPerDay = Math.max(Math.floor(categories.length / 5), 0);
@@ -61,6 +83,26 @@ export default function WeeklyChart() {
       };
     });
   }, [slotsPerDay, plotBandColor1, plotBandColor2, plotBandColorLabel]);
+
+  const plotBandsWithoutLabels = useMemo(() => (
+    plotBands.map((band) => ({ ...band, label: undefined }))
+  ), [plotBands]);
+
+  const daySeparatorLines = useMemo(() => {
+    if (slotsPerDay === 0) return [];
+
+    const separators = [];
+    for (let dayIndex = 1; dayIndex < WEEK_DAYS.length; dayIndex += 1) {
+      separators.push({
+        color: 'rgba(255,255,255,0.95)',
+        width: 8,
+        zIndex: 4,
+        value: (dayIndex * slotsPerDay) - 0.5,
+      });
+    }
+
+    return separators;
+  }, [slotsPerDay]);
 
   const syncXExtremes = useCallback(function (event) {
     if (event?.trigger === 'syncExtremes' || syncInProgress.current) return;
@@ -101,8 +143,15 @@ export default function WeeklyChart() {
   const syncHoverForIndex = useCallback((pointIndex, browserEvent) => {
     if (!Number.isFinite(pointIndex) || pointIndex < 0 || pointIndex >= categories.length) {
       clearAllHover();
+      if (pinnedIndex === null) setHoveredIndex(null);
       return;
     }
+
+    if (pinnedIndex !== null) {
+      return;
+    }
+
+    setHoveredIndex(pointIndex);
 
     if (hoveredIndexRef.current === pointIndex) {
       return;
@@ -130,13 +179,15 @@ export default function WeeklyChart() {
       chart.tooltip.refresh(sharedPoints);
       chart.xAxis[0].drawCrosshair(normalizedEvent, sharedPoints[0]);
     });
-  }, [categories.length, clearAllHover, clearChartHover]);
+  }, [categories.length, clearAllHover, clearChartHover, pinnedIndex]);
 
   useEffect(() => {
     const container = chartContainerRef.current;
     if (!container) return undefined;
 
     const handlePointer = (event) => {
+      if (pinnedIndex !== null) return;
+
       const primaryChart = chartRefs.current.find(Boolean);
       if (!primaryChart || categories.length === 0) return;
 
@@ -146,6 +197,7 @@ export default function WeeklyChart() {
 
       if (!insidePlot) {
         clearAllHover();
+        setHoveredIndex(null);
         return;
       }
 
@@ -170,10 +222,30 @@ export default function WeeklyChart() {
       container.removeEventListener('mouseleave', handleLeave);
       clearAllHover();
     };
-  }, [categories.length, clearAllHover, syncHoverForIndex]);
+  }, [categories.length, clearAllHover, syncHoverForIndex, pinnedIndex]);
+
+  useEffect(() => {
+    if (pinnedIndex === null || categories.length === 0) return;
+
+    const safeIndex = Math.max(0, Math.min(categories.length - 1, pinnedIndex));
+
+    chartRefs.current.forEach((chart, chartIndex) => {
+      if (!chart) return;
+
+      clearChartHover(chart, chartIndex);
+      const sharedPoints = chart.series
+        .map((series) => series.points?.find((point) => point?.x === safeIndex))
+        .filter((point) => point && point.y !== null);
+
+      if (sharedPoints.length === 0) return;
+
+      sharedPoints.forEach((point) => point.setState('hover'));
+      hoveredPointsRef.current[chartIndex] = sharedPoints;
+    });
+  }, [categories.length, clearChartHover, pinnedIndex]);
 
   // Optimized: Only recalculate when chartData changes
-  const buildXAxis = useCallback((showTitle) => ({
+  const buildXAxis = useCallback((showTitle, showDayLabels = true) => ({
     type: 'linear',
     min: 0,
     max: Math.max(categories.length - 1, 0),
@@ -202,13 +274,15 @@ export default function WeeklyChart() {
     events: {
       afterSetExtremes: syncXExtremes,
     },
-    plotBands,
-  }), [categories, majorTickPositions, plotBands, plotBandColorLabel, syncXExtremes, theme.colors.gray]);
+    plotLines: daySeparatorLines,
+    plotBands: showDayLabels ? plotBands : plotBandsWithoutLabels,
+  }), [categories, daySeparatorLines, majorTickPositions, plotBands, plotBandsWithoutLabels, plotBandColorLabel, syncXExtremes, theme.colors.gray]);
 
   const weeklyOptions = useMemo(() => {
     // Ensure all data arrays are mutable copies
     const safeDemand = chartData.demand ? chartData.demand.map(val => Number(val) || 0) : [];
-    const safeCapacity = chartData.capacity ? chartData.capacity.map(val => Number(val) || 0) : [];
+    const safeCapacityPedagogical = chartData.capacity_pedagogical ? chartData.capacity_pedagogical.map(val => Number(val) || 0) : [];
+    const safeCapacityAdministrative = chartData.capacity_administrative ? chartData.capacity_administrative.map(val => Number(val) || 0) : [];
 
     return {
       chart: {
@@ -226,18 +300,19 @@ export default function WeeklyChart() {
           title: 'Bedarf (Kinder)',
           color: demandColor,
           min: 0,
-          max: chartData.maxdemand || null,
+          max: getHeadroomMax(chartData.maxdemand, { factor: 0.1, minAbs: 1, integer: true }),
           tickInterval: 5,
           opposite: false,
           gridLineWidth: 1
         }),
         createColoredYAxis({
           title: 'Kapazität (Mitarbeiter)',
-          color: capacityColor,
+          color: capacityPedagogicalColor,
           min: 0,
-          max: chartData.maxcapacity || null,
+          max: getHeadroomMax(chartData.maxcapacity, { factor: 0.1, minAbs: 1, integer: true }),
           tickInterval: 1,
           opposite: true,
+          reversedStacks: false,
           gridLineWidth: 1
         })
       ],
@@ -252,36 +327,27 @@ export default function WeeklyChart() {
           marker: { enabled: false }
         },
         {
-          name: 'Kapazität',
+          name: 'Mitarbeiter (pädagogisch)',
           type: 'column',
-          data: safeCapacity,
+          data: safeCapacityPedagogical,
           yAxis: 1,
-          color: capacityColor,
+          color: capacityPedagogicalColor,
+          stacking: 'normal',
+        },
+        {
+          name: 'Mitarbeiter (administrativ)',
+          type: 'column',
+          data: safeCapacityAdministrative,
+          yAxis: 1,
+          color: capacityAdministrativeColor,
+          stacking: 'normal',
         },
       ],
       tooltip: {
-        shared: true,
-        useHTML: true,
-        fixed: true,
-        position: {
-          align: 'right',
-          relativeTo: 'spacingBox',
-          y: -2,
-        },
-        padding: 0,
-        backgroundColor: 'none',
-        headerFormat: '',
-        shadow: false,
-        style: {
-          fontSize: '14px',
-        },
-        formatter: function () {
-          const category = this.points?.[0]?.category ?? this.x;
-          return generateWeeklyChartTooltip(this.points, category, categories);
-        }
+        enabled: false,
       },
     };
-  }, [chartData, categories, buildXAxis, demandColor, capacityColor]);
+  }, [chartData, buildXAxis, demandColor, capacityPedagogicalColor, capacityAdministrativeColor, getHeadroomMax]);
 
   const weeklyRatioOptions = useMemo(() => {
     const safeCareRatio = chartData.care_ratio ? chartData.care_ratio.map(val => Number(val) || 0) : [];
@@ -297,13 +363,13 @@ export default function WeeklyChart() {
       },
       title: { text: null },
       legend: { enabled: false },
-      xAxis: buildXAxis(true),
+      xAxis: buildXAxis(true, false),
       yAxis: [
         createColoredYAxis({
           title: 'Betreuungsschlüssel',
           color: careRatioColor,
           min: 0,
-          max: chartData.max_care_ratio || null,
+          max: getHeadroomMax(chartData.max_care_ratio, { factor: 0.1, minAbs: 0.2 }),
           tickInterval: null,
           opposite: false,
           gridLineWidth: 1
@@ -312,7 +378,7 @@ export default function WeeklyChart() {
           title: 'Fachkraftquote (%)',
           color: expertRatioColor,
           min: 0,
-          max: chartData.maxexpert_ratio || null,
+          max: getHeadroomMax(chartData.maxexpert_ratio, { factor: 0.1, minAbs: 5, integer: true }),
           tickInterval: 10,
           opposite: true,
           gridLineWidth: 0
@@ -337,32 +403,45 @@ export default function WeeklyChart() {
         }
       ],
       tooltip: {
-        shared: true,
-        useHTML: true,
-        fixed: true,
-        position: {
-          align: 'right',
-          relativeTo: 'spacingBox',
-          y: -2,
-        },
-        padding: 0,
-        backgroundColor: 'none',
-        headerFormat: '',
-        shadow: false,
-        style: {
-          fontSize: '14px',
-        },
-        formatter: function () {
-          const category = this.points?.[0]?.category ?? this.x;
-          return generateWeeklyChartTooltip(this.points, category, categories);
-        }
+        enabled: false,
       }
     };
-  }, [buildXAxis, chartData, categories, careRatioColor, expertRatioColor]);
+  }, [buildXAxis, chartData, careRatioColor, expertRatioColor, getHeadroomMax]);
 
   return (
     <Box ref={chartContainerRef}>
       <Stack gap="md">
+      <Paper withBorder radius="md" p="xs">
+        <Group justify="space-between" align="center" wrap="nowrap" gap="xs">
+          <Group gap={6} wrap="wrap">
+            <Badge variant="light" color="gray">{currentLabel}</Badge>
+            <Badge variant="light" color="blue">Bedarf: {currentDemand}</Badge>
+            <Badge variant="light" color="green">Päd.: {currentCapacityPedagogical}</Badge>
+            <Badge variant="light" color="violet">Admin.: {currentCapacityAdministrative}</Badge>
+            <Badge variant="light" color="red">Schlüssel: {currentCareRatio.toFixed(1)}</Badge>
+            <Badge variant="light" color="orange">Fachkraft: {currentExpertRatio.toFixed(0)}%</Badge>
+          </Group>
+          <ActionIcon
+            variant={pinnedIndex !== null ? 'filled' : 'light'}
+            color={pinnedIndex !== null ? 'orange' : 'gray'}
+            aria-label={pinnedIndex !== null ? 'Fixierung lösen' : 'Aktuelle Werte fixieren'}
+            onClick={() => {
+              if (pinnedIndex !== null) {
+                setPinnedIndex(null);
+                return;
+              }
+
+              const nextIndex = hoveredIndex ?? 0;
+              setPinnedIndex(nextIndex);
+            }}
+          >
+            <IconPin size={14} />
+          </ActionIcon>
+        </Group>
+        <Text size="xs" c="dimmed" mt={4}>
+          {pinnedIndex !== null ? 'Werte fixiert' : 'Hover über das Diagramm zeigt aktuelle Werte'}
+        </Text>
+      </Paper>
       <Box h={250}>
         <HighchartsReact
           highcharts={Highcharts}

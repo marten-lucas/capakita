@@ -48,6 +48,9 @@ export function segmentMatchesMode(segment, mode = 'all') {
   if (mode === 'pedagogical') {
     return segment.category !== 'administrative';
   }
+  if (mode === 'administrative') {
+    return segment.category === 'administrative';
+  }
   return true;
 }
 
