@@ -77,10 +77,7 @@ function BookingDetail({ index, booking }) {
   const dispatch = useDispatch();
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
-  const { baseScenario, getEffectiveDataItem, getEffectiveBookings } = useOverlayData();
-
-  const item = getEffectiveDataItem(selectedItemId);
-  const isCapacityItem = item?.type === 'capacity';
+  const { baseScenario, getEffectiveBookings } = useOverlayData();
 
   const baseScenarioId = baseScenario?.id;
   const baseBookingsObj = baseScenarioId ? getEffectiveBookings(selectedItemId) : {};
@@ -140,7 +137,7 @@ function BookingDetail({ index, booking }) {
           id: `${parentItemId}-${index}-${dayAbbr}-${Date.now()}`,
           booking_start: suggestedRange.start,
           booking_end: suggestedRange.end,
-          category: isCapacityItem ? 'pedagogical' : undefined
+          category: 'pedagogical'
         }]
       });
     } else if (!isEnabled && dayIndex !== -1) {
@@ -169,7 +166,7 @@ function BookingDetail({ index, booking }) {
             id: `${parentItemId}-${index}-${dayAbbr}-${Date.now()}`,
             booking_start: suggestedRange.start,
             booking_end: suggestedRange.end,
-            category: isCapacityItem ? 'pedagogical' : undefined
+            category: 'pedagogical'
           }
         ]
       };
@@ -220,6 +217,27 @@ function BookingDetail({ index, booking }) {
         return { ...t, segments: newSegments };
       }
       return t;
+    });
+
+    handleUpdateBooking({ ...booking, times: newTimes });
+  };
+
+  const handleCategoryChange = (dayAbbr, segIdx, nextCategory) => {
+    if (nextCategory !== 'pedagogical' && nextCategory !== 'administrative') return;
+
+    const newTimes = cloneBookingTimes(booking.times).map((t) => {
+      if (t.day_name !== dayAbbr) return t;
+
+      const newSegments = t.segments.map((seg, i) => (
+        i === segIdx
+          ? {
+            ...seg,
+            category: nextCategory,
+          }
+          : { ...seg }
+      ));
+
+      return { ...t, segments: newSegments };
     });
 
     handleUpdateBooking({ ...booking, times: newTimes });
@@ -312,6 +330,7 @@ function BookingDetail({ index, booking }) {
               onAddSegmentAt={(minutes) => handleAddSegment(day.abbr, minutes)}
               onRemoveSegment={(sIdx) => handleRemoveSegment(day.abbr, sIdx)}
               onTimeChange={(sIdx, vals) => handleTimeChange(day.abbr, sIdx, vals)}
+              onCategoryChange={(sIdx, category) => handleCategoryChange(day.abbr, sIdx, category)}
             />
           );
         })}

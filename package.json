@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e:smoke": "playwright test tests/tooltip-simple.test.js tests/group-icon-picker.test.js",
     "test:e2e": "TEST_LEVEL=basic-single playwright test",
     "test:e2e:headed": "TEST_LEVEL=basic-single playwright test --headed",
     "test:e2e:basic": "TEST_LEVEL=basic-single playwright test",
@@ -24,6 +25,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@iconify-json/material-symbols": "^1.2.68",
+    "@iconify-json/openmoji": "^1.2.27",
+    "@iconify-json/twemoji": "^1.2.5",
     "@iconify/react": "^6.0.2",
     "@mantine/charts": "^9.0.2",
     "@mantine/core": "^9.0.2",

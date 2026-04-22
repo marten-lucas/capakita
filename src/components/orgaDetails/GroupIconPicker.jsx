@@ -18,6 +18,7 @@ import GroupIcon from '../common/GroupIcon';
 import {
   formatGroupIconLabel,
   GROUP_ICON_CATEGORIES,
+  GROUP_ICON_LOOKUP,
   normalizeGroupIcon,
 } from '../../utils/groupIcons';
 
@@ -34,10 +35,12 @@ function GroupIconPicker({ value, onChange, defaultValue = GROUP_ICON_CATEGORIES
     return Object.fromEntries(
       GROUP_ICON_CATEGORIES.map((category) => [
         category.value,
-        category.icons.filter((iconName) => {
+        category.icons.filter((entry) => {
+          const iconName = entry.icon || entry;
+          const label = entry.label || GROUP_ICON_LOOKUP[iconName]?.label || formatGroupIconLabel(iconName);
           if (!query) return true;
           return (
-            formatGroupIconLabel(iconName).toLowerCase().includes(query) ||
+            label.toLowerCase().includes(query) ||
             iconName.toLowerCase().includes(query)
           );
         }),
@@ -98,17 +101,19 @@ function GroupIconPicker({ value, onChange, defaultValue = GROUP_ICON_CATEGORIES
                       </Text>
                     ) : (
                       <SimpleGrid cols={6} spacing="xs">
-                        {icons.map((iconName) => {
+                        {icons.map((entry) => {
+                          const iconName = entry.icon || entry;
+                          const iconLabel = entry.label || GROUP_ICON_LOOKUP[iconName]?.label || formatGroupIconLabel(iconName);
                           const selected = normalizedValue === normalizeGroupIcon(iconName);
 
                           return (
-                            <Tooltip key={iconName} label={formatGroupIconLabel(iconName)} withArrow>
+                            <Tooltip key={iconName} label={iconLabel} withArrow>
                               <ActionIcon
                                 variant={selected ? 'filled' : 'light'}
                                 color={selected ? 'blue' : 'gray'}
                                 size="xl"
                                 onClick={() => handleSelect(iconName)}
-                                aria-label={formatGroupIconLabel(iconName)}
+                                aria-label={iconLabel}
                                 data-selected={selected ? 'true' : 'false'}
                               >
                                 <Box component="span" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
