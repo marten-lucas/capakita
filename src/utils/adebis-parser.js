@@ -192,32 +192,31 @@ export function adebis2GroupDefs(groupsRaw) {
     const name = group.BEZ || '';
     const lowerName = name.toLowerCase();
     let icon = DEFAULT_GROUP_ICON;
-    let IsSchool = false;
+    let isSchoolKidGroup = false;
     if (lowerName.includes('schul')) {
-      icon = 'school';
-      IsSchool = true;
+      icon = 'mdi:school';
+      isSchoolKidGroup = true;
     }
-    else if (lowerName.includes('fuchs')) icon = 'users';
-    else if (lowerName.includes('bär') || lowerName.includes('baer')) icon = 'users';
-    else if (lowerName.includes('hase') || lowerName.includes('kaninchen')) icon = 'users';
-    else if (lowerName.includes('frosch')) icon = 'users';
-    else if (lowerName.includes('schmetterling')) icon = 'users';
-    else if (lowerName.includes('marienkäfer') || lowerName.includes('käfer')) icon = 'users';
-    else if (lowerName.includes('biene')) icon = 'users';
-    else if (lowerName.includes('schule') || lowerName.includes('schulkind')) icon = 'school';
-    else if (lowerName.includes('stern')) icon = 'star';
-    else if (lowerName.includes('sonne')) icon = 'sun';
-    else if (lowerName.includes('mond')) icon = 'moon';
-    else if (lowerName.includes('regenbogen')) icon = 'rainbow';
-    else if (lowerName.includes('blume')) icon = 'flower';
-    else if (lowerName.includes('baum')) icon = 'tree';
+    else if (lowerName.includes('fuchs')) icon = 'mdi:fox';
+    else if (lowerName.includes('bär') || lowerName.includes('baer')) icon = 'mdi:bear';
+    else if (lowerName.includes('hase') || lowerName.includes('kaninchen')) icon = 'mdi:rabbit';
+    else if (lowerName.includes('frosch')) icon = 'mdi:frog';
+    else if (lowerName.includes('schmetterling')) icon = 'mdi:butterfly';
+    else if (lowerName.includes('marienkäfer') || lowerName.includes('käfer')) icon = 'mdi:ladybug';
+    else if (lowerName.includes('biene')) icon = 'mdi:bee';
+    else if (lowerName.includes('schule') || lowerName.includes('schulkind')) icon = 'mdi:school';
+    else if (lowerName.includes('stern')) icon = 'mdi:star';
+    else if (lowerName.includes('sonne')) icon = 'mdi:weather-sunny';
+    else if (lowerName.includes('mond')) icon = 'mdi:weather-night';
+    else if (lowerName.includes('regenbogen')) icon = 'mdi:rainbow';
+    else if (lowerName.includes('blume')) icon = 'mdi:flower';
+    else if (lowerName.includes('baum')) icon = 'mdi:tree';
 
     let groupDef = {
       id: String(group.GRUNR),
       name,
       icon,
-      IsSchool,
-      isSchoolKidGroup: IsSchool,
+      type: isSchoolKidGroup ? 'Schulkindgruppe' : 'Regelgruppe',
       rawdata: { ...group }
     };
     return addOriginalData(groupDef);

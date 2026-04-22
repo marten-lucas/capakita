@@ -1,9 +1,10 @@
 import { sumBookingHours } from '../bookingUtils';
+import { timeToMinutes } from '../timeUtils';
 
 function getBayKiBiGWeightForChild(child, groupDef) {
   if (!child) return 1;
 
-  if (groupDef?.IsSchool) {
+  if (groupDef?.type === 'Schulkindgruppe') {
     return 1.2;
   }
 
@@ -13,6 +14,12 @@ function getBayKiBiGWeightForChild(child, groupDef) {
   }
 
   return 1;
+}
+
+function getCategoryMinutes(category) {
+  if (typeof category !== 'string') return null;
+  const [, time] = category.split(' ');
+  return timeToMinutes(time || '');
 }
 
 // REMOVE any getScenarioChain or scenario traversal here!
@@ -37,6 +44,7 @@ export function generateExpertRatioSeries(categories, filteredCapacityBookings, 
   return categories.map((cat) => {
     // Parse category to day and time
     const [day, time] = cat.split(' ');
+    const categoryMinutes = getCategoryMinutes(cat);
     let total = 0;
     let expert = 0;
     filteredCapacityBookings.forEach(booking => {
@@ -45,9 +53,11 @@ export function generateExpertRatioSeries(categories, filteredCapacityBookings, 
       const covers = booking.times.some(dayObj => {
         if (dayObj.day_name !== day) return false;
         if (!Array.isArray(dayObj.segments)) return false;
-        return dayObj.segments.some(seg =>
-          seg.category !== 'administrative' && seg.booking_start <= time && seg.booking_end > time
-        );
+        return dayObj.segments.some(seg => {
+          const startMinutes = timeToMinutes(seg.booking_start);
+          const endMinutes = timeToMinutes(seg.booking_end);
+          return startMinutes !== null && endMinutes !== null && startMinutes <= categoryMinutes && endMinutes > categoryMinutes;
+        });
       });
       if (covers) {
         total += 1;
@@ -76,6 +86,7 @@ export function generateCareRatioSeries(categories, filteredDemandBookings, filt
   return categories.map(cat => {
     // Parse category zu day und time
     const [day, time] = cat.split(' ');
+    const categoryMinutes = getCategoryMinutes(cat);
 
     // Summe gewichtete Bedarfe (Kinderstunden)
     let weightedDemand = 0;
@@ -84,9 +95,11 @@ export function generateCareRatioSeries(categories, filteredDemandBookings, filt
       const covers = booking.times.some(dayObj => {
         if (dayObj.day_name !== day) return false;
         if (!Array.isArray(dayObj.segments)) return false;
-        return dayObj.segments.some(seg =>
-          seg.booking_start <= time && seg.booking_end > time
-        );
+        return dayObj.segments.some(seg => {
+          const startMinutes = timeToMinutes(seg.booking_start);
+          const endMinutes = timeToMinutes(seg.booking_end);
+          return startMinutes !== null && endMinutes !== null && startMinutes <= categoryMinutes && endMinutes > categoryMinutes;
+        });
       });
       if (covers) {
         // Hole das Kind-Objekt und GroupDef
@@ -104,9 +117,11 @@ export function generateCareRatioSeries(categories, filteredDemandBookings, filt
       const covers = booking.times.some(dayObj => {
         if (dayObj.day_name !== day) return false;
         if (!Array.isArray(dayObj.segments)) return false;
-        return dayObj.segments.some(seg =>
-          seg.category !== 'administrative' && seg.booking_start <= time && seg.booking_end > time
-        );
+        return dayObj.segments.some(seg => {
+          const startMinutes = timeToMinutes(seg.booking_start);
+          const endMinutes = timeToMinutes(seg.booking_end);
+          return startMinutes !== null && endMinutes !== null && startMinutes <= categoryMinutes && endMinutes > categoryMinutes;
+        });
       });
       if (covers) {
         capacityCount += 1;

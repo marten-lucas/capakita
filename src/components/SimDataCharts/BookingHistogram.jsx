@@ -1,10 +1,11 @@
-import { useMemo, useEffect } from 'react';
+import { useMemo } from 'react';
 import HighchartsReact from 'highcharts-react-official';
 import Highcharts from 'highcharts';
 import { Box, useMantineTheme } from '@mantine/core';
-import { useSelector, useDispatch } from 'react-redux';
-import { updateHistogramChartData } from '../../store/chartSlice';
+import { useSelector } from 'react-redux';
 import { generateHistogramTooltip } from '../../utils/chartUtils/chartUtilsHistogram';
+import { createColoredYAxis } from '../../utils/highchartsAxis';
+import { selectHistogramChartData } from '../../store/chartSelectors';
 
 export default function BookingHistogram() {
   const theme = useMantineTheme();
@@ -12,23 +13,7 @@ export default function BookingHistogram() {
   const demandColor = theme.colors.blue[6];
   const capacityColor = theme.colors.green[6];
 
-  const scenarioId = useSelector(state => state.simScenario.selectedScenarioId);
-  const dispatch = useDispatch();
-
-  // Get current filters from chartSlice (per scenario)
-  const chartState = useSelector(state => state.chart[scenarioId] || {});
-  const chartData = useMemo(() => chartState.chartData?.histogram || {}, [chartState]);
-  const referenceDate = chartState.referenceDate;
-  const filterGroups = useMemo(() => chartState.filter?.Groups || [], [chartState.filter?.Groups]);
-  const filterQualifications = useMemo(() => chartState.filter?.Qualifications || [], [chartState.filter?.Qualifications]);
-  // Remove showNavigator logic
-
-  // Update chart data when filters, reference date, or simulation data change
-  useEffect(() => {
-    if (scenarioId) {
-      dispatch(updateHistogramChartData(scenarioId));
-    }
-  }, [dispatch, scenarioId, referenceDate, filterGroups, filterQualifications]);
+  const chartData = useSelector(selectHistogramChartData);
 
   // Optimized: Only recalculate when chartData changes
   const histogramOptions = useMemo(() => {
@@ -48,11 +33,12 @@ export default function BookingHistogram() {
           style: { fontSize: '10px' }
         }
       },
-      yAxis: {
-        title: { text: 'Anzahl Personen' },
+      yAxis: createColoredYAxis({
+        title: 'Anzahl Personen',
+        color: demandColor,
         min: 0,
         allowDecimals: false
-      },
+      }),
       plotOptions: {
         column: {
           pointPadding: 0.1,

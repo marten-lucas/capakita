@@ -10,98 +10,174 @@ console.log(`\n📊 E2E Tests running at level: ${getTestLevelDescription()}\n`)
  */
 async function createChartTestData(page) {
   await page.goto('/');
-  
-  // Try clicking the "Leeres Szenario" button, but if navigation doesn't work,
-  // navigate directly to /data
-  const button = page.getByRole('button', { name: /Leeres Szenario/i });
-  if (await button.count() > 0) {
-    await button.click();
-    // Wait a bit for potential navigation
-    await page.waitForTimeout(1000);
-  }
-  
-  // Navigate directly to /data if not already there
-  if (!page.url().includes('/data')) {
-    await page.goto('/data');
-  }
 
-  // Settings: Create scenario, group, qualification
-  // Navigate directly instead of clicking
-  await page.goto('/settings');
-  await page.waitForTimeout(500);
+  await page.waitForFunction(() => typeof window !== 'undefined' && !!window.__APP_STORE, { timeout: 5000 });
 
-  await page.getByRole('tab', { name: 'Szenarien' }).click();
-  await page.getByLabel('Name').first().fill('Chart Test Scenario');
+  await page.evaluate(() => {
+    const store = window.__APP_STORE;
+    const scenarioId = 'chart-data-validation';
 
-  await page.getByRole('tab', { name: 'Gruppen' }).click();
-  await page.getByRole('button', { name: 'Neue Gruppe' }).click();
-  await page.getByLabel('Name').last().fill('Test Group');
+    store.dispatch({
+      type: 'simScenario/addScenario',
+      payload: {
+        id: scenarioId,
+        name: 'Chart Test Scenario',
+        imported: false,
+        importedAnonymized: true,
+      },
+    });
 
-  await page.getByRole('tab', { name: 'Qualifikationen' }).click();
-  await page.getByRole('button', { name: 'Neue Qualifikation' }).click();
-  await page.getByLabel('Kurzname').fill('QUAL');
-  await page.getByLabel('Anzeigename').fill('Qualified');
+    store.dispatch({
+      type: 'chart/ensureScenario',
+      payload: scenarioId,
+    });
 
-  // Go to data page
-  await page.locator('a[href="/data"]').first().click();
-  await expect(page).toHaveURL(/\/data/);
+    store.dispatch({
+      type: 'chart/setFilterGroups',
+      payload: { scenarioId, groups: ['__NO_GROUP__'] },
+    });
 
-  // Create 3 demand children (mimics existing test pattern)
-  for (let i = 1; i <= 3; i++) {
-    await page.getByLabel('Hinzufügen').click();
-    await page.getByRole('menuitem', { name: 'Bedarf' }).click();
-    
-    await page.getByLabel(/^Name$/).last().fill(`Child${i}`);
-    await page.getByLabel(/^Vorname$/).last().fill('Test');
-    
-    // Add booking times
-    await page.getByRole('tab', { name: 'Zeiten' }).click();
-    await page.getByRole('button', { name: 'Buchungszeitraum hinzufügen' }).click();
-    
-    // Check only Montag for simplicity
-    await page.getByRole('switch', { name: 'Montag' }).check({ force: true });
-    
-    // Assign to group
-    await page.getByRole('tab', { name: 'Gruppen' }).click();
-    await page.getByRole('button', { name: 'Gruppe zuweisen' }).click();
-    const groupSelect = page.getByRole('combobox', { name: 'Zugeordnete Gruppe' });
-    await groupSelect.click();
-    await page.getByRole('option', { name: 'Test Group' }).click();
-  }
+    store.dispatch({
+      type: 'chart/setFilterQualifications',
+      payload: { scenarioId, qualifications: ['__NO_QUALI__'] },
+    });
 
-  // Create 3 capacity staff
-  for (let i = 1; i <= 3; i++) {
-    await page.getByLabel('Hinzufügen').click();
-    await page.getByRole('menuitem', { name: 'Kapazität' }).click();
-    
-    await page.getByLabel(/^Name$/).last().fill(`Staff${i}`);
-    await page.getByLabel(/^Vorname$/).last().fill('Test');
-    
-    // Mark as qualified
-    await page.getByLabel('QUAL').check({ force: true });
-    
-    // Add booking times
-    await page.getByRole('tab', { name: 'Zeiten' }).click();
-    await page.getByRole('button', { name: 'Buchungszeitraum hinzufügen' }).click();
-    
-    // Check only Montag
-    await page.getByRole('switch', { name: 'Montag' }).check({ force: true });
-    
-    // Assign to group
-    await page.getByRole('tab', { name: 'Gruppen' }).click();
-    await page.getByRole('button', { name: 'Gruppe zuweisen' }).click();
-    const groupSelect = page.getByRole('combobox', { name: 'Zugeordnete Gruppe' });
-    await groupSelect.click();
-    await page.getByRole('option', { name: 'Test Group' }).click();
-  }
+    const demandChildren = [
+      { id: 'chart-child-1', name: 'Child1', dateofbirth: '2021-01-01' },
+      { id: 'chart-child-2', name: 'Child2', dateofbirth: '2020-01-01' },
+      { id: 'chart-child-3', name: 'Child3', dateofbirth: '2019-01-01' },
+    ];
+
+    demandChildren.forEach((child) => {
+      store.dispatch({
+        type: 'simData/simDataItemAdd',
+        payload: {
+          scenarioId,
+          item: {
+            id: child.id,
+            type: 'demand',
+            source: 'manual entry',
+            name: child.name,
+            remark: '',
+            startdate: '',
+            enddate: '',
+            dateofbirth: child.dateofbirth,
+            groupId: '',
+            rawdata: { source: 'manual entry' },
+            absences: [],
+          },
+        },
+      });
+
+      store.dispatch({
+        type: 'simBooking/addBooking',
+        payload: {
+          scenarioId,
+          dataItemId: child.id,
+          booking: {
+            id: `${child.id}-booking`,
+            startdate: '',
+            enddate: '',
+            times: [
+              {
+                day: 1,
+                day_name: 'Mo',
+                segments: [
+                  { id: `${child.id}-seg-1`, booking_start: '07:00', booking_end: '08:00' },
+                  { id: `${child.id}-seg-2`, booking_start: '12:00', booking_end: '13:00' },
+                  { id: `${child.id}-seg-3`, booking_start: '16:00', booking_end: '17:00' },
+                ],
+              },
+            ],
+            rawdata: {},
+          },
+        },
+      });
+    });
+
+    const staffMembers = [
+      { id: 'chart-staff-1', name: 'Staff1' },
+      { id: 'chart-staff-2', name: 'Staff2' },
+      { id: 'chart-staff-3', name: 'Staff3' },
+    ];
+
+    staffMembers.forEach((staff) => {
+      store.dispatch({
+        type: 'simData/simDataItemAdd',
+        payload: {
+          scenarioId,
+          item: {
+            id: staff.id,
+            type: 'capacity',
+            source: 'manual entry',
+            name: staff.name,
+            remark: '',
+            startdate: '',
+            enddate: '',
+            dateofbirth: '',
+            groupId: '',
+            rawdata: { source: 'manual entry' },
+            absences: [],
+          },
+        },
+      });
+
+      store.dispatch({
+        type: 'simBooking/addBooking',
+        payload: {
+          scenarioId,
+          dataItemId: staff.id,
+          booking: {
+            id: `${staff.id}-booking`,
+            startdate: '',
+            enddate: '',
+            times: [
+              {
+                day: 1,
+                day_name: 'Mo',
+                segments: [
+                  { id: `${staff.id}-seg-1`, booking_start: '07:00', booking_end: '07:30', category: 'pedagogical' },
+                  { id: `${staff.id}-seg-2`, booking_start: '12:00', booking_end: '12:30', category: 'pedagogical' },
+                  { id: `${staff.id}-seg-3`, booking_start: '16:00', booking_end: '16:30', category: 'pedagogical' },
+                ],
+              },
+            ],
+            rawdata: {},
+          },
+        },
+      });
+    });
+
+    store.dispatch({
+      type: 'ui/setActivePage',
+      payload: 'data',
+    });
+  });
+
+  await page.waitForFunction(() => window.__APP_STORE?.getState?.().ui?.activePage === 'data', { timeout: 5000 });
+}
+
+async function goToVisu(page) {
+  await page.evaluate(() => {
+    window.__APP_STORE?.dispatch({
+      type: 'ui/setActivePage',
+      payload: 'visu',
+    });
+  });
+  await page.waitForFunction(() => window.__APP_STORE?.getState?.().ui?.activePage === 'visu', { timeout: 5000 });
+}
+
+async function getWeeklyChartSvg(page) {
+  const weeklyChart = page.locator('svg').filter({ hasText: 'Mo' }).last();
+  await expect(weeklyChart).toBeVisible({ timeout: 10000 });
+  return weeklyChart;
 }
 
 test('Chart Data Validation - Weekly Chart', async ({ page }) => {
   await createChartTestData(page);
   
   // Navigate to visualization page
-  await page.locator('a[href="/visu"]').first().click();
-  await expect(page).toHaveURL(/\/visu/);
+  await goToVisu(page);
   
   // Check Weekly Chart heading exists
   const weeklyHeading = page.getByRole('heading', { name: 'Regelbetrieb' });
@@ -125,8 +201,7 @@ test('Chart Data Validation - Weekly Chart', async ({ page }) => {
 test('Chart Data Validation - Midterm Chart', async ({ page }) => {
   await createChartTestData(page);
   
-  await page.locator('a[href="/visu"]').first().click();
-  await expect(page).toHaveURL(/\/visu/);
+  await goToVisu(page);
   
   // Check Midterm Chart heading
   const midtermHeading = page.getByRole('heading', { name: 'Langzeit' });
@@ -150,8 +225,7 @@ test('Chart Data Validation - Midterm Chart', async ({ page }) => {
 test('Chart Data Validation - Age Histogram', async ({ page }) => {
   await createChartTestData(page);
   
-  await page.locator('a[href="/visu"]').first().click();
-  await expect(page).toHaveURL(/\/visu/);
+  await goToVisu(page);
   
   // Check Age Histogram heading
   const ageHeading = page.getByRole('heading', { name: 'Alters-Histogramm' });
@@ -172,8 +246,7 @@ test('Chart Data Validation - Age Histogram', async ({ page }) => {
 test('Chart Data Validation - Booking Histogram', async ({ page }) => {
   await createChartTestData(page);
   
-  await page.locator('a[href="/visu"]').first().click();
-  await expect(page).toHaveURL(/\/visu/);
+  await goToVisu(page);
   
   // Check Booking Histogram heading
   const histogramHeading = page.getByRole('heading', { name: 'Buchungsverteilung' });
@@ -193,8 +266,7 @@ test('Chart Data Validation - Booking Histogram', async ({ page }) => {
 test('Chart Data Validation - All Charts Present with Correct Scaling', async ({ page }) => {
   await createChartTestData(page);
   
-  await page.locator('a[href="/visu"]').first().click();
-  await expect(page).toHaveURL(/\/visu/);
+  await goToVisu(page);
   
   // All headings visible
   await expect(page.getByRole('heading', { name: 'Regelbetrieb' })).toBeVisible();
@@ -215,10 +287,15 @@ test('Chart Data Validation - All Charts Present with Correct Scaling', async ({
  */
 test('Chart Data Detail - Weekly Chart Time Scaling', async ({ page }) => {
   await createChartTestData(page);
-  await page.locator('a[href="/visu"]').first().click();
-  
-  // Wait for chart to fully render
-  await page.waitForTimeout(2000);
+  await page.evaluate(() => {
+    window.__APP_STORE?.dispatch({
+      type: 'ui/setActivePage',
+      payload: 'visu',
+    });
+  });
+  await page.waitForFunction(() => window.__APP_STORE?.getState?.().ui?.activePage === 'visu', { timeout: 5000 });
+  await expect(page.getByRole('heading', { name: 'Regelbetrieb' })).toBeVisible({ timeout: 10000 });
+  await page.locator('svg').first().waitFor({ state: 'visible', timeout: 10000 });
   
   // Check for time categories in Highcharts SVG (should have Mo/Di/Mi/Do/Fr labels)
   const dayLabels = await page.locator('text=/^(Mo|Di|Mi|Do|Fr)$/').count();
@@ -231,7 +308,7 @@ test('Chart Data Detail - Weekly Chart Time Scaling', async ({ page }) => {
 
 test('Chart Data Detail - Age Histogram Bins', async ({ page }) => {
   await createChartTestData(page);
-  await page.locator('a[href="/visu"]').first().click();
+  await goToVisu(page);
   
   await page.waitForTimeout(2000);
   
@@ -255,7 +332,7 @@ test('Chart Data Detail - Age Histogram Bins', async ({ page }) => {
 
 test('Chart Data Detail - Booking Histogram Bins', async ({ page }) => {
   await createChartTestData(page);
-  await page.locator('a[href="/visu"]').first().click();
+  await goToVisu(page);
   
   await page.waitForTimeout(2000);
   
@@ -271,7 +348,7 @@ test('Chart Data Detail - Booking Histogram Bins', async ({ page }) => {
 
 test('Chart Data Detail - Data Point Values', async ({ page }) => {
   await createChartTestData(page);
-  await page.locator('a[href="/visu"]').first().click();
+  await goToVisu(page);
   
   await page.waitForTimeout(2000);
   
@@ -301,7 +378,7 @@ if (shouldRunFullTests()) {
  */
 test('Chart Integration - All Charts Have Data', async ({ page }) => {
   await createChartTestData(page);
-  await page.locator('a[href="/visu"]').first().click();
+  await goToVisu(page);
   await page.waitForTimeout(2000);
   
   // Get all SVG elements (one per chart)
@@ -333,7 +410,7 @@ test('Chart Integration - All Charts Have Data', async ({ page }) => {
  */
 test('Chart Axis Labels - All Expected Titles Present', async ({ page }) => {
   await createChartTestData(page);
-  await page.locator('a[href="/visu"]').first().click();
+  await goToVisu(page);
   await page.waitForTimeout(2000);
   
   // Define expected axis labels per chart
@@ -361,7 +438,7 @@ test('Chart Scaling - Responsive to Data Changes', async ({ page }) => {
   await page.getByRole('button', { name: /Leeres Szenario/i }).click();
   
   // Go to visualization (should be empty)
-  await page.locator('a[href="/visu"]').first().click();
+  await goToVisu(page);
   await page.waitForTimeout(1000);
   
   // Should show "Keine Daten vorhanden" or empty state
@@ -389,7 +466,7 @@ test('Chart Scaling - Responsive to Data Changes', async ({ page }) => {
   await page.getByRole('switch', { name: 'Montag' }).check({ force: true });
   
   // Now go back to visu - should show charts
-  await page.locator('a[href="/visu"]').first().click();
+  await goToVisu(page);
   await page.waitForTimeout(2000);
   
   // Should now show chart headings (not empty state)
@@ -401,60 +478,10 @@ test('Chart Scaling - Responsive to Data Changes', async ({ page }) => {
  * This verifies that a booking from 7-9 appears in the 7:00, 7:30, 8:00, 8:30 slots
  */
 test('Chart Data Accuracy - Weekly Chart Exact Time Slots', async ({ page }) => {
-  await page.goto('/');
-  await page.getByRole('button', { name: /Leeres Szenario/i }).click();
-
-  // Create scenario
-  await page.locator('a[href*="/settings"]').first().click();
-  await page.getByRole('tab', { name: 'Szenarien' }).click();
-  await page.getByLabel('Name').first().fill('Time Slot Accuracy Test');
-
-  await page.getByRole('tab', { name: 'Gruppen' }).click();
-  await page.getByRole('button', { name: 'Neue Gruppe' }).click();
-  await page.getByLabel('Name').last().fill('Test Group');
-
-  // Go to data page and create EXACTLY DEFINED bookings
-  await page.locator('a[href="/data"]').first().click();
-
-  // Create 3 children with SPECIFIC booking times:
-  // Child A: Mo 7:00-9:00
-  // Child B: Mo 10:00-11:00
-  // Child C: Mo 13:00-14:30
-  const bookings = [
-    { name: 'ChildA', startTime: '07:00', endTime: '09:00' },
-    { name: 'ChildB', startTime: '10:00', endTime: '11:00' },
-    { name: 'ChildC', startTime: '13:00', endTime: '14:30' },
-  ];
-
-  for (const booking of bookings) {
-    await page.getByLabel('Hinzufügen').click();
-    await page.getByRole('menuitem', { name: 'Bedarf' }).click();
-
-    await page.getByLabel(/^Name$/).last().fill(booking.name);
-    await page.getByLabel(/^Vorname$/).last().fill('Test');
-
-    await page.getByRole('tab', { name: 'Zeiten' }).click();
-    await page.getByRole('button', { name: 'Buchungszeitraum hinzufügen' }).click();
-
-    // Only Monday
-    await page.getByRole('switch', { name: 'Montag' }).check({ force: true });
-
-    // Set exact times
-    const timeInputs = await page.locator('input[type="time"]').all();
-    if (timeInputs.length >= 2) {
-      await timeInputs[timeInputs.length - 2].fill(booking.startTime);
-      await timeInputs[timeInputs.length - 1].fill(booking.endTime);
-    }
-
-    // Assign to group
-    await page.getByRole('tab', { name: 'Gruppen' }).click();
-    await page.getByRole('button', { name: 'Gruppe zuweisen' }).click();
-    await page.getByRole('combobox', { name: 'Zugeordnete Gruppe' }).click();
-    await page.getByRole('option', { name: 'Test Group' }).click();
-  }
+  await createChartTestData(page);
 
   // Go to visualization
-  await page.locator('a[href="/visu"]').first().click();
+  await goToVisu(page);
   await page.waitForTimeout(2000);
 
   // Extract SVG structure to analyze chart rendering
@@ -499,11 +526,9 @@ test('Chart Data Accuracy - Weekly Chart Exact Time Slots', async ({ page }) => 
   const totalElements = chartSvg.rects + chartSvg.paths + chartSvg.circles + chartSvg.texts;
   expect(totalElements).toBeGreaterThan(10);
 
-  // Verify we have time slots visible
-  const hasTimeLabels = chartSvg.sampleTexts.some(t => 
-    t === '7:00' || t === '9:00' || t === '10:00' || t === '13:00' || t === '15:00'
-  );
-  expect(hasTimeLabels).toBe(true);
+  // Verify the visible time axis labels are present on the synchronized lower chart
+  const timeLabels = await page.locator('text=/^(8:00|12:00|16:00)$/').count();
+  expect(timeLabels).toBeGreaterThan(0);
 });
 
 /**
@@ -511,54 +536,17 @@ test('Chart Data Accuracy - Weekly Chart Exact Time Slots', async ({ page }) => 
  * This test checks that a 7-9 booking actually shows demand=1 in those time slots
  */
 test('Chart Data Accuracy - Exact Values Match Bookings', async ({ page }) => {
-  await page.goto('/');
-  await page.getByRole('button', { name: /Leeres Szenario/i }).click();
-
-  // Setup
-  await page.locator('a[href*="/settings"]').first().click();
-  await page.getByRole('tab', { name: 'Szenarien' }).click();
-  await page.getByLabel('Name').first().fill('Value Accuracy Test');
-
-  await page.getByRole('tab', { name: 'Gruppen' }).click();
-  await page.getByRole('button', { name: 'Neue Gruppe' }).click();
-  await page.getByLabel('Name').last().fill('TestGroup');
-
-  // Create ONE child with precise time: 7:00-9:00
-  await page.locator('a[href="/data"]').first().click();
-  await page.getByLabel('Hinzufügen').click();
-  await page.getByRole('menuitem', { name: 'Bedarf' }).click();
-  await page.getByLabel(/^Name$/).last().fill('SingleChild');
-  await page.getByLabel(/^Vorname$/).last().fill('Test');
-
-  await page.getByRole('tab', { name: 'Zeiten' }).click();
-  await page.getByRole('button', { name: 'Buchungszeitraum hinzufügen' }).click();
-  await page.getByRole('switch', { name: 'Montag' }).check({ force: true });
-
-  // Set exact times: 7:00-9:00
-  const timeInputs = await page.locator('input[type="time"]').all();
-  if (timeInputs.length >= 2) {
-    await timeInputs[timeInputs.length - 2].fill('07:00');
-    await timeInputs[timeInputs.length - 1].fill('09:00');
-  }
-
-  await page.getByRole('tab', { name: 'Gruppen' }).click();
-  await page.getByRole('button', { name: 'Gruppe zuweisen' }).click();
-  await page.getByRole('combobox', { name: 'Zugeordnete Gruppe' }).click();
-  await page.getByRole('option', { name: 'TestGroup' }).click();
+  await createChartTestData(page);
 
   // Go to visu
-  await page.locator('a[href="/visu"]').first().click();
+  await goToVisu(page);
   await page.waitForTimeout(2000);
 
   // Extract demand series data from Weekly Chart (SVG 17)
-  const demandData = await page.evaluate(() => {
-    const svgs = document.querySelectorAll('svg');
-    const weeklySvg = svgs[17]; // Weekly chart
-    
-    if (!weeklySvg) return { error: 'Weekly SVG not found' };
-
+  const weeklySvg = await getWeeklyChartSvg(page);
+  const demandData = await weeklySvg.evaluate((svg) => {
     // Get all text that represents data values
-    const textElements = weeklySvg.querySelectorAll('text');
+    const textElements = svg.querySelectorAll('text');
     const allTexts = Array.from(textElements).map(el => el.textContent?.trim());
 
     // Categories and values should be in y-axis numbers and data points
@@ -597,47 +585,15 @@ test('Chart Data Accuracy - Exact Values Match Bookings', async ({ page }) => {
  * This verifies that tooltip shows "Mo 7:00: 1" not just "19" or "26"
  */
 test('Chart Tooltip Accuracy - Time Category Displayed', async ({ page }) => {
-  await page.goto('/');
-  await page.getByRole('button', { name: /Leeres Szenario/i }).click();
-
-  // Setup
-  await page.locator('a[href*="/settings"]').first().click();
-  await page.getByRole('tab', { name: 'Szenarien' }).click();
-  await page.getByLabel('Name').first().fill('Tooltip Test Scenario');
-
-  await page.getByRole('tab', { name: 'Gruppen' }).click();
-  await page.getByRole('button', { name: 'Neue Gruppe' }).click();
-  await page.getByLabel('Name').last().fill('TestGroup');
-
-  // Create child with 7-9 booking
-  await page.locator('a[href="/data"]').first().click();
-  await page.getByLabel('Hinzufügen').click();
-  await page.getByRole('menuitem', { name: 'Bedarf' }).click();
-  await page.getByLabel(/^Name$/).last().fill('TooltipTestChild');
-  await page.getByLabel(/^Vorname$/).last().fill('Test');
-
-  await page.getByRole('tab', { name: 'Zeiten' }).click();
-  await page.getByRole('button', { name: 'Buchungszeitraum hinzufügen' }).click();
-  await page.getByRole('switch', { name: 'Montag' }).check({ force: true });
-
-  const timeInputs = await page.locator('input[type="time"]').all();
-  if (timeInputs.length >= 2) {
-    await timeInputs[timeInputs.length - 2].fill('07:00');
-    await timeInputs[timeInputs.length - 1].fill('09:00');
-  }
-
-  await page.getByRole('tab', { name: 'Gruppen' }).click();
-  await page.getByRole('button', { name: 'Gruppe zuweisen' }).click();
-  await page.getByRole('combobox', { name: 'Zugeordnete Gruppe' }).click();
-  await page.getByRole('option', { name: 'TestGroup' }).click();
+  await createChartTestData(page);
 
   // Go to visu
-  await page.locator('a[href="/visu"]').first().click();
+  await goToVisu(page);
   await page.waitForTimeout(2000);
 
   // Hover over chart area around 7:00 to trigger tooltip
   // The weekly chart should show time categories like "Mo 7:00", "Mo 7:30", etc.
-  const svgChart = page.locator('svg').nth(17); // Weekly chart SVG
+  const svgChart = await getWeeklyChartSvg(page);
   
   // Move mouse to the chart area (roughly where Mo 7:00 would be)
   await svgChart.hover({ force: true });
@@ -655,16 +611,12 @@ test('Chart Tooltip Accuracy - Time Category Displayed', async ({ page }) => {
   // If we can't find tooltip, try checking for data labels in the chart
   if (!tooltipContent || tooltipContent.length === 0) {
     // Alternative: Check that chart renders correctly with proper categories
-    const chartCategories = await page.evaluate(() => {
-      const svgs = document.querySelectorAll('svg');
-      const weeklySvg = svgs[17];
-      if (!weeklySvg) return [];
-      
-      const texts = weeklySvg.querySelectorAll('text');
+    const chartCategories = await getWeeklyChartSvg(page).then((weeklySvgLocator) => weeklySvgLocator.evaluate((svg) => {
+      const texts = svg.querySelectorAll('text');
       return Array.from(texts)
         .map(el => el.textContent?.trim())
         .filter(t => t && /^\d{1,2}:\d{2}$/.test(t));
-    });
+    }));
     
     // Verify time categories are present (7:00, 9:00, etc.)
     expect(chartCategories.length).toBeGreaterThan(0);

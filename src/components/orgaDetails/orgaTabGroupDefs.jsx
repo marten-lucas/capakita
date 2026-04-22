@@ -1,19 +1,18 @@
 import React from 'react';
-import { Stack, Button, Text, Group, Badge, ActionIcon, TextInput, Checkbox, Select } from '@mantine/core';
+import { Stack, Button, Text, Group, Badge, ActionIcon, TextInput, Select } from '@mantine/core';
 import { IconPlus, IconTrash } from '@tabler/icons-react';
-import { IconPicker } from 'mantine-icon-picker';
-import { IconsClassName } from 'tabler-dynamic-icon';
 import { useSelector, useDispatch } from 'react-redux';
 import { addGroupDef, updateGroupDef, deleteGroupDef } from '../../store/simGroupSlice';
 import { useOverlayData } from '../../hooks/useOverlayData';
 import TabbedListDetail from '../common/TabbedListDetail';
-import TablerIcon from '../common/TablerIcon';
+import GroupIcon from '../common/GroupIcon';
+import GroupIconPicker from './GroupIconPicker';
 import { DEFAULT_GROUP_ICON, normalizeGroupIcon } from '../../utils/groupIcons';
 
 const GROUP_TYPE_OPTIONS = [
   { value: 'Krippe', label: 'Krippe (0-3 Jahre)' },
   { value: 'Regelgruppe', label: 'Regelgruppe (3-6 Jahre)' },
-  { value: 'Schulkindgruppe', label: 'Schulkind-Betreuung (6+ Jahre)' },
+  { value: 'Schulkindgruppe', label: 'Schulkindgruppe (6+ Jahre)' },
 ];
 
 function OrgaTabGroupDefs() {
@@ -31,7 +30,6 @@ function OrgaTabGroupDefs() {
           name: 'Neue Gruppe',
           icon: DEFAULT_GROUP_ICON,
           type: 'Regelgruppe',
-          isSchoolKidGroup: false,
         },
       })
     );
@@ -50,12 +48,11 @@ function OrgaTabGroupDefs() {
         emptyText="Keine Gruppen vorhanden."
         renderItem={(item) => (
           <Group gap="sm">
-            <TablerIcon icon={item.icon} size={22} />
+            <GroupIcon icon={item.icon} size={22} />
             <div>
               <Text fw={500}>{item.name || 'Gruppe'}</Text>
               <Group gap="xs">
                 {item.type && <Badge size="xs">{item.type}</Badge>}
-                {item.isSchoolKidGroup && <Badge size="xs" color="blue">Schulkind</Badge>}
               </Group>
             </div>
           </Group>
@@ -85,20 +82,19 @@ function OrgaTabGroupDefs() {
                   updateGroupDef({
                     scenarioId: selectedScenarioId,
                     groupId: item.id,
-                    updates: { 
-                      type: value || 'Regelgruppe',
-                      isSchoolKidGroup: value === 'Schulkindgruppe',
-                    },
+                    updates: { type: value || 'Regelgruppe' },
                   })
                 )
               }
             />
             <Stack gap="xs">
-              <Text size="sm" fw={500}>Icon</Text>
+              <Text size="sm" fw={500}>
+                Icon
+              </Text>
               <div data-testid="group-icon-picker">
-                <IconPicker
+                <GroupIconPicker
                   value={normalizeGroupIcon(item?.icon)}
-                  onSelect={(value) =>
+                  onChange={(value) =>
                     dispatch(
                       updateGroupDef({
                         scenarioId: selectedScenarioId,
@@ -107,32 +103,10 @@ function OrgaTabGroupDefs() {
                       })
                     )
                   }
-                  defaultIcon={DEFAULT_GROUP_ICON}
-                  iconsList={IconsClassName}
-                  showSearchBar
-                  searchPlaceholder="Tabler-Icon suchen"
-                  height={320}
-                  itemPerColumn={8}
-                  iconSize={18}
+                  defaultValue={DEFAULT_GROUP_ICON}
                 />
               </div>
             </Stack>
-            <Checkbox
-              label="Schulkind-Gruppe (veraltet - nutze Gruppentyp statt dem)"
-              checked={!!item?.isSchoolKidGroup}
-              onChange={(event) =>
-                dispatch(
-                  updateGroupDef({
-                    scenarioId: selectedScenarioId,
-                    groupId: item.id,
-                    updates: { 
-                      isSchoolKidGroup: event.currentTarget.checked,
-                      type: event.currentTarget.checked ? 'Schulkindgruppe' : 'Regelgruppe',
-                    },
-                  })
-                )
-              }
-            />
           </Stack>
         )}
         actions={(item) => (

@@ -3,8 +3,6 @@ import { DatePickerInput } from '@mantine/dates';
 import { useSelector, useDispatch } from 'react-redux';
 import {
   setReferenceDate,
-  updateWeeklyChartData,
-  updateHistogramChartData,
 } from '../../store/chartSlice';
 import { Drawer, Group, Text, Badge, ScrollArea, Divider } from '@mantine/core';
 import { selectConsolidatedEventsForScenario } from '../../store/eventSlice';
@@ -21,8 +19,6 @@ function EventPicker({ scenarioId }) {
   function handleChange(date) {
     const nextDate = date ? date.toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
     dispatch(setReferenceDate({ scenarioId, date: nextDate }));
-    dispatch(updateWeeklyChartData(scenarioId));
-    dispatch(updateHistogramChartData(scenarioId));
   }
 
   function handleSelectEvent(date) {

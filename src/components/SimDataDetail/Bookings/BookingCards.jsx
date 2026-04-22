@@ -121,15 +121,24 @@ function BookingWeeklyOverview({ bookingTimes }) {
   );
 }
 
+function formatGermanDate(isoDate) {
+  if (!isoDate) return '';
+  const parts = isoDate.split('-');
+  if (parts.length !== 3) return isoDate;
+  return `${parts[2]}.${parts[1]}.${parts[0]}`;
+}
+
 function BookingCards({ item, index }) {
   const booking = item;
+  const start = formatGermanDate(booking.startdate);
+  const end = formatGermanDate(booking.enddate);
   let dateRangeText = '';
-  if (booking.startdate && booking.enddate) {
-    dateRangeText = `von ${booking.startdate} bis ${booking.enddate}`;
-  } else if (booking.startdate) {
-    dateRangeText = `ab ${booking.startdate}`;
-  } else if (booking.enddate) {
-    dateRangeText = `bis ${booking.enddate}`;
+  if (start && end) {
+    dateRangeText = `von ${start} bis ${end}`;
+  } else if (start) {
+    dateRangeText = `ab ${start}`;
+  } else if (end) {
+    dateRangeText = `bis ${end}`;
   }
   
   const hoursText = getBookingHours(booking.times);

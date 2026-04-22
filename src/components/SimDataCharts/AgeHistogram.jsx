@@ -1,22 +1,14 @@
-import { useMemo, useEffect } from 'react';
+import { useMemo } from 'react';
 import HighchartsReact from 'highcharts-react-official';
 import Highcharts from 'highcharts';
 import { Box, useMantineTheme } from '@mantine/core';
-import { useSelector, useDispatch } from 'react-redux';
-import { updateAgeHistogramData } from '../../store/chartSlice';
+import { useSelector } from 'react-redux';
+import { createColoredYAxis } from '../../utils/highchartsAxis';
+import { selectAgeHistogramChartData } from '../../store/chartSelectors';
 
 export default function AgeHistogram() {
   const theme = useMantineTheme();
-  const scenarioId = useSelector((state) => state.simScenario.selectedScenarioId);
-  const chartState = useSelector((state) => state.chart[scenarioId] || {});
-  const chartData = useMemo(() => chartState.chartData?.ageHistogram || {}, [chartState]);
-  const dispatch = useDispatch();
-
-  useEffect(() => {
-    if (scenarioId) {
-      dispatch(updateAgeHistogramData(scenarioId));
-    }
-  }, [dispatch, scenarioId, chartState.referenceDate, chartState.filter?.Groups]);
+  const chartData = useSelector(selectAgeHistogramChartData);
 
   const options = useMemo(() => ({
     chart: { type: 'column' },
@@ -29,11 +21,12 @@ export default function AgeHistogram() {
         style: { fontSize: '10px' },
       },
     },
-    yAxis: {
+    yAxis: createColoredYAxis({
+      title: 'Anzahl Kinder',
+      color: theme.colors.indigo[6],
       min: 0,
       allowDecimals: false,
-      title: { text: 'Anzahl Kinder' },
-    },
+    }),
     legend: { enabled: false },
     tooltip: {
       pointFormat: '<b>{point.y}</b> Kinder',

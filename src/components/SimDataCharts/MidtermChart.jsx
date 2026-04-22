@@ -1,10 +1,11 @@
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import HighchartsReact from 'highcharts-react-official';
 import Highcharts from 'highcharts';
 import { Box, useMantineTheme } from '@mantine/core';
-import { useSelector, useDispatch } from 'react-redux';
-import { updateMidTermChartData } from '../../store/chartSlice';
+import { useSelector } from 'react-redux';
 import { generateWeeklyChartTooltip } from '../../utils/chartUtils/chartUtilsWeekly';
+import { createColoredYAxis } from '../../utils/highchartsAxis';
+import { selectMidtermChartData } from '../../store/chartSelectors';
 
 export default function MidtermChart() {
   const theme = useMantineTheme();
@@ -14,19 +15,7 @@ export default function MidtermChart() {
   const careRatioColor = theme.colors.red[6];
   const expertRatioColor = theme.colors.orange[6];
 
-  const scenarioId = useSelector(state => state.simScenario.selectedScenarioId);
-  const dispatch = useDispatch();
-
-  // Get current filters from chartSlice (per scenario)
-  const chartState = useSelector(state => state.chart[scenarioId] || {});
-  const chartData = useMemo(() => chartState.chartData?.midterm || {}, [chartState]);
-
-  // Update chart data when filters or simulation data change
-  useEffect(() => {
-    if (scenarioId) {
-      dispatch(updateMidTermChartData(scenarioId));
-    }
-  }, [dispatch, scenarioId]);
+  const chartData = useSelector(selectMidtermChartData);
 
 
   // Chart options
@@ -38,38 +27,42 @@ export default function MidtermChart() {
       title: { text: 'Zeitraum' }
     },
     yAxis: [
-      { // Bedarf
-        title: { text: 'Bedarf (Stunden)' },
+      createColoredYAxis({
+        title: 'Bedarf (Stunden)',
+        color: demandColor,
         min: 0,
         max: chartData.maxdemand || null,
         tickInterval: null,
         opposite: false,
         gridLineWidth: 1
-      },
-      { // Kapazität
-        title: { text: 'Kapazität (Stunden)' },
+      }),
+      createColoredYAxis({
+        title: 'Kapazität (Stunden)',
+        color: capacityColor,
         min: 0,
         max: chartData.maxcapacity || null,
         tickInterval: null,
         opposite: false,
         gridLineWidth: 1
-      },
-      { // Betreuungsschlüssel
-        title: { text: 'Betreuungsschlüssel' },
+      }),
+      createColoredYAxis({
+        title: 'Betreuungsschlüssel',
+        color: careRatioColor,
         min: 0,
         max: chartData.max_care_ratio || null,
         tickInterval: null,
         opposite: true,
         gridLineWidth: 0
-      },
-      { // Fachkraftquote
-        title: { text: 'Fachkraftquote (%)' },
+      }),
+      createColoredYAxis({
+        title: 'Fachkraftquote (%)',
+        color: expertRatioColor,
         min: 0,
         max: chartData.maxexpert_ratio || 100,
         tickInterval: 10,
         opposite: true,
         gridLineWidth: 0
-      }
+      })
     ],
     series: [
       {

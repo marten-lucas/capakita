@@ -121,6 +121,7 @@ export const updateWeeklyChartData = (scenarioId) => (dispatch, getState) => {
   const state = getState();
   const chartState = state.chart[scenarioId] || {};
   const referenceDate = chartState.referenceDate || '';
+  const timedimension = chartState.timedimension || 'month';
   const selectedGroups = [...(chartState.filter?.Groups || [])];
   const selectedQualifications = [...(chartState.filter?.Qualifications || [])];
 
@@ -179,6 +180,7 @@ export const updateWeeklyChartData = (scenarioId) => (dispatch, getState) => {
   // Build flags for events: map event effectiveDate -> category index
   const flags = [];
   try {
+    const events = (state.events?.eventsByScenario?.[scenarioId] || []).filter((event) => event.enabled !== false);
     (events || []).forEach((ev) => {
       const label = formatDateToCategory(timedimension, ev.effectiveDate);
       const idx = clonedData.categories.indexOf(label);
@@ -190,7 +192,7 @@ export const updateWeeklyChartData = (scenarioId) => (dispatch, getState) => {
         });
       }
     });
-  } catch (e) {
+  } catch {
     // ignore
   }
 

@@ -159,6 +159,7 @@ export const addDataItemAndSelect = ({ scenarioId, item }) => (dispatch, getStat
       payload: id
     });
   }
+
 };
 
 // Thunk for updating a data item (overlay-aware)
@@ -194,6 +195,7 @@ export const updateDataItemThunk = ({ scenarioId, itemId, updates }) => (dispatc
   } else {
     dispatch(updateDataItem({ scenarioId, itemId, updates }));
   }
+
 };
 
 export const selectDataItemsByScenario = createSelector(

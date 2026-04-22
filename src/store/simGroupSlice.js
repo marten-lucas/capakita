@@ -3,13 +3,13 @@ import { createId } from '../utils/idUtils';
 import { DEFAULT_GROUP_ICON, normalizeGroupIcon } from '../utils/groupIcons';
 
 function normalizeGroupDefRecord(groupDef = {}) {
-  const isSchoolKidGroup = groupDef?.isSchoolKidGroup ?? groupDef?.IsSchool ?? groupDef?.type === 'Schulkindgruppe';
+  const { isSchoolKidGroup, IsSchool, ...rest } = groupDef || {};
+  const type = rest.type || (isSchoolKidGroup || IsSchool ? 'Schulkindgruppe' : 'Regelgruppe');
 
   return {
-    ...groupDef,
-    icon: normalizeGroupIcon(groupDef?.icon || DEFAULT_GROUP_ICON),
-    isSchoolKidGroup,
-    IsSchool: isSchoolKidGroup,
+    ...rest,
+    type,
+    icon: normalizeGroupIcon(rest?.icon || DEFAULT_GROUP_ICON),
   };
 }
 

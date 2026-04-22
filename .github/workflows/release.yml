@@ -5,6 +5,11 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Optionales Release-Tag, z. B. v1.2.3"
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -16,6 +21,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -26,19 +33,61 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
       - name: Run tests
-        run: npm test
+        run: |
+          npm test
+          npm run test:e2e:basic
 
       - name: Build app
         run: npm run build
 
-      - name: Package build artifact
+      - name: Package release assets
         run: |
+          mkdir -p release
+          cp dist/index.html release/kiga-simulator.html
           cd dist
-          zip -r ../kiga-simulator-dist.zip .
+          zip -r ../release/kiga-simulator-release.zip .
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
         with:
-          files: kiga-simulator-dist.zip
-          generate_release_notes: true
+          name: release-build
+          path: release/*
+
+      - name: Resolve release tag
+        id: tag
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          elif [[ -n "${{ inputs.release_tag }}" ]]; then
+            echo "tag=${{ inputs.release_tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "release_tag must be set when starting manually." >&2
+            exit 1
+          fi
+
+      - name: Create tag when started manually
+        if: github.event_name == 'workflow_dispatch' && inputs.release_tag != ''
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          if ! git rev-parse "$TAG" >/dev/null 2>&1; then
+            git tag "$TAG"
+            git push origin "$TAG"
+          fi
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" ./release/kiga-simulator-release.zip ./release/kiga-simulator.html --clobber
+          else
+            gh release create "$TAG" ./release/kiga-simulator-release.zip ./release/kiga-simulator.html \
+              --title "kiga-simulator $TAG" \
+              --notes "Automatisch erzeugter Build fuer $TAG."
+          fi

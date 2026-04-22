@@ -27,9 +27,8 @@ async function seedScenarioWithGroup(page) {
         groupDef: {
           id: 'group-icon-picker-test-group',
           name: 'Testgruppe',
-          icon: 'users',
+          icon: 'mdi:dog',
           type: 'Regelgruppe',
-          isSchoolKidGroup: false,
         },
       },
     });
@@ -56,11 +55,13 @@ test('group icon picker opens without runtime errors', async ({ page }, testInfo
   const picker = page.getByTestId('group-icon-picker');
   await expect(picker).toBeVisible();
 
-  await picker.locator('button').first().click();
+  await picker.getByTestId('group-icon-picker-trigger').click();
 
-  await expect(page.locator('.icon-picker__grid')).toBeVisible();
-  await expect(page.getByPlaceholder('Tabler-Icon suchen')).toBeVisible();
-  expect(await page.locator('.icon-picker__grid .icon-picker__item').count()).toBeGreaterThan(0);
+  await expect(page.getByTestId('group-icon-picker-popover')).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Tiere' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Menschen' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Natur' })).toBeVisible();
+  expect(await page.getByRole('button', { name: /Hund|Dog/i }).count()).toBeGreaterThan(0);
 
   const screenshotPath = `test-results/group-icon-picker-${Date.now()}.png`;
   await page.screenshot({ path: screenshotPath, fullPage: true });

@@ -1,5 +1,4 @@
 import { createSlice, createSelector } from '@reduxjs/toolkit';
-import { Event } from '../models/Event';
 
 // Helper: get next working day (Mon-Fri)
 function getNextWorkingDay(dateStr) {
@@ -64,7 +63,7 @@ function buildAutomaticTransitionEvents({ dataItems, existingEvents = [], scenar
             if (!isWithinAttendanceRange(item, transition.effectiveDate)) return;
             if (hasConflictingRealEvent({ existingEvents, itemKey, effectiveDate: transition.effectiveDate })) return;
 
-            events.push(new Event({
+            events.push({
                 id: transition.id,
                 scenarioId,
                 effectiveDate: transition.effectiveDate,
@@ -81,7 +80,7 @@ function buildAutomaticTransitionEvents({ dataItems, existingEvents = [], scenar
                     targetStage: transition.targetStage,
                 },
                 enabled: !disabledIds[transition.id]
-            }));
+            });
         });
     });
 
@@ -110,7 +109,7 @@ function extractEventsForScenario(state, scenarioId, disabledIds = {}) {
         metadata = {},
         enabled = true
     }) {
-        return new Event({
+        return {
             id,
             scenarioId,
             effectiveDate,
@@ -124,7 +123,7 @@ function extractEventsForScenario(state, scenarioId, disabledIds = {}) {
             description,
             metadata,
             enabled: !disabledIds[id] && enabled
-        });
+        };
     }
 
     // Data items: presence (start/end), absences

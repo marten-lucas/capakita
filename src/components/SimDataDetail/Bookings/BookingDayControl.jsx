@@ -168,9 +168,6 @@ function DayControl({ dayLabel, dayData, onToggle, onTimeChange, onAddSegment, o
   }, []);
 
   const finishDrag = React.useCallback(() => {
-    if (dragStateRef.current) {
-      console.log('[Drag] finishDrag – mode was:', dragStateRef.current.mode);
-    }
     dragStateRef.current = null;
     document.body.style.userSelect = '';
     document.body.style.cursor = '';
@@ -181,16 +178,10 @@ function DayControl({ dayLabel, dayData, onToggle, onTimeChange, onAddSegment, o
     if (!dragState) return;
 
     const nextPointerMinutes = getPointerMinutes(event.clientX);
-    if (nextPointerMinutes === null) {
-      console.log('[Drag] handleDragMove – getPointerMinutes returned null, clientX:', event.clientX);
-      return;
-    }
+    if (nextPointerMinutes === null) return;
 
     const currentSegment = segmentsRef.current[dragState.segmentIndex];
-    if (!currentSegment) {
-      console.log('[Drag] handleDragMove – no segment at index', dragState.segmentIndex);
-      return;
-    }
+    if (!currentSegment) return;
 
     const currentStart = timeToMinutes(currentSegment.booking_start);
     const currentEnd = timeToMinutes(currentSegment.booking_end);
@@ -208,8 +199,6 @@ function DayControl({ dayLabel, dayData, onToggle, onTimeChange, onAddSegment, o
       nextEnd = clampMinutes(nextPointerMinutes, currentStart + 15, TIMELINE_END_MINUTES);
     }
 
-    console.log('[Drag] move – mode:', dragState.mode, 'ptr:', nextPointerMinutes, 'next:', minutesToTime(nextStart), '–', minutesToTime(nextEnd));
-
     onTimeChangeRef.current(dragState.segmentIndex, {
       start: minutesToTime(nextStart),
       end: minutesToTime(nextEnd),
@@ -217,7 +206,6 @@ function DayControl({ dayLabel, dayData, onToggle, onTimeChange, onAddSegment, o
   }, [getPointerMinutes]);
 
   React.useEffect(() => {
-    console.log('[Drag] registering document drag listeners');
     const handleMouseMove = (event) => handleDragMove(event);
     const handlePointerMove = (event) => {
       // skip synthetic pointer events that duplicate mouse events
@@ -236,7 +224,6 @@ function DayControl({ dayLabel, dayData, onToggle, onTimeChange, onAddSegment, o
     document.addEventListener('pointerup', handlePointerUp);
 
     return () => {
-      console.log('[Drag] removing document drag listeners');
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('pointermove', handlePointerMove);
       document.removeEventListener('mouseup', handleMouseUp);
@@ -252,25 +239,14 @@ function DayControl({ dayLabel, dayData, onToggle, onTimeChange, onAddSegment, o
     event.stopPropagation();
 
     const segment = segments[segmentIndex];
-    if (!segment) {
-      console.log('[Drag] startDrag – no segment at index', segmentIndex);
-      return;
-    }
+    if (!segment) return;
 
     const startMinutes = timeToMinutes(segment.booking_start);
     const endMinutes = timeToMinutes(segment.booking_end);
-    if (startMinutes === null || endMinutes === null) {
-      console.log('[Drag] startDrag – invalid segment times', segment.booking_start, segment.booking_end);
-      return;
-    }
+    if (startMinutes === null || endMinutes === null) return;
 
     const pointerMinutes = getPointerMinutes(event.clientX);
-    if (pointerMinutes === null) {
-      console.log('[Drag] startDrag – getPointerMinutes returned null, clientX:', event.clientX);
-      return;
-    }
-
-    console.log('[Drag] startDrag – mode:', mode, 'segment:', segmentIndex, 'ptr:', pointerMinutes, 'start:', startMinutes, 'end:', endMinutes);
+    if (pointerMinutes === null) return;
 
     dragStateRef.current = {
       mode,
@@ -303,17 +279,14 @@ function DayControl({ dayLabel, dayData, onToggle, onTimeChange, onAddSegment, o
     if (event.target !== event.currentTarget) return;
     const pointerMinutes = getPointerMinutes(event.clientX, 30, 'floor');
     if (pointerMinutes === null) return;
-    console.log('[Click-add] pointerdown – pointerMinutes:', pointerMinutes, 'canAdd:', canAddSegmentAt(pointerMinutes));
     if (!canAddSegmentAt(pointerMinutes)) return;
     onAddSegmentAt?.(pointerMinutes);
   }, [canAddSegmentAt, getPointerMinutes, onAddSegmentAt]);
 
   const handleTimelineMouseDown = React.useCallback((event) => {
     if (event.target !== event.currentTarget) return;
-    const rect = timelineRef.current?.getBoundingClientRect();
     const pointerMinutes = getPointerMinutes(event.clientX, 30, 'floor');
     if (pointerMinutes === null) return;
-    console.log('[Click-add] mousedown – clientX:', event.clientX, 'rect.left:', rect?.left, 'pointerMinutes:', pointerMinutes, 'canAdd:', canAddSegmentAt(pointerMinutes));
     if (!canAddSegmentAt(pointerMinutes)) return;
     onAddSegmentAt?.(pointerMinutes);
   }, [canAddSegmentAt, getPointerMinutes, onAddSegmentAt]);

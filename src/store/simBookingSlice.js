@@ -112,6 +112,7 @@ export const addBookingThunk = ({ scenarioId, dataItemId, booking }) => (dispatc
   } else {
     dispatch(simBookingSlice.actions.addBooking({ scenarioId, dataItemId, booking }));
   }
+
 };
 
 // Thunk for updating a booking, overlay-aware
@@ -146,6 +147,7 @@ export const updateBookingThunk = ({ scenarioId, dataItemId, bookingId, updates 
   } else {
     dispatch(simBookingSlice.actions.updateBooking({ scenarioId, dataItemId, bookingId, updates }));
   }
+
 };
 
 // Thunk for deleting a booking, overlay-aware
@@ -162,6 +164,7 @@ export const deleteBookingThunk = ({ scenarioId, dataItemId, bookingId }) => (di
   } else {
     dispatch(simBookingSlice.actions.deleteBooking({ scenarioId, dataItemId, bookingId }));
   }
+
 };
 
 export const {

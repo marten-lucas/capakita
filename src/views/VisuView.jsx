@@ -10,24 +10,19 @@ import { setActivePage } from '../store/uiSlice';
 import React from 'react';
 import ChartFilterForm from '../components/SimDataCharts/ChartFilterForm';
 import { useScenarioEvents } from '../hooks/useScenarioEvents';
-import { createSelector } from '@reduxjs/toolkit';
 import { buildOverlayAwareData } from '../utils/overlayUtils';
+import ChartErrorBoundary from '../components/common/ChartErrorBoundary';
 
 const EMPTY_TOGGLES = [];
 
 // Memoized selector for chart toggles
-const selectChartToggles = createSelector(
-  [
-    (state, scenarioId) => state.chart[scenarioId]?.chartToggles
-  ],
-  (chartToggles) => chartToggles || EMPTY_TOGGLES
-);
 
 function VisuView() {
   const dispatch = useDispatch();
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const scenarios = useSelector(state => state.simScenario.scenarios);
-  const chartToggles = useSelector(state => selectChartToggles(state, selectedScenarioId));
+  const chartState = useSelector((state) => state.chart[selectedScenarioId] ?? null);
+  const chartToggles = chartState?.chartToggles || EMPTY_TOGGLES;
 
   React.useEffect(() => {
     if (selectedScenarioId && scenarios.length > 0) {
@@ -79,9 +74,9 @@ function VisuView() {
       {chartToggles.includes('weekly') && (
         <Paper p="md" withBorder>
           <Title order={4} mb="md" c="dimmed">Regelbetrieb</Title>
-          <Box h={400}>
+          <ChartErrorBoundary>
             <WeeklyChart />
-          </Box>
+          </ChartErrorBoundary>
         </Paper>
       )}
 
@@ -89,7 +84,9 @@ function VisuView() {
         <Paper p="md" withBorder>
           <Title order={4} mb="md" c="dimmed">Langzeit</Title>
           <Box h={400}>
-            <MidtermChart hideFilters scenarioId={selectedScenarioId} />
+            <ChartErrorBoundary>
+              <MidtermChart hideFilters scenarioId={selectedScenarioId} />
+            </ChartErrorBoundary>
           </Box>
         </Paper>
       )}
@@ -98,7 +95,9 @@ function VisuView() {
         <Paper p="md" withBorder>
           <Title order={4} mb="md" c="dimmed">Alters-Histogramm</Title>
           <Box h={400}>
-            <AgeHistogram />
+            <ChartErrorBoundary>
+              <AgeHistogram />
+            </ChartErrorBoundary>
           </Box>
         </Paper>
       )}
@@ -107,7 +106,9 @@ function VisuView() {
         <Paper p="md" withBorder>
           <Title order={4} mb="md" c="dimmed">Buchungsverteilung</Title>
           <Box h={400}>
-            <BookingHistogram />
+            <ChartErrorBoundary>
+              <BookingHistogram />
+            </ChartErrorBoundary>
           </Box>
         </Paper>
       )}

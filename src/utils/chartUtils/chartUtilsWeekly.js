@@ -1,20 +1,63 @@
 import { generateExpertRatioSeries, generateCareRatioSeries, filterBookings } from '../chartUtils/chartUtils';
+import { timeToMinutes } from '../timeUtils';
+
+const WEEKLY_DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr'];
+const WEEKLY_SLOT_START_MINUTES = 7 * 60;
+const WEEKLY_SLOT_END_MINUTES = 17 * 60;
+const WEEKLY_SLOT_MINUTES = 30;
+const WEEKLY_SLOTS_PER_DAY = ((WEEKLY_SLOT_END_MINUTES - WEEKLY_SLOT_START_MINUTES) / WEEKLY_SLOT_MINUTES) + 1;
+
+function parseWeeklyCategory(value) {
+  if (typeof value !== 'string') return null;
+
+  const [day, time] = value.split(' ');
+  if (!day || !time) return null;
+
+  const [hourPart, minutePart] = time.split(':');
+  const hour = Number(hourPart);
+  const minute = Number(minutePart);
+
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+
+  return { day, hour, minute };
+}
+
+function getWeeklyCategoryMinutes(category) {
+  const slot = parseWeeklyCategory(category);
+  if (!slot) return null;
+  return timeToMinutes(`${slot.hour}:${String(slot.minute).padStart(2, '0')}`);
+}
 
 // Hilfsfunktion für Zeitsegmente
 export function generateTimeSegments() {
-  const days = ['Mo', 'Di', 'Mi', 'Do', 'Fr'];
-  const startHour = 7;
-  const endHour = 17;
   const segments = [];
-  for (let d = 0; d < days.length; d++) {
-    for (let h = startHour; h <= endHour; h += 0.5) {
-      const hour = Math.floor(h);
-      const min = h % 1 === 0 ? '00' : '30';
-      segments.push(`${days[d]} ${hour}:${min}`);
+
+  for (let dayIndex = 0; dayIndex < WEEKLY_DAYS.length; dayIndex++) {
+    for (let slotIndex = 0; slotIndex < WEEKLY_SLOTS_PER_DAY; slotIndex++) {
+      const totalMinutes = WEEKLY_SLOT_START_MINUTES + (slotIndex * WEEKLY_SLOT_MINUTES);
+      const hour = Math.floor(totalMinutes / 60);
+      const min = totalMinutes % 60;
+      segments.push(`${WEEKLY_DAYS[dayIndex]} ${hour}:${String(min).padStart(2, '0')}`);
     }
   }
   // Ensure we return a new mutable array every time
   return [...segments];
+}
+
+export function formatWeeklyCategoryLabel(value, categories = []) {
+  if (typeof value === 'string') return value;
+  if (Number.isFinite(value) && categories[value] !== undefined) return categories[value];
+  return '';
+}
+
+export function formatWeeklyAxisLabel(value, categories = []) {
+  const category = formatWeeklyCategoryLabel(value, categories);
+  const slot = parseWeeklyCategory(category);
+
+  if (!slot || slot.minute !== 0) return '';
+  if (![8, 12, 16].includes(slot.hour)) return '';
+
+  return `${slot.hour}:00`;
 }
 
 /**
@@ -41,11 +84,17 @@ export function generateBookingDataSeries(referenceDate, filteredBookings, categ
   function bookingCoversCategory(booking, catDay, catTime) {
     if (!Array.isArray(booking.times)) return false;
     // booking.times: [{ day_name: 'Mo', segments: [{ booking_start, booking_end }] }, ...]
+    const categoryMinutes = getWeeklyCategoryMinutes(`${catDay} ${catTime}`);
+    if (categoryMinutes === null) return false;
+
     return booking.times.some(dayObj => {
       if (dayObj.day_name !== catDay) return false;
       if (!Array.isArray(dayObj.segments)) return false;
       return dayObj.segments.some(seg =>
-        seg.category !== 'administrative' && seg.booking_start <= catTime && seg.booking_end > catTime // exclusive end
+        timeToMinutes(seg.booking_start) !== null
+        && timeToMinutes(seg.booking_end) !== null
+        && timeToMinutes(seg.booking_start) <= categoryMinutes
+        && timeToMinutes(seg.booking_end) > categoryMinutes // exclusive end
       );
     });
   }
@@ -66,8 +115,9 @@ export function generateBookingDataSeries(referenceDate, filteredBookings, categ
   return series.map(val => val); // Create a new array with copied values
 }
 
-export function generateWeeklyChartTooltip(points, x) {
-  let s = `<b>${x}</b><br/>`;
+export function generateWeeklyChartTooltip(points, x, categories = []) {
+  const label = formatWeeklyCategoryLabel(x, categories) || String(x);
+  let s = `<b>${label}</b><br/>`;
   points.forEach(point => {
     s += `<span style="color:${point.color}">\u25CF</span> <b>${point.series.name}:</b> ${point.y}<br/>`;
   });

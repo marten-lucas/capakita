@@ -7,10 +7,6 @@ import {
   setFilterGroups,
   setFilterQualifications,
   ensureScenario,
-  updateWeeklyChartData,
-  updateMidTermChartData,
-  updateHistogramChartData,
-  updateAgeHistogramData,
 } from '../../store/chartSlice';
 import { useOverlayData } from '../../hooks/useOverlayData';
 import EventPicker from '../EventCalendar/EventPicker';
@@ -27,14 +23,14 @@ function ChartFilterForm({ showStichtag = false, scenarioId, onTimedimensionChan
     }
   }, [dispatch, scenarioId]);
 
-  const chartState = useSelector((state) => state.chart[scenarioId] || {});
+  const chartState = useSelector((state) => state.chart[scenarioId] ?? null);
   
   // Memoize selections to prevent new references every render
-  const timedimension = React.useMemo(() => chartState.timedimension || 'month', [chartState.timedimension]);
-  const chartToggles = React.useMemo(() => chartState.chartToggles || DEFAULT_CHART_TOGGLES, [chartState.chartToggles]);
-  const selectedGroups = React.useMemo(() => chartState.filter?.Groups || EMPTY_SELECTION, [chartState.filter?.Groups]);
-  const selectedQualifications = React.useMemo(() => chartState.filter?.Qualifications || EMPTY_SELECTION, [chartState.filter?.Qualifications]);
-  const referenceDate = React.useMemo(() => chartState.referenceDate || '', [chartState.referenceDate]);
+  const timedimension = React.useMemo(() => chartState?.timedimension || 'month', [chartState?.timedimension]);
+  const chartToggles = React.useMemo(() => chartState?.chartToggles || DEFAULT_CHART_TOGGLES, [chartState?.chartToggles]);
+  const selectedGroups = React.useMemo(() => chartState?.filter?.Groups || EMPTY_SELECTION, [chartState?.filter?.Groups]);
+  const selectedQualifications = React.useMemo(() => chartState?.filter?.Qualifications || EMPTY_SELECTION, [chartState?.filter?.Qualifications]);
+  const referenceDate = React.useMemo(() => chartState?.referenceDate || '', [chartState?.referenceDate]);
 
   const { getEffectiveGroupDefs, getEffectiveQualificationDefs } = useOverlayData();
   const groupDefs = getEffectiveGroupDefs();
@@ -75,14 +71,6 @@ function ChartFilterForm({ showStichtag = false, scenarioId, onTimedimensionChan
       );
     }
   }, [dispatch, scenarioId, selectedQualifications.length, qualificationOptions]);
-
-  React.useEffect(() => {
-    if (!scenarioId) return;
-    dispatch(updateWeeklyChartData(scenarioId));
-    dispatch(updateMidTermChartData(scenarioId));
-    dispatch(updateAgeHistogramData(scenarioId));
-    dispatch(updateHistogramChartData(scenarioId));
-  }, [dispatch, scenarioId, timedimension, referenceDate, chartToggles, selectedGroups, selectedQualifications]);
 
   return (
     <Paper withBorder p="md">

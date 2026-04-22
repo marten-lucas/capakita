@@ -242,49 +242,57 @@ function BookingDetail({ index, booking }) {
   }, [booking.times]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const validityRange = [booking.startdate || null, booking.enddate || null];
-  const [validityRangeDraft, setValidityRangeDraft] = React.useState(validityRange);
+  const [startDraft, setStartDraft] = React.useState(validityRange[0]);
+  const [endDraft, setEndDraft] = React.useState(validityRange[1]);
 
   React.useEffect(() => {
-    setValidityRangeDraft([booking.startdate || null, booking.enddate || null]);
+    setStartDraft(booking.startdate || null);
+    setEndDraft(booking.enddate || null);
   }, [booking.startdate, booking.enddate]);
 
-  const handleRangeChange = (value) => {
-    setValidityRangeDraft(value);
-  };
+  function isoFromValue(value) {
+    if (!value) return '';
+    if (typeof value === 'string') return value;
+    if (value instanceof Date) return value.toISOString().split('T')[0];
+    return '';
+  }
 
-  const commitValidityRange = () => {
-    const [rangeStart, rangeEnd] = Array.isArray(validityRangeDraft) ? validityRangeDraft : [null, null];
-    const nextStartDate = typeof rangeStart === 'string'
-      ? rangeStart
-      : rangeStart instanceof Date
-        ? rangeStart.toISOString().split('T')[0]
-        : '';
-    const nextEndDate = typeof rangeEnd === 'string'
-      ? rangeEnd
-      : rangeEnd instanceof Date
-        ? rangeEnd.toISOString().split('T')[0]
-        : '';
-
+  const commitDate = (nextStart, nextEnd) => {
     handleUpdateBooking({
       ...booking,
-      startdate: nextStartDate,
-      enddate: nextEndDate,
+      startdate: isoFromValue(nextStart),
+      enddate: isoFromValue(nextEnd),
     });
   };
 
   return (
     <Stack gap="md">
-      <Group align="center" wrap="nowrap" gap="md">
+      <Group align="center" wrap="nowrap" gap="sm">
         <Text fw={600} style={{ whiteSpace: 'nowrap' }}>Gültigkeitszeitraum</Text>
         <DatePickerInput
-          type="range"
-          placeholder="Zeitraum wählen"
-          value={validityRangeDraft}
-          onChange={handleRangeChange}
-          onDropdownClose={commitValidityRange}
-          closeOnChange={false}
+          placeholder="Von"
+          value={startDraft}
+          onChange={(value) => {
+            setStartDraft(value);
+            commitDate(value, endDraft);
+          }}
+          valueFormat="DD.MM.YYYY"
           clearable
           style={{ flex: 1 }}
+          aria-label="Gültig ab"
+        />
+        <Text size="sm" c="dimmed">–</Text>
+        <DatePickerInput
+          placeholder="Bis"
+          value={endDraft}
+          onChange={(value) => {
+            setEndDraft(value);
+            commitDate(startDraft, value);
+          }}
+          valueFormat="DD.MM.YYYY"
+          clearable
+          style={{ flex: 1 }}
+          aria-label="Gültig bis"
         />
       </Group>
 

@@ -10,7 +10,7 @@ import { sumBookingHours } from '../../utils/bookingUtils';
 import { getEffectiveGroupAssignments, getScenarioChain } from '../../utils/overlayUtils';
 import TabbedListDetail from '../common/TabbedListDetail';
 import SimDataTabs from './SimDataTabs';
-import TablerIcon from '../common/TablerIcon';
+import GroupIcon from '../common/GroupIcon';
 
 function SimDataList() {
   const dispatch = useDispatch();
@@ -69,7 +69,7 @@ function SimDataList() {
         <Group wrap="nowrap">
           <Avatar color={item.type === 'demand' ? 'cyan' : 'green'} radius="xl">
             {groupDef?.icon ? (
-              <TablerIcon icon={groupDef.icon} size={16} />
+              <GroupIcon icon={groupDef.icon} size={16} />
             ) : item.type === 'demand' ? (
               <IconBabyCarriage size={20} />
             ) : (
