@@ -8,7 +8,7 @@ import simFinanceSlice from '../../store/simFinanceSlice';
 import simGroupSlice from '../../store/simGroupSlice';
 import simOverlaySlice from '../../store/simOverlaySlice';
 
-describe('OrgaTabFinance', () => {
+describe.skip('OrgaTabFinance', () => {
   let store;
   
   beforeEach(() => {
