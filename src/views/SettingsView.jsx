@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { Paper, Tabs, Box } from '@mantine/core';
-import { IconCalendarEvent, IconCertificate, IconLayersIntersect, IconUsers } from '@tabler/icons-react';
+import { IconCalendarEvent, IconCertificate, IconLayersIntersect, IconTools, IconUsers } from '@tabler/icons-react';
 import OrgaTabGroupDefs from '../components/orgaDetails/orgaTabGroupDefs';
 import OrgaTabQualificationDefs from '../components/orgaDetails/orgaTabQualificatoinDefs';
 import OrgaTabScenarioDefs from '../components/orgaDetails/orgaTabScenarioDefs';
 import OrgaTabEvents from '../components/orgaDetails/orgaTabEvents';
+import OrgaTabFinance from '../components/orgaDetails/orgaTabFinance';
 
 function SettingsView() {
   const [activeTab, setActiveTab] = useState('groups');
@@ -30,6 +31,9 @@ function SettingsView() {
             <Tabs.Tab value="events" leftSection={<IconCalendarEvent size={16} />}>
               Ereignisse
             </Tabs.Tab>
+            <Tabs.Tab value="finance" leftSection={<IconTools size={16} />}>
+              Finanzen
+            </Tabs.Tab>
           </Tabs.List>
 
           <Box p="md">
@@ -44,6 +48,9 @@ function SettingsView() {
             </Tabs.Panel>
             <Tabs.Panel value="events">
               <OrgaTabEvents />
+            </Tabs.Panel>
+            <Tabs.Panel value="finance">
+              <OrgaTabFinance />
             </Tabs.Panel>
           </Box>
         </Tabs>

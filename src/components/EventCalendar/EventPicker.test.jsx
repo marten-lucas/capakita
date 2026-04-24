@@ -96,6 +96,9 @@ describe('EventPicker', () => {
 
     expect(screen.getByTestId('stichtag-panel')).toBeInTheDocument();
 
+    fireEvent.click(screen.getByTestId('stichtag-timeline-toggle'));
+    expect(await screen.findByTestId('stichtag-timeline')).toBeInTheDocument();
+
     fireEvent.click(screen.getByTestId('stichtag-timeline-item-2099-01-01'));
 
     expect(screen.getByTestId('stichtag-input')).toHaveTextContent('01.01.2099');

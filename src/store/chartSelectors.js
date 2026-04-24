@@ -4,6 +4,13 @@ import { calculateChartDataWeekly } from '../utils/chartUtils/chartUtilsWeekly';
 import { calculateChartDataMidterm, generateMidtermCategories, formatDateToCategory } from '../utils/chartUtils/chartUtilsMidterm';
 import { calculateChartDataHistogram } from '../utils/chartUtils/chartUtilsHistogram';
 import { calculateChartDataAgeHistogram } from '../utils/chartUtils/chartUtilsAgeHistogram';
+import {
+  calculateScenarioMonthlyFinance,
+  convertMonthlyAmountToPeriod,
+  getPeriodBoundsForCategory,
+  hasAnyBookingInWeek,
+  isRecordActiveOnDate,
+} from '../utils/financeUtils';
 
 const EMPTY_ARRAY = [];
 const EMPTY_OBJECT = {};
@@ -35,6 +42,16 @@ const EMPTY_MIDTERM_DATA = {
   max_care_ratio: '',
   expert_ratio: [],
   maxexpert_ratio: '100',
+  income_total: [],
+  expenses_total: [],
+  net_total: [],
+  maxfinance: 0,
+  financeKpis: {
+    averageCareRatioWeek: 0,
+    personnelCostPerChild: 0,
+    activeChildrenWithBookings: 0,
+    monthlyPersonnelCost: 0,
+  },
   flags: [],
 };
 
@@ -65,6 +82,7 @@ const selectGroupsByScenario = (state) => state.simGroup.groupsByScenario;
 const selectQualificationAssignmentsByScenario = (state) => state.simQualification.qualificationAssignmentsByScenario;
 const selectQualificationDefsByScenario = (state) => state.simQualification.qualificationDefsByScenario;
 const selectEventsByScenario = (state) => state.events?.eventsByScenario || EMPTY_OBJECT;
+const selectFinanceByScenario = (state) => state.simFinance?.financeByScenario || EMPTY_OBJECT;
 
 export const selectChartScenarioState = createSelector(
   [selectChartSlice, selectSelectedScenarioId],
@@ -171,12 +189,14 @@ export const selectWeeklyChartData = createSelector(
 );
 
 export const selectMidtermChartData = createSelector(
-  [selectSelectedScenarioId, selectChartFilters, selectOverlayAwareChartData, selectEventsByScenario],
+  [selectSelectedScenarioId, selectChartFilters, selectOverlayAwareChartData, selectEventsByScenario, selectFinanceByScenario, selectWeeklyChartData],
   (
     scenarioId,
     { referenceDate, timedimension, selectedGroups, selectedQualifications },
     overlayData,
-    eventsByScenario
+    eventsByScenario,
+    financeByScenario,
+    weeklyChartData
   ) => {
     if (!scenarioId || !overlayData) {
       return EMPTY_MIDTERM_DATA;
@@ -193,6 +213,7 @@ export const selectMidtermChartData = createSelector(
       effectiveGroupDefs,
       effectiveQualificationDefs,
     } = overlayData;
+    const financeScenario = financeByScenario?.[scenarioId] || EMPTY_OBJECT;
 
     const wrappedPayload = {
       bookingsByScenario: { [scenarioId]: effectiveBookingsByItem },
@@ -232,6 +253,59 @@ export const selectMidtermChartData = createSelector(
       })
       .filter(Boolean);
 
+    const financeSeriesData = (chartData?.categories || []).map((category) => {
+      const bounds = getPeriodBoundsForCategory(timedimension, category);
+      const financeReferenceDate = bounds?.start || referenceDate;
+      const finance = calculateScenarioMonthlyFinance({
+        referenceDate: financeReferenceDate,
+        effectiveDataItems,
+        effectiveBookingsByItem,
+        effectiveGroupAssignmentsByItem,
+        effectiveGroupDefs,
+        financeScenario,
+      });
+
+      return {
+        income: convertMonthlyAmountToPeriod(finance.summary.incomeTotal, timedimension),
+        expenses: convertMonthlyAmountToPeriod(finance.summary.expensesTotal, timedimension),
+        net: convertMonthlyAmountToPeriod(finance.summary.net, timedimension),
+      };
+    });
+
+    const referenceFinance = calculateScenarioMonthlyFinance({
+      referenceDate,
+      effectiveDataItems,
+      effectiveBookingsByItem,
+      effectiveGroupAssignmentsByItem,
+      effectiveGroupDefs,
+      financeScenario,
+    });
+
+    const activeChildrenWithBookings = Object.entries(effectiveDataItems || {}).filter(([itemId, item]) => {
+      if (item?.type !== 'demand') return false;
+      if (!isRecordActiveOnDate(item, referenceDate)) return false;
+      return hasAnyBookingInWeek(Object.values(effectiveBookingsByItem?.[itemId] || {}), referenceDate);
+    }).length;
+
+    const careRatioValues = (weeklyChartData?.care_ratio || []).filter((value) => Number(value) > 0);
+    const averageCareRatioWeek = careRatioValues.length > 0
+      ? careRatioValues.reduce((sum, value) => sum + value, 0) / careRatioValues.length
+      : 0;
+
+    const financeKpis = {
+      averageCareRatioWeek,
+      personnelCostPerChild: activeChildrenWithBookings > 0
+        ? referenceFinance.summary.expensesPersonnel / activeChildrenWithBookings
+        : 0,
+      activeChildrenWithBookings,
+      monthlyPersonnelCost: referenceFinance.summary.expensesPersonnel,
+    };
+
+    const incomeTotal = financeSeriesData.map((entry) => entry.income);
+    const expensesTotal = financeSeriesData.map((entry) => entry.expenses);
+    const netTotal = financeSeriesData.map((entry) => entry.net);
+    const maxfinance = Math.max(...incomeTotal, ...expensesTotal, ...netTotal.map((value) => Math.abs(value)), 0);
+
     return {
       categories: chartData?.categories ? [...chartData.categories] : [],
       demand: chartData?.demand ? chartData.demand.map((value) => (typeof value === 'number' ? value : 0)) : [],
@@ -244,6 +318,11 @@ export const selectMidtermChartData = createSelector(
       max_care_ratio: chartData?.max_care_ratio || '',
       expert_ratio: chartData?.expert_ratio ? chartData.expert_ratio.map((value) => (typeof value === 'number' ? value : 0)) : [],
       maxexpert_ratio: chartData?.maxexpert_ratio || '100',
+      income_total: incomeTotal,
+      expenses_total: expensesTotal,
+      net_total: netTotal,
+      maxfinance,
+      financeKpis,
       flags,
     };
   }

@@ -70,7 +70,7 @@ async function createManualDataset(page) {
 test.describe('BASIC: Manual Data & Visualization', () => {
   test('Manual data entry + visualization', async ({ page }) => {
     await createManualDataset(page);
-    await page.getByRole('link', { name: /Analyse/i }).click();
+    await page.getByRole('button', { name: 'Analyse' }).click();
 
     await expect(page.getByRole('heading', { name: 'Regelbetrieb' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Langzeit' })).toBeVisible();
@@ -106,7 +106,7 @@ test.describe('BASIC: Export/Import Roundtrip', () => {
     await expect(page.locator('text=Lina').first()).toBeVisible();
     await expect(page.locator('text=Mara').first()).toBeVisible();
 
-    await page.getByRole('link', { name: /Analyse/i }).click();
+    await page.getByRole('button', { name: 'Analyse' }).click();
     await expect(page.getByRole('heading', { name: 'Regelbetrieb' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Alters-Histogramm' })).toBeVisible();
   });
@@ -132,7 +132,7 @@ test.describe('IMPORT: Adebis Data & Visualization', () => {
       await expect(page).toHaveURL(/\/data/);
       await expect(page.locator('.mantine-Avatar-root').first()).toBeVisible();
 
-      await page.getByRole('link', { name: /Analyse/i }).click();
+      await page.getByRole('button', { name: 'Analyse' }).click();
       await expect(page.getByRole('heading', { name: 'Regelbetrieb' })).toBeVisible();
       await expect(page.getByRole('heading', { name: 'Alters-Histogramm' })).toBeVisible();
     });
@@ -179,23 +179,86 @@ if (shouldRunFullTests()) {
         await importDialog.locator('input[type="file"]').setInputFiles(importZip);
         await importDialog.getByRole('button', { name: /^Importieren$/ }).click();
 
-        await page.getByRole('link', { name: /Analyse/i }).click();
+        await page.getByRole('button', { name: 'Analyse' }).click();
 
         await expect(page.getByRole('heading', { name: 'Regelbetrieb' })).toBeVisible();
         await expect(page.getByRole('heading', { name: 'Langzeit' })).toBeVisible();
+        await expect(page.getByRole('heading', { name: 'Alters-Histogramm' })).toBeVisible();
+        await expect(page.getByRole('heading', { name: 'Buchungsverteilung' })).toBeVisible();
 
-        await page.getByRole('checkbox', { name: 'Langzeit' }).uncheck({ force: true });
+        const ruleCheckbox = page.getByRole('checkbox', { name: 'Regelbetrieb' });
+        const longtermCheckbox = page.getByRole('checkbox', { name: 'Langzeit' });
+        const ageHistogramCheckbox = page.getByRole('checkbox', { name: 'Alters-Histogramm' });
+        const histogramCheckbox = page.getByRole('checkbox', { name: 'Buchungsverteilung' });
+
+        await expect(ruleCheckbox).toBeChecked();
+        await expect(longtermCheckbox).toBeChecked();
+        await expect(ageHistogramCheckbox).toBeChecked();
+        await expect(histogramCheckbox).toBeChecked();
+
+        await ruleCheckbox.uncheck({ force: true });
+        await expect(page.getByRole('heading', { name: 'Regelbetrieb' })).toHaveCount(0);
+        await ruleCheckbox.check({ force: true });
+        await expect(page.getByRole('heading', { name: 'Regelbetrieb' })).toBeVisible();
+
+        await longtermCheckbox.uncheck({ force: true });
         await expect(page.getByRole('heading', { name: 'Langzeit' })).toHaveCount(0);
-
-        await page.getByRole('checkbox', { name: 'Langzeit' }).check({ force: true });
+        await longtermCheckbox.check({ force: true });
         await expect(page.getByRole('heading', { name: 'Langzeit' })).toBeVisible();
+
+        await ageHistogramCheckbox.uncheck({ force: true });
+        await expect(page.getByRole('heading', { name: 'Alters-Histogramm' })).toHaveCount(0);
+        await ageHistogramCheckbox.check({ force: true });
+        await expect(page.getByRole('heading', { name: 'Alters-Histogramm' })).toBeVisible();
+
+        await histogramCheckbox.uncheck({ force: true });
+        await expect(page.getByRole('heading', { name: 'Buchungsverteilung' })).toHaveCount(0);
+        await histogramCheckbox.check({ force: true });
+        await expect(page.getByRole('heading', { name: 'Buchungsverteilung' })).toBeVisible();
 
         await page.getByRole('combobox', { name: 'Zeitdimension' }).click();
         await page.getByRole('option', { name: 'Quartal' }).click();
         await expect(page.getByRole('combobox', { name: 'Zeitdimension' })).toHaveValue('Quartal');
 
-        await expect(page.getByRole('combobox', { name: 'Gruppen' })).toBeVisible();
-        await expect(page.getByRole('combobox', { name: 'Qualifikationen' })).toBeVisible();
+        const groupsCombobox = page.getByRole('combobox', { name: 'Gruppen' });
+        const qualificationsCombobox = page.getByRole('combobox', { name: 'Qualifikationen' });
+
+        await expect(groupsCombobox).toBeVisible();
+        await expect(qualificationsCombobox).toBeVisible();
+
+        await groupsCombobox.click();
+        await expect(page.getByRole('option').first()).toBeVisible();
+        await page.keyboard.press('Escape');
+
+        await qualificationsCombobox.click();
+        await expect(page.getByRole('option').first()).toBeVisible();
+        await page.keyboard.press('Escape');
+
+        await expect(page.getByTestId('stichtag-input')).toBeVisible();
+
+        await page.getByTestId('stichtag-timeline-toggle').click();
+        await expect(page.getByTestId('stichtag-timeline-shell')).toBeVisible();
+
+        const stichtagInput = page.getByTestId('stichtag-input');
+        const beforeSelection = await stichtagInput.textContent();
+        await stichtagInput.click();
+
+        const dayButton = page.getByRole('button', { name: /^\d{4}-\d{2}-\d{2}$/ }).first();
+        await expect(dayButton).toBeVisible();
+        await dayButton.click();
+
+        await expect(stichtagInput).toContainText(/\d{2}\.\d{2}\.\d{4}/);
+
+        const timelinePoint = page.locator('.highcharts-point').first();
+        await expect(timelinePoint).toBeVisible();
+        await timelinePoint.click();
+
+        if (beforeSelection) {
+          await expect(stichtagInput).not.toHaveText(beforeSelection);
+        }
+
+        await page.getByTestId('stichtag-timeline-toggle').click();
+        await expect(page.getByTestId('stichtag-timeline-shell')).toHaveCount(0);
       });
     }
   });

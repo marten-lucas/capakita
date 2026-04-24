@@ -113,7 +113,10 @@ function OrgaTabGroupDefs() {
           <ActionIcon
             color="red"
             variant="subtle"
-            onClick={() => dispatch(deleteGroupDef({ scenarioId: selectedScenarioId, groupId: item.id }))}
+            onClick={() => {
+              dispatch(deleteGroupDef({ scenarioId: selectedScenarioId, groupId: item.id }));
+              dispatch({ type: 'simFinance/deleteGroupFeeCatalog', payload: { scenarioId: selectedScenarioId, groupId: item.id } });
+            }}
           >
             <IconTrash size={18} />
           </ActionIcon>

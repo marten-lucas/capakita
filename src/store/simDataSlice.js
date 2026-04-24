@@ -262,6 +262,7 @@ export const deleteDataItemThunk = ({ scenarioId, itemId }) => (dispatch, getSta
   dispatch({ type: 'simBooking/deleteAllBookingsForItem', payload: { scenarioId, itemId } });
   dispatch({ type: 'simGroup/deleteAllGroupAssignmentsForItem', payload: { scenarioId, itemId } });
   dispatch({ type: 'simQualification/deleteAllQualificationAssignmentsForItem', payload: { scenarioId, itemId } });
+  dispatch({ type: 'simFinance/deleteItemFinance', payload: { scenarioId, itemId } });
 };
 
 // Thunk: delete all data items for a scenario and all related data

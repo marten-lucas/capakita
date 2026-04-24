@@ -121,7 +121,25 @@ export function generateWeeklyChartTooltip(points, x, categories = []) {
   const label = formatWeeklyCategoryLabel(x, categories) || String(x);
   let s = `<b>${label}</b><br/>`;
   points.forEach(point => {
-    s += `<span style="color:${point.color}">\u25CF</span> <b>${point.series.name}:</b> ${point.y}<br/>`;
+    const seriesName = point.series?.name || 'Series';
+    let displayValue = point.y;
+    
+    // Format financial series with currency
+    const financeSeriesNames = ['income_total', 'income_parents', 'income_baykibig', 'expenses_total', 'expenses_personnel', 'net_total'];
+    const isFinanceSeries = financeSeriesNames.some(name => seriesName.toLowerCase().includes(name.toLowerCase())) ||
+                           ['Einkommen', 'Ausgaben', 'Gewinn', 'Netto'].some(name => seriesName.includes(name)) ||
+                           ['income', 'expenses', 'net'].some(name => seriesName.toLowerCase().includes(name));
+    
+    if (isFinanceSeries && typeof displayValue === 'number') {
+      displayValue = displayValue.toLocaleString('de-DE', {
+        style: 'currency',
+        currency: 'EUR',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      });
+    }
+    
+    s += `<span style="color:${point.color}">\u25CF</span> <b>${seriesName}:</b> ${displayValue}<br/>`;
   });
   return s;
 }

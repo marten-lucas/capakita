@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import HighchartsReact from 'highcharts-react-official';
 import Highcharts from 'highcharts';
-import { Box, useMantineTheme } from '@mantine/core';
+import { Box, Card, Group, SimpleGrid, Text, useMantineTheme } from '@mantine/core';
 import { useSelector } from 'react-redux';
 import { generateWeeklyChartTooltip } from '../../utils/chartUtils/chartUtilsWeekly';
 import { createColoredYAxis } from '../../utils/highchartsAxis';
@@ -15,8 +15,17 @@ export default function MidtermChart() {
   const capacityAdministrativeColor = theme.colors.violet[6];
   const careRatioColor = theme.colors.red[6];
   const expertRatioColor = theme.colors.orange[6];
+  const financeIncomeColor = theme.colors.teal[6];
+  const financeExpenseColor = theme.colors.gray[7];
+  const financeNetColor = theme.colors.lime[7];
 
   const chartData = useSelector(selectMidtermChartData);
+
+  const formatCurrency = (value) => new Intl.NumberFormat('de-DE', {
+    style: 'currency',
+    currency: 'EUR',
+    maximumFractionDigits: 0,
+  }).format(Number(value) || 0);
 
 
   // Chart options
@@ -61,6 +70,15 @@ export default function MidtermChart() {
         min: 0,
         max: chartData.maxexpert_ratio || 100,
         tickInterval: 10,
+        opposite: true,
+        gridLineWidth: 0
+      }),
+      createColoredYAxis({
+        title: 'Finanzen (EUR)',
+        color: financeIncomeColor,
+        min: chartData.net_total?.some((value) => value < 0) ? undefined : 0,
+        max: chartData.maxfinance || null,
+        tickInterval: null,
         opposite: true,
         gridLineWidth: 0
       })
@@ -108,6 +126,34 @@ export default function MidtermChart() {
         yAxis: 3,
         color: expertRatioColor,
         marker: { enabled: false }
+      },
+      {
+        name: 'Einnahmen',
+        type: 'line',
+        data: chartData.income_total || [],
+        yAxis: 4,
+        color: financeIncomeColor,
+        lineWidth: 2,
+        marker: { enabled: false }
+      },
+      {
+        name: 'Ausgaben',
+        type: 'line',
+        data: chartData.expenses_total || [],
+        yAxis: 4,
+        color: financeExpenseColor,
+        lineWidth: 2,
+        marker: { enabled: false }
+      },
+      {
+        name: 'Saldo',
+        type: 'line',
+        data: chartData.net_total || [],
+        yAxis: 4,
+        color: financeNetColor,
+        dashStyle: 'ShortDash',
+        lineWidth: 2,
+        marker: { enabled: false }
       }
       ,
       ...(chartData.flags && chartData.flags.length > 0 ? [{
@@ -126,16 +172,44 @@ export default function MidtermChart() {
       shared: true,
       useHTML: true,
       formatter: function () {
-        // Use category (e.g., "2026-04") instead of just index
         const category = this.points?.[0]?.category || this.x;
         return generateWeeklyChartTooltip(this.points, category);
       }
     },
-  }), [chartData, demandColor, capacityPedagogicalColor, capacityAdministrativeColor, careRatioColor, expertRatioColor]);
+  }), [
+    chartData,
+    demandColor,
+    capacityPedagogicalColor,
+    capacityAdministrativeColor,
+    careRatioColor,
+    expertRatioColor,
+    financeIncomeColor,
+    financeExpenseColor,
+    financeNetColor,
+  ]);
 
   return (
-    <Box h={400}>
-      <HighchartsReact highcharts={Highcharts} options={midtermOptions} containerProps={{ style: { height: '100%' } }} />
+    <Box>
+      <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mb="md">
+        <Card withBorder radius="md" padding="lg">
+          <Text size="sm" c="dimmed" mb={4}>Durchschnittlicher Betreuungsschluessel</Text>
+          <Group justify="space-between" align="flex-end">
+            <Text fw={700} size="xl">{(chartData.financeKpis?.averageCareRatioWeek || 0).toFixed(1)}</Text>
+            <Text size="sm" c="dimmed">Stichtagswoche</Text>
+          </Group>
+        </Card>
+        <Card withBorder radius="md" padding="lg">
+          <Text size="sm" c="dimmed" mb={4}>Personalkosten pro betreutem Kind</Text>
+          <Group justify="space-between" align="flex-end">
+            <Text fw={700} size="xl">{formatCurrency(chartData.financeKpis?.personnelCostPerChild || 0)}</Text>
+            <Text size="sm" c="dimmed">{chartData.financeKpis?.activeChildrenWithBookings || 0} Kinder</Text>
+          </Group>
+        </Card>
+      </SimpleGrid>
+
+      <Box h={400}>
+        <HighchartsReact highcharts={Highcharts} options={midtermOptions} containerProps={{ style: { height: '100%' } }} />
+      </Box>
     </Box>
   );
 }

@@ -6,6 +6,7 @@ import { useOverlayData } from '../../hooks/useOverlayData';
 import SimDataGeneralTab from './SimDataGeneralTab';
 import SimDataBookingTab from './Bookings/SimDataBookingTab';
 import SimDataGroupsTab from './Groups/SimDataGroupsTab';
+import SimDataFinanceTab from './SimDataFinanceTab';
 
 function SimDataTabs() {
   const [activeTab, setActiveTab] = useState('general');
@@ -46,6 +47,9 @@ function SimDataTabs() {
           <Tabs.Tab value="groups" leftSection={<IconUsers size={16} />}>
             Gruppen
           </Tabs.Tab>
+          <Tabs.Tab value="finance" leftSection={<IconTools size={16} />}>
+            Finanzen
+          </Tabs.Tab>
         </Tabs.List>
 
         <Box pt="md" style={{ flex: 1, overflow: 'auto' }}>
@@ -57,6 +61,9 @@ function SimDataTabs() {
           </Tabs.Panel>
           <Tabs.Panel value="groups">
             <SimDataGroupsTab />
+          </Tabs.Panel>
+          <Tabs.Panel value="finance">
+            <SimDataFinanceTab />
           </Tabs.Panel>
         </Box>
       </Tabs>

@@ -13,6 +13,7 @@ export function useSaveLoad() {
   const simBooking = useSelector(state => state.simBooking);
   const simGroup = useSelector(state => state.simGroup);
   const simQualification = useSelector(state => state.simQualification);
+  const simFinance = useSelector(state => state.simFinance);
   const chart = useSelector(state => state.chart);
 
   const saveData = useCallback(async (password) => {
@@ -32,6 +33,7 @@ export function useSaveLoad() {
         bookingsByScenario: simBooking.bookingsByScenario,
         groupsByScenario: simGroup.groupsByScenario,
         groupDefsByScenario: simGroup.groupDefsByScenario,
+        financeByScenario: simFinance.financeByScenario,
         qualificationDefsByScenario: simQualification.qualificationDefsByScenario,
         qualificationAssignmentsByScenario: simQualification.qualificationAssignmentsByScenario,
         chartStore: chart,
@@ -71,6 +73,7 @@ export function useSaveLoad() {
     simBooking,
     simGroup,
     simQualification,
+    simFinance,
     chart
   ]);
 
@@ -107,6 +110,9 @@ export function useSaveLoad() {
         }
         if (data.groupDefsByScenario) {
           dispatch({ type: 'simGroup/loadGroupDefsByScenario', payload: data.groupDefsByScenario });
+        }
+        if (data.financeByScenario) {
+          dispatch({ type: 'simFinance/loadFinanceByScenario', payload: data.financeByScenario });
         }
         if (data.qualificationDefsByScenario) {
           dispatch({ type: 'simQualification/loadQualificationDefsByScenario', payload: data.qualificationDefsByScenario });

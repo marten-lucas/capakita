@@ -30,6 +30,7 @@ export const extractSaveData = (state) => {
     bookingsByScenario: state.simBooking.bookingsByScenario,
     groupsByScenario: state.simGroup.groupsByScenario,
     groupDefsByScenario: state.simGroup.groupDefsByScenario,
+    financeByScenario: state.simFinance.financeByScenario,
     qualificationDefsByScenario: state.simQualification.qualificationDefsByScenario,
     qualificationAssignmentsByScenario: state.simQualification.qualificationAssignmentsByScenario,
     chartStore: {

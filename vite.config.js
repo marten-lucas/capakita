@@ -5,6 +5,16 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   base: './',
   plugins: [react()],
+  server: {
+    proxy: {
+      '/stmas-proxy': {
+        target: 'https://www.stmas.bayern.de',
+        changeOrigin: true,
+        secure: true,
+        rewrite: (path) => path.replace(/^\/stmas-proxy/, ''),
+      },
+    },
+  },
   build: {
     chunkSizeWarningLimit: 1600,
   },

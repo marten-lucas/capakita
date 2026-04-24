@@ -1,0 +1,251 @@
+{
+  "metadata": {
+    "source": "Kiga Gramschatz - https://www.kiga-gramschatz.de/",
+    "validFrom": "2025-01-01",
+    "validUntil": "2025-12-31",
+    "currency": "EUR",
+    "description": "Real-world test data extracted from Gramschatz kindergarten fee schedule"
+  },
+  "feeStructures": {
+    "childrenUnder3": {
+      "ageRange": "0-2 Jahre",
+      "description": "Beiträge für Kinder unter 3 Jahren",
+      "bands": [
+        {"minHours": 3, "maxHours": 4, "monthlyAmountMembers": 165, "monthlyAmountNonMembers": 170},
+        {"minHours": 4.01, "maxHours": 5, "monthlyAmountMembers": 195, "monthlyAmountNonMembers": 200},
+        {"minHours": 5.01, "maxHours": 6, "monthlyAmountMembers": 225, "monthlyAmountNonMembers": 230},
+        {"minHours": 6.01, "maxHours": 7, "monthlyAmountMembers": 255, "monthlyAmountNonMembers": 260},
+        {"minHours": 7.01, "maxHours": 8, "monthlyAmountMembers": 285, "monthlyAmountNonMembers": 290},
+        {"minHours": 8.01, "maxHours": 9, "monthlyAmountMembers": 315, "monthlyAmountNonMembers": 320},
+        {"minHours": 9.01, "maxHours": 10, "monthlyAmountMembers": 345, "monthlyAmountNonMembers": 350}
+      ]
+    },
+    "childrenOver3": {
+      "ageRange": "3-5 Jahre",
+      "description": "Beiträge für Kinder über 3 Jahren (vor Schuleintritt)",
+      "bands": [
+        {"minHours": 3, "maxHours": 4, "monthlyAmountMembers": 145, "monthlyAmountNonMembers": 150},
+        {"minHours": 4.01, "maxHours": 5, "monthlyAmountMembers": 165, "monthlyAmountNonMembers": 170},
+        {"minHours": 5.01, "maxHours": 6, "monthlyAmountMembers": 185, "monthlyAmountNonMembers": 190},
+        {"minHours": 6.01, "maxHours": 7, "monthlyAmountMembers": 205, "monthlyAmountNonMembers": 210},
+        {"minHours": 7.01, "maxHours": 8, "monthlyAmountMembers": 225, "monthlyAmountNonMembers": 230},
+        {"minHours": 8.01, "maxHours": 9, "monthlyAmountMembers": 245, "monthlyAmountNonMembers": 250},
+        {"minHours": 9.01, "maxHours": 10, "monthlyAmountMembers": 265, "monthlyAmountNonMembers": 270}
+      ]
+    },
+    "schoolChildren": {
+      "ageRange": "Schulkinder",
+      "description": "Beiträge für die Mittagsbetreuung / Ferienbetreuung der Schulkinder",
+      "bands": [
+        {"minHours": 1, "maxHours": 2, "monthlyAmountMembers": 105, "monthlyAmountNonMembers": 110},
+        {"minHours": 2.01, "maxHours": 3, "monthlyAmountMembers": 125, "monthlyAmountNonMembers": 130},
+        {"minHours": 3.01, "maxHours": 4, "monthlyAmountMembers": 145, "monthlyAmountNonMembers": 150}
+      ]
+    }
+  },
+  "testScenarios": {
+    "baykibig_weights_gramschatz_2025": {
+      "description": "Test data for all 8 BayKiBiG weight categories using Gramschatz fee structure",
+      "groupFeeCatalog": {
+        "krippe": {
+          "groupId": "group-krippe",
+          "groupType": "Krippe",
+          "validFrom": "2025-01-01",
+          "validUntil": "2025-12-31",
+          "feeBands": [
+            {"id": "f1", "minHours": 3, "maxHours": 4, "monthlyAmount": 165, "validFrom": "2025-01-01"},
+            {"id": "f2", "minHours": 4.01, "maxHours": 5, "monthlyAmount": 195, "validFrom": "2025-01-01"},
+            {"id": "f3", "minHours": 5.01, "maxHours": 6, "monthlyAmount": 225, "validFrom": "2025-01-01"},
+            {"id": "f4", "minHours": 6.01, "maxHours": 7, "monthlyAmount": 255, "validFrom": "2025-01-01"},
+            {"id": "f5", "minHours": 7.01, "maxHours": 8, "monthlyAmount": 285, "validFrom": "2025-01-01"},
+            {"id": "f6", "minHours": 8.01, "maxHours": 9, "monthlyAmount": 315, "validFrom": "2025-01-01"},
+            {"id": "f7", "minHours": 9.01, "maxHours": 10, "monthlyAmount": 345, "validFrom": "2025-01-01"}
+          ]
+        },
+        "kindergarten": {
+          "groupId": "group-kiga",
+          "groupType": "Kindergarten",
+          "validFrom": "2025-01-01",
+          "validUntil": "2025-12-31",
+          "feeBands": [
+            {"id": "f8", "minHours": 3, "maxHours": 4, "monthlyAmount": 145, "validFrom": "2025-01-01"},
+            {"id": "f9", "minHours": 4.01, "maxHours": 5, "monthlyAmount": 165, "validFrom": "2025-01-01"},
+            {"id": "f10", "minHours": 5.01, "maxHours": 6, "monthlyAmount": 185, "validFrom": "2025-01-01"},
+            {"id": "f11", "minHours": 6.01, "maxHours": 7, "monthlyAmount": 205, "validFrom": "2025-01-01"},
+            {"id": "f12", "minHours": 7.01, "maxHours": 8, "monthlyAmount": 225, "validFrom": "2025-01-01"},
+            {"id": "f13", "minHours": 8.01, "maxHours": 9, "monthlyAmount": 245, "validFrom": "2025-01-01"},
+            {"id": "f14", "minHours": 9.01, "maxHours": 10, "monthlyAmount": 265, "validFrom": "2025-01-01"}
+          ]
+        }
+      },
+      "bayKiBiGRules": [
+        {"id": "baykibig-1", "label": "BayKiBiG 2025", "baseValue": 120, "validFrom": "2025-01-01", "validUntil": "2025-12-31"}
+      ],
+      "testCases": [
+        {
+          "id": "child-under3-weight2",
+          "description": "Category 1: Child under 3 years (weight 2.0)",
+          "child": {
+            "id": "child-1",
+            "name": "Max (under 3)",
+            "type": "demand",
+            "dateofbirth": "2024-06-15",
+            "groupId": "group-krippe",
+            "hasDisability": false,
+            "temporaryDisabilityDate": "",
+            "isInDaycare": false,
+            "hasNonGermanSpeakingParents": false
+          },
+          "weeklyHours": 5,
+          "expectedGroupFeeAmount": 195,
+          "expectedWeight": 2.0,
+          "expectedBayKiBiGAmount": 240,
+          "expectedTotalMonthly": 435
+        },
+        {
+          "id": "child-3to5-weight1",
+          "description": "Category 2: Child 3-5 years (weight 1.0)",
+          "child": {
+            "id": "child-2",
+            "name": "Lisa (3-5 Jahre)",
+            "type": "demand",
+            "dateofbirth": "2022-03-20",
+            "groupId": "group-kiga",
+            "hasDisability": false,
+            "temporaryDisabilityDate": "",
+            "isInDaycare": false,
+            "hasNonGermanSpeakingParents": false
+          },
+          "weeklyHours": 6,
+          "expectedGroupFeeAmount": 205,
+          "expectedWeight": 1.0,
+          "expectedBayKiBiGAmount": 120,
+          "expectedTotalMonthly": 325
+        },
+        {
+          "id": "child-schoolage-weight12",
+          "description": "Category 3: School-age child (weight 1.2)",
+          "child": {
+            "id": "child-3",
+            "name": "Tom (Schulkind)",
+            "type": "demand",
+            "dateofbirth": "2018-09-10",
+            "groupId": "group-schulkind",
+            "hasDisability": false,
+            "temporaryDisabilityDate": "",
+            "isInDaycare": false,
+            "hasNonGermanSpeakingParents": false
+          },
+          "weeklyHours": 2,
+          "expectedGroupFeeAmount": 105,
+          "expectedWeight": 1.2,
+          "expectedBayKiBiGAmount": 144,
+          "expectedTotalMonthly": 249
+        },
+        {
+          "id": "child-disability-weight45",
+          "description": "Category 4: Child with permanent disability (weight 4.5)",
+          "child": {
+            "id": "child-4",
+            "name": "Anna (mit Behinderung)",
+            "type": "demand",
+            "dateofbirth": "2023-01-15",
+            "groupId": "group-krippe",
+            "hasDisability": true,
+            "temporaryDisabilityDate": "",
+            "isInDaycare": false,
+            "hasNonGermanSpeakingParents": false
+          },
+          "weeklyHours": 5,
+          "expectedGroupFeeAmount": 195,
+          "expectedWeight": 4.5,
+          "expectedBayKiBiGAmount": 540,
+          "expectedTotalMonthly": 735
+        },
+        {
+          "id": "child-tempDisability-weight45",
+          "description": "Category 5: Child with temporary disability application (weight 4.5 for 6 months)",
+          "child": {
+            "id": "child-5",
+            "name": "Julia (temporäre Behinderung)",
+            "type": "demand",
+            "dateofbirth": "2022-12-01",
+            "groupId": "group-kiga",
+            "hasDisability": false,
+            "temporaryDisabilityDate": "2025-02-01",
+            "isInDaycare": false,
+            "hasNonGermanSpeakingParents": false
+          },
+          "weeklyHours": 6,
+          "expectedGroupFeeAmount": 205,
+          "expectedWeight": 4.5,
+          "expectedBayKiBiGAmount": 540,
+          "expectedTotalMonthly": 745,
+          "validForReferenceDate": "2025-05-01",
+          "note": "Weight expires after 180 days from temporaryDisabilityDate"
+        },
+        {
+          "id": "child-daycare-weight13",
+          "description": "Category 6: Child in day-care/Tagespflege (weight 1.3)",
+          "child": {
+            "id": "child-6",
+            "name": "Leon (Tagespflege)",
+            "type": "demand",
+            "dateofbirth": "2023-07-10",
+            "groupId": "group-krippe",
+            "hasDisability": false,
+            "temporaryDisabilityDate": "",
+            "isInDaycare": true,
+            "hasNonGermanSpeakingParents": false
+          },
+          "weeklyHours": 4,
+          "expectedGroupFeeAmount": 195,
+          "expectedWeight": 1.3,
+          "expectedBayKiBiGAmount": 156,
+          "expectedTotalMonthly": 351
+        },
+        {
+          "id": "child-nonGermanParents-weight13",
+          "description": "Category 8: Child of non-German-speaking parents (weight 1.3)",
+          "child": {
+            "id": "child-7",
+            "name": "Sofia (nichtdeutschsprachig)",
+            "type": "demand",
+            "dateofbirth": "2022-08-22",
+            "groupId": "group-kiga",
+            "hasDisability": false,
+            "temporaryDisabilityDate": "",
+            "isInDaycare": false,
+            "hasNonGermanSpeakingParents": true
+          },
+          "weeklyHours": 7,
+          "expectedGroupFeeAmount": 225,
+          "expectedWeight": 1.3,
+          "expectedBayKiBiGAmount": 156,
+          "expectedTotalMonthly": 381
+        },
+        {
+          "id": "child-disability-wins-precedence",
+          "description": "Precedence: Disability (4.5) overrides day-care (1.3)",
+          "child": {
+            "id": "child-8",
+            "name": "Marco (Behinderung + Tagespflege)",
+            "type": "demand",
+            "dateofbirth": "2023-05-05",
+            "groupId": "group-krippe",
+            "hasDisability": true,
+            "temporaryDisabilityDate": "",
+            "isInDaycare": true,
+            "hasNonGermanSpeakingParents": false
+          },
+          "weeklyHours": 5,
+          "expectedGroupFeeAmount": 195,
+          "expectedWeight": 4.5,
+          "expectedBayKiBiGAmount": 540,
+          "expectedTotalMonthly": 735,
+          "note": "Disability weight (4.5) takes precedence over day-care weight (1.3)"
+        }
+      ]
+    }
+  }
+}
