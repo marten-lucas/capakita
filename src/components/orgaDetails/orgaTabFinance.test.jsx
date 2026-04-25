@@ -1,164 +1,157 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { describe, expect, it } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
+import { MantineProvider } from '@mantine/core';
 import OrgaTabFinance from './orgaTabFinance';
-import simFinanceSlice from '../../store/simFinanceSlice';
-import simGroupSlice from '../../store/simGroupSlice';
-import simOverlaySlice from '../../store/simOverlaySlice';
+import simScenarioReducer from '../../store/simScenarioSlice';
+import simDataReducer from '../../store/simDataSlice';
+import simBookingReducer from '../../store/simBookingSlice';
+import simGroupReducer from '../../store/simGroupSlice';
+import simQualificationReducer from '../../store/simQualificationSlice';
+import simOverlayReducer from '../../store/simOverlaySlice';
+import simFinanceReducer from '../../store/simFinanceSlice';
+import chartReducer from '../../store/chartSlice';
 
-describe.skip('OrgaTabFinance', () => {
-  let store;
-  
-  beforeEach(() => {
-    store = configureStore({
-      reducer: {
-        simFinance: simFinanceSlice,
-        simGroup: simGroupSlice,
-        simOverlay: simOverlaySlice,
+function createTestStore() {
+  return configureStore({
+    reducer: {
+      simScenario: simScenarioReducer,
+      simData: simDataReducer,
+      simBooking: simBookingReducer,
+      simGroup: simGroupReducer,
+      simQualification: simQualificationReducer,
+      simOverlay: simOverlayReducer,
+      simFinance: simFinanceReducer,
+      chart: chartReducer,
+    },
+    preloadedState: {
+      simScenario: {
+        scenarios: [{ id: 'scenario-1', name: 'Szenario 1' }],
+        selectedScenarioId: 'scenario-1',
+        selectedItems: { 'scenario-1': null },
+        saveDialogOpen: false,
+        loadDialogOpen: false,
       },
-      preloadedState: {
-        simFinance: {
-          financeByScenario: {
-            'scenario-1': {
-              bayKiBiGRules: [
-                { id: 'b1', label: 'BayKiBiG 2025', baseValue: 120, validFrom: '2025-01-01', validUntil: '2025-12-31' },
-              ],
-              groupFeeCatalogs: {
-                'group-1': [
-                  { id: 'f1', minHours: 3, maxHours: 6, monthlyAmount: 200, validFrom: '2025-01-01' },
-                  { id: 'f2', minHours: 6.01, maxHours: 10, monthlyAmount: 280, validFrom: '2025-01-01' },
-                ],
-                'group-2': [
-                  { id: 'f3', minHours: 3, maxHours: 6, monthlyAmount: 150, validFrom: '2025-01-01' },
-                ],
+      simData: {
+        dataByScenario: {
+          'scenario-1': {},
+        },
+      },
+      simBooking: {
+        bookingsByScenario: {
+          'scenario-1': {},
+        },
+      },
+      simGroup: {
+        groupDefsByScenario: {
+          'scenario-1': [
+            { id: 'group-1', name: 'Krippe Sonnen', type: 'Krippe' },
+            { id: 'group-2', name: 'Kindergarten Wald', type: 'Kindergarten' },
+          ],
+        },
+        groupsByScenario: {
+          'scenario-1': {},
+        },
+      },
+      simQualification: {
+        qualificationDefsByScenario: {},
+        qualificationAssignmentsByScenario: {},
+      },
+      simOverlay: {
+        overlaysByScenario: {},
+      },
+      simFinance: {
+        financeByScenario: {
+          'scenario-1': {
+            settings: {
+              partialAbsenceThresholdDays: 42,
+              partialAbsenceEmployerSharePercent: 0,
+            },
+            bayKiBiGRules: [
+              {
+                id: 'rule-1',
+                label: 'BayKiBiG 2025',
+                validFrom: '2025-01-01',
+                validUntil: '2025-12-31',
+                baseValue: 120,
+                weightFactors: {
+                  regelkind_3to6: 1.0,
+                  schulkind: 1.2,
+                  migration: 1.3,
+                  under3: 2.0,
+                  disabled: 4.5,
+                },
               },
-              sicknessBayKiBiGEmployerShareAfterSixWeeks: 0,
+            ],
+            groupFeeCatalogs: {
+              'group-1': [
+                {
+                  id: 'fee-1',
+                  validFrom: '2025-01-01',
+                  minHours: 3,
+                  maxHours: 6,
+                  monthlyAmount: 200,
+                },
+              ],
+              'group-2': [
+                {
+                  id: 'fee-2',
+                  validFrom: '2025-01-01',
+                  minHours: 3,
+                  maxHours: 6,
+                  monthlyAmount: 150,
+                },
+              ],
             },
-          },
-        },
-        simGroup: {
-          groupDefsByScenario: {
-            'scenario-1': {
-              'group-1': { id: 'group-1', name: 'Krippe Sonnen', type: 'Krippe' },
-              'group-2': { id: 'group-2', name: 'Kindergarten Wald', type: 'Kindergarten' },
-            },
-          },
-        },
-        simOverlay: {
-          overlayByScenario: {
-            'scenario-1': { mode: 'view', scenarioId: 'scenario-1' },
+            itemFinances: {},
           },
         },
       },
-    });
+      chart: {
+        'scenario-1': {
+          referenceDate: '2026-04-15',
+        },
+      },
+    },
+  });
+}
+
+describe('OrgaTabFinance', () => {
+  it('renders finance sections and existing finance data', () => {
+    const store = createTestStore();
+
+    render(
+      <MantineProvider>
+        <Provider store={store}>
+          <OrgaTabFinance />
+        </Provider>
+      </MantineProvider>
+    );
+
+    expect(screen.getByText('BayKiBiG-Rahmen')).toBeTruthy();
+    expect(screen.getByText('Teilweise Bezahlte Abwesenheit')).toBeTruthy();
+    expect(screen.getByText('Beitragskataloge pro Gruppe')).toBeTruthy();
+    expect(screen.getByText('BayKiBiG 2025')).toBeTruthy();
+    expect(screen.getByText('Krippe Sonnen')).toBeTruthy();
+    expect(screen.getByText('Kindergarten Wald')).toBeTruthy();
   });
 
-  it('displays BayKiBiG rules section', () => {
-    render(
-      <Provider store={store}>
-        <OrgaTabFinance scenarioId="scenario-1" />
-      </Provider>
-    );
-    
-    expect(screen.getByText(/BayKiBiG/i)).toBeDefined();
-  });
+  it('adds a new BayKiBiG rule via the add button', () => {
+    const store = createTestStore();
 
-  it('displays group fee catalogs section', () => {
     render(
-      <Provider store={store}>
-        <OrgaTabFinance scenarioId="scenario-1" />
-      </Provider>
+      <MantineProvider>
+        <Provider store={store}>
+          <OrgaTabFinance />
+        </Provider>
+      </MantineProvider>
     );
-    
-    expect(screen.getByText(/Gruppenbeiträge/i) || screen.getByText(/Gebührentarif/i)).toBeDefined();
-  });
 
-  it('displays sickness rule setting', () => {
-    render(
-      <Provider store={store}>
-        <OrgaTabFinance scenarioId="scenario-1" />
-      </Provider>
-    );
-    
-    expect(screen.getByText(/Krankheit|Fehltage|nach sechs Wochen/i)).toBeDefined();
-  });
+    const addButton = screen.getByRole('button', { name: 'BayKiBiG-Regel hinzufuegen' });
+    fireEvent.click(addButton);
 
-  it('shows existing BayKiBiG rule with baseValue', () => {
-    render(
-      <Provider store={store}>
-        <OrgaTabFinance scenarioId="scenario-1" />
-      </Provider>
-    );
-    
-    expect(screen.getByDisplayValue('120')).toBeDefined();
-  });
-
-  it('shows fee band entries for each group', () => {
-    render(
-      <Provider store={store}>
-        <OrgaTabFinance scenarioId="scenario-1" />
-      </Provider>
-    );
-    
-    // Check for fee band values
-    expect(screen.getByDisplayValue('200')).toBeDefined(); // First fee band amount
-  });
-
-  it('allows adding new BayKiBiG rule', async () => {
-    const user = userEvent.setup();
-    render(
-      <Provider store={store}>
-        <OrgaTabFinance scenarioId="scenario-1" />
-      </Provider>
-    );
-    
-    const addButtons = screen.getAllByRole('button').filter(btn => btn.textContent.includes('Hinzufügen') || btn.textContent.includes('+'));
-    
-    if (addButtons.length > 0) {
-      await user.click(addButtons[0]);
-      await waitFor(() => {
-        // Should have a new input field or form for new rule
-        expect(screen.getAllByDisplayValue).toBeDefined();
-      });
-    }
-  });
-
-  it('displays validity dates for BayKiBiG rules', () => {
-    render(
-      <Provider store={store}>
-        <OrgaTabFinance scenarioId="scenario-1" />
-      </Provider>
-    );
-    
-    // Look for date inputs
-    const dateInputs = screen.queryAllByType('input').filter(input => input.type === 'date');
-    expect(dateInputs.length).toBeGreaterThanOrEqual(0);
-  });
-
-  it('shows all fee bands for each group', () => {
-    render(
-      <Provider store={store}>
-        <OrgaTabFinance scenarioId="scenario-1" />
-      </Provider>
-    );
-    
-    // Should show both fee bands for group-1
-    expect(screen.queryAllByDisplayValue.length).toBeGreaterThanOrEqual(0);
-    // At least 280 should be visible (second band amount)
-    expect(screen.queryByDisplayValue('280')).toBeDefined() || expect(screen.queryByText('280')).toBeDefined();
-  });
-
-  it('displays currency formatting (EUR) for amounts', () => {
-    render(
-      <Provider store={store}>
-        <OrgaTabFinance scenarioId="scenario-1" />
-      </Provider>
-    );
-    
-    // Check if EUR or € symbol is visible
-    const container = screen.getByText(/BayKiBiG/i).closest('div');
-    expect(container?.textContent).toMatch(/€|EUR/);
+    const rules = store.getState().simFinance.financeByScenario['scenario-1'].bayKiBiGRules;
+    expect(rules).toHaveLength(2);
   });
 });
