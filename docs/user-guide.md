@@ -53,6 +53,50 @@ Zeigt die Entwicklung über Woche, Monat, Quartal oder Jahr. Geeignet für saiso
 ### Buchungsverteilung
 Zeigt die Verteilung der Buchungsstunden und macht Häufungen sichtbar.
 
+## Statistik-Seite
+
+Die Statistik-Seite ist nur bei importierten Adebis-Daten sichtbar.
+
+### Historische Kennzahlen
+- Kinderzahl
+- Buchungsstunden
+- Betreuungsstunden
+
+Die Darstellung ist umschaltbar nach:
+- Monat
+- Quartal
+- Jahr
+
+### Gruppenübergänge
+Die Statistik zeigt für Gruppenwechsel:
+- Datum und Wechselrichtung (von Gruppe zu Gruppe)
+- Alter beim Übergang
+- Buchungszeit vorher und nachher (90-Tage-Fenster)
+- Delta in Stunden und Prozent
+
+Zusätzlich gibt es ein Histogramm für das Alter beim Übergang.
+
+### Filter
+Für Gruppenübergänge sind folgende Filter verfügbar:
+- Zeitraum: Gesamt, letzte 12 Monate, letzte 24 Monate
+- Von-Gruppe
+- Zu-Gruppe
+
+## Auto-Events in Optionen
+
+Im Tab Optionen → Ereignisse gibt es den Bereich Auto-Event Einstellungen.
+
+Dort können für beide Standard-Wechsel konfiguriert werden:
+- Zeitpunkt des Wechsels (Alter in Jahren)
+- erwartete Änderung der Buchungszeit (Stunden pro Woche)
+
+Konfigurierbare Wechsel:
+- Krippe → Kita
+- Kita → Schulkindbetreuung
+
+Mit dem Button Werte in Statistik belegen werden die aktuellen Einstellungen als Referenz in die Statistik übernommen.
+Diese Belegung wird auf der Statistik-Seite als eigene Hinweisbox angezeigt.
+
 ## Szenarien speichern und laden
 
 ### Speichern

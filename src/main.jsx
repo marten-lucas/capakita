@@ -12,6 +12,7 @@ import App from './App.jsx'
 import { Provider } from 'react-redux'
 import store from './store/store'
 import Highcharts from 'highcharts'
+import 'highcharts/modules/stock'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

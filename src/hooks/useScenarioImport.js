@@ -14,8 +14,8 @@ export function useScenarioImport() {
   const dispatch = useDispatch();
 
   const importScenarioHandler = useCallback(
-    async ({ file, isAnonymized, importLimit }) => {
-      const { rawdata } = await extractAdebisData(file, isAnonymized);
+    async ({ file, isAnonymized, importLimit, importMode = 'historical' }) => {
+      const { rawdata, importMeta } = await extractAdebisData(file, isAnonymized, { mode: importMode });
 
       let kidsRaw = rawdata.kidsRaw;
       let employeesRaw = rawdata.employeesRaw;
@@ -47,7 +47,9 @@ export function useScenarioImport() {
         desirability: 50,
         baseScenarioId: null,
         imported: true,
-        importedAnonymized: !!isAnonymized
+        importedAnonymized: !!isAnonymized,
+        importMode: importMeta?.mode || 'snapshot',
+        importWarningsCount: Array.isArray(importMeta?.warnings) ? importMeta.warnings.length : 0
       };
 
       await dispatch(importScenario({

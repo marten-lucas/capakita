@@ -48,6 +48,9 @@ function seedScenario(store, scenarioId) {
   store.dispatch(
     refreshEventsForScenario({
       scenarioId,
+      simScenario: {
+        scenarios: [{ id: scenarioId }],
+      },
       simData: {
         dataByScenario: {
           [scenarioId]: {

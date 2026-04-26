@@ -103,6 +103,16 @@ export const isSaveAllowed = (state) => {
   );
 };
 
+export const selectSelectedScenario = (state) => {
+  const selectedScenarioId = state.simScenario.selectedScenarioId;
+  return state.simScenario.scenarios.find((scenario) => String(scenario.id) === String(selectedScenarioId)) || null;
+};
+
+export const selectSelectedScenarioHasAdebisImport = (state) => {
+  const selectedScenario = selectSelectedScenario(state);
+  return Boolean(selectedScenario?.imported);
+};
+
 // Thunk for importing a scenario and all related data
 export const importScenario = ({
   scenarioSettings,

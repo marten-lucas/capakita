@@ -1,9 +1,9 @@
 import React from 'react';
 import { Group, Button, Text, Menu, ActionIcon, Container, Select, Stack, Switch, Modal, Alert } from '@mantine/core';
 import { useSelector, useDispatch } from 'react-redux';
-import { isSaveAllowed, setSaveDialogOpen, setLoadDialogOpen, setSelectedScenarioId } from '../store/simScenarioSlice';
+import { isSaveAllowed, selectSelectedScenarioHasAdebisImport, setSaveDialogOpen, setLoadDialogOpen, setSelectedScenarioId } from '../store/simScenarioSlice';
 import { setActivePage, setBrowserAutoSaveEnabled } from '../store/uiSlice';
-import { IconDatabase, IconChartBar, IconSettings, IconDotsVertical, IconUpload, IconDeviceFloppy, IconFolderOpen, IconCalendarEvent, IconInfoCircle } from '@tabler/icons-react';
+import { IconDatabase, IconChartBar, IconSettings, IconDotsVertical, IconUpload, IconDeviceFloppy, IconFolderOpen, IconCalendarEvent, IconInfoCircle, IconChartLine } from '@tabler/icons-react';
 import DataImportModal from './modals/DataImportModal';
 
 function TopNav() {
@@ -12,6 +12,7 @@ function TopNav() {
   const scenarios = useSelector((state) => state.simScenario.scenarios);
   const selectedScenarioId = useSelector((state) => state.simScenario.selectedScenarioId);
   const browserAutoSaveEnabled = useSelector((state) => state.ui.browserAutoSaveEnabled);
+  const hasAdebisImport = useSelector(selectSelectedScenarioHasAdebisImport);
   const [importModalOpen, setImportModalOpen] = React.useState(false);
   const [privacyModalOpen, setPrivacyModalOpen] = React.useState(false);
 
@@ -86,6 +87,15 @@ function TopNav() {
           >
             Ereignisse
           </Button>
+          {hasAdebisImport && (
+            <Button
+              onClick={() => dispatch(setActivePage('statistics'))}
+              variant="subtle"
+              leftSection={<IconChartLine size={20} />}
+            >
+              Statistik
+            </Button>
+          )}
 
           <Menu shadow="md" width={200}>
             <Menu.Target>

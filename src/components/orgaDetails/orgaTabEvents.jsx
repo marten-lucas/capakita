@@ -1,14 +1,112 @@
 import React from 'react';
-import { Alert, Badge, Group, Paper, Stack, Switch, Text, ThemeIcon } from '@mantine/core';
+import { Alert, Badge, Button, Group, NumberInput, Paper, Stack, Switch, Text, ThemeIcon } from '@mantine/core';
 import { IconCalendarEvent, IconInfoCircle } from '@tabler/icons-react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useScenarioEvents } from '../../hooks/useScenarioEvents';
 import { setEventEnabled } from '../../store/eventSlice';
+import { selectSelectedScenario, updateScenario } from '../../store/simScenarioSlice';
+
+const DEFAULT_AUTO_EVENT_SETTINGS = {
+  kita: {
+    ageYears: 3,
+    bookingDeltaHours: 0,
+  },
+  school: {
+    ageYears: 6,
+    bookingDeltaHours: 0,
+  },
+};
+
+function getScenarioAutoEventSettings(scenario) {
+  return {
+    kita: {
+      ageYears: Number.isFinite(Number(scenario?.autoEventSettings?.kita?.ageYears))
+        ? Number(scenario.autoEventSettings.kita.ageYears)
+        : DEFAULT_AUTO_EVENT_SETTINGS.kita.ageYears,
+      bookingDeltaHours: Number.isFinite(Number(scenario?.autoEventSettings?.kita?.bookingDeltaHours))
+        ? Number(scenario.autoEventSettings.kita.bookingDeltaHours)
+        : DEFAULT_AUTO_EVENT_SETTINGS.kita.bookingDeltaHours,
+    },
+    school: {
+      ageYears: Number.isFinite(Number(scenario?.autoEventSettings?.school?.ageYears))
+        ? Number(scenario.autoEventSettings.school.ageYears)
+        : DEFAULT_AUTO_EVENT_SETTINGS.school.ageYears,
+      bookingDeltaHours: Number.isFinite(Number(scenario?.autoEventSettings?.school?.bookingDeltaHours))
+        ? Number(scenario.autoEventSettings.school.bookingDeltaHours)
+        : DEFAULT_AUTO_EVENT_SETTINGS.school.bookingDeltaHours,
+    },
+    statisticsBinding: scenario?.autoEventSettings?.statisticsBinding || null,
+  };
+}
 
 function OrgaTabEvents() {
   const dispatch = useDispatch();
   const scenarioId = useSelector((state) => state.simScenario.selectedScenarioId);
+  const selectedScenario = useSelector(selectSelectedScenario);
   const { events } = useScenarioEvents(scenarioId);
+  const autoEventSettings = React.useMemo(() => getScenarioAutoEventSettings(selectedScenario), [selectedScenario]);
+  const autoEventWarnings = React.useMemo(() => {
+    const warnings = [];
+
+    if (autoEventSettings.kita.ageYears < 1 || autoEventSettings.kita.ageYears > 8) {
+      warnings.push('Krippe -> Kita: Alter liegt außerhalb des üblichen Bereichs (1 bis 8 Jahre).');
+    }
+
+    if (autoEventSettings.school.ageYears < 4 || autoEventSettings.school.ageYears > 12) {
+      warnings.push('Kita -> Schulkind: Alter liegt außerhalb des üblichen Bereichs (4 bis 12 Jahre).');
+    }
+
+    if (autoEventSettings.school.ageYears <= autoEventSettings.kita.ageYears) {
+      warnings.push('Kita -> Schulkind sollte nach Krippe -> Kita liegen.');
+    }
+
+    if (Math.abs(autoEventSettings.kita.bookingDeltaHours) > 15) {
+      warnings.push('Krippe -> Kita: Buchungsdelta ist sehr hoch (>|15| h/Woche).');
+    }
+
+    if (Math.abs(autoEventSettings.school.bookingDeltaHours) > 15) {
+      warnings.push('Kita -> Schulkind: Buchungsdelta ist sehr hoch (>|15| h/Woche).');
+    }
+
+    return warnings;
+  }, [autoEventSettings]);
+
+  function updateAutoEventSettings(nextSettings) {
+    if (!scenarioId) return;
+    dispatch(
+      updateScenario({
+        scenarioId,
+        updates: {
+          autoEventSettings: {
+            ...autoEventSettings,
+            ...nextSettings,
+          },
+        },
+      })
+    );
+  }
+
+  function updateTransitionRule(key, field, value) {
+    updateAutoEventSettings({
+      [key]: {
+        ...autoEventSettings[key],
+        [field]: value,
+      },
+    });
+  }
+
+  function bindToStatistics() {
+    const appliedAt = new Date().toISOString();
+    updateAutoEventSettings({
+      statisticsBinding: {
+        appliedAt,
+        snapshot: {
+          kita: { ...autoEventSettings.kita },
+          school: { ...autoEventSettings.school },
+        },
+      },
+    });
+  }
 
   const groupedEvents = React.useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -42,6 +140,82 @@ function OrgaTabEvents() {
       <Alert icon={<IconInfoCircle size={16} />} color="blue" variant="light">
         Automatisch erzeugte Gruppenwechsel sind markiert und können hier einzeln aktiviert oder deaktiviert werden.
       </Alert>
+
+      <Paper withBorder p="md" radius="md" data-testid="auto-events-settings">
+        <Stack gap="sm">
+          <Text fw={600}>Auto-Event Einstellungen</Text>
+          <Text size="sm" c="dimmed">
+            Definiere, wann automatische Gruppenwechsel stattfinden und wie stark sich Buchungszeiten dabei ändern sollen.
+          </Text>
+
+          <Group grow align="flex-end">
+            <NumberInput
+              label="Krippe → Kita: Alter (Jahre)"
+              min={0}
+              max={12}
+              step={0.5}
+              decimalScale={1}
+              value={autoEventSettings.kita.ageYears}
+              onChange={(value) => updateTransitionRule('kita', 'ageYears', Number(value) || 0)}
+              data-testid="auto-events-kita-age"
+            />
+            <NumberInput
+              label="Krippe → Kita: Buchungsdelta (h/Woche)"
+              step={0.5}
+              decimalScale={1}
+              value={autoEventSettings.kita.bookingDeltaHours}
+              onChange={(value) => updateTransitionRule('kita', 'bookingDeltaHours', Number(value) || 0)}
+              data-testid="auto-events-kita-delta"
+            />
+          </Group>
+
+          <Group grow align="flex-end">
+            <NumberInput
+              label="Kita → Schulkind: Alter (Jahre)"
+              min={0}
+              max={12}
+              step={0.5}
+              decimalScale={1}
+              value={autoEventSettings.school.ageYears}
+              onChange={(value) => updateTransitionRule('school', 'ageYears', Number(value) || 0)}
+              data-testid="auto-events-school-age"
+            />
+            <NumberInput
+              label="Kita → Schulkind: Buchungsdelta (h/Woche)"
+              step={0.5}
+              decimalScale={1}
+              value={autoEventSettings.school.bookingDeltaHours}
+              onChange={(value) => updateTransitionRule('school', 'bookingDeltaHours', Number(value) || 0)}
+              data-testid="auto-events-school-delta"
+            />
+          </Group>
+
+          <Group justify="space-between" align="center" wrap="wrap">
+            <Button onClick={bindToStatistics} data-testid="auto-events-bind-statistics">
+              Werte in Statistik belegen
+            </Button>
+            {autoEventSettings.statisticsBinding?.appliedAt ? (
+              <Badge variant="light" color="green">
+                Statistik-Belegung: {autoEventSettings.statisticsBinding.appliedAt.slice(0, 10)}
+              </Badge>
+            ) : (
+              <Badge variant="light" color="gray">
+                Noch nicht in Statistik belegt
+              </Badge>
+            )}
+          </Group>
+
+          {autoEventWarnings.length > 0 && (
+            <Alert color="yellow" variant="light" title="Plausibilitäts-Hinweis" data-testid="auto-events-warnings">
+              <Stack gap={4}>
+                {autoEventWarnings.map((warning) => (
+                  <Text key={warning} size="sm">- {warning}</Text>
+                ))}
+              </Stack>
+            </Alert>
+          )}
+        </Stack>
+      </Paper>
 
       {groupedEvents.length === 0 ? (
         <Paper withBorder p="md">

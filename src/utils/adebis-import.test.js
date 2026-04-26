@@ -58,6 +58,40 @@ function xmlTimesContainRealEntries(value) {
 }
 
 describe('Adebis import regression', () => {
+  it('supports snapshot and historical import modes', async () => {
+    let foundHistoricalDelta = false;
+
+    for (const zipFileName of testZips) {
+      const zipPath = path.resolve(process.cwd(), 'tests/testdata', zipFileName);
+      const zipBuffer = await readFile(zipPath);
+
+      const snapshotResult = await extractAdebisData(zipBuffer, false, { mode: 'snapshot' });
+      const historicalResult = await extractAdebisData(zipBuffer, false, { mode: 'historical' });
+
+      expect(snapshotResult.importMeta?.mode).toBe('snapshot');
+      expect(historicalResult.importMeta?.mode).toBe('historical');
+
+      const snapshotRaw = snapshotResult.rawdata;
+      const historicalRaw = historicalResult.rawdata;
+
+      expect(historicalRaw.kidsRaw.length).toBeGreaterThanOrEqual(snapshotRaw.kidsRaw.length);
+      expect(historicalRaw.employeesRaw.length).toBeGreaterThanOrEqual(snapshotRaw.employeesRaw.length);
+      expect(historicalRaw.grukiRaw.length).toBeGreaterThanOrEqual(snapshotRaw.grukiRaw.length);
+      expect(historicalRaw.belegungRaw.length).toBeGreaterThanOrEqual(snapshotRaw.belegungRaw.length);
+
+      if (
+        historicalRaw.kidsRaw.length > snapshotRaw.kidsRaw.length ||
+        historicalRaw.employeesRaw.length > snapshotRaw.employeesRaw.length ||
+        historicalRaw.grukiRaw.length > snapshotRaw.grukiRaw.length ||
+        historicalRaw.belegungRaw.length > snapshotRaw.belegungRaw.length
+      ) {
+        foundHistoricalDelta = true;
+      }
+    }
+
+    expect(foundHistoricalDelta).toBe(true);
+  }, 30000);
+
   it('imports times for first testset (regression)', async () => {
     const zipPath = path.resolve(process.cwd(), 'tests/testdata', testZips[0]);
     const zipBuffer = await readFile(zipPath);

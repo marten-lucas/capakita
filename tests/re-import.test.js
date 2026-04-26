@@ -16,51 +16,139 @@ console.log(`\n📊 E2E Tests running at level: ${getTestLevelDescription()}\n`)
 
 async function createManualDataset(page) {
   await page.goto('/');
-  await page.getByRole('button', { name: /Leeres Szenario/i }).click();
-  await expect(page).toHaveURL(/\/data/);
+  await page.waitForFunction(() => typeof window !== 'undefined' && !!window.__APP_STORE, { timeout: 5000 });
 
-  await page.getByRole('link', { name: /Optionen/i }).click();
-  await expect(page).toHaveURL(/\/settings/);
+  await page.evaluate(() => {
+    const store = window.__APP_STORE;
+    const scenarioId = `reimport-e2e-${Date.now()}`;
 
-  await page.getByRole('tab', { name: 'Szenarien' }).click();
-  await page.getByLabel('Name').first().fill('E2E Szenario');
-  await page.getByLabel('Bemerkung').fill('Manuell angelegte Testdaten');
+    store.dispatch({
+      type: 'simScenario/addScenario',
+      payload: {
+        id: scenarioId,
+        name: 'E2E Szenario',
+        remark: 'Manuell angelegte Testdaten',
+        imported: false,
+        importedAnonymized: true,
+      },
+    });
 
-  await page.getByRole('tab', { name: 'Gruppen' }).click();
-  await page.getByRole('button', { name: 'Neue Gruppe' }).click();
-  await page.getByLabel('Name').last().fill('Sonnengruppe');
+    store.dispatch({
+      type: 'simGroup/importGroupDefs',
+      payload: {
+        scenarioId,
+        defs: [{ id: 'g1', name: 'Sonnengruppe', icon: 'openmoji:sun', type: 'Regelgruppe' }],
+      },
+    });
 
-  await page.getByRole('tab', { name: 'Qualifikationen' }).click();
-  await page.getByRole('button', { name: 'Neue Qualifikation' }).click();
-  await page.getByLabel('Kurzname').fill('ERZ');
-  await page.getByLabel('Anzeigename').fill('Erzieher');
+    store.dispatch({
+      type: 'simQualification/importQualificationDefs',
+      payload: {
+        scenarioId,
+        defs: [{ key: 'ERZ', name: 'Erzieher' }],
+      },
+    });
 
-  await page.getByRole('link', { name: /Daten/i }).click();
+    store.dispatch({
+      type: 'simData/simDataItemAdd',
+      payload: {
+        scenarioId,
+        item: {
+          id: 'kid-lina',
+          type: 'demand',
+          source: 'manual entry',
+          name: 'Lina',
+          startdate: '',
+          enddate: '',
+          dateofbirth: '2021-01-01',
+          absences: [],
+          rawdata: { source: 'manual entry' },
+        },
+      },
+    });
 
-  await page.getByLabel('Hinzufügen').click();
-  await page.getByRole('menuitem', { name: 'Bedarf' }).click();
-  await page.getByLabel(/^Name$/).last().fill('Lina');
-  await page.getByLabel(/^Vorname$/).last().fill('Kind');
-  await page.getByRole('tab', { name: 'Zeiten' }).click();
-  await page.getByRole('button', { name: 'Buchungszeitraum hinzufügen' }).click();
-  await page.getByRole('switch', { name: 'Montag' }).check({ force: true });
-  await page.getByRole('tab', { name: 'Gruppen' }).click();
-  await page.getByRole('button', { name: 'Gruppe zuweisen' }).click();
-  await page.getByRole('combobox', { name: 'Zugeordnete Gruppe' }).click();
-  await page.getByRole('option', { name: 'Sonnengruppe' }).click();
+    store.dispatch({
+      type: 'simData/simDataItemAdd',
+      payload: {
+        scenarioId,
+        item: {
+          id: 'staff-mara',
+          type: 'capacity',
+          source: 'manual entry',
+          name: 'Mara',
+          startdate: '',
+          enddate: '',
+          dateofbirth: '',
+          absences: [],
+          rawdata: { source: 'manual entry', QUALIFIK: 'ERZ' },
+        },
+      },
+    });
 
-  await page.getByLabel('Hinzufügen').click();
-  await page.getByRole('menuitem', { name: 'Kapazität' }).click();
-  await page.getByLabel(/^Name$/).last().fill('Mara');
-  await page.getByLabel(/^Vorname$/).last().fill('Team');
-  await page.getByLabel('ERZ').check({ force: true });
-  await page.getByRole('tab', { name: 'Zeiten' }).click();
-  await page.getByRole('button', { name: 'Buchungszeitraum hinzufügen' }).click();
-  await page.getByRole('switch', { name: 'Montag' }).check({ force: true });
-  await page.getByRole('tab', { name: 'Gruppen' }).click();
-  await page.getByRole('button', { name: 'Gruppe zuweisen' }).click();
-  await page.getByRole('combobox', { name: 'Zugeordnete Gruppe' }).click();
-  await page.getByRole('option', { name: 'Sonnengruppe' }).click();
+    store.dispatch({
+      type: 'simGroup/importGroupAssignments',
+      payload: {
+        scenarioId,
+        assignments: [
+          { id: 'ga1', kindId: 'kid-lina', groupId: 'g1', start: '', end: '' },
+        ],
+      },
+    });
+
+    store.dispatch({
+      type: 'simQualification/importQualificationAssignments',
+      payload: {
+        scenarioId,
+        assignments: [{ id: 'qa1', dataItemId: 'staff-mara', qualification: 'ERZ' }],
+      },
+    });
+
+    store.dispatch({
+      type: 'simBooking/addBooking',
+      payload: {
+        scenarioId,
+        dataItemId: 'kid-lina',
+        booking: {
+          id: 'bk-kid-lina',
+          startdate: '',
+          enddate: '',
+          times: [
+            {
+              day: 1,
+              day_name: 'Mo',
+              segments: [{ id: 'bk-kid-lina-seg1', booking_start: '08:00', booking_end: '12:00', category: 'pedagogical' }],
+            },
+          ],
+          rawdata: {},
+        },
+      },
+    });
+
+    store.dispatch({
+      type: 'simBooking/addBooking',
+      payload: {
+        scenarioId,
+        dataItemId: 'staff-mara',
+        booking: {
+          id: 'bk-staff-mara',
+          startdate: '',
+          enddate: '',
+          times: [
+            {
+              day: 1,
+              day_name: 'Mo',
+              segments: [{ id: 'bk-staff-mara-seg1', booking_start: '08:00', booking_end: '12:00', category: 'pedagogical' }],
+            },
+          ],
+          rawdata: {},
+        },
+      },
+    });
+
+    store.dispatch({ type: 'ui/setActivePage', payload: 'data' });
+  });
+
+  await expect(page.getByLabel('Hinzufügen')).toBeVisible();
 }
 
 // ==========================================
@@ -102,7 +190,7 @@ test.describe('BASIC: Export/Import Roundtrip', () => {
     await loadDialog.getByLabel(/^Passwort$/).fill(exportPassword);
     await loadDialog.getByRole('button', { name: /^Laden$/ }).click();
 
-    await expect(page).toHaveURL(/\/data/);
+    await expect(page.getByLabel('Hinzufügen')).toBeVisible();
     await expect(page.locator('text=Lina').first()).toBeVisible();
     await expect(page.locator('text=Mara').first()).toBeVisible();
 
@@ -129,7 +217,7 @@ test.describe('IMPORT: Adebis Data & Visualization', () => {
       await importDialog.locator('input[type="file"]').setInputFiles(importZip);
       await importDialog.getByRole('button', { name: /^Importieren$/ }).click();
 
-      await expect(page).toHaveURL(/\/data/);
+      await expect(page.getByLabel('Hinzufügen')).toBeVisible();
       await expect(page.locator('.mantine-Avatar-root').first()).toBeVisible();
 
       await page.getByRole('button', { name: 'Analyse' }).click();
@@ -155,7 +243,7 @@ if (shouldRunFullTests()) {
         await importDialog.locator('input[type="file"]').setInputFiles(importZip);
         await importDialog.getByRole('button', { name: /^Importieren$/ }).click();
 
-        await page.getByRole('link', { name: /Optionen/i }).click();
+        await page.getByRole('button', { name: /Optionen/i }).click();
         await page.getByRole('tab', { name: 'Ereignisse' }).click();
 
         await expect(page.getByText('Automatisch generiert').first()).toBeVisible();

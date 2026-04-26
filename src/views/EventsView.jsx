@@ -1,17 +1,26 @@
 import React from 'react';
+import dayjs from 'dayjs';
+import HighchartsReact from 'highcharts-react-official';
+import Highcharts from 'highcharts';
 import { useSelector } from 'react-redux';
 import { selectEventsForScenario } from '../store/eventSlice';
-import { Group, Text, Card, Divider, SegmentedControl, Stack, Badge } from '@mantine/core';
+import { Group, Text, Card, Divider, SegmentedControl, Stack, Badge, ActionIcon, Box, Paper, useMantineTheme } from '@mantine/core';
+import { IconChevronDown, IconChevronUp } from '@tabler/icons-react';
 
 function isUnknownEntityName(name) {
   return !name || String(name).trim().toLowerCase() === 'unbekannt';
 }
 
 function EventsView() {
+  const theme = useMantineTheme();
+  const isTestEnvironment = import.meta.env.MODE === 'test';
   const selectedScenarioId = useSelector((state) => state.simScenario.selectedScenarioId);
   const events = useSelector((state) => selectEventsForScenario(state, selectedScenarioId));
 
   const [mode, setMode] = React.useState('all');
+  const [timelineVisible, setTimelineVisible] = React.useState(false);
+  const [selectedTimelineDate, setSelectedTimelineDate] = React.useState(null);
+  const entryRefsByDate = React.useRef({});
 
   // Filter events by auto/generated selection
   const filtered = React.useMemo(() => {
@@ -36,10 +45,141 @@ function EventsView() {
     return map;
   }, [filtered]);
 
+  const timelinePoints = React.useMemo(() => {
+    const groupedByDate = new Map();
+
+    (filtered || []).forEach((ev) => {
+      const date = ev.effectiveDate;
+      if (!date) return;
+
+      if (!groupedByDate.has(date)) {
+        groupedByDate.set(date, []);
+      }
+
+      groupedByDate.get(date).push(ev);
+    });
+
+    return Array.from(groupedByDate.entries())
+      .sort((a, b) => dayjs(a[0]).valueOf() - dayjs(b[0]).valueOf())
+      .map(([date, eventItems]) => {
+        const isSelected = date === selectedTimelineDate;
+
+        return {
+          x: dayjs(date).valueOf(),
+          y: 0,
+          date,
+          count: eventItems.length,
+          eventItems,
+          color: isSelected ? theme.colors.blue[6] : theme.colors.gray[6],
+          marker: {
+            radius: isSelected ? 8 : 6,
+            lineWidth: isSelected ? 2 : 1,
+            lineColor: isSelected ? theme.colors.blue[8] : theme.colors.gray[4],
+          },
+        };
+      });
+  }, [filtered, selectedTimelineDate, theme.colors.blue, theme.colors.gray]);
+
+  const timelineOptions = React.useMemo(
+    () => ({
+      chart: {
+        type: 'scatter',
+        height: 170,
+        spacingTop: 4,
+        spacingRight: 12,
+        spacingBottom: 4,
+      },
+      title: { text: null },
+      credits: { enabled: false },
+      legend: { enabled: false },
+      xAxis: {
+        type: 'datetime',
+        title: { text: 'Zeitlinie' },
+        labels: {
+          format: '{value:%d.%m.%Y}',
+        },
+        tickLength: 8,
+        lineColor: theme.colors.gray[4],
+      },
+      yAxis: {
+        visible: false,
+        title: { text: null },
+        min: -1,
+        max: 1,
+      },
+      tooltip: {
+        useHTML: true,
+        formatter() {
+          const date = dayjs(this.point.options.date).format('DD.MM.YYYY');
+          return `<strong>${date}</strong><br /><span>${this.point.options.count} Ereignisse</span>`;
+        },
+      },
+      plotOptions: {
+        series: {
+          cursor: 'pointer',
+          states: {
+            hover: {
+              halo: {
+                size: 8,
+              },
+            },
+          },
+          point: {
+            events: {
+              click: function handleTimelineClick() {
+                setSelectedTimelineDate(this.options.date);
+              },
+            },
+          },
+        },
+      },
+      series: [
+        {
+          name: 'Events',
+          data: timelinePoints,
+          marker: {
+            symbol: 'circle',
+          },
+          showInLegend: false,
+        },
+      ],
+    }),
+    [theme.colors.gray, timelinePoints]
+  );
+
+  React.useEffect(() => {
+    entryRefsByDate.current = {};
+  }, [filtered]);
+
+  React.useEffect(() => {
+    if (!selectedTimelineDate) return;
+
+    const target = entryRefsByDate.current[selectedTimelineDate];
+    if (!target) return;
+
+    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [selectedTimelineDate]);
+
+  function handleSelectTimelineDate(date) {
+    setSelectedTimelineDate(date);
+  }
+
   return (
     <div>
       <Stack spacing="xs">
-        <Text size="xl" fw={700}>Ereignisse</Text>
+        <Group justify="space-between" align="center" wrap="wrap">
+          <Text size="xl" fw={700}>Ereignisse</Text>
+          <ActionIcon
+            variant="light"
+            size="lg"
+            onClick={() => setTimelineVisible((visible) => !visible)}
+            data-testid="events-timeline-toggle"
+            aria-label={timelineVisible ? 'Timeline ausblenden' : 'Timeline anzeigen'}
+            title={timelineVisible ? 'Timeline ausblenden' : 'Timeline anzeigen'}
+          >
+            {timelineVisible ? <IconChevronUp size={18} /> : <IconChevronDown size={18} />}
+          </ActionIcon>
+        </Group>
         <SegmentedControl
           value={mode}
           onChange={setMode}
@@ -49,9 +189,67 @@ function EventsView() {
             { label: 'Reale', value: 'real' },
           ]}
         />
+
+        {timelineVisible && (
+          <Box data-testid="events-timeline-shell">
+            <Text size="sm" c="dimmed" mb="sm">
+              Klick auf einen Punkt springt zum ersten Ereignis an diesem Datum.
+            </Text>
+
+            {isTestEnvironment ? (
+              <Box data-testid="events-timeline" style={{ display: 'flex', gap: theme.spacing.sm, width: '100%' }}>
+                {timelinePoints.length === 0 ? (
+                  <Text size="sm" c="dimmed">
+                    Keine Timeline-Einträge vorhanden.
+                  </Text>
+                ) : (
+                  timelinePoints.map((point) => {
+                    const isSelected = point.date === selectedTimelineDate;
+
+                    return (
+                      <Paper
+                        key={point.date}
+                        component="button"
+                        type="button"
+                        withBorder
+                        p="xs"
+                        onClick={() => handleSelectTimelineDate(point.date)}
+                        data-testid={`events-timeline-item-${point.date}`}
+                        data-selected={isSelected ? 'true' : 'false'}
+                        style={{
+                          flex: '1 1 0',
+                          minWidth: 0,
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          borderColor: isSelected ? 'var(--mantine-color-blue-6)' : undefined,
+                          background: isSelected ? 'var(--mantine-color-blue-0)' : undefined,
+                        }}
+                      >
+                        <Text size="sm" fw={700}>
+                          {dayjs(point.date).format('DD.MM')}
+                        </Text>
+                        <Text size="xs" c="dimmed">
+                          {point.count} Ereignisse
+                        </Text>
+                      </Paper>
+                    );
+                  })
+                )}
+              </Box>
+            ) : (
+              <Box h={170} data-testid="events-timeline" style={{ width: '100%' }}>
+                <HighchartsReact
+                  highcharts={Highcharts}
+                  options={timelineOptions}
+                  containerProps={{ style: { height: '100%', width: '100%' } }}
+                />
+              </Box>
+            )}
+          </Box>
+        )}
       </Stack>
       <div style={{ marginTop: 12 }}>
-        <Text color="dimmed">Gefiltert: <Badge>{filtered.length}</Badge></Text>
+        <Text component="span" color="dimmed">Gefiltert: <Badge>{filtered.length}</Badge></Text>
       </div>
       {Object.entries(byEntity).map(([entityType, items]) => (
         <div key={entityType} style={{ marginBottom: 16 }}>
@@ -65,7 +263,19 @@ function EventsView() {
               </Group>
               <Divider my="sm" />
               {evs.map((ev) => (
-                <div key={ev.id} style={{ padding: '6px 0' }}>
+                <div
+                  key={ev.id}
+                  ref={(node) => {
+                    if (!node || !ev.effectiveDate) return;
+                    if (entryRefsByDate.current[ev.effectiveDate]) return;
+                    entryRefsByDate.current[ev.effectiveDate] = node;
+                  }}
+                  style={{
+                    padding: '6px 0',
+                    borderRadius: 6,
+                    background: selectedTimelineDate === ev.effectiveDate ? 'var(--mantine-color-blue-0)' : undefined,
+                  }}
+                >
                   <Text size="sm">{ev.effectiveDate} — {ev.description || ev.type}</Text>
                 </div>
               ))}

@@ -235,7 +235,7 @@ test('Chart Data Validation - Age Histogram', async ({ page }) => {
   await page.waitForTimeout(1000);
   
   // Verify axis labels
-  await expect(page.locator('text=Alter in Monaten')).toBeVisible();
+  await expect(page.locator('text=Alter in Jahren')).toBeVisible();
   await expect(page.locator('text=Anzahl Kinder')).toBeVisible();
   
   // Check for age bin labels (0-2, 3-5, 6-8, etc.)

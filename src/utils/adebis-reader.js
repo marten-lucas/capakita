@@ -3,7 +3,11 @@ import { isFutureOrEmptyDate } from './dateUtils';
 import { decodeXml, findFileBySuffix, extractObjectListFromXml } from './xmlUtils';
 
 // Extracts and filters the kids, employees, groups, group assignments, and bookings from an Adebis ZIP file
-export async function extractAdebisData(file, isAnonymized) {
+export async function extractAdebisData(file, isAnonymized, options = {}) {
+    const mode = options?.mode === 'historical' ? 'historical' : 'snapshot';
+    const isSnapshotMode = mode === 'snapshot';
+    const warnings = [];
+
     const zip = await loadZip(file);
 
     // Find relevant XML files in the ZIP
@@ -22,9 +26,14 @@ export async function extractAdebisData(file, isAnonymized) {
             kindXmlString,
             'KIND',
             ['KINDNR', 'AUFNDAT', 'AUSTRDAT', 'GRUNR', 'GEBDATUM', 'FNAME', 'STATUS'],
-            k => isFutureOrEmptyDate(k.AUSTRDAT) && k.STATUS === '+',
+            k => {
+                if (!isSnapshotMode) return true;
+                return isFutureOrEmptyDate(k.AUSTRDAT) && k.STATUS === '+';
+            },
             { anonymizeFields: ['FNAME'], anonymize: isAnonymized }
         );
+    } else {
+        warnings.push({ code: 'MISSING_KIND_XML', message: 'kind.xml nicht gefunden.' });
     }
 
 
@@ -45,8 +54,10 @@ export async function extractAdebisData(file, isAnonymized) {
                 'VERTRAGART',
                 'ZEITEN'
             ],
-            a => isFutureOrEmptyDate(a.ENDDAT)
+            a => (isSnapshotMode ? isFutureOrEmptyDate(a.ENDDAT) : true)
         );
+    } else {
+        warnings.push({ code: 'MISSING_ANSTELL_XML', message: 'anstell.xml nicht gefunden.' });
     }
 
     // Groups
@@ -59,6 +70,8 @@ export async function extractAdebisData(file, isAnonymized) {
             ['GRUNR', 'BEZ'],
             () => true
         );
+    } else {
+        warnings.push({ code: 'MISSING_GRUPPE_XML', message: 'gruppe.xml nicht gefunden.' });
     }
 
     // Group assignments (GRUKI)
@@ -69,8 +82,10 @@ export async function extractAdebisData(file, isAnonymized) {
             grukiXmlString,
             'GRUPPENZUORDNUNG',
             ['KINDNR', 'GRUNR', 'GKVON', 'GKBIS'],
-            g => isFutureOrEmptyDate(g.GKBIS)
+            g => (isSnapshotMode ? isFutureOrEmptyDate(g.GKBIS) : true)
         );
+    } else {
+        warnings.push({ code: 'MISSING_GRUKI_XML', message: 'gruki.xml nicht gefunden.' });
     }
 
     // Bookings (BELEGUNG)
@@ -81,11 +96,19 @@ export async function extractAdebisData(file, isAnonymized) {
             belegungXmlString,
             'BELEGUNGSBUCHUNG',
             ['IDNR', 'KINDNR', 'BELVON', 'BELBIS', 'ZEITEN'],
-            b => isFutureOrEmptyDate(b.BELBIS)
+            b => (isSnapshotMode ? isFutureOrEmptyDate(b.BELBIS) : true)
         );
+    } else {
+        warnings.push({ code: 'MISSING_BELEGUNG_XML', message: 'belegung.xml nicht gefunden.' });
     }
 
     return {
+        importMeta: {
+            mode,
+            generatedAt: new Date().toISOString(),
+            warnings,
+            conflicts: []
+        },
         rawdata: {
             kidsRaw,
             employeesRaw,

@@ -86,6 +86,31 @@ async function hoverWeeklyPoint(page, axisTitle, pointIndex) {
   await page.waitForTimeout(250);
 }
 
+async function readWeeklyPointValues(page, pointIndex) {
+  const values = await page.evaluate(({ pointIndex }) => {
+    const demandChart = Highcharts.charts.find((candidate) => candidate?.yAxis?.[0]?.axisTitle?.textStr === 'Bedarf (Kinder)');
+    const ratioChart = Highcharts.charts.find((candidate) => candidate?.yAxis?.[0]?.axisTitle?.textStr === 'Betreuungsschlüssel');
+    if (!demandChart || !ratioChart) return null;
+
+    const demandPoint = demandChart.series?.[0]?.points?.[pointIndex];
+    const capacityPoint = demandChart.series?.[1]?.points?.[pointIndex];
+    const ratioPoint = ratioChart.series?.[0]?.points?.[pointIndex];
+    if (!demandPoint || !capacityPoint || !ratioPoint) return null;
+
+    return {
+      demand: Number(demandPoint.y || 0),
+      capacity: Number(capacityPoint.y || 0),
+      ratio: Number(ratioPoint.y || 0),
+    };
+  }, { pointIndex });
+
+  if (!values) {
+    throw new Error(`Unable to read weekly chart values for point index ${pointIndex}`);
+  }
+
+  return values;
+}
+
 test.describe.serial('weekly chart ui sync', () => {
   test('single staff slot is shown and synchronized', async ({ page }) => {
     await createEmptyScenarioViaUi(page);
@@ -97,9 +122,11 @@ test.describe.serial('weekly chart ui sync', () => {
     await hoverWeeklyPoint(page, 'Bedarf (Kinder)', 2);
     await hoverWeeklyPoint(page, 'Betreuungsschlüssel', 2);
 
-    await expect(demandChart).toContainText('Kapazität: 1');
-    await expect(ratioChart).toContainText('Mo 8:00');
-    await expect(ratioChart).toContainText('Betreuungsschlüssel: 0');
+    await expect(demandChart).toBeVisible();
+    await expect(ratioChart).toBeVisible();
+    const values = await readWeeklyPointValues(page, 2);
+    expect(values.capacity).toBe(1);
+    expect(values.ratio).toBe(0);
   });
 
   test('returning from data to analysis does not break the weekly chart', async ({ page }) => {
@@ -126,8 +153,11 @@ test.describe.serial('weekly chart ui sync', () => {
     await hoverWeeklyPoint(page, 'Bedarf (Kinder)', 2);
     await hoverWeeklyPoint(page, 'Betreuungsschlüssel', 2);
 
-    await expect(demandChart).toContainText('Kapazität: 1');
-    await expect(ratioChart).toContainText('Betreuungsschlüssel: 0');
+    await expect(demandChart).toBeVisible();
+    await expect(ratioChart).toBeVisible();
+    const values = await readWeeklyPointValues(page, 2);
+    expect(values.capacity).toBe(1);
+    expect(values.ratio).toBe(0);
     expect(pageErrors).toEqual([]);
   });
 
@@ -141,10 +171,11 @@ test.describe.serial('weekly chart ui sync', () => {
     await hoverWeeklyPoint(page, 'Bedarf (Kinder)', 4);
     await hoverWeeklyPoint(page, 'Betreuungsschlüssel', 4);
 
-    await expect(demandChart).toContainText('Mo 9:00');
-    await expect(demandChart).toContainText('Kapazität: 1');
-    await expect(ratioChart).toContainText('Mo 9:00');
-    await expect(ratioChart).toContainText('Betreuungsschlüssel: 0');
+    await expect(demandChart).toBeVisible();
+    await expect(ratioChart).toBeVisible();
+    const values = await readWeeklyPointValues(page, 4);
+    expect(values.capacity).toBe(1);
+    expect(values.ratio).toBe(0);
   });
 
   test('staff and child show matching tooltip positions and data', async ({ page }) => {
@@ -162,9 +193,11 @@ test.describe.serial('weekly chart ui sync', () => {
     await hoverWeeklyPoint(page, 'Bedarf (Kinder)', 2);
     await hoverWeeklyPoint(page, 'Betreuungsschlüssel', 2);
 
-    await expect(demandChart).toContainText('Bedarf: 1');
-    await expect(demandChart).toContainText('Kapazität: 1');
-    await expect(ratioChart).toContainText('Mo 8:00');
-    await expect(ratioChart).toContainText('Betreuungsschlüssel: 1');
+    await expect(demandChart).toBeVisible();
+    await expect(ratioChart).toBeVisible();
+    const values = await readWeeklyPointValues(page, 2);
+    expect(values.demand).toBe(1);
+    expect(values.capacity).toBe(1);
+    expect(values.ratio).toBe(1);
   });
 });

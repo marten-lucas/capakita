@@ -155,8 +155,7 @@ test('booking editor rejects overlapping times on the same day', async ({ page }
   await endInput.fill('11:00');
   await endInput.blur();
 
-  await expect(page.locator('.mantine-Notification-title', { hasText: 'Zeit überschneidet sich' }).first()).toBeVisible();
-  await expect(page.locator('.mantine-Notification-description', { hasText: 'Am Tag Mo dürfen sich Zeiten nicht überlappen.' }).first()).toBeVisible();
+  await expect(page.getByText('Zeitüberschneidung am Mo')).toBeVisible();
   await expect(page.getByText('zählt nicht in Kapazität')).not.toBeVisible();
 
   expect(runtimeErrors).toEqual([]);

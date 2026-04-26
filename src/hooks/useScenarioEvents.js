@@ -12,6 +12,7 @@ export function useScenarioEvents(scenarioId) {
   const simData = useSelector(state => state.simData);
   const simBooking = useSelector(state => state.simBooking);
   const simGroup = useSelector(state => state.simGroup);
+  const simScenario = useSelector(state => state.simScenario);
   const needsRefresh = useSelector(state => state.events?._needsRefresh);
 
   // Refresh events for scenario when relevant data changes OR when refresh is needed
@@ -22,11 +23,12 @@ export function useScenarioEvents(scenarioId) {
           scenarioId,
           simData,
           simBooking,
-          simGroup
+          simGroup,
+          simScenario,
         })
       );
     }
-  }, [scenarioId, simData, simBooking, simGroup, needsRefresh, dispatch]);
+  }, [scenarioId, simData, simBooking, simGroup, simScenario, needsRefresh, dispatch]);
 
   // Memoize fallback values to prevent unnecessary re-renders
   const emptyEvents = useMemo(() => [], []);
