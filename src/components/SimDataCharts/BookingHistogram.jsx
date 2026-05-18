@@ -25,7 +25,7 @@ export default function BookingHistogram() {
     const safeCapacityAdministrative = chartData.capacity_administrative ? chartData.capacity_administrative.map(val => Number(val) || 0) : [];
 
     return {
-      chart: { type: 'column', zoomType: 'x' },
+      chart: { type: 'column', zoomType: 'xy', resetZoomButton: { position: { align: 'right', verticalAlign: 'top', x: -10, y: 10 }, relativeTo: 'plot' } },
       title: { text: null },
       xAxis: {
         categories: safeCategories,

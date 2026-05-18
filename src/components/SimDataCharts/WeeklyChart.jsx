@@ -287,10 +287,11 @@ export default function WeeklyChart() {
     return {
       chart: {
         type: 'line',
-        zoomType: 'x',
+        zoomType: 'xy',
         spacingTop: 20,
         spacingBottom: 20,
         spacingRight: 96,
+        resetZoomButton: { position: { align: 'right', verticalAlign: 'top', x: -10, y: 10 }, relativeTo: 'plot' },
       },
       title: { text: null },
       legend: { enabled: false },
@@ -356,10 +357,11 @@ export default function WeeklyChart() {
     return {
       chart: {
         type: 'line',
-        zoomType: 'x',
+        zoomType: 'xy',
         spacingTop: 20,
         spacingBottom: 20,
         spacingRight: 96,
+        resetZoomButton: { position: { align: 'right', verticalAlign: 'top', x: -10, y: 10 }, relativeTo: 'plot' },
       },
       title: { text: null },
       legend: { enabled: false },

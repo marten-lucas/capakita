@@ -11,7 +11,7 @@ export default function AgeHistogram() {
   const chartData = useSelector(selectAgeHistogramChartData);
 
   const options = useMemo(() => ({
-    chart: { type: 'column' },
+    chart: { type: 'column', zoomType: 'xy', resetZoomButton: { position: { align: 'right', verticalAlign: 'top', x: -10, y: 10 }, relativeTo: 'plot' } },
     title: { text: null },
     xAxis: {
       categories: chartData.categories || [],

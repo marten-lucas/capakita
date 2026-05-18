@@ -99,7 +99,7 @@ export default function MidtermChart() {
   const maxHours = Math.max(Number(chartData.maxdemand) || 0, Number(chartData.maxcapacity) || 0) || null;
 
   const demandCapacityOptions = useMemo(() => ({
-    chart: { type: 'line', zoomType: 'x' },
+    chart: { type: 'line', zoomType: 'xy', resetZoomButton: { position: { align: 'right', verticalAlign: 'top', x: -10, y: 10 }, relativeTo: 'plot' } },
     title: { text: null },
     xAxis: buildXAxis(false, false),
     yAxis: [
@@ -161,7 +161,7 @@ export default function MidtermChart() {
   ]);
 
   const ratioFinanceOptions = useMemo(() => ({
-    chart: { type: 'line', zoomType: 'x' },
+    chart: { type: 'line', zoomType: 'xy', resetZoomButton: { position: { align: 'right', verticalAlign: 'top', x: -10, y: 10 }, relativeTo: 'plot' } },
     title: { text: null },
     xAxis: buildXAxis(false, false),
     yAxis: [
@@ -244,7 +244,7 @@ export default function MidtermChart() {
   ]);
 
   const eventTimelineOptions = useMemo(() => ({
-    chart: { type: 'line', zoomType: 'x' },
+    chart: { type: 'line', zoomType: 'x', resetZoomButton: { position: { align: 'right', verticalAlign: 'top', x: -10, y: 10 }, relativeTo: 'plot' } },
     title: { text: null },
     xAxis: buildXAxis(true, true),
     yAxis: {
