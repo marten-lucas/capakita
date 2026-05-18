@@ -52,6 +52,12 @@ export const TESTSETS = [
     kids: 43,
     staff: 11,
   },
+  {
+    name: 'Johannes-202605',
+    zip: 'tests/testdata/kita-anonym-53181382.zip',
+    kids: '?',
+    staff: '?',
+  },
 ];
 
 /**

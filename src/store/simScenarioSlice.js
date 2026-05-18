@@ -1,4 +1,5 @@
 import { createSlice } from '@reduxjs/toolkit';
+import { isRecordActiveOnDate } from '../utils/financeUtils';
 
 const initialState = {
   scenarios: [],
@@ -123,6 +124,7 @@ export const importScenario = ({
   qualiDefs,
   groupAssignments
 }) => async (dispatch, getState) => {
+  const today = new Date().toISOString().slice(0, 10);
   // 1. Generate unique scenario id
   const scenarioId = Date.now().toString();
 
@@ -186,8 +188,15 @@ export const importScenario = ({
 
   // 8. Build qualification assignments for all imported capacity items
   const qualiAssignmentsFinal = {};
+  const importedQualificationKeys = new Set((qualiDefs || []).map((definition) => definition.key));
   Object.entries(dataByScenario).forEach(([storeKey, item]) => {
-    if (item.type === 'capacity' && item.rawdata && item.rawdata.QUALIFIK) {
+    if (
+      item.type === 'capacity' &&
+      item.rawdata &&
+      item.rawdata.QUALIFIK &&
+      importedQualificationKeys.has(item.rawdata.QUALIFIK) &&
+      isRecordActiveOnDate(item, today)
+    ) {
       const id = `${item.rawdata.QUALIFIK}-${Date.now()}-${Math.random()}`;
       const qualiAssignment = {
         dataItemId: storeKey,

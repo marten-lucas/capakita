@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { useDispatch } from 'react-redux';
 import { importScenario } from '../store/simScenarioSlice';
 import { extractAdebisData } from '../utils/adebis-reader';
+import { isRecordActiveOnDate } from '../utils/financeUtils';
 import {
   adebis2simData,
   adebis2bookings,
@@ -16,6 +17,7 @@ export function useScenarioImport() {
   const importScenarioHandler = useCallback(
     async ({ file, isAnonymized, importLimit, importMode = 'historical' }) => {
       const { rawdata, importMeta } = await extractAdebisData(file, isAnonymized, { mode: importMode });
+      const today = new Date().toISOString().slice(0, 10);
 
       let kidsRaw = rawdata.kidsRaw;
       let employeesRaw = rawdata.employeesRaw;
@@ -33,9 +35,13 @@ export function useScenarioImport() {
       }
 
       const { simDataList } = adebis2simData(kidsRaw, employeesRaw, belegungRaw);
+      const activeEmployeeRawdata = simDataList
+        .filter((item) => item.type === 'capacity')
+        .filter((item) => isRecordActiveOnDate(item, today))
+        .map((item) => item.rawdata || {});
       const { bookings, bookingReference } = adebis2bookings(belegungRaw, employeesRaw);
       const groupDefs = adebis2GroupDefs(groupsRaw);
-      const qualiDefs = adebis2QualiDefs(employeesRaw);
+      const qualiDefs = adebis2QualiDefs(activeEmployeeRawdata);
       const { groupAssignments, groupAssignmentReference } = adebis2GroupAssignments(grukiRaw);
 
       const scenarioName = isAnonymized ? 'Importiertes Szenario (anonymisiert)' : 'Importiertes Szenario';

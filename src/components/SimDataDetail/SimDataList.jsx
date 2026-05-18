@@ -7,6 +7,7 @@ import { useOverlayData } from '../../hooks/useOverlayData';
 import { IconTrash, IconUser, IconBabyCarriage, IconChevronRight } from '@tabler/icons-react';
 import { getDateRangeString } from '../../utils/dateUtils';
 import { sumBookingHours } from '../../utils/bookingUtils';
+import { shouldShowDataItemInEditor } from '../../utils/dataVisibility';
 import { getEffectiveGroupAssignments, getScenarioChain } from '../../utils/overlayUtils';
 import TabbedListDetail from '../common/TabbedListDetail';
 import SimDataTabs from './SimDataTabs';
@@ -39,12 +40,17 @@ function SimDataList() {
   const qualificationDefs = getEffectiveQualificationDefs();
 
   const data = useMemo(
-    () =>
-      Object.entries(effectiveDataItems).map(([key, item]) => ({
-        ...item,
-        id: key,
-        _key: key,
-      })),
+    () => {
+      const today = new Date().toISOString().slice(0, 10);
+
+      return Object.entries(effectiveDataItems)
+        .map(([key, item]) => ({
+          ...item,
+          id: key,
+          _key: key,
+        }))
+        .filter((item) => shouldShowDataItemInEditor(item, today));
+    },
     [effectiveDataItems]
   );
 

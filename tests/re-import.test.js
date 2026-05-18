@@ -274,7 +274,15 @@ if (shouldRunFullTests()) {
         await expect(page.getByRole('heading', { name: 'Alters-Histogramm' })).toBeVisible();
         await expect(page.getByRole('heading', { name: 'Buchungsverteilung' })).toBeVisible();
 
+        const filterToggle = page.getByTestId('analysis-filter-toggle');
         const ruleCheckbox = page.getByRole('checkbox', { name: 'Regelbetrieb' });
+        await expect(filterToggle).toBeVisible();
+        await expect(ruleCheckbox).toBeVisible();
+        await filterToggle.click();
+        await expect(ruleCheckbox).not.toBeVisible();
+        await filterToggle.click();
+        await expect(ruleCheckbox).toBeVisible();
+
         const longtermCheckbox = page.getByRole('checkbox', { name: 'Langzeit' });
         const ageHistogramCheckbox = page.getByRole('checkbox', { name: 'Alters-Histogramm' });
         const histogramCheckbox = page.getByRole('checkbox', { name: 'Buchungsverteilung' });
@@ -337,9 +345,13 @@ if (shouldRunFullTests()) {
 
         await expect(stichtagInput).toContainText(/\d{2}\.\d{2}\.\d{4}/);
 
-        const timelinePoint = page.locator('.highcharts-point').first();
+        const timelinePoint = page
+          .getByTestId('stichtag-timeline-shell')
+          .locator('.highcharts-point')
+          .first();
         await expect(timelinePoint).toBeVisible();
-        await timelinePoint.click();
+        await timelinePoint.scrollIntoViewIfNeeded();
+        await timelinePoint.click({ force: true });
 
         if (beforeSelection) {
           await expect(stichtagInput).not.toHaveText(beforeSelection);

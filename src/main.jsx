@@ -14,6 +14,25 @@ import store from './store/store'
 import Highcharts from 'highcharts'
 import 'highcharts/modules/stock'
 
+// Configure Highcharts to handle rapid updates gracefully
+Highcharts.Chart.prototype.series = Highcharts.Chart.prototype.series || [];
+const originalUpdate = Highcharts.Series.prototype.update;
+Highcharts.Series.prototype.update = function(options, redraw) {
+  // Guard against update attempts on invalid series state
+  try {
+    if (!this.points || !Array.isArray(this.points)) {
+      return this;
+    }
+    return originalUpdate.call(this, options, redraw);
+  } catch (e) {
+    if (e?.message?.includes?.('removePoint')) {
+      // Silently ignore removePoint race conditions during rapid updates
+      return this;
+    }
+    throw e;
+  }
+};
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <Provider store={store}>

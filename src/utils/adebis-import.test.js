@@ -12,6 +12,7 @@ import simOverlayReducer from '../store/simOverlaySlice';
 import chartReducer from '../store/chartSlice';
 import eventReducer from '../store/eventSlice';
 import datesOfInterestReducer from '../store/datesOfInterestSlice';
+import { isRecordActiveOnDate } from './financeUtils';
 import { extractAdebisData } from './adebis-reader';
 import {
   adebis2simData,
@@ -28,6 +29,7 @@ const testZips = [
   'kita-anonym-55055120.zip',
   'kita-anonym-71814654.zip',
   'kita-anonym-72229327.zip',
+  'kita-anonym-53181382.zip',
 ];
 
 function createTestStore() {
@@ -372,6 +374,64 @@ describe('Adebis import regression', () => {
     expect(groupDefs[2].type).toBe('Schulkindgruppe');
     expect(groupDefs[3].type).toBe('Schulkindgruppe');
   });
+
+  it('imports only current qualification definitions and assignments in historical mode', async () => {
+    const today = new Date().toISOString().slice(0, 10);
+
+    for (const zipFileName of testZips) {
+      const zipPath = path.resolve(process.cwd(), 'tests/testdata', zipFileName);
+      const zipBuffer = await readFile(zipPath);
+      const { rawdata } = await extractAdebisData(zipBuffer, false, { mode: 'historical' });
+
+      const { simDataList } = adebis2simData(rawdata.kidsRaw, rawdata.employeesRaw, rawdata.belegungRaw);
+      const activeCapacityItems = simDataList.filter(
+        (item) => item.type === 'capacity' && isRecordActiveOnDate(item, today)
+      );
+      const expectedQualificationKeys = new Set(
+        activeCapacityItems.map((item) => item.rawdata?.QUALIFIK).filter(Boolean)
+      );
+
+      const { bookings, bookingReference } = adebis2bookings(rawdata.belegungRaw, rawdata.employeesRaw);
+      const groupDefs = adebis2GroupDefs(rawdata.groupsRaw);
+      const qualiDefs = adebis2QualiDefs(activeCapacityItems.map((item) => item.rawdata || {}));
+      const { groupAssignments } = adebis2GroupAssignments(rawdata.grukiRaw);
+
+      const store = createTestStore();
+      await store.dispatch(
+        importScenario({
+          scenarioSettings: {
+            name: 'Qualification Import Regression',
+            imported: true,
+            importedAnonymized: false,
+          },
+          simDataList,
+          bookings,
+          bookingReference,
+          groupDefs,
+          qualiDefs,
+          groupAssignments,
+        })
+      );
+
+      const state = store.getState();
+      const scenarioId = state.simScenario.selectedScenarioId;
+      const importedDefs = state.simQualification.qualificationDefsByScenario[scenarioId] || [];
+      const importedAssignments = state.simQualification.qualificationAssignmentsByScenario[scenarioId] || {};
+      const importedData = state.simData.dataByScenario[scenarioId] || {};
+
+      expect(new Set(importedDefs.map((definition) => definition.key))).toEqual(expectedQualificationKeys);
+
+      Object.entries(importedAssignments).forEach(([itemId, assignmentMap]) => {
+        const item = importedData[itemId];
+        expect(item?.type).toBe('capacity');
+        expect(isRecordActiveOnDate(item, today)).toBe(true);
+
+        Object.values(assignmentMap || {}).forEach((assignment) => {
+          expect(expectedQualificationKeys.has(assignment.qualification)).toBe(true);
+        });
+      });
+    }
+  }, 30000);
 
   /**
    * Documentative test: validates that orphaned bookings (children with bookings but missing in kind.xml)

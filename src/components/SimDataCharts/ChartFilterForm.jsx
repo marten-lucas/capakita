@@ -1,5 +1,6 @@
 import React from 'react';
-import { Paper, Stack, Text, Group, Checkbox, MultiSelect, Select } from '@mantine/core';
+import { Paper, Stack, Text, Group, Checkbox, MultiSelect, Select, Button, Box } from '@mantine/core';
+import { IconChevronDown, IconChevronUp } from '@tabler/icons-react';
 import { useSelector, useDispatch } from 'react-redux';
 import {
   setTimedimension,
@@ -16,6 +17,7 @@ const EMPTY_SELECTION = [];
 
 function ChartFilterForm({ showStichtag = false, scenarioId, onTimedimensionChange }) {
   const dispatch = useDispatch();
+  const [filtersOpen, setFiltersOpen] = React.useState(true);
 
   React.useEffect(() => {
     if (scenarioId) {
@@ -75,61 +77,79 @@ function ChartFilterForm({ showStichtag = false, scenarioId, onTimedimensionChan
   return (
     <Paper withBorder p="md">
       <Stack gap="md">
-        <Text fw={600}>Filter</Text>
-
-        <Checkbox.Group
-          value={chartToggles}
-          onChange={(value) => dispatch(setChartToggles({ scenarioId, toggles: value }))}
-        >
-          <Group>
-            <Checkbox value="weekly" label="Regelbetrieb" />
-            <Checkbox value="midterm" label="Langzeit" />
-            <Checkbox value="ageHistogram" label="Alters-Histogramm" />
-            <Checkbox value="histogram" label="Buchungsverteilung" />
-          </Group>
-        </Checkbox.Group>
-
-        <Group align="flex-start" grow>
-          <MultiSelect
-            label="Gruppen"
-            data={groupOptions}
-            value={selectedGroups}
-            onChange={(value) => dispatch(setFilterGroups({ scenarioId, groups: value }))}
-            searchable
-            clearable
-          />
-
-          <MultiSelect
-            label="Qualifikationen"
-            data={qualificationOptions}
-            value={selectedQualifications}
-            onChange={(value) => dispatch(setFilterQualifications({ scenarioId, qualifications: value }))}
-            searchable
-            clearable
-          />
-
-          {chartToggles.includes('midterm') && (
-            <Select
-              label="Zeitdimension"
-              data={[
-                { value: 'week', label: 'Woche' },
-                { value: 'month', label: 'Monat' },
-                { value: 'quarter', label: 'Quartal' },
-                { value: 'year', label: 'Jahr' },
-              ]}
-              value={timedimension}
-              onChange={(value) => {
-                if (!value) return;
-                dispatch(setTimedimension({ scenarioId, timedimension: value }));
-                onTimedimensionChange?.(value);
-              }}
-            />
-            )}
+        <Group justify="space-between" align="center">
+          <Text fw={600}>Filter</Text>
+          <Button
+            variant="subtle"
+            size="compact-sm"
+            onClick={() => setFiltersOpen((open) => !open)}
+            rightSection={filtersOpen ? <IconChevronUp size={16} /> : <IconChevronDown size={16} />}
+            data-testid="analysis-filter-toggle"
+            aria-expanded={filtersOpen}
+          >
+            {filtersOpen ? 'Filter einklappen' : 'Filter ausklappen'}
+          </Button>
         </Group>
 
-          {showStichtag && (chartToggles.includes('weekly') || chartToggles.includes('histogram')) && (
-            <EventPicker scenarioId={scenarioId} />
-          )}
+        {filtersOpen && (
+          <Box data-testid="analysis-filter-content">
+            <Stack gap="md">
+            <Checkbox.Group
+              value={chartToggles}
+              onChange={(value) => dispatch(setChartToggles({ scenarioId, toggles: value }))}
+            >
+              <Group>
+                <Checkbox value="weekly" label="Regelbetrieb" />
+                <Checkbox value="midterm" label="Langzeit" />
+                <Checkbox value="ageHistogram" label="Alters-Histogramm" />
+                <Checkbox value="histogram" label="Buchungsverteilung" />
+              </Group>
+            </Checkbox.Group>
+
+            <Group align="flex-start" grow>
+              <MultiSelect
+                label="Gruppen"
+                data={groupOptions}
+                value={selectedGroups}
+                onChange={(value) => dispatch(setFilterGroups({ scenarioId, groups: value }))}
+                searchable
+                clearable
+              />
+
+              <MultiSelect
+                label="Qualifikationen"
+                data={qualificationOptions}
+                value={selectedQualifications}
+                onChange={(value) => dispatch(setFilterQualifications({ scenarioId, qualifications: value }))}
+                searchable
+                clearable
+              />
+
+              {chartToggles.includes('midterm') && (
+                <Select
+                  label="Zeitdimension"
+                  data={[
+                    { value: 'week', label: 'Woche' },
+                    { value: 'month', label: 'Monat' },
+                    { value: 'quarter', label: 'Quartal' },
+                    { value: 'year', label: 'Jahr' },
+                  ]}
+                  value={timedimension}
+                  onChange={(value) => {
+                    if (!value) return;
+                    dispatch(setTimedimension({ scenarioId, timedimension: value }));
+                    onTimedimensionChange?.(value);
+                  }}
+                />
+              )}
+            </Group>
+
+            {showStichtag && (chartToggles.includes('weekly') || chartToggles.includes('histogram')) && (
+              <EventPicker scenarioId={scenarioId} />
+            )}
+            </Stack>
+          </Box>
+        )}
       </Stack>
     </Paper>
   );

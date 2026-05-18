@@ -22,10 +22,8 @@ function buildAgeBins(maxMonths) {
 
   for (let start = 0; start <= cappedMax; start += 3) {
     const end = start + 3;
-    // Convert to decimal years in 0.25 year increments
-    const startYears = (start / 12).toFixed(2);
-    const endYears = (end / 12).toFixed(2);
-    labels.push(`${startYears}-${endYears}`);
+    const endYears = Number((end / 12).toFixed(2));
+    labels.push(String(endYears).replace('.', ','));
   }
 
   return labels;
