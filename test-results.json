@@ -1,0 +1,775 @@
+{
+  "config": {
+    "configFile": "/home/marten/Development/kiga-simulator/playwright.config.js",
+    "rootDir": "/home/marten/Development/kiga-simulator/tests",
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/home/marten/Development/kiga-simulator/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "desktop",
+        "name": "desktop",
+        "testDir": "/home/marten/Development/kiga-simulator/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "/home/marten/Development/kiga-simulator/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "tablet",
+        "name": "tablet",
+        "testDir": "/home/marten/Development/kiga-simulator/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "/responsive-(layout|realdata)\\.test\\.js$/"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "/home/marten/Development/kiga-simulator/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "smartphone",
+        "name": "smartphone",
+        "testDir": "/home/marten/Development/kiga-simulator/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "/responsive-(layout|realdata)\\.test\\.js$/"
+        ],
+        "timeout": 120000
+      }
+    ],
+    "quiet": true,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.59.1",
+    "workers": 1,
+    "webServer": {
+      "command": "npm run dev -- --host 127.0.0.1 --port 4173",
+      "url": "http://127.0.0.1:4173",
+      "reuseExistingServer": true,
+      "timeout": 120000
+    }
+  },
+  "suites": [
+    {
+      "title": "responsive-layout.test.js",
+      "file": "responsive-layout.test.js",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "welcome and legal pages stay usable across viewports",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3730,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-05-20T19:58:29.861Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "d791b0307f367ad6bd45-7f24fadc9e07ed4a67d0",
+          "file": "responsive-layout.test.js",
+          "line": 211,
+          "column": 1
+        },
+        {
+          "title": "all main app pages remain usable without horizontal overflow",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 3836,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mpage\u001b[39m\u001b[2m).\u001b[22mtoHaveScreenshot\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\n  Expected an image 1440px by 949px, received 1440px by 953px. 7103 pixels (ratio 0.01 of all image pixels) are different.\n\n  Snapshot: responsive-data-view.png\n\nCall log:\n\u001b[2m  - Expect \"toHaveScreenshot(responsive-data-view.png)\" with timeout 5000ms\u001b[22m\n\u001b[2m    - verifying given screenshot expectation\u001b[22m\n\u001b[2m  - taking page screenshot\u001b[22m\n\u001b[2m    - disabled all CSS animations\u001b[22m\n\u001b[2m  - waiting for fonts to load...\u001b[22m\n\u001b[2m  - fonts loaded\u001b[22m\n\u001b[2m  - Expected an image 1440px by 949px, received 1440px by 953px. 7103 pixels (ratio 0.01 of all image pixels) are different.\u001b[22m\n\u001b[2m  - waiting 100ms before taking screenshot\u001b[22m\n\u001b[2m  - taking page screenshot\u001b[22m\n\u001b[2m    - disabled all CSS animations\u001b[22m\n\u001b[2m  - waiting for fonts to load...\u001b[22m\n\u001b[2m  - fonts loaded\u001b[22m\n\u001b[2m  - captured a stable screenshot\u001b[22m\n\u001b[2m  - Expected an image 1440px by 949px, received 1440px by 953px. 7103 pixels (ratio 0.01 of all image pixels) are different.\u001b[22m\n",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mpage\u001b[39m\u001b[2m).\u001b[22mtoHaveScreenshot\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\n  Expected an image 1440px by 949px, received 1440px by 953px. 7103 pixels (ratio 0.01 of all image pixels) are different.\n\n  Snapshot: responsive-data-view.png\n\nCall log:\n\u001b[2m  - Expect \"toHaveScreenshot(responsive-data-view.png)\" with timeout 5000ms\u001b[22m\n\u001b[2m    - verifying given screenshot expectation\u001b[22m\n\u001b[2m  - taking page screenshot\u001b[22m\n\u001b[2m    - disabled all CSS animations\u001b[22m\n\u001b[2m  - waiting for fonts to load...\u001b[22m\n\u001b[2m  - fonts loaded\u001b[22m\n\u001b[2m  - Expected an image 1440px by 949px, received 1440px by 953px. 7103 pixels (ratio 0.01 of all image pixels) are different.\u001b[22m\n\u001b[2m  - waiting 100ms before taking screenshot\u001b[22m\n\u001b[2m  - taking page screenshot\u001b[22m\n\u001b[2m    - disabled all CSS animations\u001b[22m\n\u001b[2m  - waiting for fonts to load...\u001b[22m\n\u001b[2m  - fonts loaded\u001b[22m\n\u001b[2m  - captured a stable screenshot\u001b[22m\n\u001b[2m  - Expected an image 1440px by 949px, received 1440px by 953px. 7103 pixels (ratio 0.01 of all image pixels) are different.\u001b[22m\n\n    at expectLayoutScreenshot (/home/marten/Development/kiga-simulator/tests/responsive-layout.test.js:8:22)\n    at /home/marten/Development/kiga-simulator/tests/responsive-layout.test.js:243:9",
+                    "location": {
+                      "file": "/home/marten/Development/kiga-simulator/tests/responsive-layout.test.js",
+                      "column": 22,
+                      "line": 8
+                    },
+                    "snippet": "   6 |\n   7 | async function expectLayoutScreenshot(page, name) {\n>  8 |   await expect(page).toHaveScreenshot(name, {\n     |                      ^\n   9 |     animations: 'disabled',\n  10 |     caret: 'hide',\n  11 |     fullPage: true,"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/home/marten/Development/kiga-simulator/tests/responsive-layout.test.js",
+                        "column": 22,
+                        "line": 8
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mpage\u001b[39m\u001b[2m).\u001b[22mtoHaveScreenshot\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\n  Expected an image 1440px by 949px, received 1440px by 953px. 7103 pixels (ratio 0.01 of all image pixels) are different.\n\n  Snapshot: responsive-data-view.png\n\nCall log:\n\u001b[2m  - Expect \"toHaveScreenshot(responsive-data-view.png)\" with timeout 5000ms\u001b[22m\n\u001b[2m    - verifying given screenshot expectation\u001b[22m\n\u001b[2m  - taking page screenshot\u001b[22m\n\u001b[2m    - disabled all CSS animations\u001b[22m\n\u001b[2m  - waiting for fonts to load...\u001b[22m\n\u001b[2m  - fonts loaded\u001b[22m\n\u001b[2m  - Expected an image 1440px by 949px, received 1440px by 953px. 7103 pixels (ratio 0.01 of all image pixels) are different.\u001b[22m\n\u001b[2m  - waiting 100ms before taking screenshot\u001b[22m\n\u001b[2m  - taking page screenshot\u001b[22m\n\u001b[2m    - disabled all CSS animations\u001b[22m\n\u001b[2m  - waiting for fonts to load...\u001b[22m\n\u001b[2m  - fonts loaded\u001b[22m\n\u001b[2m  - captured a stable screenshot\u001b[22m\n\u001b[2m  - Expected an image 1440px by 949px, received 1440px by 953px. 7103 pixels (ratio 0.01 of all image pixels) are different.\u001b[22m\n\n\n   6 |\n   7 | async function expectLayoutScreenshot(page, name) {\n>  8 |   await expect(page).toHaveScreenshot(name, {\n     |                      ^\n   9 |     animations: 'disabled',\n  10 |     caret: 'hide',\n  11 |     fullPage: true,\n    at expectLayoutScreenshot (/home/marten/Development/kiga-simulator/tests/responsive-layout.test.js:8:22)\n    at /home/marten/Development/kiga-simulator/tests/responsive-layout.test.js:243:9"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-05-20T19:58:33.780Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "responsive-data-view-expected.png",
+                      "contentType": "image/png",
+                      "path": "/home/marten/Development/kiga-simulator/tests/responsive-layout.test.js-snapshots/responsive-data-view-desktop-linux.png"
+                    },
+                    {
+                      "name": "responsive-data-view-actual.png",
+                      "contentType": "image/png",
+                      "path": "/home/marten/Development/kiga-simulator/test-results/responsive-layout-all-main-9446e-without-horizontal-overflow-desktop/responsive-data-view-actual.png"
+                    },
+                    {
+                      "name": "responsive-data-view-diff.png",
+                      "contentType": "image/png",
+                      "path": "/home/marten/Development/kiga-simulator/test-results/responsive-layout-all-main-9446e-without-horizontal-overflow-desktop/responsive-data-view-diff.png"
+                    },
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "/home/marten/Development/kiga-simulator/test-results/responsive-layout-all-main-9446e-without-horizontal-overflow-desktop/test-failed-1.png"
+                    },
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "/home/marten/Development/kiga-simulator/test-results/responsive-layout-all-main-9446e-without-horizontal-overflow-desktop/video.webm"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/home/marten/Development/kiga-simulator/test-results/responsive-layout-all-main-9446e-without-horizontal-overflow-desktop/error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "/home/marten/Development/kiga-simulator/test-results/responsive-layout-all-main-9446e-without-horizontal-overflow-desktop/trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/home/marten/Development/kiga-simulator/tests/responsive-layout.test.js",
+                    "column": 22,
+                    "line": 8
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "d791b0307f367ad6bd45-ab7e1ba16cd5f14ac816",
+          "file": "responsive-layout.test.js",
+          "line": 231,
+          "column": 1
+        },
+        {
+          "title": "modals and finance forms stay usable across viewports",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 5864,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mpage\u001b[39m\u001b[2m).\u001b[22mtoHaveScreenshot\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\n  Expected an image 1440px by 949px, received 1440px by 953px. 5152 pixels (ratio 0.01 of all image pixels) are different.\n\n  Snapshot: responsive-save-dialog.png\n\nCall log:\n\u001b[2m  - Expect \"toHaveScreenshot(responsive-save-dialog.png)\" with timeout 5000ms\u001b[22m\n\u001b[2m    - verifying given screenshot expectation\u001b[22m\n\u001b[2m  - taking page screenshot\u001b[22m\n\u001b[2m    - disabled all CSS animations\u001b[22m\n\u001b[2m  - waiting for fonts to load...\u001b[22m\n\u001b[2m  - fonts loaded\u001b[22m\n\u001b[2m  - Expected an image 1440px by 949px, received 1440px by 953px. 5152 pixels (ratio 0.01 of all image pixels) are different.\u001b[22m\n\u001b[2m  - waiting 100ms before taking screenshot\u001b[22m\n\u001b[2m  - taking page screenshot\u001b[22m\n\u001b[2m    - disabled all CSS animations\u001b[22m\n\u001b[2m  - waiting for fonts to load...\u001b[22m\n\u001b[2m  - fonts loaded\u001b[22m\n\u001b[2m  - captured a stable screenshot\u001b[22m\n\u001b[2m  - Expected an image 1440px by 949px, received 1440px by 953px. 5152 pixels (ratio 0.01 of all image pixels) are different.\u001b[22m\n",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mpage\u001b[39m\u001b[2m).\u001b[22mtoHaveScreenshot\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\n  Expected an image 1440px by 949px, received 1440px by 953px. 5152 pixels (ratio 0.01 of all image pixels) are different.\n\n  Snapshot: responsive-save-dialog.png\n\nCall log:\n\u001b[2m  - Expect \"toHaveScreenshot(responsive-save-dialog.png)\" with timeout 5000ms\u001b[22m\n\u001b[2m    - verifying given screenshot expectation\u001b[22m\n\u001b[2m  - taking page screenshot\u001b[22m\n\u001b[2m    - disabled all CSS animations\u001b[22m\n\u001b[2m  - waiting for fonts to load...\u001b[22m\n\u001b[2m  - fonts loaded\u001b[22m\n\u001b[2m  - Expected an image 1440px by 949px, received 1440px by 953px. 5152 pixels (ratio 0.01 of all image pixels) are different.\u001b[22m\n\u001b[2m  - waiting 100ms before taking screenshot\u001b[22m\n\u001b[2m  - taking page screenshot\u001b[22m\n\u001b[2m    - disabled all CSS animations\u001b[22m\n\u001b[2m  - waiting for fonts to load...\u001b[22m\n\u001b[2m  - fonts loaded\u001b[22m\n\u001b[2m  - captured a stable screenshot\u001b[22m\n\u001b[2m  - Expected an image 1440px by 949px, received 1440px by 953px. 5152 pixels (ratio 0.01 of all image pixels) are different.\u001b[22m\n\n    at expectLayoutScreenshot (/home/marten/Development/kiga-simulator/tests/responsive-layout.test.js:8:22)\n    at /home/marten/Development/kiga-simulator/tests/responsive-layout.test.js:286:9",
+                    "location": {
+                      "file": "/home/marten/Development/kiga-simulator/tests/responsive-layout.test.js",
+                      "column": 22,
+                      "line": 8
+                    },
+                    "snippet": "   6 |\n   7 | async function expectLayoutScreenshot(page, name) {\n>  8 |   await expect(page).toHaveScreenshot(name, {\n     |                      ^\n   9 |     animations: 'disabled',\n  10 |     caret: 'hide',\n  11 |     fullPage: true,"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/home/marten/Development/kiga-simulator/tests/responsive-layout.test.js",
+                        "column": 22,
+                        "line": 8
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mpage\u001b[39m\u001b[2m).\u001b[22mtoHaveScreenshot\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\n  Expected an image 1440px by 949px, received 1440px by 953px. 5152 pixels (ratio 0.01 of all image pixels) are different.\n\n  Snapshot: responsive-save-dialog.png\n\nCall log:\n\u001b[2m  - Expect \"toHaveScreenshot(responsive-save-dialog.png)\" with timeout 5000ms\u001b[22m\n\u001b[2m    - verifying given screenshot expectation\u001b[22m\n\u001b[2m  - taking page screenshot\u001b[22m\n\u001b[2m    - disabled all CSS animations\u001b[22m\n\u001b[2m  - waiting for fonts to load...\u001b[22m\n\u001b[2m  - fonts loaded\u001b[22m\n\u001b[2m  - Expected an image 1440px by 949px, received 1440px by 953px. 5152 pixels (ratio 0.01 of all image pixels) are different.\u001b[22m\n\u001b[2m  - waiting 100ms before taking screenshot\u001b[22m\n\u001b[2m  - taking page screenshot\u001b[22m\n\u001b[2m    - disabled all CSS animations\u001b[22m\n\u001b[2m  - waiting for fonts to load...\u001b[22m\n\u001b[2m  - fonts loaded\u001b[22m\n\u001b[2m  - captured a stable screenshot\u001b[22m\n\u001b[2m  - Expected an image 1440px by 949px, received 1440px by 953px. 5152 pixels (ratio 0.01 of all image pixels) are different.\u001b[22m\n\n\n   6 |\n   7 | async function expectLayoutScreenshot(page, name) {\n>  8 |   await expect(page).toHaveScreenshot(name, {\n     |                      ^\n   9 |     animations: 'disabled',\n  10 |     caret: 'hide',\n  11 |     fullPage: true,\n    at expectLayoutScreenshot (/home/marten/Development/kiga-simulator/tests/responsive-layout.test.js:8:22)\n    at /home/marten/Development/kiga-simulator/tests/responsive-layout.test.js:286:9"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-05-20T19:58:38.631Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "responsive-save-dialog-expected.png",
+                      "contentType": "image/png",
+                      "path": "/home/marten/Development/kiga-simulator/tests/responsive-layout.test.js-snapshots/responsive-save-dialog-desktop-linux.png"
+                    },
+                    {
+                      "name": "responsive-save-dialog-actual.png",
+                      "contentType": "image/png",
+                      "path": "/home/marten/Development/kiga-simulator/test-results/responsive-layout-modals-a-d28a3-tay-usable-across-viewports-desktop/responsive-save-dialog-actual.png"
+                    },
+                    {
+                      "name": "responsive-save-dialog-diff.png",
+                      "contentType": "image/png",
+                      "path": "/home/marten/Development/kiga-simulator/test-results/responsive-layout-modals-a-d28a3-tay-usable-across-viewports-desktop/responsive-save-dialog-diff.png"
+                    },
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "/home/marten/Development/kiga-simulator/test-results/responsive-layout-modals-a-d28a3-tay-usable-across-viewports-desktop/test-failed-1.png"
+                    },
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "/home/marten/Development/kiga-simulator/test-results/responsive-layout-modals-a-d28a3-tay-usable-across-viewports-desktop/video.webm"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/home/marten/Development/kiga-simulator/test-results/responsive-layout-modals-a-d28a3-tay-usable-across-viewports-desktop/error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "/home/marten/Development/kiga-simulator/test-results/responsive-layout-modals-a-d28a3-tay-usable-across-viewports-desktop/trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/home/marten/Development/kiga-simulator/tests/responsive-layout.test.js",
+                    "column": 22,
+                    "line": 8
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "d791b0307f367ad6bd45-00d340bbf23f18f399be",
+          "file": "responsive-layout.test.js",
+          "line": 270,
+          "column": 1
+        },
+        {
+          "title": "welcome and legal pages stay usable across viewports",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "tablet",
+              "projectName": "tablet",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2566,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-05-20T19:58:45.730Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "d791b0307f367ad6bd45-8103dd6e97be3b412e95",
+          "file": "responsive-layout.test.js",
+          "line": 211,
+          "column": 1
+        },
+        {
+          "title": "all main app pages remain usable without horizontal overflow",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "tablet",
+              "projectName": "tablet",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 2972,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mpage\u001b[39m\u001b[2m).\u001b[22mtoHaveScreenshot\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\n  Expected an image 1024px by 1415px, received 1024px by 1419px. 7103 pixels (ratio 0.01 of all image pixels) are different.\n\n  Snapshot: responsive-data-view.png\n\nCall log:\n\u001b[2m  - Expect \"toHaveScreenshot(responsive-data-view.png)\" with timeout 5000ms\u001b[22m\n\u001b[2m    - verifying given screenshot expectation\u001b[22m\n\u001b[2m  - taking page screenshot\u001b[22m\n\u001b[2m    - disabled all CSS animations\u001b[22m\n\u001b[2m  - waiting for fonts to load...\u001b[22m\n\u001b[2m  - fonts loaded\u001b[22m\n\u001b[2m  - Expected an image 1024px by 1415px, received 1024px by 1419px. 7103 pixels (ratio 0.01 of all image pixels) are different.\u001b[22m\n\u001b[2m  - waiting 100ms before taking screenshot\u001b[22m\n\u001b[2m  - taking page screenshot\u001b[22m\n\u001b[2m    - disabled all CSS animations\u001b[22m\n\u001b[2m  - waiting for fonts to load...\u001b[22m\n\u001b[2m  - fonts loaded\u001b[22m\n\u001b[2m  - captured a stable screenshot\u001b[22m\n\u001b[2m  - Expected an image 1024px by 1415px, received 1024px by 1419px. 7103 pixels (ratio 0.01 of all image pixels) are different.\u001b[22m\n",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mpage\u001b[39m\u001b[2m).\u001b[22mtoHaveScreenshot\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\n  Expected an image 1024px by 1415px, received 1024px by 1419px. 7103 pixels (ratio 0.01 of all image pixels) are different.\n\n  Snapshot: responsive-data-view.png\n\nCall log:\n\u001b[2m  - Expect \"toHaveScreenshot(responsive-data-view.png)\" with timeout 5000ms\u001b[22m\n\u001b[2m    - verifying given screenshot expectation\u001b[22m\n\u001b[2m  - taking page screenshot\u001b[22m\n\u001b[2m    - disabled all CSS animations\u001b[22m\n\u001b[2m  - waiting for fonts to load...\u001b[22m\n\u001b[2m  - fonts loaded\u001b[22m\n\u001b[2m  - Expected an image 1024px by 1415px, received 1024px by 1419px. 7103 pixels (ratio 0.01 of all image pixels) are different.\u001b[22m\n\u001b[2m  - waiting 100ms before taking screenshot\u001b[22m\n\u001b[2m  - taking page screenshot\u001b[22m\n\u001b[2m    - disabled all CSS animations\u001b[22m\n\u001b[2m  - waiting for fonts to load...\u001b[22m\n\u001b[2m  - fonts loaded\u001b[22m\n\u001b[2m  - captured a stable screenshot\u001b[22m\n\u001b[2m  - Expected an image 1024px by 1415px, received 1024px by 1419px. 7103 pixels (ratio 0.01 of all image pixels) are different.\u001b[22m\n\n    at expectLayoutScreenshot (/home/marten/Development/kiga-simulator/tests/responsive-layout.test.js:8:22)\n    at /home/marten/Development/kiga-simulator/tests/responsive-layout.test.js:243:9",
+                    "location": {
+                      "file": "/home/marten/Development/kiga-simulator/tests/responsive-layout.test.js",
+                      "column": 22,
+                      "line": 8
+                    },
+                    "snippet": "   6 |\n   7 | async function expectLayoutScreenshot(page, name) {\n>  8 |   await expect(page).toHaveScreenshot(name, {\n     |                      ^\n   9 |     animations: 'disabled',\n  10 |     caret: 'hide',\n  11 |     fullPage: true,"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/home/marten/Development/kiga-simulator/tests/responsive-layout.test.js",
+                        "column": 22,
+                        "line": 8
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mpage\u001b[39m\u001b[2m).\u001b[22mtoHaveScreenshot\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\n  Expected an image 1024px by 1415px, received 1024px by 1419px. 7103 pixels (ratio 0.01 of all image pixels) are different.\n\n  Snapshot: responsive-data-view.png\n\nCall log:\n\u001b[2m  - Expect \"toHaveScreenshot(responsive-data-view.png)\" with timeout 5000ms\u001b[22m\n\u001b[2m    - verifying given screenshot expectation\u001b[22m\n\u001b[2m  - taking page screenshot\u001b[22m\n\u001b[2m    - disabled all CSS animations\u001b[22m\n\u001b[2m  - waiting for fonts to load...\u001b[22m\n\u001b[2m  - fonts loaded\u001b[22m\n\u001b[2m  - Expected an image 1024px by 1415px, received 1024px by 1419px. 7103 pixels (ratio 0.01 of all image pixels) are different.\u001b[22m\n\u001b[2m  - waiting 100ms before taking screenshot\u001b[22m\n\u001b[2m  - taking page screenshot\u001b[22m\n\u001b[2m    - disabled all CSS animations\u001b[22m\n\u001b[2m  - waiting for fonts to load...\u001b[22m\n\u001b[2m  - fonts loaded\u001b[22m\n\u001b[2m  - captured a stable screenshot\u001b[22m\n\u001b[2m  - Expected an image 1024px by 1415px, received 1024px by 1419px. 7103 pixels (ratio 0.01 of all image pixels) are different.\u001b[22m\n\n\n   6 |\n   7 | async function expectLayoutScreenshot(page, name) {\n>  8 |   await expect(page).toHaveScreenshot(name, {\n     |                      ^\n   9 |     animations: 'disabled',\n  10 |     caret: 'hide',\n  11 |     fullPage: true,\n    at expectLayoutScreenshot (/home/marten/Development/kiga-simulator/tests/responsive-layout.test.js:8:22)\n    at /home/marten/Development/kiga-simulator/tests/responsive-layout.test.js:243:9"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-05-20T19:58:48.408Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "responsive-data-view-expected.png",
+                      "contentType": "image/png",
+                      "path": "/home/marten/Development/kiga-simulator/tests/responsive-layout.test.js-snapshots/responsive-data-view-tablet-linux.png"
+                    },
+                    {
+                      "name": "responsive-data-view-actual.png",
+                      "contentType": "image/png",
+                      "path": "/home/marten/Development/kiga-simulator/test-results/responsive-layout-all-main-9446e-without-horizontal-overflow-tablet/responsive-data-view-actual.png"
+                    },
+                    {
+                      "name": "responsive-data-view-diff.png",
+                      "contentType": "image/png",
+                      "path": "/home/marten/Development/kiga-simulator/test-results/responsive-layout-all-main-9446e-without-horizontal-overflow-tablet/responsive-data-view-diff.png"
+                    },
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "/home/marten/Development/kiga-simulator/test-results/responsive-layout-all-main-9446e-without-horizontal-overflow-tablet/test-failed-1.png"
+                    },
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "/home/marten/Development/kiga-simulator/test-results/responsive-layout-all-main-9446e-without-horizontal-overflow-tablet/video.webm"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/home/marten/Development/kiga-simulator/test-results/responsive-layout-all-main-9446e-without-horizontal-overflow-tablet/error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "/home/marten/Development/kiga-simulator/test-results/responsive-layout-all-main-9446e-without-horizontal-overflow-tablet/trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/home/marten/Development/kiga-simulator/tests/responsive-layout.test.js",
+                    "column": 22,
+                    "line": 8
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "d791b0307f367ad6bd45-a8790a9e7756a8af29ad",
+          "file": "responsive-layout.test.js",
+          "line": 231,
+          "column": 1
+        },
+        {
+          "title": "modals and finance forms stay usable across viewports",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "tablet",
+              "projectName": "tablet",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 5991,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mpage\u001b[39m\u001b[2m).\u001b[22mtoHaveScreenshot\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\n  Expected an image 1024px by 1415px, received 1024px by 1419px. 5152 pixels (ratio 0.01 of all image pixels) are different.\n\n  Snapshot: responsive-save-dialog.png\n\nCall log:\n\u001b[2m  - Expect \"toHaveScreenshot(responsive-save-dialog.png)\" with timeout 5000ms\u001b[22m\n\u001b[2m    - verifying given screenshot expectation\u001b[22m\n\u001b[2m  - taking page screenshot\u001b[22m\n\u001b[2m    - disabled all CSS animations\u001b[22m\n\u001b[2m  - waiting for fonts to load...\u001b[22m\n\u001b[2m  - fonts loaded\u001b[22m\n\u001b[2m  - Expected an image 1024px by 1415px, received 1024px by 1419px. 5152 pixels (ratio 0.01 of all image pixels) are different.\u001b[22m\n\u001b[2m  - waiting 100ms before taking screenshot\u001b[22m\n\u001b[2m  - taking page screenshot\u001b[22m\n\u001b[2m    - disabled all CSS animations\u001b[22m\n\u001b[2m  - waiting for fonts to load...\u001b[22m\n\u001b[2m  - fonts loaded\u001b[22m\n\u001b[2m  - captured a stable screenshot\u001b[22m\n\u001b[2m  - Expected an image 1024px by 1415px, received 1024px by 1419px. 5152 pixels (ratio 0.01 of all image pixels) are different.\u001b[22m\n",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mpage\u001b[39m\u001b[2m).\u001b[22mtoHaveScreenshot\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\n  Expected an image 1024px by 1415px, received 1024px by 1419px. 5152 pixels (ratio 0.01 of all image pixels) are different.\n\n  Snapshot: responsive-save-dialog.png\n\nCall log:\n\u001b[2m  - Expect \"toHaveScreenshot(responsive-save-dialog.png)\" with timeout 5000ms\u001b[22m\n\u001b[2m    - verifying given screenshot expectation\u001b[22m\n\u001b[2m  - taking page screenshot\u001b[22m\n\u001b[2m    - disabled all CSS animations\u001b[22m\n\u001b[2m  - waiting for fonts to load...\u001b[22m\n\u001b[2m  - fonts loaded\u001b[22m\n\u001b[2m  - Expected an image 1024px by 1415px, received 1024px by 1419px. 5152 pixels (ratio 0.01 of all image pixels) are different.\u001b[22m\n\u001b[2m  - waiting 100ms before taking screenshot\u001b[22m\n\u001b[2m  - taking page screenshot\u001b[22m\n\u001b[2m    - disabled all CSS animations\u001b[22m\n\u001b[2m  - waiting for fonts to load...\u001b[22m\n\u001b[2m  - fonts loaded\u001b[22m\n\u001b[2m  - captured a stable screenshot\u001b[22m\n\u001b[2m  - Expected an image 1024px by 1415px, received 1024px by 1419px. 5152 pixels (ratio 0.01 of all image pixels) are different.\u001b[22m\n\n    at expectLayoutScreenshot (/home/marten/Development/kiga-simulator/tests/responsive-layout.test.js:8:22)\n    at /home/marten/Development/kiga-simulator/tests/responsive-layout.test.js:286:9",
+                    "location": {
+                      "file": "/home/marten/Development/kiga-simulator/tests/responsive-layout.test.js",
+                      "column": 22,
+                      "line": 8
+                    },
+                    "snippet": "   6 |\n   7 | async function expectLayoutScreenshot(page, name) {\n>  8 |   await expect(page).toHaveScreenshot(name, {\n     |                      ^\n   9 |     animations: 'disabled',\n  10 |     caret: 'hide',\n  11 |     fullPage: true,"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/home/marten/Development/kiga-simulator/tests/responsive-layout.test.js",
+                        "column": 22,
+                        "line": 8
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mpage\u001b[39m\u001b[2m).\u001b[22mtoHaveScreenshot\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\n  Expected an image 1024px by 1415px, received 1024px by 1419px. 5152 pixels (ratio 0.01 of all image pixels) are different.\n\n  Snapshot: responsive-save-dialog.png\n\nCall log:\n\u001b[2m  - Expect \"toHaveScreenshot(responsive-save-dialog.png)\" with timeout 5000ms\u001b[22m\n\u001b[2m    - verifying given screenshot expectation\u001b[22m\n\u001b[2m  - taking page screenshot\u001b[22m\n\u001b[2m    - disabled all CSS animations\u001b[22m\n\u001b[2m  - waiting for fonts to load...\u001b[22m\n\u001b[2m  - fonts loaded\u001b[22m\n\u001b[2m  - Expected an image 1024px by 1415px, received 1024px by 1419px. 5152 pixels (ratio 0.01 of all image pixels) are different.\u001b[22m\n\u001b[2m  - waiting 100ms before taking screenshot\u001b[22m\n\u001b[2m  - taking page screenshot\u001b[22m\n\u001b[2m    - disabled all CSS animations\u001b[22m\n\u001b[2m  - waiting for fonts to load...\u001b[22m\n\u001b[2m  - fonts loaded\u001b[22m\n\u001b[2m  - captured a stable screenshot\u001b[22m\n\u001b[2m  - Expected an image 1024px by 1415px, received 1024px by 1419px. 5152 pixels (ratio 0.01 of all image pixels) are different.\u001b[22m\n\n\n   6 |\n   7 | async function expectLayoutScreenshot(page, name) {\n>  8 |   await expect(page).toHaveScreenshot(name, {\n     |                      ^\n   9 |     animations: 'disabled',\n  10 |     caret: 'hide',\n  11 |     fullPage: true,\n    at expectLayoutScreenshot (/home/marten/Development/kiga-simulator/tests/responsive-layout.test.js:8:22)\n    at /home/marten/Development/kiga-simulator/tests/responsive-layout.test.js:286:9"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-05-20T19:58:52.334Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "responsive-save-dialog-expected.png",
+                      "contentType": "image/png",
+                      "path": "/home/marten/Development/kiga-simulator/tests/responsive-layout.test.js-snapshots/responsive-save-dialog-tablet-linux.png"
+                    },
+                    {
+                      "name": "responsive-save-dialog-actual.png",
+                      "contentType": "image/png",
+                      "path": "/home/marten/Development/kiga-simulator/test-results/responsive-layout-modals-a-d28a3-tay-usable-across-viewports-tablet/responsive-save-dialog-actual.png"
+                    },
+                    {
+                      "name": "responsive-save-dialog-diff.png",
+                      "contentType": "image/png",
+                      "path": "/home/marten/Development/kiga-simulator/test-results/responsive-layout-modals-a-d28a3-tay-usable-across-viewports-tablet/responsive-save-dialog-diff.png"
+                    },
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "/home/marten/Development/kiga-simulator/test-results/responsive-layout-modals-a-d28a3-tay-usable-across-viewports-tablet/test-failed-1.png"
+                    },
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "/home/marten/Development/kiga-simulator/test-results/responsive-layout-modals-a-d28a3-tay-usable-across-viewports-tablet/video.webm"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/home/marten/Development/kiga-simulator/test-results/responsive-layout-modals-a-d28a3-tay-usable-across-viewports-tablet/error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "/home/marten/Development/kiga-simulator/test-results/responsive-layout-modals-a-d28a3-tay-usable-across-viewports-tablet/trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/home/marten/Development/kiga-simulator/tests/responsive-layout.test.js",
+                    "column": 22,
+                    "line": 8
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "d791b0307f367ad6bd45-43879071e207bfa81e4e",
+          "file": "responsive-layout.test.js",
+          "line": 270,
+          "column": 1
+        },
+        {
+          "title": "welcome and legal pages stay usable across viewports",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "smartphone",
+              "projectName": "smartphone",
+              "results": [
+                {
+                  "workerIndex": 4,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2475,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-05-20T19:58:59.442Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "d791b0307f367ad6bd45-3581603f06e7303a831d",
+          "file": "responsive-layout.test.js",
+          "line": 211,
+          "column": 1
+        },
+        {
+          "title": "all main app pages remain usable without horizontal overflow",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "smartphone",
+              "projectName": "smartphone",
+              "results": [
+                {
+                  "workerIndex": 4,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 3083,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mpage\u001b[39m\u001b[2m).\u001b[22mtoHaveScreenshot\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\n  Expected an image 390px by 896px, received 390px by 892px. 6111 pixels (ratio 0.02 of all image pixels) are different.\n\n  Snapshot: responsive-data-view.png\n\nCall log:\n\u001b[2m  - Expect \"toHaveScreenshot(responsive-data-view.png)\" with timeout 5000ms\u001b[22m\n\u001b[2m    - verifying given screenshot expectation\u001b[22m\n\u001b[2m  - taking page screenshot\u001b[22m\n\u001b[2m    - disabled all CSS animations\u001b[22m\n\u001b[2m  - waiting for fonts to load...\u001b[22m\n\u001b[2m  - fonts loaded\u001b[22m\n\u001b[2m  - Expected an image 390px by 896px, received 390px by 892px. 6111 pixels (ratio 0.02 of all image pixels) are different.\u001b[22m\n\u001b[2m  - waiting 100ms before taking screenshot\u001b[22m\n\u001b[2m  - taking page screenshot\u001b[22m\n\u001b[2m    - disabled all CSS animations\u001b[22m\n\u001b[2m  - waiting for fonts to load...\u001b[22m\n\u001b[2m  - fonts loaded\u001b[22m\n\u001b[2m  - captured a stable screenshot\u001b[22m\n\u001b[2m  - Expected an image 390px by 896px, received 390px by 892px. 6111 pixels (ratio 0.02 of all image pixels) are different.\u001b[22m\n",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mpage\u001b[39m\u001b[2m).\u001b[22mtoHaveScreenshot\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\n  Expected an image 390px by 896px, received 390px by 892px. 6111 pixels (ratio 0.02 of all image pixels) are different.\n\n  Snapshot: responsive-data-view.png\n\nCall log:\n\u001b[2m  - Expect \"toHaveScreenshot(responsive-data-view.png)\" with timeout 5000ms\u001b[22m\n\u001b[2m    - verifying given screenshot expectation\u001b[22m\n\u001b[2m  - taking page screenshot\u001b[22m\n\u001b[2m    - disabled all CSS animations\u001b[22m\n\u001b[2m  - waiting for fonts to load...\u001b[22m\n\u001b[2m  - fonts loaded\u001b[22m\n\u001b[2m  - Expected an image 390px by 896px, received 390px by 892px. 6111 pixels (ratio 0.02 of all image pixels) are different.\u001b[22m\n\u001b[2m  - waiting 100ms before taking screenshot\u001b[22m\n\u001b[2m  - taking page screenshot\u001b[22m\n\u001b[2m    - disabled all CSS animations\u001b[22m\n\u001b[2m  - waiting for fonts to load...\u001b[22m\n\u001b[2m  - fonts loaded\u001b[22m\n\u001b[2m  - captured a stable screenshot\u001b[22m\n\u001b[2m  - Expected an image 390px by 896px, received 390px by 892px. 6111 pixels (ratio 0.02 of all image pixels) are different.\u001b[22m\n\n    at expectLayoutScreenshot (/home/marten/Development/kiga-simulator/tests/responsive-layout.test.js:8:22)\n    at /home/marten/Development/kiga-simulator/tests/responsive-layout.test.js:243:9",
+                    "location": {
+                      "file": "/home/marten/Development/kiga-simulator/tests/responsive-layout.test.js",
+                      "column": 22,
+                      "line": 8
+                    },
+                    "snippet": "   6 |\n   7 | async function expectLayoutScreenshot(page, name) {\n>  8 |   await expect(page).toHaveScreenshot(name, {\n     |                      ^\n   9 |     animations: 'disabled',\n  10 |     caret: 'hide',\n  11 |     fullPage: true,"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/home/marten/Development/kiga-simulator/tests/responsive-layout.test.js",
+                        "column": 22,
+                        "line": 8
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mpage\u001b[39m\u001b[2m).\u001b[22mtoHaveScreenshot\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\n  Expected an image 390px by 896px, received 390px by 892px. 6111 pixels (ratio 0.02 of all image pixels) are different.\n\n  Snapshot: responsive-data-view.png\n\nCall log:\n\u001b[2m  - Expect \"toHaveScreenshot(responsive-data-view.png)\" with timeout 5000ms\u001b[22m\n\u001b[2m    - verifying given screenshot expectation\u001b[22m\n\u001b[2m  - taking page screenshot\u001b[22m\n\u001b[2m    - disabled all CSS animations\u001b[22m\n\u001b[2m  - waiting for fonts to load...\u001b[22m\n\u001b[2m  - fonts loaded\u001b[22m\n\u001b[2m  - Expected an image 390px by 896px, received 390px by 892px. 6111 pixels (ratio 0.02 of all image pixels) are different.\u001b[22m\n\u001b[2m  - waiting 100ms before taking screenshot\u001b[22m\n\u001b[2m  - taking page screenshot\u001b[22m\n\u001b[2m    - disabled all CSS animations\u001b[22m\n\u001b[2m  - waiting for fonts to load...\u001b[22m\n\u001b[2m  - fonts loaded\u001b[22m\n\u001b[2m  - captured a stable screenshot\u001b[22m\n\u001b[2m  - Expected an image 390px by 896px, received 390px by 892px. 6111 pixels (ratio 0.02 of all image pixels) are different.\u001b[22m\n\n\n   6 |\n   7 | async function expectLayoutScreenshot(page, name) {\n>  8 |   await expect(page).toHaveScreenshot(name, {\n     |                      ^\n   9 |     animations: 'disabled',\n  10 |     caret: 'hide',\n  11 |     fullPage: true,\n    at expectLayoutScreenshot (/home/marten/Development/kiga-simulator/tests/responsive-layout.test.js:8:22)\n    at /home/marten/Development/kiga-simulator/tests/responsive-layout.test.js:243:9"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-05-20T19:59:02.028Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "responsive-data-view-expected.png",
+                      "contentType": "image/png",
+                      "path": "/home/marten/Development/kiga-simulator/tests/responsive-layout.test.js-snapshots/responsive-data-view-smartphone-linux.png"
+                    },
+                    {
+                      "name": "responsive-data-view-actual.png",
+                      "contentType": "image/png",
+                      "path": "/home/marten/Development/kiga-simulator/test-results/responsive-layout-all-main-9446e-without-horizontal-overflow-smartphone/responsive-data-view-actual.png"
+                    },
+                    {
+                      "name": "responsive-data-view-diff.png",
+                      "contentType": "image/png",
+                      "path": "/home/marten/Development/kiga-simulator/test-results/responsive-layout-all-main-9446e-without-horizontal-overflow-smartphone/responsive-data-view-diff.png"
+                    },
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "/home/marten/Development/kiga-simulator/test-results/responsive-layout-all-main-9446e-without-horizontal-overflow-smartphone/test-failed-1.png"
+                    },
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "/home/marten/Development/kiga-simulator/test-results/responsive-layout-all-main-9446e-without-horizontal-overflow-smartphone/video.webm"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/home/marten/Development/kiga-simulator/test-results/responsive-layout-all-main-9446e-without-horizontal-overflow-smartphone/error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "/home/marten/Development/kiga-simulator/test-results/responsive-layout-all-main-9446e-without-horizontal-overflow-smartphone/trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/home/marten/Development/kiga-simulator/tests/responsive-layout.test.js",
+                    "column": 22,
+                    "line": 8
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "d791b0307f367ad6bd45-9597588af282c9ed2a29",
+          "file": "responsive-layout.test.js",
+          "line": 231,
+          "column": 1
+        },
+        {
+          "title": "modals and finance forms stay usable across viewports",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "smartphone",
+              "projectName": "smartphone",
+              "results": [
+                {
+                  "workerIndex": 5,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 5724,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mpage\u001b[39m\u001b[2m).\u001b[22mtoHaveScreenshot\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\n  Expected an image 390px by 896px, received 390px by 892px. 633 pixels (ratio 0.01 of all image pixels) are different.\n\n  Snapshot: responsive-save-dialog.png\n\nCall log:\n\u001b[2m  - Expect \"toHaveScreenshot(responsive-save-dialog.png)\" with timeout 5000ms\u001b[22m\n\u001b[2m    - verifying given screenshot expectation\u001b[22m\n\u001b[2m  - taking page screenshot\u001b[22m\n\u001b[2m    - disabled all CSS animations\u001b[22m\n\u001b[2m  - waiting for fonts to load...\u001b[22m\n\u001b[2m  - fonts loaded\u001b[22m\n\u001b[2m  - Expected an image 390px by 896px, received 390px by 892px. 633 pixels (ratio 0.01 of all image pixels) are different.\u001b[22m\n\u001b[2m  - waiting 100ms before taking screenshot\u001b[22m\n\u001b[2m  - taking page screenshot\u001b[22m\n\u001b[2m    - disabled all CSS animations\u001b[22m\n\u001b[2m  - waiting for fonts to load...\u001b[22m\n\u001b[2m  - fonts loaded\u001b[22m\n\u001b[2m  - captured a stable screenshot\u001b[22m\n\u001b[2m  - Expected an image 390px by 896px, received 390px by 892px. 633 pixels (ratio 0.01 of all image pixels) are different.\u001b[22m\n",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mpage\u001b[39m\u001b[2m).\u001b[22mtoHaveScreenshot\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\n  Expected an image 390px by 896px, received 390px by 892px. 633 pixels (ratio 0.01 of all image pixels) are different.\n\n  Snapshot: responsive-save-dialog.png\n\nCall log:\n\u001b[2m  - Expect \"toHaveScreenshot(responsive-save-dialog.png)\" with timeout 5000ms\u001b[22m\n\u001b[2m    - verifying given screenshot expectation\u001b[22m\n\u001b[2m  - taking page screenshot\u001b[22m\n\u001b[2m    - disabled all CSS animations\u001b[22m\n\u001b[2m  - waiting for fonts to load...\u001b[22m\n\u001b[2m  - fonts loaded\u001b[22m\n\u001b[2m  - Expected an image 390px by 896px, received 390px by 892px. 633 pixels (ratio 0.01 of all image pixels) are different.\u001b[22m\n\u001b[2m  - waiting 100ms before taking screenshot\u001b[22m\n\u001b[2m  - taking page screenshot\u001b[22m\n\u001b[2m    - disabled all CSS animations\u001b[22m\n\u001b[2m  - waiting for fonts to load...\u001b[22m\n\u001b[2m  - fonts loaded\u001b[22m\n\u001b[2m  - captured a stable screenshot\u001b[22m\n\u001b[2m  - Expected an image 390px by 896px, received 390px by 892px. 633 pixels (ratio 0.01 of all image pixels) are different.\u001b[22m\n\n    at expectLayoutScreenshot (/home/marten/Development/kiga-simulator/tests/responsive-layout.test.js:8:22)\n    at /home/marten/Development/kiga-simulator/tests/responsive-layout.test.js:286:9",
+                    "location": {
+                      "file": "/home/marten/Development/kiga-simulator/tests/responsive-layout.test.js",
+                      "column": 22,
+                      "line": 8
+                    },
+                    "snippet": "   6 |\n   7 | async function expectLayoutScreenshot(page, name) {\n>  8 |   await expect(page).toHaveScreenshot(name, {\n     |                      ^\n   9 |     animations: 'disabled',\n  10 |     caret: 'hide',\n  11 |     fullPage: true,"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/home/marten/Development/kiga-simulator/tests/responsive-layout.test.js",
+                        "column": 22,
+                        "line": 8
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mpage\u001b[39m\u001b[2m).\u001b[22mtoHaveScreenshot\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\n  Expected an image 390px by 896px, received 390px by 892px. 633 pixels (ratio 0.01 of all image pixels) are different.\n\n  Snapshot: responsive-save-dialog.png\n\nCall log:\n\u001b[2m  - Expect \"toHaveScreenshot(responsive-save-dialog.png)\" with timeout 5000ms\u001b[22m\n\u001b[2m    - verifying given screenshot expectation\u001b[22m\n\u001b[2m  - taking page screenshot\u001b[22m\n\u001b[2m    - disabled all CSS animations\u001b[22m\n\u001b[2m  - waiting for fonts to load...\u001b[22m\n\u001b[2m  - fonts loaded\u001b[22m\n\u001b[2m  - Expected an image 390px by 896px, received 390px by 892px. 633 pixels (ratio 0.01 of all image pixels) are different.\u001b[22m\n\u001b[2m  - waiting 100ms before taking screenshot\u001b[22m\n\u001b[2m  - taking page screenshot\u001b[22m\n\u001b[2m    - disabled all CSS animations\u001b[22m\n\u001b[2m  - waiting for fonts to load...\u001b[22m\n\u001b[2m  - fonts loaded\u001b[22m\n\u001b[2m  - captured a stable screenshot\u001b[22m\n\u001b[2m  - Expected an image 390px by 896px, received 390px by 892px. 633 pixels (ratio 0.01 of all image pixels) are different.\u001b[22m\n\n\n   6 |\n   7 | async function expectLayoutScreenshot(page, name) {\n>  8 |   await expect(page).toHaveScreenshot(name, {\n     |                      ^\n   9 |     animations: 'disabled',\n  10 |     caret: 'hide',\n  11 |     fullPage: true,\n    at expectLayoutScreenshot (/home/marten/Development/kiga-simulator/tests/responsive-layout.test.js:8:22)\n    at /home/marten/Development/kiga-simulator/tests/responsive-layout.test.js:286:9"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-05-20T19:59:06.338Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "responsive-save-dialog-expected.png",
+                      "contentType": "image/png",
+                      "path": "/home/marten/Development/kiga-simulator/tests/responsive-layout.test.js-snapshots/responsive-save-dialog-smartphone-linux.png"
+                    },
+                    {
+                      "name": "responsive-save-dialog-actual.png",
+                      "contentType": "image/png",
+                      "path": "/home/marten/Development/kiga-simulator/test-results/responsive-layout-modals-a-d28a3-tay-usable-across-viewports-smartphone/responsive-save-dialog-actual.png"
+                    },
+                    {
+                      "name": "responsive-save-dialog-diff.png",
+                      "contentType": "image/png",
+                      "path": "/home/marten/Development/kiga-simulator/test-results/responsive-layout-modals-a-d28a3-tay-usable-across-viewports-smartphone/responsive-save-dialog-diff.png"
+                    },
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "/home/marten/Development/kiga-simulator/test-results/responsive-layout-modals-a-d28a3-tay-usable-across-viewports-smartphone/test-failed-1.png"
+                    },
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "/home/marten/Development/kiga-simulator/test-results/responsive-layout-modals-a-d28a3-tay-usable-across-viewports-smartphone/video.webm"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/home/marten/Development/kiga-simulator/test-results/responsive-layout-modals-a-d28a3-tay-usable-across-viewports-smartphone/error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "/home/marten/Development/kiga-simulator/test-results/responsive-layout-modals-a-d28a3-tay-usable-across-viewports-smartphone/trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/home/marten/Development/kiga-simulator/tests/responsive-layout.test.js",
+                    "column": 22,
+                    "line": 8
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "d791b0307f367ad6bd45-eeb2f6e4f53d52f7a6a9",
+          "file": "responsive-layout.test.js",
+          "line": 270,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-05-20T19:58:27.600Z",
+    "duration": 45042.217,
+    "expected": 3,
+    "skipped": 0,
+    "unexpected": 6,
+    "flaky": 0
+  }
+}
