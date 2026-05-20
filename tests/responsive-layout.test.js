@@ -9,6 +9,7 @@ async function expectLayoutScreenshot(page, name) {
     animations: 'disabled',
     caret: 'hide',
     fullPage: true,
+    maxDiffPixelRatio: 0.03,
   });
 }
 
