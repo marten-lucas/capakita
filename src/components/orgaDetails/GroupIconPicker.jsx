@@ -56,7 +56,15 @@ function GroupIconPicker({ value, onChange, defaultValue = GROUP_ICON_CATEGORIES
   const triggerLabel = `Gruppenicon auswählen: ${formatGroupIconLabel(normalizedValue)}`;
 
   return (
-    <Popover opened={opened} onChange={(nextOpened) => (nextOpened ? open() : close())} withinPortal position="bottom-start" shadow="md" width={560} offset={8}>
+    <Popover
+      opened={opened}
+      onChange={(nextOpened) => (nextOpened ? open() : close())}
+      withinPortal
+      position="bottom-start"
+      shadow="md"
+      width="min(560px, 92vw)"
+      offset={8}
+    >
       <Popover.Target>
         <Button
           variant="light"
@@ -100,7 +108,7 @@ function GroupIconPicker({ value, onChange, defaultValue = GROUP_ICON_CATEGORIES
                         Keine Icons in dieser Kategorie.
                       </Text>
                     ) : (
-                      <SimpleGrid cols={6} spacing="xs">
+                      <SimpleGrid cols={{ base: 4, sm: 5, md: 6 }} spacing="xs">
                         {icons.map((entry) => {
                           const iconName = entry.icon || entry;
                           const iconLabel = entry.label || GROUP_ICON_LOOKUP[iconName]?.label || formatGroupIconLabel(iconName);

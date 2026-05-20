@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Paper, Tabs, Box } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { IconCalendarEvent, IconCertificate, IconLayersIntersect, IconTools, IconUsers } from '@tabler/icons-react';
 import OrgaTabGroupDefs from '../components/orgaDetails/orgaTabGroupDefs';
 import OrgaTabQualificationDefs from '../components/orgaDetails/orgaTabQualificatoinDefs';
@@ -9,6 +10,7 @@ import OrgaTabFinance from '../components/orgaDetails/orgaTabFinance';
 
 function SettingsView() {
   const [activeTab, setActiveTab] = useState('groups');
+  const isMobile = useMediaQuery('(max-width: 48em)');
 
   const handleTabChange = (value) => {
     setActiveTab(value);
@@ -18,7 +20,12 @@ function SettingsView() {
     <>
       <Paper shadow="sm" withBorder p={0}>
         <Tabs value={activeTab} onChange={handleTabChange}>
-          <Tabs.List>
+          <Tabs.List
+            style={{
+              overflowX: 'auto',
+              flexWrap: 'nowrap',
+            }}
+          >
             <Tabs.Tab value="scenarios" leftSection={<IconLayersIntersect size={16} />}>
               Szenarien
             </Tabs.Tab>
@@ -36,7 +43,7 @@ function SettingsView() {
             </Tabs.Tab>
           </Tabs.List>
 
-          <Box p="md">
+          <Box p={isMobile ? 'sm' : 'md'}>
             <Tabs.Panel value="scenarios">
               <OrgaTabScenarioDefs />
             </Tabs.Panel>

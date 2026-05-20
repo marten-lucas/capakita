@@ -288,7 +288,7 @@ function BookingDetail({ index, booking }) {
 
   return (
     <Stack gap="md">
-      <Group align="center" wrap="nowrap" gap="sm">
+      <Group align="center" wrap="wrap" gap="sm">
         <Text fw={600} style={{ whiteSpace: 'nowrap' }}>Gültigkeitszeitraum</Text>
         <DatePickerInput
           placeholder="Von"

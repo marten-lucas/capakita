@@ -4,6 +4,7 @@ import HighchartsReact from 'highcharts-react-official';
 import Highcharts from 'highcharts';
 import { DatePickerInput } from '@mantine/dates';
 import { ActionIcon, Box, Badge, Group, Paper, Stack, Text, useMantineTheme } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { useSelector, useDispatch } from 'react-redux';
 import { IconChevronDown, IconChevronUp } from '@tabler/icons-react';
 import { setReferenceDate } from '../../store/chartSlice';
@@ -21,6 +22,7 @@ function escapeHtml(value) {
 function EventPicker({ scenarioId }) {
   const dispatch = useDispatch();
   const theme = useMantineTheme();
+  const isMobile = useMediaQuery('(max-width: 48em)');
   const isTestEnvironment = import.meta.env.MODE === 'test';
   const [timelineVisible, setTimelineVisible] = React.useState(false);
   const referenceDate = useSelector((state) => state.chart[scenarioId]?.referenceDate || null);
@@ -148,7 +150,7 @@ function EventPicker({ scenarioId }) {
           <Text fw={700}>Stichtag auswählen</Text>
         </Group>
 
-        <Group align="flex-end" wrap="nowrap" gap="xs">
+        <Group align="flex-end" wrap={isMobile ? 'wrap' : 'nowrap'} gap="xs">
           <Box style={{ flex: 1, minWidth: 0 }}>
             <DatePickerInput
               placeholder="Datum wählen"
@@ -202,7 +204,7 @@ function EventPicker({ scenarioId }) {
               </Text>
 
               {isTestEnvironment ? (
-                <Box data-testid="stichtag-timeline" style={{ display: 'flex', gap: theme.spacing.sm, width: '100%' }}>
+                <Box data-testid="stichtag-timeline" style={{ display: 'flex', gap: theme.spacing.sm, width: '100%', flexWrap: 'wrap' }}>
                   {timelinePoints.length === 0 ? (
                     <Text size="sm" c="dimmed">
                       Keine Timeline-Einträge vorhanden.
@@ -242,7 +244,7 @@ function EventPicker({ scenarioId }) {
                   )}
                 </Box>
               ) : (
-                <Box h={170} data-testid="stichtag-timeline" style={{ width: '100%' }}>
+                <Box h={{ base: 150, sm: 170 }} data-testid="stichtag-timeline" style={{ width: '100%' }}>
                   <HighchartsReact
                     highcharts={Highcharts}
                     options={timelineOptions}

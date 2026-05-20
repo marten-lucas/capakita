@@ -94,8 +94,8 @@ Konfigurierbare Wechsel:
 - Krippe → Kita
 - Kita → Schulkindbetreuung
 
-Mit dem Button Werte in Statistik belegen werden die aktuellen Einstellungen als Referenz in die Statistik übernommen.
-Diese Belegung wird auf der Statistik-Seite als eigene Hinweisbox angezeigt.
+Mit dem Button Werte aus Statistik übernehmen werden die statistisch ermittelten Übergangswerte in die Auto-Event-Einstellungen übernommen.
+Diese übernommenen Werte werden auf der Statistik-Seite als eigene Hinweisbox angezeigt.
 
 ## Szenarien speichern und laden
 

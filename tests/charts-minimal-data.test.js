@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 /**
  * Minimal test data setup
  */
-async function createMinimalTestDataSimple(page, withGroups = false) {
+async function createMinimalTestDataSimple(page) {
   await page.goto('/');
   await page.goto('/data');
   await page.waitForLoadState('networkidle');
@@ -37,7 +37,7 @@ async function createMinimalTestDataSimple(page, withGroups = false) {
 }
 
 test('Minimal Data - No Groups - Chart Rendering', async ({ page }) => {
-  await createMinimalTestDataSimple(page, false);
+  await createMinimalTestDataSimple(page);
   const svgs = page.locator('svg');
   const svgCount = await svgs.count();
   console.log(`Found ${svgCount} SVG elements`);

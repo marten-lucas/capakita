@@ -1,5 +1,5 @@
 import React from 'react';
-import { Stack, TextInput, Radio, Group, Text, Paper, Button, ActionIcon, Select, Badge, Divider } from '@mantine/core';
+import { Stack, TextInput, Radio, Group, Text, Paper, Button, ActionIcon, Select, Badge, Divider, SimpleGrid } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import { useSelector, useDispatch } from 'react-redux';
 import { IconPlus, IconTrash } from '@tabler/icons-react';
@@ -148,7 +148,7 @@ function SimDataGeneralTab() {
 
       <Paper withBorder p="md" radius="md">
         <Text fw={600} mb="xs">Gültigkeit</Text>
-        <Group grow>
+        <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
           <DatePickerInput
             label="Gültig von"
             placeholder="Datum wählen"
@@ -163,7 +163,7 @@ function SimDataGeneralTab() {
             onChange={(date) => handleUpdate({ validUntil: date ? date.toISOString().slice(0, 10) : '' })}
             clearable
           />
-        </Group>
+        </SimpleGrid>
       </Paper>
 
       {itemType === 'capacity' && (
@@ -201,7 +201,7 @@ function SimDataGeneralTab() {
                           <IconTrash size={16} />
                         </ActionIcon>
                       </Group>
-                      <Group grow>
+                      <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
                         <DatePickerInput
                           label="Von"
                           placeholder="Datum wählen"
@@ -216,7 +216,7 @@ function SimDataGeneralTab() {
                           onChange={(date) => handleAbsenceUpdate(absence.id, { end: date ? date.toISOString().slice(0, 10) : '' })}
                           clearable
                         />
-                      </Group>
+                      </SimpleGrid>
                       <Select
                         label="Bezahlung"
                         data={[

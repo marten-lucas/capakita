@@ -5,10 +5,12 @@ import {
   Group,
   NumberInput,
   Paper,
+  SimpleGrid,
   Stack,
   Text,
   TextInput,
 } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { DatePickerInput } from '@mantine/dates';
 import { IconPlus } from '@tabler/icons-react';
 import { useDispatch, useSelector } from 'react-redux';
@@ -59,7 +61,7 @@ function PersonnelCostSummary({ item }) {
 function PersonnelCostDetail({ item, scenarioId, selectedItemId, dispatch }) {
   return (
     <Stack gap="sm">
-      <Group grow>
+      <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
         <DatePickerInput
           label="Gueltig von"
           value={toDateValue(item.validFrom)}
@@ -82,7 +84,7 @@ function PersonnelCostDetail({ item, scenarioId, selectedItemId, dispatch }) {
           }))}
           clearable
         />
-      </Group>
+      </SimpleGrid>
       <NumberInput
         label="Bruttojahresgehalt"
         value={item.annualGrossSalary}
@@ -128,6 +130,7 @@ function PersonnelCostDetail({ item, scenarioId, selectedItemId, dispatch }) {
 
 function SimDataFinanceTab() {
   const dispatch = useDispatch();
+  const isMobile = useMediaQuery('(max-width: 48em)');
   const scenarioId = useSelector((state) => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector((state) => state.simScenario.selectedItems?.[scenarioId]);
   const referenceDate = useSelector((state) => state.chart?.[scenarioId]?.referenceDate || dayjs().format('YYYY-MM-DD'));
@@ -176,19 +179,19 @@ function SimDataFinanceTab() {
 
         <Paper withBorder p="md" radius="md">
           <Stack gap="sm">
-            <Group justify="space-between">
+            <Group justify="space-between" wrap="wrap">
               <Text>Durchschnittliche Wochenstunden</Text>
               <Text fw={600}>{childFinance.weeklyHours.toFixed(1)} h</Text>
             </Group>
-            <Group justify="space-between">
+            <Group justify="space-between" wrap="wrap">
               <Text>Elternbeitrag</Text>
               <Text fw={600}>{formatCurrency(childFinance.parentFeeAmount)}</Text>
             </Group>
-            <Group justify="space-between">
+            <Group justify="space-between" wrap="wrap">
               <Text>BayKiBiG-Foerderung</Text>
               <Text fw={600}>{formatCurrency(childFinance.bayKiBiGAmount)}</Text>
             </Group>
-            <Group justify="space-between">
+            <Group justify="space-between" wrap="wrap">
               <Text fw={600}>Gesamteinnahmen</Text>
               <Text fw={700}>{formatCurrency(childFinance.totalAmount)}</Text>
             </Group>
@@ -215,23 +218,23 @@ function SimDataFinanceTab() {
       <Paper withBorder p="md" radius="md">
         <Stack gap="sm">
           <Text fw={600}>Personalkosten zum Stichtag</Text>
-          <Group justify="space-between">
+          <Group justify="space-between" wrap="wrap">
             <Text>Wochenarbeitszeit (paedagogisch)</Text>
             <Text fw={600}>{weeklyPedagogicalHours.toFixed(1)} h</Text>
           </Group>
-          <Group justify="space-between">
+          <Group justify="space-between" wrap="wrap">
             <Text>Wochenarbeitszeit (administrativ)</Text>
             <Text fw={600}>{weeklyAdministrativeHours.toFixed(1)} h</Text>
           </Group>
-          <Group justify="space-between">
+          <Group justify="space-between" wrap="wrap">
             <Text>Monatliche Basiskosten</Text>
             <Text fw={600}>{formatCurrency(staffFinance.baseMonthlyCost)}</Text>
           </Group>
-          <Group justify="space-between">
+          <Group justify="space-between" wrap="wrap">
             <Text>Anwesenheitsfaktor</Text>
             <Text fw={600}>{(staffFinance.absenceCostFactor * 100).toFixed(0)} %</Text>
           </Group>
-          <Group justify="space-between">
+          <Group justify="space-between" wrap="wrap">
             <Text fw={600}>Monatliche Personalkosten</Text>
             <Text fw={700}>{formatCurrency(staffFinance.adjustedMonthlyCost)}</Text>
           </Group>
@@ -240,7 +243,7 @@ function SimDataFinanceTab() {
 
       <Paper withBorder p="md" radius="md">
         <Stack gap="md">
-          <Group justify="space-between">
+          <Group justify="space-between" wrap="wrap">
             <div>
               <Text fw={600}>Personalkosten</Text>
               <Text size="sm" c="dimmed">Historie mit Bruttojahresgehalt und AG-Nebenkosten. Der Rest bleibt unveraendert.</Text>
@@ -253,6 +256,7 @@ function SimDataFinanceTab() {
                 itemId: selectedItemId,
                 entry: { validFrom: '', validUntil: '', annualGrossSalary: '', employerOnCostPercent: '' },
               }))}
+              fullWidth={isMobile}
             >
               Personalkosten-Eintrag
             </Button>

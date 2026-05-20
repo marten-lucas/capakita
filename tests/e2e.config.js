@@ -3,8 +3,6 @@
  * Defines test levels and datasets for parametrized testing
  */
 
-import path from 'path';
-
 export const TEST_LEVELS = {
   BASIC_SINGLE: 'basic-single',
   FULL_SINGLE: 'full-single',
@@ -78,7 +76,7 @@ export function getTestsetsForLevel(level = TEST_LEVEL) {
  * Determine which tests should run based on level
  */
 export function shouldRunBasicTests(level = TEST_LEVEL) {
-  const { isBasic } = parseTestLevel(level);
+  void level;
   return true; // Basic tests always run
 }
 

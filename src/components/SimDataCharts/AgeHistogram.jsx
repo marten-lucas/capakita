@@ -41,7 +41,7 @@ export default function AgeHistogram() {
   }), [chartData, theme.colors.indigo]);
 
   return (
-    <Box h={400}>
+    <Box h={{ base: 280, sm: 340, lg: 400 }}>
       <HighchartsReact highcharts={Highcharts} options={options} containerProps={{ style: { height: '100%' } }} />
     </Box>
   );

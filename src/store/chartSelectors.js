@@ -11,6 +11,7 @@ import {
   hasAnyBookingInWeek,
   isRecordActiveOnDate,
 } from '../utils/financeUtils';
+import { minutesToTime, timeToMinutes } from '../utils/timeUtils';
 
 const EMPTY_ARRAY = [];
 const EMPTY_OBJECT = {};
@@ -45,6 +46,13 @@ const EMPTY_MIDTERM_DATA = {
   income_total: [],
   expenses_total: [],
   net_total: [],
+  child_count: [],
+  employee_count: [],
+  child_count_by_group: [],
+  employee_count_by_group: [],
+  maxcount: 0,
+  maxchildcount: 0,
+  maxemployeecount: 0,
   maxfinance: 0,
   financeKpis: {
     averageCareRatioWeek: 0,
@@ -84,6 +92,251 @@ const selectQualificationDefsByScenario = (state) => state.simQualification.qual
 const selectEventsByScenario = (state) => state.events?.eventsByScenario || EMPTY_OBJECT;
 const selectFinanceByScenario = (state) => state.simFinance?.financeByScenario || EMPTY_OBJECT;
 
+function parseIsoDate(dateStr) {
+  if (!dateStr || typeof dateStr !== 'string') return null;
+  const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]) - 1;
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month, day));
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function toIsoDate(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function addDays(dateStr, days) {
+  const date = parseIsoDate(dateStr);
+  if (!date) return null;
+  date.setUTCDate(date.getUTCDate() + days);
+  return toIsoDate(date);
+}
+
+function cloneTimes(times = []) {
+  return (times || []).map((day) => ({
+    ...day,
+    segments: (day?.segments || []).map((segment) => ({ ...segment })),
+  }));
+}
+
+function isBookingActiveOnDate(booking, dateStr) {
+  if (!booking || !dateStr) return false;
+  if (booking.startdate && booking.startdate > dateStr) return false;
+  if (booking.enddate && booking.enddate < dateStr) return false;
+  return true;
+}
+
+function adjustSegmentsForDay(segments = [], deltaMinutes) {
+  const nextSegments = (segments || []).map((segment) => ({ ...segment }));
+  if (!deltaMinutes || nextSegments.length === 0) return nextSegments;
+
+  if (deltaMinutes > 0) {
+    const lastSegment = nextSegments[nextSegments.length - 1];
+    const endMinutes = timeToMinutes(lastSegment.booking_end);
+    if (endMinutes === null) return nextSegments;
+    lastSegment.booking_end = minutesToTime(endMinutes + deltaMinutes);
+    return nextSegments;
+  }
+
+  let remainingReduction = Math.abs(deltaMinutes);
+  for (let index = nextSegments.length - 1; index >= 0 && remainingReduction > 0; index -= 1) {
+    const segment = nextSegments[index];
+    const startMinutes = timeToMinutes(segment.booking_start);
+    const endMinutes = timeToMinutes(segment.booking_end);
+    if (startMinutes === null || endMinutes === null || endMinutes <= startMinutes) continue;
+
+    const reducibleMinutes = endMinutes - startMinutes;
+    if (remainingReduction >= reducibleMinutes) {
+      nextSegments.splice(index, 1);
+      remainingReduction -= reducibleMinutes;
+      continue;
+    }
+
+    segment.booking_end = minutesToTime(endMinutes - remainingReduction);
+    remainingReduction = 0;
+  }
+
+  return nextSegments;
+}
+
+function adjustBookingTimesByWeeklyDelta(times = [], weeklyDeltaHours = 0) {
+  const totalDeltaMinutes = Math.round(Number(weeklyDeltaHours || 0) * 60);
+  const activeDayIndexes = (times || []).reduce((indexes, day, index) => {
+    if (Array.isArray(day?.segments) && day.segments.length > 0) {
+      indexes.push(index);
+    }
+    return indexes;
+  }, []);
+
+  if (totalDeltaMinutes === 0 || activeDayIndexes.length === 0) {
+    return cloneTimes(times);
+  }
+
+  const baseDelta = Math.trunc(totalDeltaMinutes / activeDayIndexes.length);
+  let remainder = totalDeltaMinutes - baseDelta * activeDayIndexes.length;
+  const remainderStep = remainder === 0 ? 0 : remainder > 0 ? 1 : -1;
+  const nextTimes = cloneTimes(times);
+
+  activeDayIndexes.forEach((dayIndex) => {
+    let dayDelta = baseDelta;
+    if (remainder !== 0) {
+      dayDelta += remainderStep;
+      remainder -= remainderStep;
+    }
+
+    nextTimes[dayIndex].segments = adjustSegmentsForDay(nextTimes[dayIndex].segments, dayDelta);
+  });
+
+  return nextTimes;
+}
+
+function applyAutoTransitionEventsToBookings(effectiveBookingsByItem, scenarioEvents = []) {
+  const projectedBookingsByItem = Object.fromEntries(
+    Object.entries(effectiveBookingsByItem || {}).map(([itemId, bookings]) => [
+      itemId,
+      Object.fromEntries(Object.entries(bookings || {}).map(([bookingId, booking]) => [bookingId, { ...booking, times: cloneTimes(booking.times) }])),
+    ])
+  );
+
+  const autoEvents = (scenarioEvents || [])
+    .filter((event) => event?.enabled !== false && event?.type === 'auto_group_transition' && event?.effectiveDate && event?.entityId)
+    .sort((left, right) => {
+      const dateDiff = String(left.effectiveDate).localeCompare(String(right.effectiveDate));
+      if (dateDiff !== 0) return dateDiff;
+      return String(left.id).localeCompare(String(right.id));
+    });
+
+  autoEvents.forEach((event) => {
+    const itemBookings = projectedBookingsByItem[event.entityId];
+    if (!itemBookings) return;
+
+    const activeBookingEntry = Object.entries(itemBookings)
+      .filter(([, booking]) => isBookingActiveOnDate(booking, event.effectiveDate))
+      .sort(([, left], [, right]) => String(right.startdate || '').localeCompare(String(left.startdate || '')))[0];
+
+    if (!activeBookingEntry) return;
+
+    const [activeBookingId, activeBooking] = activeBookingEntry;
+    const adjustedTimes = adjustBookingTimesByWeeklyDelta(activeBooking.times, event.metadata?.bookingDeltaHours || 0);
+    const projectedBookingId = `${activeBookingId}__${event.id}`;
+    const previousDate = addDays(event.effectiveDate, -1);
+    const canSplitCurrentBooking = previousDate && (!activeBooking.startdate || activeBooking.startdate <= previousDate);
+
+    if (canSplitCurrentBooking) {
+      itemBookings[activeBookingId] = {
+        ...activeBooking,
+        enddate: previousDate,
+      };
+    } else {
+      delete itemBookings[activeBookingId];
+    }
+
+    itemBookings[projectedBookingId] = {
+      ...activeBooking,
+      id: projectedBookingId,
+      startdate: event.effectiveDate,
+      times: adjustedTimes,
+      metadata: {
+        ...(activeBooking.metadata || {}),
+        projectedFromEventId: event.id,
+        autoGenerated: true,
+      },
+    };
+  });
+
+  return projectedBookingsByItem;
+}
+
+function itemOverlapsBounds(item, bounds) {
+  if (!item || !bounds) return false;
+  const itemStart = item?.startdate || '';
+  const itemEnd = item?.enddate || '';
+  return itemStart <= bounds.end && (itemEnd === '' || itemEnd >= bounds.start);
+}
+
+function bookingOverlapsBounds(booking, bounds) {
+  if (!booking || !bounds) return false;
+  const bookingStart = booking?.startdate || '';
+  const bookingEnd = booking?.enddate || '';
+  return bookingStart <= bounds.end && (bookingEnd === '' || bookingEnd >= bounds.start);
+}
+
+function resolveGroupIdForBounds(assignmentsByItem, itemId, bounds, fallbackGroupId = null) {
+  const assignments = Object.values(assignmentsByItem?.[itemId] || {});
+  const activeAtStart = assignments.find((assignment) => {
+    const startOk = !assignment.start || assignment.start <= bounds.start;
+    const endOk = !assignment.end || assignment.end >= bounds.start;
+    return startOk && endOk;
+  });
+
+  if (activeAtStart?.groupId) {
+    return String(activeAtStart.groupId);
+  }
+
+  const overlapping = assignments
+    .filter((assignment) => {
+      const assignmentStart = assignment?.start || '';
+      const assignmentEnd = assignment?.end || '';
+      return assignmentStart <= bounds.end && (assignmentEnd === '' || assignmentEnd >= bounds.start);
+    })
+    .sort((left, right) => String(left.start || '').localeCompare(String(right.start || '')))[0];
+
+  return overlapping?.groupId ? String(overlapping.groupId) : fallbackGroupId;
+}
+
+function buildGroupedCountSeries({
+  categories,
+  timedimension,
+  effectiveDataItems,
+  effectiveBookingsByItem,
+  effectiveGroupAssignmentsByItem,
+  effectiveGroupDefs,
+  itemType,
+}) {
+  const groupLabelById = new Map(
+    (effectiveGroupDefs || []).map((groupDef) => [String(groupDef.id), groupDef.name || String(groupDef.id)])
+  );
+  const groupedCounts = new Map();
+
+  (categories || []).forEach((category, categoryIndex) => {
+    const bounds = getPeriodBoundsForCategory(timedimension, category);
+    if (!bounds) return;
+
+    Object.entries(effectiveDataItems || {}).forEach(([itemId, item]) => {
+      if (item?.type !== itemType) return;
+      if (!itemOverlapsBounds(item, bounds)) return;
+
+      const hasBooking = Object.values(effectiveBookingsByItem?.[itemId] || {}).some((booking) => bookingOverlapsBounds(booking, bounds));
+      if (!hasBooking) return;
+
+      const resolvedGroupId = resolveGroupIdForBounds(
+        effectiveGroupAssignmentsByItem,
+        itemId,
+        bounds,
+        item?.groupId ? String(item.groupId) : '__NO_GROUP__'
+      ) || '__NO_GROUP__';
+      const groupKey = String(resolvedGroupId);
+      const groupLabel = groupKey === '__NO_GROUP__' ? 'Ohne Gruppe' : (groupLabelById.get(groupKey) || groupKey);
+
+      if (!groupedCounts.has(groupKey)) {
+        groupedCounts.set(groupKey, {
+          groupId: groupKey,
+          name: groupLabel,
+          data: new Array((categories || []).length).fill(0),
+        });
+      }
+
+      groupedCounts.get(groupKey).data[categoryIndex] += 1;
+    });
+  });
+
+  return Array.from(groupedCounts.values())
+    .sort((left, right) => left.name.localeCompare(right.name));
+}
+
 export const selectChartScenarioState = createSelector(
   [selectChartSlice, selectSelectedScenarioId],
   (chartState, scenarioId) => (scenarioId ? (chartState[scenarioId] || EMPTY_OBJECT) : EMPTY_OBJECT)
@@ -110,6 +363,7 @@ export const selectOverlayAwareChartData = createSelector(
     selectGroupsByScenario,
     selectQualificationAssignmentsByScenario,
     selectQualificationDefsByScenario,
+    selectEventsByScenario,
   ],
   (
     scenarioId,
@@ -120,13 +374,14 @@ export const selectOverlayAwareChartData = createSelector(
     groupDefsByScenario,
     groupsByScenario,
     qualificationAssignmentsByScenario,
-    qualificationDefsByScenario
+    qualificationDefsByScenario,
+    eventsByScenario
   ) => {
     if (!scenarioId) {
       return null;
     }
 
-    return buildOverlayAwareData(scenarioId, {
+    const overlayData = buildOverlayAwareData(scenarioId, {
       simScenario: { scenarios },
       simOverlay: { overlaysByScenario },
       simData: { dataByScenario },
@@ -134,6 +389,14 @@ export const selectOverlayAwareChartData = createSelector(
       simGroup: { groupDefsByScenario, groupsByScenario },
       simQualification: { qualificationAssignmentsByScenario, qualificationDefsByScenario },
     });
+
+    return {
+      ...overlayData,
+      effectiveBookingsByItem: applyAutoTransitionEventsToBookings(
+        overlayData.effectiveBookingsByItem,
+        eventsByScenario?.[scenarioId] || EMPTY_ARRAY
+      ),
+    };
   }
 );
 
@@ -272,6 +535,34 @@ export const selectMidtermChartData = createSelector(
       };
     });
 
+    const childCountByGroup = buildGroupedCountSeries({
+      categories: chartData?.categories || [],
+      timedimension,
+      effectiveDataItems,
+      effectiveBookingsByItem,
+      effectiveGroupAssignmentsByItem,
+      effectiveGroupDefs,
+      itemType: 'demand',
+    });
+
+    const employeeCountByGroup = buildGroupedCountSeries({
+      categories: chartData?.categories || [],
+      timedimension,
+      effectiveDataItems,
+      effectiveBookingsByItem,
+      effectiveGroupAssignmentsByItem,
+      effectiveGroupDefs,
+      itemType: 'capacity',
+    });
+
+    const childCount = (chartData?.categories || []).map((_, index) => (
+      childCountByGroup.reduce((sum, entry) => sum + (entry.data[index] || 0), 0)
+    ));
+
+    const employeeCount = (chartData?.categories || []).map((_, index) => (
+      employeeCountByGroup.reduce((sum, entry) => sum + (entry.data[index] || 0), 0)
+    ));
+
     const referenceFinance = calculateScenarioMonthlyFinance({
       referenceDate,
       effectiveDataItems,
@@ -304,6 +595,9 @@ export const selectMidtermChartData = createSelector(
     const incomeTotal = financeSeriesData.map((entry) => entry.income);
     const expensesTotal = financeSeriesData.map((entry) => entry.expenses);
     const netTotal = financeSeriesData.map((entry) => entry.net);
+    const maxchildcount = Math.max(...childCount, 0);
+    const maxemployeecount = Math.max(...employeeCount, 0);
+    const maxcount = Math.max(...childCount, ...employeeCount, 0);
     const maxfinance = Math.max(...incomeTotal, ...expensesTotal, ...netTotal.map((value) => Math.abs(value)), 0);
 
     return {
@@ -321,6 +615,13 @@ export const selectMidtermChartData = createSelector(
       income_total: incomeTotal,
       expenses_total: expensesTotal,
       net_total: netTotal,
+      child_count: childCount,
+      employee_count: employeeCount,
+      child_count_by_group: childCountByGroup,
+      employee_count_by_group: employeeCountByGroup,
+      maxcount,
+      maxchildcount,
+      maxemployeecount,
       maxfinance,
       financeKpis,
       flags,

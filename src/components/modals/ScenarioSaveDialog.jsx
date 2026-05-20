@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { Modal, Button, Stack, Text, Group, PasswordInput, Loader } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { useSaveLoad } from '../../hooks/useSaveLoad';
 import { useSelector, useDispatch } from 'react-redux';
 import { setSaveDialogOpen } from '../../store/simScenarioSlice';
 
 function ScenarioSaveDialog() {
   const dispatch = useDispatch();
+  const isMobile = useMediaQuery('(max-width: 48em)');
   const opened = useSelector(state => state.simScenario.saveDialogOpen);
   const { saveData } = useSaveLoad();
   
@@ -43,7 +45,14 @@ function ScenarioSaveDialog() {
   };
 
   return (
-    <Modal opened={opened} onClose={handleClose} title="Szenarien speichern" centered>
+    <Modal
+      opened={opened}
+      onClose={handleClose}
+      title="Szenarien speichern"
+      centered
+      fullScreen={isMobile}
+      size={isMobile ? '100%' : 'md'}
+    >
       <Stack>
         <PasswordInput
           label="Passwort"
@@ -67,11 +76,11 @@ function ScenarioSaveDialog() {
           Zahlen sowie Sonderzeichen enthalten.
         </Text>
 
-        <Group justify="flex-end" mt="md">
-          <Button variant="subtle" onClick={handleClose} disabled={isSaving}>
+        <Group justify="flex-end" mt="md" wrap="wrap">
+          <Button variant="subtle" onClick={handleClose} disabled={isSaving} fullWidth={isMobile}>
             Abbrechen
           </Button>
-          <Button onClick={handleSubmit} disabled={isSaving || !pwValue || !pwValue2}>
+          <Button onClick={handleSubmit} disabled={isSaving || !pwValue || !pwValue2} fullWidth={isMobile}>
             {isSaving ? <Loader size="xs" color="white" /> : 'Speichern'}
           </Button>
         </Group>

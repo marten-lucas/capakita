@@ -23,6 +23,86 @@ const EMPTY_TRANSITIONS_RESULT = {
   ageHistogram: [],
 };
 
+const ENTRY_STAGE_ID = 'entry';
+const KRIPPE_STAGE_ID = 'krippe';
+const REGEL_STAGE_ID = 'regelgruppe';
+const SCHOOL_STAGE_ID = 'schulkindbetreuung';
+
+const TRANSITION_KIND = {
+  ENTRY_KRIPPE: 'entry_krippe',
+  ENTRY_REGEL: 'entry_regelgruppe',
+  KRIPPE_TO_REGEL: 'krippe_to_regelgruppe',
+  REGEL_TO_SCHOOL: 'regelgruppe_to_schulkindbetreuung',
+};
+
+function getStageLabel(stageId) {
+  if (stageId === ENTRY_STAGE_ID) return 'Einstieg';
+  if (stageId === KRIPPE_STAGE_ID) return 'Krippe';
+  if (stageId === REGEL_STAGE_ID) return 'Regelgruppe';
+  if (stageId === SCHOOL_STAGE_ID) return 'Schulkindbetreuung';
+  return '';
+}
+
+function roundOne(value) {
+  return Math.round((value + Number.EPSILON) * 10) / 10;
+}
+
+function isKrippeGroup(definition, fallbackName = '') {
+  const haystack = `${definition?.type || ''} ${definition?.name || ''} ${fallbackName}`.toLowerCase();
+  return haystack.includes('krippe');
+}
+
+function isSchoolGroup(definition, fallbackName = '') {
+  const haystack = `${definition?.type || ''} ${definition?.name || ''} ${fallbackName}`.toLowerCase();
+  return haystack.includes('schul');
+}
+
+function compressAssignments(assignments) {
+  return assignments.reduce((accumulator, assignment) => {
+    const last = accumulator[accumulator.length - 1];
+    if (last && String(last.groupId) === String(assignment.groupId)) {
+      return accumulator;
+    }
+
+    accumulator.push(assignment);
+    return accumulator;
+  }, []);
+}
+
+function classifyAssignmentStages(assignments, groupDefsById) {
+  const schoolIndex = assignments.findIndex((assignment) => {
+    const definition = groupDefsById[String(assignment.groupId)];
+    return isSchoolGroup(definition, assignment.groupName);
+  });
+  const nonSchoolCutoff = schoolIndex >= 0 ? schoolIndex : assignments.length;
+  const nonSchoolAssignments = assignments.slice(0, nonSchoolCutoff);
+  const hasExplicitKrippeStage = nonSchoolAssignments.some((assignment) => {
+    const definition = groupDefsById[String(assignment.groupId)];
+    return isKrippeGroup(definition, assignment.groupName);
+  });
+
+  return assignments.map((assignment) => {
+    const definition = groupDefsById[String(assignment.groupId)];
+    if (isSchoolGroup(definition, assignment.groupName)) {
+      return { ...assignment, stageId: SCHOOL_STAGE_ID };
+    }
+
+    const nonSchoolIndex = nonSchoolAssignments
+      .filter((candidate) => !isSchoolGroup(groupDefsById[String(candidate.groupId)], candidate.groupName))
+      .findIndex((candidate) => String(candidate.id) === String(assignment.id));
+
+    if (isKrippeGroup(definition, assignment.groupName)) {
+      return { ...assignment, stageId: KRIPPE_STAGE_ID };
+    }
+
+    if (!hasExplicitKrippeStage && nonSchoolAssignments.length >= 2 && nonSchoolIndex === 0) {
+      return { ...assignment, stageId: KRIPPE_STAGE_ID };
+    }
+
+    return { ...assignment, stageId: REGEL_STAGE_ID };
+  });
+}
+
 const AGGREGATIONS = new Set(['month', 'quarter', 'year']);
 
 function parseIsoDate(value) {
@@ -224,6 +304,36 @@ function buildAgeHistogram(ages) {
     .sort((a, b) => a.start - b.start);
 }
 
+export function deriveAutoEventSettingsFromStatistics(transitionStatistics, groupDefs = [], fallbackSettings = {}) {
+  void groupDefs;
+  const groupedTransitions = {
+    kita: (transitionStatistics?.transitions || []).filter(
+      (transition) => transition.transitionKind === TRANSITION_KIND.KRIPPE_TO_REGEL
+    ),
+    school: (transitionStatistics?.transitions || []).filter(
+      (transition) => transition.transitionKind === TRANSITION_KIND.REGEL_TO_SCHOOL
+    ),
+  };
+
+  return ['kita', 'school'].reduce((accumulator, key) => {
+    const routeTransitions = groupedTransitions[key];
+    const fallback = fallbackSettings?.[key] || {};
+    const ages = routeTransitions
+      .map((transition) => transition.ageMonths)
+      .filter((value) => Number.isFinite(value));
+    const deltas = routeTransitions
+      .map((transition) => transition.deltaHours)
+      .filter((value) => Number.isFinite(value));
+
+    accumulator[key] = {
+      ageYears: ages.length > 0 ? roundOne(average(ages) / 12) : Number(fallback.ageYears) || 0,
+      bookingDeltaHours: deltas.length > 0 ? roundOne(average(deltas)) : Number(fallback.bookingDeltaHours) || 0,
+    };
+
+    return accumulator;
+  }, {});
+}
+
 export const selectHistoricalStatistics = createSelector(
   [
     (state) => state.simScenario.selectedScenarioId,
@@ -329,59 +439,112 @@ export const selectGroupTransitionStatistics = createSelector(
     const bookingsByItem = bookingsByScenario?.[scenarioId] || {};
     const groupAssignmentsByItem = groupsByScenario?.[scenarioId] || {};
     const groupDefs = groupDefsByScenario?.[scenarioId] || [];
-    const groupNames = Object.fromEntries((groupDefs || []).map((def) => [String(def.id), def.name || String(def.id)]));
+    const groupDefsById = Object.fromEntries((groupDefs || []).map((def) => [String(def.id), def]));
 
     const transitions = [];
+
+    function pushTransition({ itemId, item, transitionDate, fromStageId, toStageId, transitionKind }) {
+      const bookingMap = bookingsByItem[itemId] || {};
+      const beforeStart = fromStageId === ENTRY_STAGE_ID ? null : addDays(transitionDate, -windowDays);
+      const beforeEnd = fromStageId === ENTRY_STAGE_ID ? null : addDays(transitionDate, -1);
+      const afterStart = transitionDate;
+      const afterEnd = addDays(transitionDate, windowDays - 1) < asOfDate
+        ? addDays(transitionDate, windowDays - 1)
+        : asOfDate;
+
+      const beforeHours = fromStageId === ENTRY_STAGE_ID
+        ? 0
+        : averageWeeklyBookedHoursInWindow(bookingMap, item, beforeStart, beforeEnd);
+      const afterHours = averageWeeklyBookedHoursInWindow(bookingMap, item, afterStart, afterEnd);
+      const deltaHours = roundTwo(afterHours - beforeHours);
+      const deltaPercent = beforeHours > 0 ? roundTwo((deltaHours / beforeHours) * 100) : null;
+      const dateOfBirth = parseIsoDate(item?.dateofbirth);
+      const ageMonths = monthsBetween(dateOfBirth, transitionDate);
+
+      transitions.push({
+        key: `${itemId}:${toIsoDate(transitionDate)}:${transitionKind}`,
+        itemId,
+        itemName: item?.name || itemId,
+        date: toIsoDate(transitionDate),
+        fromGroupId: fromStageId,
+        fromGroupName: getStageLabel(fromStageId),
+        toGroupId: toStageId,
+        toGroupName: getStageLabel(toStageId),
+        transitionKind,
+        ageMonths,
+        beforeHours,
+        afterHours,
+        deltaHours,
+        deltaPercent,
+      });
+    }
 
     Object.entries(items).forEach(([itemId, item]) => {
       if (item?.type !== 'demand') return;
 
-      const assignments = Object.values(groupAssignmentsByItem[itemId] || {})
+      const assignments = compressAssignments(
+        Object.values(groupAssignmentsByItem[itemId] || {})
         .filter((assignment) => assignment?.groupId)
-        .sort((a, b) => normalizeStart(a?.start) - normalizeStart(b?.start));
+        .sort((a, b) => normalizeStart(a?.start) - normalizeStart(b?.start))
+      );
 
-      if (assignments.length < 2) return;
+      if (assignments.length === 0) return;
 
-      for (let index = 1; index < assignments.length; index += 1) {
-        const previous = assignments[index - 1];
-        const current = assignments[index];
+      const classifiedAssignments = classifyAssignmentStages(assignments, groupDefsById);
+      const firstAssignment = classifiedAssignments[0];
+      const firstDate = parseIsoDate(firstAssignment?.start) || parseIsoDate(item?.startdate);
 
-        if (String(previous.groupId) === String(current.groupId)) continue;
+      if (firstDate && firstDate <= asOfDate) {
+        if (firstAssignment.stageId === KRIPPE_STAGE_ID) {
+          pushTransition({
+            itemId,
+            item,
+            transitionDate: firstDate,
+            fromStageId: ENTRY_STAGE_ID,
+            toStageId: KRIPPE_STAGE_ID,
+            transitionKind: TRANSITION_KIND.ENTRY_KRIPPE,
+          });
+        } else if (firstAssignment.stageId === REGEL_STAGE_ID) {
+          pushTransition({
+            itemId,
+            item,
+            transitionDate: firstDate,
+            fromStageId: ENTRY_STAGE_ID,
+            toStageId: REGEL_STAGE_ID,
+            transitionKind: TRANSITION_KIND.ENTRY_REGEL,
+          });
+        }
+      }
 
+      if (classifiedAssignments.length < 2) return;
+
+      for (let index = 1; index < classifiedAssignments.length; index += 1) {
+        const previous = classifiedAssignments[index - 1];
+        const current = classifiedAssignments[index];
         const transitionDate = parseIsoDate(current?.start) || parseIsoDate(previous?.end);
         if (!transitionDate || transitionDate > asOfDate) continue;
 
-        const bookingMap = bookingsByItem[itemId] || {};
-        const beforeStart = addDays(transitionDate, -windowDays);
-        const beforeEnd = addDays(transitionDate, -1);
-        const afterStart = transitionDate;
-        const afterEnd = addDays(transitionDate, windowDays - 1) < asOfDate
-          ? addDays(transitionDate, windowDays - 1)
-          : asOfDate;
+        if (previous.stageId === KRIPPE_STAGE_ID && current.stageId === REGEL_STAGE_ID) {
+          pushTransition({
+            itemId,
+            item,
+            transitionDate,
+            fromStageId: KRIPPE_STAGE_ID,
+            toStageId: REGEL_STAGE_ID,
+            transitionKind: TRANSITION_KIND.KRIPPE_TO_REGEL,
+          });
+        }
 
-        const beforeHours = averageWeeklyBookedHoursInWindow(bookingMap, item, beforeStart, beforeEnd);
-        const afterHours = averageWeeklyBookedHoursInWindow(bookingMap, item, afterStart, afterEnd);
-        const deltaHours = roundTwo(afterHours - beforeHours);
-        const deltaPercent = beforeHours > 0 ? roundTwo((deltaHours / beforeHours) * 100) : null;
-
-        const dateOfBirth = parseIsoDate(item?.dateofbirth);
-        const ageMonths = monthsBetween(dateOfBirth, transitionDate);
-
-        transitions.push({
-          key: `${itemId}:${toIsoDate(transitionDate)}:${previous.groupId}->${current.groupId}`,
-          itemId,
-          itemName: item?.name || itemId,
-          date: toIsoDate(transitionDate),
-          fromGroupId: String(previous.groupId),
-          fromGroupName: groupNames[String(previous.groupId)] || String(previous.groupId),
-          toGroupId: String(current.groupId),
-          toGroupName: groupNames[String(current.groupId)] || String(current.groupId),
-          ageMonths,
-          beforeHours,
-          afterHours,
-          deltaHours,
-          deltaPercent,
-        });
+        if (previous.stageId === REGEL_STAGE_ID && current.stageId === SCHOOL_STAGE_ID) {
+          pushTransition({
+            itemId,
+            item,
+            transitionDate,
+            fromStageId: REGEL_STAGE_ID,
+            toStageId: SCHOOL_STAGE_ID,
+            transitionKind: TRANSITION_KIND.REGEL_TO_SCHOOL,
+          });
+        }
       }
     });
 

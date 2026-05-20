@@ -6,12 +6,14 @@ import {
   Group,
   NumberInput,
   Paper,
+  SimpleGrid,
   Stack,
   Text,
   TextInput,
   FileInput,
   Badge,
 } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { DatePickerInput } from '@mantine/dates';
 import { IconPlus, IconUpload, IconDownload } from '@tabler/icons-react';
 import { useDispatch, useSelector } from 'react-redux';
@@ -37,6 +39,11 @@ import {
 } from '../../utils/feeCatalogTransfer';
 
 const STMAS_BAYKIBIG_URL = 'https://www.stmas.bayern.de/imperia/md/content/stmas/stmas_inet/kinderbetreuung/3.7.2.2_kfa-131118.xls';
+const EMPTY_FINANCE_SCENARIO = {
+  settings: { partialAbsenceThresholdDays: 42, partialAbsenceEmployerSharePercent: 0 },
+  bayKiBiGRules: [],
+  groupFeeCatalogs: {},
+};
 
 function downloadJsonFile(fileName, data) {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -105,7 +112,7 @@ function BufferedNumberInput({ value, onCommit, ...props }) {
 function BayKiBiGSummary({ item }) {
   return (
     <Stack gap={2}>
-      <Group justify="space-between">
+      <Group justify="space-between" wrap="wrap">
         <Text fw={500}>{item.label || 'BayKiBiG-Regel'}</Text>
         <Badge size="sm" variant="light">{formatCurrency(item.baseValue)}/Jahr</Badge>
       </Group>
@@ -131,7 +138,7 @@ function BayKiBiGDetail({ item, scenarioId, dispatch }) {
           updates: { label: nextLabel },
         }))}
       />
-      <Group grow>
+      <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
         <DatePickerInput
           label="Gueltig von"
           value={toDateValue(item.validFrom)}
@@ -152,7 +159,7 @@ function BayKiBiGDetail({ item, scenarioId, dispatch }) {
           }))}
           clearable
         />
-      </Group>
+      </SimpleGrid>
       <BufferedNumberInput
         label="Grundwert pro Jahr (EUR)"
         value={item.baseValue}
@@ -170,7 +177,7 @@ function BayKiBiGDetail({ item, scenarioId, dispatch }) {
       
       <div>
         <Text fw={500} mb="sm">Gewichtungsfaktoren</Text>
-        <Group grow>
+        <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md">
           <BufferedNumberInput
             label="Regelkind (3-6 Jahre)"
             value={factors.regelkind_3to6 ?? 1.0}
@@ -207,8 +214,8 @@ function BayKiBiGDetail({ item, scenarioId, dispatch }) {
             min={0}
             step={0.1}
           />
-        </Group>
-        <Group grow mt="xs">
+        </SimpleGrid>
+        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mt="xs">
           <BufferedNumberInput
             label="Unter 3 Jahren"
             value={factors.under3 ?? 2.0}
@@ -233,7 +240,7 @@ function BayKiBiGDetail({ item, scenarioId, dispatch }) {
             min={0}
             step={0.1}
           />
-        </Group>
+        </SimpleGrid>
       </div>
     </Stack>
   );
@@ -264,7 +271,7 @@ function FeeEntryDetail({ item, groupId, scenarioId, dispatch }) {
           updates: { label: nextLabel },
         }))}
       />
-      <Group grow>
+      <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
         <DatePickerInput
           label="Gueltig von"
           value={toDateValue(item.validFrom)}
@@ -287,7 +294,7 @@ function FeeEntryDetail({ item, groupId, scenarioId, dispatch }) {
           }))}
           clearable
         />
-      </Group>
+      </SimpleGrid>
       <Group grow>
         <BufferedNumberInput
           label="Min. Wochenstunden"
@@ -339,12 +346,11 @@ function FeeEntryDetail({ item, groupId, scenarioId, dispatch }) {
 
 function OrgaTabFinance() {
   const dispatch = useDispatch();
+  const isMobile = useMediaQuery('(max-width: 48em)');
   const selectedScenarioId = useSelector((state) => state.simScenario.selectedScenarioId);
-  const financeScenario = useSelector((state) => state.simFinance.financeByScenario[selectedScenarioId] || {
-    settings: { partialAbsenceThresholdDays: 42, partialAbsenceEmployerSharePercent: 0 },
-    bayKiBiGRules: [],
-    groupFeeCatalogs: {},
-  });
+  const financeScenario = useSelector(
+    (state) => state.simFinance.financeByScenario[selectedScenarioId] || EMPTY_FINANCE_SCENARIO
+  );
   const { getEffectiveGroupDefs } = useOverlayData();
   const groupDefs = getEffectiveGroupDefs();
   const [excelFile, setExcelFile] = React.useState(null);
@@ -436,7 +442,7 @@ function OrgaTabFinance() {
             onDelete={(_, item) => dispatch(deleteBayKiBiGRule({ scenarioId: selectedScenarioId, ruleId: item.id }))}
           />
           
-          <Group align="end" grow>
+          <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
             <FileInput
               label="Offizielle Tabelle importieren"
               placeholder=".xls Datei von stmas.bayern.de"
@@ -450,12 +456,13 @@ function OrgaTabFinance() {
               onClick={() => excelFile && handleImportBayKiBiG(excelFile)}
               disabled={!excelFile}
               mt="auto"
+              fullWidth={isMobile}
             >
               Datei importieren
             </Button>
-          </Group>
+          </SimpleGrid>
 
-          <Group align="end" grow>
+          <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
             <TextInput
               label="Oder per URL importieren"
               value={excelUrl}
@@ -467,10 +474,11 @@ function OrgaTabFinance() {
               onClick={handleImportBayKiBiGFromUrl}
               disabled={!excelUrl?.trim()}
               mt="auto"
+              fullWidth={isMobile}
             >
               URL importieren
             </Button>
-          </Group>
+          </SimpleGrid>
         </Stack>
       </Paper>
 
@@ -482,7 +490,7 @@ function OrgaTabFinance() {
               Nach Ablauf der Lohnfortzahlung kann ein reduzierter Arbeitgeberanteil berechnet werden.
             </Text>
           </div>
-          <Group grow>
+          <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
             <BufferedNumberInput
               label="Schwelle in Tagen (ab wann Reduktion)"
               value={financeScenario.settings?.partialAbsenceThresholdDays ?? 42}
@@ -504,7 +512,7 @@ function OrgaTabFinance() {
               max={100}
               suffix=" %"
             />
-          </Group>
+          </SimpleGrid>
         </Stack>
       </Paper>
 
@@ -517,11 +525,12 @@ function OrgaTabFinance() {
             </Text>
           </div>
 
-          <Group align="end" grow>
+          <SimpleGrid cols={{ base: 1, md: 3 }} spacing="md">
             <Button
               leftSection={<IconDownload size={16} />}
               onClick={handleExportFeeCatalogs}
               variant="light"
+              fullWidth={isMobile}
             >
               Beitragskataloge exportieren
             </Button>
@@ -538,10 +547,11 @@ function OrgaTabFinance() {
               onClick={() => feeCatalogFile && handleImportFeeCatalogs(feeCatalogFile)}
               disabled={!feeCatalogFile}
               mt="auto"
+              fullWidth={isMobile}
             >
               Kataloge importieren
             </Button>
-          </Group>
+          </SimpleGrid>
 
           {groupDefs.length === 0 ? (
             <Text size="sm" c="dimmed">Keine Gruppen vorhanden.</Text>
@@ -552,7 +562,7 @@ function OrgaTabFinance() {
                 return (
                   <Accordion.Item key={group.id} value={group.id}>
                     <Accordion.Control>
-                      <Group justify="space-between">
+                      <Group justify="space-between" wrap="wrap">
                         <div>
                           <Text fw={500}>{group.name || 'Gruppe'}</Text>
                           <Text size="sm" c="dimmed">{entries.length} Staffel{entries.length === 1 ? '' : 'n'}</Text>

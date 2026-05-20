@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { selectGroupTransitionStatistics, selectHistoricalStatistics } from './statisticsSelectors';
+import { deriveAutoEventSettingsFromStatistics, selectGroupTransitionStatistics, selectHistoricalStatistics } from './statisticsSelectors';
 
 function segment(booking_start, booking_end, category = 'pedagogical') {
   return { booking_start, booking_end, category };
@@ -135,13 +135,25 @@ describe('statisticsSelectors', () => {
       windowDays: 90,
     });
 
-    expect(result.summary.count).toBe(1);
-    expect(result.transitions).toHaveLength(1);
+    expect(result.summary.count).toBe(3);
+    expect(result.transitions).toHaveLength(3);
 
-    expect(result.transitions[0]).toMatchObject({
+    expect(result.transitions.find((entry) => entry.transitionKind === 'entry_krippe')).toMatchObject({
+      itemId: 'k1',
+      fromGroupName: 'Einstieg',
+      toGroupName: 'Krippe',
+      transitionKind: 'entry_krippe',
+      date: '2024-01-10',
+      beforeHours: 0,
+      afterHours: 2.71,
+      deltaHours: 2.71,
+    });
+
+    expect(result.transitions.find((entry) => entry.transitionKind === 'krippe_to_regelgruppe')).toMatchObject({
       itemId: 'k1',
       fromGroupName: 'Krippe',
-      toGroupName: 'Kita',
+      toGroupName: 'Regelgruppe',
+      transitionKind: 'krippe_to_regelgruppe',
       date: '2024-02-15',
       ageMonths: 49,
       beforeHours: 2,
@@ -150,11 +162,135 @@ describe('statisticsSelectors', () => {
       deltaPercent: 100,
     });
 
-    expect(result.summary.averageAgeMonths).toBe(49);
-    expect(result.summary.medianAgeMonths).toBe(49);
+    expect(result.transitions.find((entry) => entry.transitionKind === 'entry_regelgruppe')).toMatchObject({
+      itemId: 'k2',
+      fromGroupName: 'Einstieg',
+      toGroupName: 'Regelgruppe',
+      transitionKind: 'entry_regelgruppe',
+      date: '2024-02-01',
+      beforeHours: 0,
+      afterHours: 3,
+      deltaHours: 3,
+    });
+
+    expect(result.summary.averageAgeMonths).toBe(43.67);
+    expect(result.summary.medianAgeMonths).toBe(48);
     expect(result.ageHistogram[0]).toMatchObject({
-      label: '48-50 Monate',
+      label: '33-35 Monate',
       count: 1,
+    });
+  });
+
+  it('derives auto-event settings from grouped transition statistics', () => {
+    const derived = deriveAutoEventSettingsFromStatistics(
+      {
+        transitions: [
+          {
+            transitionKind: 'krippe_to_regelgruppe',
+            ageMonths: 36,
+            deltaHours: 2,
+          },
+          {
+            transitionKind: 'entry_krippe',
+            ageMonths: 35,
+            deltaHours: 7,
+          },
+          {
+            transitionKind: 'regelgruppe_to_schulkindbetreuung',
+            ageMonths: 66,
+            deltaHours: -1,
+          },
+        ],
+      },
+      [],
+      {
+        kita: { ageYears: 3, bookingDeltaHours: 0 },
+        school: { ageYears: 6, bookingDeltaHours: 0 },
+      }
+    );
+
+    expect(derived).toEqual({
+      kita: { ageYears: 3, bookingDeltaHours: 2 },
+      school: { ageYears: 5.5, bookingDeltaHours: -1 },
+    });
+  });
+
+  it('falls back to the youngest non-school route when imported group types do not mark Krippe explicitly', () => {
+    const derived = deriveAutoEventSettingsFromStatistics(
+      {
+        transitions: [
+          {
+            transitionKind: 'krippe_to_regelgruppe',
+            ageMonths: 35,
+            deltaHours: 2.4,
+          },
+          {
+            transitionKind: 'regelgruppe_to_schulkindbetreuung',
+            ageMonths: 80,
+            deltaHours: -8.4,
+          },
+        ],
+      },
+      [],
+      {
+        kita: { ageYears: 3, bookingDeltaHours: 0 },
+        school: { ageYears: 6, bookingDeltaHours: 0 },
+      }
+    );
+
+    expect(derived).toEqual({
+      kita: { ageYears: 2.9, bookingDeltaHours: 2.4 },
+      school: { ageYears: 6.7, bookingDeltaHours: -8.4 },
+    });
+  });
+
+  it('ignores unsupported reverse transitions like regelgruppe to krippe', () => {
+    const state = {
+      simScenario: { selectedScenarioId: 's1' },
+      simData: {
+        dataByScenario: {
+          s1: {
+            k1: { id: 'k1', type: 'demand', startdate: '2024-01-01', enddate: '', dateofbirth: '2020-01-01' },
+          },
+        },
+      },
+      simBooking: {
+        bookingsByScenario: {
+          s1: {
+            k1: {
+              b1: booking('b1', '2024-01-01', '', [segment('08:00', '10:00')]),
+            },
+          },
+        },
+      },
+      simGroup: {
+        groupDefsByScenario: {
+          s1: [
+            { id: 'g1', name: 'Regelgruppe', type: 'Regelgruppe' },
+            { id: 'g2', name: 'Krippe', type: 'Krippe' },
+          ],
+        },
+        groupsByScenario: {
+          s1: {
+            k1: {
+              ga1: { id: 'ga1', groupId: 'g1', start: '2024-01-01', end: '2024-03-31' },
+              ga2: { id: 'ga2', groupId: 'g2', start: '2024-04-01', end: '' },
+            },
+          },
+        },
+      },
+    };
+
+    const result = selectGroupTransitionStatistics(state, {
+      asOfDate: '2024-06-30',
+      windowDays: 90,
+    });
+
+    expect(result.transitions).toHaveLength(1);
+    expect(result.transitions[0]).toMatchObject({
+      transitionKind: 'entry_regelgruppe',
+      fromGroupName: 'Einstieg',
+      toGroupName: 'Regelgruppe',
     });
   });
 });

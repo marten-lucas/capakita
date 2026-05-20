@@ -85,7 +85,7 @@ function BookingWeeklyOverview({ bookingTimes }) {
               <Text size="10px" fw={700} c="dimmed">
                 {day.abbr}
               </Text>
-              <Group gap={3} wrap="nowrap">
+              <Group gap={3} wrap="wrap">
                 {hoursLabel && (
                   <Badge size="xs" variant="light" color="gray">
                     {hoursLabel}
@@ -171,7 +171,7 @@ function BookingCards({ item, index }) {
 
   return (
     <Stack gap={6} w="100%">
-      <Group wrap="nowrap" gap="sm" align="flex-start">
+      <Group wrap="wrap" gap="sm" align="flex-start">
         <Avatar color="blue" radius="xl" size="sm">
           {index + 1}
         </Avatar>

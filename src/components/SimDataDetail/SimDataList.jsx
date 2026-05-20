@@ -71,8 +71,8 @@ function SimDataList() {
     });
 
     return (
-      <Group justify="space-between" wrap="nowrap" gap="sm">
-        <Group wrap="nowrap">
+      <Group justify="space-between" wrap="wrap" gap="sm">
+        <Group wrap="nowrap" style={{ minWidth: 0 }}>
           <Avatar color={item.type === 'demand' ? 'cyan' : 'green'} radius="xl">
             {groupDef?.icon ? (
               <GroupIcon icon={groupDef.icon} size={16} />
@@ -82,16 +82,16 @@ function SimDataList() {
               <IconUser size={20} />
             )}
           </Avatar>
-          <div>
-            <Group gap={5}>
+          <div style={{ minWidth: 0 }}>
+            <Group gap={5} wrap="wrap">
                 <Text size="sm" fw={500}>{item.name}</Text>
                 {hasOverlay(item._key) && <Badge size="xs" color="orange" variant="light">Neu</Badge>}
             </Group>
-            <Text size="xs" c="dimmed">{subtitle}</Text>
+            <Text size="xs" c="dimmed" lineClamp={2}>{subtitle}</Text>
           </div>
         </Group>
         
-        <Group gap={4}>
+        <Group gap={4} wrap="wrap">
             {item.type === 'capacity' && getEffectiveQualificationAssignments(item._key).map(a => (
                 <Badge key={a.id} size="xs" variant="outline" color={isExpert ? 'blue' : 'gray'}>
                     {qualificationDefs.find(d => d.key === a.qualification)?.initial || a.qualification}

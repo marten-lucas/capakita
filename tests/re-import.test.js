@@ -3,9 +3,7 @@ import path from 'path';
 import {
   TEST_LEVEL,
   getTestsetsForLevel,
-  shouldRunBasicTests,
   shouldRunFullTests,
-  parseTestLevel,
   getTestLevelDescription,
 } from './e2e.config.js';
 

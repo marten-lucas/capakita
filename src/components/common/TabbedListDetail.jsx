@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Group, Box, Paper, ScrollArea, Stack, ActionIcon, Text, Title, Badge } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 
 function TabbedListDetail({
   data = [],
@@ -11,6 +12,7 @@ function TabbedListDetail({
   actions, // function(item) -> ReactNode
   emptyText = 'Keine Einträge vorhanden.'
 }) {
+  const isMobile = useMediaQuery('(max-width: 62em)');
   const [uncontrolledSelectedId, setUncontrolledSelectedId] = useState(data[0]?.id || null);
   const selectedId = controlledSelectedId ?? uncontrolledSelectedId;
 
@@ -35,9 +37,21 @@ function TabbedListDetail({
   const selectedItem = data.find(item => item.id === selectedId);
 
   return (
-    <Group align="flex-start" gap="md" h="calc(100vh - 120px)" wrap="nowrap">
+    <Group
+      align="stretch"
+      gap="md"
+      wrap={isMobile ? 'wrap' : 'nowrap'}
+      style={{ height: isMobile ? 'auto' : 'calc(100vh - 120px)' }}
+    >
       {/* Sidebar / List */}
-      <Paper withBorder shadow="xs" w={320} h="100%" display="flex" style={{ flexDirection: 'column' }}>
+      <Paper
+        withBorder
+        shadow="xs"
+        w={isMobile ? '100%' : 320}
+        h={isMobile ? 300 : '100%'}
+        display="flex"
+        style={{ flexDirection: 'column' }}
+      >
         <ScrollArea style={{ flex: 1 }} p="xs">
           {data.length === 0 ? (
             <Text c="dimmed" fs="italic" ta="center" mt="xl">{emptyText}</Text>
@@ -63,17 +77,28 @@ function TabbedListDetail({
       </Paper>
 
       {/* Main Content / Detail */}
-      <Paper withBorder shadow="xs" style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <Paper
+        withBorder
+        shadow="xs"
+        style={{
+          flex: 1,
+          minWidth: isMobile ? '100%' : 0,
+          height: isMobile ? 'auto' : '100%',
+          minHeight: isMobile ? 360 : undefined,
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
         {selectedItem ? (
-          <Box display="flex" style={{ flexDirection: 'column', height: '100%' }}>
-            <Group justify="space-between" p="md" style={{ borderBottom: '1px solid var(--mantine-color-gray-3)' }}>
+          <Box display="flex" style={{ flexDirection: 'column', height: isMobile ? 'auto' : '100%' }}>
+            <Group justify="space-between" p="md" wrap="wrap" style={{ borderBottom: '1px solid var(--mantine-color-gray-3)' }}>
               <Title order={4}>
                 {typeof detailTitle === 'function' ? detailTitle(selectedItem) : detailTitle}
               </Title>
               {actions && actions(selectedItem)}
             </Group>
             
-            <ScrollArea style={{ flex: 1 }} p="md">
+            <ScrollArea style={{ flex: isMobile ? 'initial' : 1 }} p="md" h={isMobile ? 'auto' : undefined} mah={isMobile ? '70vh' : undefined}>
               {typeof detailContent === 'function' ? detailContent(selectedItem) : detailContent}
             </ScrollArea>
           </Box>

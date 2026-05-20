@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { Tabs, Box, Text, Center } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { IconUser, IconClock, IconUsers, IconTools } from '@tabler/icons-react';
 import { useOverlayData } from '../../hooks/useOverlayData';
 import SimDataGeneralTab from './SimDataGeneralTab';
@@ -10,6 +11,7 @@ import SimDataFinanceTab from './SimDataFinanceTab';
 
 function SimDataTabs() {
   const [activeTab, setActiveTab] = useState('general');
+  const isMobile = useMediaQuery('(max-width: 48em)');
 
   // Get selected scenario and item id from Redux
   const scenarioId = useSelector(state => state.simScenario.selectedScenarioId);
@@ -35,9 +37,15 @@ function SimDataTabs() {
   }
 
   return (
-    <Box h="100%" style={{ display: 'flex', flexDirection: 'column' }}>
+    <Box h={isMobile ? 'auto' : '100%'} style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       <Tabs value={activeTab} onChange={setActiveTab} variant="outline">
-        <Tabs.List grow>
+        <Tabs.List
+          grow={!isMobile}
+          style={{
+            overflowX: 'auto',
+            flexWrap: 'nowrap',
+          }}
+        >
           <Tabs.Tab value="general" leftSection={<IconUser size={16} />}>
             Allgemein
           </Tabs.Tab>
@@ -52,7 +60,7 @@ function SimDataTabs() {
           </Tabs.Tab>
         </Tabs.List>
 
-        <Box pt="md" style={{ flex: 1, overflow: 'auto' }}>
+        <Box pt="md" style={{ flex: 1, overflow: 'auto', minHeight: isMobile ? 320 : 0 }}>
           <Tabs.Panel value="general">
             <SimDataGeneralTab />
           </Tabs.Panel>

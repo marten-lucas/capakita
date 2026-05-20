@@ -9,10 +9,12 @@ import {
   Paper,
   SegmentedControl,
   Select,
+  SimpleGrid,
   Stack,
   Text,
   useMantineTheme,
 } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { IconInfoCircle } from '@tabler/icons-react';
 import { useSelector } from 'react-redux';
 import { selectGroupTransitionStatistics, selectHistoricalStatistics } from '../store/statisticsSelectors';
@@ -108,6 +110,7 @@ function shortenRouteLabel(label, maxLength = 22) {
 
 function StatisticsView() {
   const theme = useMantineTheme();
+  const isMobile = useMediaQuery('(max-width: 48em)');
   const isTestEnvironment = import.meta.env.MODE === 'test';
   const [aggregation, setAggregation] = React.useState('month');
   const [timeframe, setTimeframe] = React.useState('all');
@@ -429,6 +432,7 @@ function StatisticsView() {
               { label: 'Jahr', value: 'year' },
             ]}
             data-testid="statistics-aggregation"
+            fullWidth={isMobile}
           />
         </Group>
         <Text c="dimmed">
@@ -441,7 +445,7 @@ function StatisticsView() {
         {statisticsBinding?.snapshot && (
           <Alert icon={<IconInfoCircle size={16} />} color="teal" variant="light" data-testid="statistics-auto-event-binding">
             <Stack gap={4}>
-              <Text fw={600}>Belegte Auto-Event-Werte aus Optionen</Text>
+              <Text fw={600}>Aus Statistik übernommene Auto-Event-Werte</Text>
               <Text size="sm">
                 Krippe → Kita: {statisticsBinding.snapshot.kita?.ageYears ?? 'n/a'} Jahre, Delta {statisticsBinding.snapshot.kita?.bookingDeltaHours ?? 'n/a'} h/Woche
               </Text>
@@ -476,7 +480,7 @@ function StatisticsView() {
               ))}
             </Box>
           ) : (
-            <Box h={320} data-testid="statistics-historical-chart" style={{ width: '100%' }}>
+            <Box h={{ base: 280, sm: 320 }} data-testid="statistics-historical-chart" style={{ width: '100%' }}>
               <HighchartsReact
                 highcharts={Highcharts}
                 options={historicalOptions}
@@ -488,7 +492,7 @@ function StatisticsView() {
 
         <Text size="lg" fw={700} mt="md">Gruppenübergänge</Text>
 
-        <Group grow align="flex-end" data-testid="statistics-transition-filters">
+        <SimpleGrid cols={{ base: 1, md: 3 }} spacing="md" data-testid="statistics-transition-filters">
           <SegmentedControl
             value={timeframe}
             onChange={setTimeframe}
@@ -498,6 +502,7 @@ function StatisticsView() {
               { label: 'Letzte 24M', value: 'last24' },
             ]}
             data-testid="statistics-transition-timeframe"
+            fullWidth
           />
           <Select
             label="Von Gruppe"
@@ -515,7 +520,7 @@ function StatisticsView() {
             allowDeselect={false}
             data-testid="statistics-transition-to-group"
           />
-        </Group>
+        </SimpleGrid>
 
         <Group gap="md" wrap="wrap" data-testid="statistics-transition-kpis">
           <Badge variant="light" size="lg">Übergänge: {filteredSummary.count}</Badge>
@@ -537,7 +542,7 @@ function StatisticsView() {
               ))}
             </Box>
           ) : (
-            <Box h={260} data-testid="statistics-transition-histogram" style={{ width: '100%' }}>
+            <Box h={{ base: 240, sm: 260 }} data-testid="statistics-transition-histogram" style={{ width: '100%' }}>
               <HighchartsReact
                 highcharts={Highcharts}
                 options={histogramOptions}
@@ -547,7 +552,7 @@ function StatisticsView() {
           )}
         </Paper>
 
-        <Group grow align="stretch">
+        <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="md">
           <Paper withBorder p="sm" data-testid="statistics-transition-routes-shell">
             <Text size="sm" fw={600} mb="xs">Übergänge nach Wechselrichtung</Text>
             {routeCounts.length === 0 ? (
@@ -559,7 +564,7 @@ function StatisticsView() {
                 ))}
               </Box>
             ) : (
-              <Box h={260} data-testid="statistics-transition-routes-chart" style={{ width: '100%' }}>
+              <Box h={{ base: 240, sm: 260 }} data-testid="statistics-transition-routes-chart" style={{ width: '100%' }}>
                 <HighchartsReact
                   highcharts={Highcharts}
                   options={routeCountOptions}
@@ -580,7 +585,7 @@ function StatisticsView() {
                 ))}
               </Box>
             ) : (
-              <Box h={260} data-testid="statistics-transition-delta-chart" style={{ width: '100%' }}>
+              <Box h={{ base: 240, sm: 260 }} data-testid="statistics-transition-delta-chart" style={{ width: '100%' }}>
                 <HighchartsReact
                   highcharts={Highcharts}
                   options={routeDeltaOptions}
@@ -589,7 +594,7 @@ function StatisticsView() {
               </Box>
             )}
           </Paper>
-        </Group>
+        </SimpleGrid>
       </Stack>
     </Paper>
   );

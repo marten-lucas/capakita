@@ -50,7 +50,7 @@ function DayHeader({ dayLabel, isActive, onToggle, detailsOpen, onToggleDetails 
     <Group
       justify="space-between"
       align="center"
-      wrap="nowrap"
+      wrap="wrap"
       gap="md"
       style={{
         width: '100%',
@@ -58,7 +58,7 @@ function DayHeader({ dayLabel, isActive, onToggle, detailsOpen, onToggleDetails 
         paddingInline: 16,
       }}
     >
-      <Group align="center" gap="sm" wrap="nowrap" style={{ minHeight: HEADER_ROW_HEIGHT }}>
+      <Group align="center" gap="sm" wrap="wrap" style={{ minHeight: HEADER_ROW_HEIGHT }}>
         <Text w={88} size="sm" fw={700} c="dark.8">
           {dayLabel}
         </Text>
@@ -572,11 +572,11 @@ function DayControl({ dayLabel, dayData, onToggle, onTimeChange, onAddSegment, o
 
                 return (
                   <Paper key={segment.id || idx} withBorder radius="md" p="xs" bg="white" style={{ borderColor: 'var(--mantine-color-gray-3)' }}>
-                    <Group justify="space-between" align="center" wrap="nowrap" gap="sm">
+                    <Group justify="space-between" align="center" wrap="wrap" gap="sm">
                       <Text size="sm" fw={600} c="dark.8" style={{ whiteSpace: 'nowrap', minWidth: 88, flexShrink: 0 }}>
                         Segment {idx + 1}
                       </Text>
-                      <Group align="center" wrap="nowrap" gap="xs" style={{ flex: 1, minWidth: 0 }}>
+                      <Group align="center" wrap="wrap" gap="xs" style={{ flex: 1, minWidth: 0 }}>
                         <TextInput
                           size="xs"
                           value={draft.start}

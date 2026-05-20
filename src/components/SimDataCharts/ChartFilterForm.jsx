@@ -1,5 +1,6 @@
 import React from 'react';
 import { Paper, Stack, Text, Group, Checkbox, MultiSelect, Select, Button, Box } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { IconChevronDown, IconChevronUp } from '@tabler/icons-react';
 import { useSelector, useDispatch } from 'react-redux';
 import {
@@ -17,6 +18,7 @@ const EMPTY_SELECTION = [];
 
 function ChartFilterForm({ showStichtag = false, scenarioId, onTimedimensionChange }) {
   const dispatch = useDispatch();
+  const isMobile = useMediaQuery('(max-width: 62em)');
   const [filtersOpen, setFiltersOpen] = React.useState(true);
 
   React.useEffect(() => {
@@ -32,8 +34,6 @@ function ChartFilterForm({ showStichtag = false, scenarioId, onTimedimensionChan
   const chartToggles = React.useMemo(() => chartState?.chartToggles || DEFAULT_CHART_TOGGLES, [chartState?.chartToggles]);
   const selectedGroups = React.useMemo(() => chartState?.filter?.Groups || EMPTY_SELECTION, [chartState?.filter?.Groups]);
   const selectedQualifications = React.useMemo(() => chartState?.filter?.Qualifications || EMPTY_SELECTION, [chartState?.filter?.Qualifications]);
-  const referenceDate = React.useMemo(() => chartState?.referenceDate || '', [chartState?.referenceDate]);
-
   const { getEffectiveGroupDefs, getEffectiveQualificationDefs } = useOverlayData();
   const groupDefs = getEffectiveGroupDefs();
   const qualificationDefs = getEffectiveQualificationDefs();
@@ -94,19 +94,19 @@ function ChartFilterForm({ showStichtag = false, scenarioId, onTimedimensionChan
         {filtersOpen && (
           <Box data-testid="analysis-filter-content">
             <Stack gap="md">
-            <Checkbox.Group
-              value={chartToggles}
-              onChange={(value) => dispatch(setChartToggles({ scenarioId, toggles: value }))}
-            >
-              <Group>
-                <Checkbox value="weekly" label="Regelbetrieb" />
-                <Checkbox value="midterm" label="Langzeit" />
-                <Checkbox value="ageHistogram" label="Alters-Histogramm" />
-                <Checkbox value="histogram" label="Buchungsverteilung" />
-              </Group>
-            </Checkbox.Group>
+              <Checkbox.Group
+                value={chartToggles}
+                onChange={(value) => dispatch(setChartToggles({ scenarioId, toggles: value }))}
+              >
+                <Group wrap="wrap">
+                  <Checkbox value="weekly" label="Regelbetrieb" />
+                  <Checkbox value="midterm" label="Langzeit" />
+                  <Checkbox value="ageHistogram" label="Alters-Histogramm" />
+                  <Checkbox value="histogram" label="Buchungsverteilung" />
+                </Group>
+              </Checkbox.Group>
 
-            <Group align="flex-start" grow>
+              <Group align="flex-start" grow={!isMobile} wrap={isMobile ? 'wrap' : 'nowrap'}>
               <MultiSelect
                 label="Gruppen"
                 data={groupOptions}
@@ -114,6 +114,7 @@ function ChartFilterForm({ showStichtag = false, scenarioId, onTimedimensionChan
                 onChange={(value) => dispatch(setFilterGroups({ scenarioId, groups: value }))}
                 searchable
                 clearable
+                w={isMobile ? '100%' : undefined}
               />
 
               <MultiSelect
@@ -123,6 +124,7 @@ function ChartFilterForm({ showStichtag = false, scenarioId, onTimedimensionChan
                 onChange={(value) => dispatch(setFilterQualifications({ scenarioId, qualifications: value }))}
                 searchable
                 clearable
+                w={isMobile ? '100%' : undefined}
               />
 
               {chartToggles.includes('midterm') && (
@@ -140,9 +142,10 @@ function ChartFilterForm({ showStichtag = false, scenarioId, onTimedimensionChan
                     dispatch(setTimedimension({ scenarioId, timedimension: value }));
                     onTimedimensionChange?.(value);
                   }}
+                  w={isMobile ? '100%' : undefined}
                 />
               )}
-            </Group>
+              </Group>
 
             {showStichtag && (chartToggles.includes('weekly') || chartToggles.includes('histogram')) && (
               <EventPicker scenarioId={scenarioId} />

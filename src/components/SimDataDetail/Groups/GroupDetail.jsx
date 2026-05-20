@@ -1,5 +1,5 @@
 import React from 'react';
-import { Stack, Text, Group, Paper, Select } from '@mantine/core';
+import { Stack, Text, Group, Paper, Select, SimpleGrid } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import { useSelector, useDispatch } from 'react-redux';
 import { useOverlayData } from '../../../hooks/useOverlayData';
@@ -65,7 +65,7 @@ function GroupDetail({ group }) {
 
       <Paper withBorder p="sm" radius="md">
         <Text fw={600} mb="xs">Zeitraum in der Gruppe</Text>
-        <Group grow>
+        <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
           <DatePickerInput
             label="Zugeordnet von"
             value={startDate}
@@ -84,7 +84,7 @@ function GroupDetail({ group }) {
             placeholder="Datum wählen"
             clearable
           />
-        </Group>
+        </SimpleGrid>
       </Paper>
     </Stack>
   );

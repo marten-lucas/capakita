@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Box, Button, Paper, Title, Text, Stack, ActionIcon, Menu, Group, Container } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { IconUpload, IconPlus, IconUser, IconBabyCarriage, IconLayersIntersect } from '@tabler/icons-react';
 import DataImportModal from '../components/modals/DataImportModal';
 import SimDataList from '../components/SimDataDetail/SimDataList';
@@ -10,6 +11,7 @@ import { useOverlayData } from '../hooks/useOverlayData';
 
 function DataPage() {
   const [modalOpen, setModalOpen] = useState(false);
+  const isMobile = useMediaQuery('(max-width: 48em)');
   const dispatch = useDispatch();
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const scenarios = useSelector(state => state.simScenario.scenarios);
@@ -66,11 +68,11 @@ function DataPage() {
       <Menu position="left-start" offset={10} shadow="md">
         <Menu.Target>
           <ActionIcon 
-            size="xl" 
+            size={isMobile ? 'lg' : 'xl'}
             radius="xl" 
             variant="filled"
             aria-label="Hinzufügen"
-            style={{ position: 'fixed', bottom: 32, right: 32, zIndex: 1000 }}
+            style={{ position: 'fixed', bottom: isMobile ? 16 : 32, right: isMobile ? 16 : 32, zIndex: 1000 }}
           >
             <IconPlus size={24} />
           </ActionIcon>

@@ -81,7 +81,7 @@ export default function BookingHistogram() {
   }, [chartData, demandColor, capacityPedagogicalColor, capacityAdministrativeColor]);
 
   return (
-    <Box h={400}>
+    <Box h={{ base: 280, sm: 340, lg: 400 }}>
       <HighchartsReact highcharts={Highcharts} options={histogramOptions} containerProps={{ style: { height: '100%' } }} />
     </Box>
   );

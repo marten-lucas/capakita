@@ -60,7 +60,7 @@ async function getWeeklyCharts(page) {
 
 async function hoverWeeklyPoint(page, axisTitle, pointIndex) {
   const coords = await page.evaluate(({ axisTitle, pointIndex }) => {
-    const chart = Highcharts.charts.find((candidate) => candidate?.yAxis?.[0]?.axisTitle?.textStr === axisTitle);
+    const chart = window.Highcharts.charts.find((candidate) => candidate?.yAxis?.[0]?.axisTitle?.textStr === axisTitle);
     if (!chart) return null;
 
     const point = chart.series[0]?.points?.[pointIndex];
@@ -88,8 +88,8 @@ async function hoverWeeklyPoint(page, axisTitle, pointIndex) {
 
 async function readWeeklyPointValues(page, pointIndex) {
   const values = await page.evaluate(({ pointIndex }) => {
-    const demandChart = Highcharts.charts.find((candidate) => candidate?.yAxis?.[0]?.axisTitle?.textStr === 'Bedarf (Kinder)');
-    const ratioChart = Highcharts.charts.find((candidate) => candidate?.yAxis?.[0]?.axisTitle?.textStr === 'Betreuungsschlüssel');
+    const demandChart = window.Highcharts.charts.find((candidate) => candidate?.yAxis?.[0]?.axisTitle?.textStr === 'Bedarf (Kinder)');
+    const ratioChart = window.Highcharts.charts.find((candidate) => candidate?.yAxis?.[0]?.axisTitle?.textStr === 'Betreuungsschlüssel');
     if (!demandChart || !ratioChart) return null;
 
     const demandPoint = demandChart.series?.[0]?.points?.[pointIndex];

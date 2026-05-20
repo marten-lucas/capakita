@@ -1,4 +1,5 @@
 import { Box, Paper, Title, Text, Button, Stack, Container } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { IconUpload } from '@tabler/icons-react';
 import WeeklyChart from '../components/SimDataCharts/WeeklyChart';
 import MidtermChart from '../components/SimDataCharts/MidtermChart';
@@ -19,6 +20,7 @@ const EMPTY_TOGGLES = [];
 
 function VisuView() {
   const dispatch = useDispatch();
+  const isMobile = useMediaQuery('(max-width: 48em)');
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const scenarios = useSelector(state => state.simScenario.scenarios);
   const chartState = useSelector((state) => state.chart[selectedScenarioId] ?? null);
@@ -68,7 +70,7 @@ function VisuView() {
   }
 
   return (
-    <Stack gap="lg" pb="xl">
+    <Stack gap={isMobile ? 'md' : 'lg'} pb="xl">
       <ChartFilterForm showStichtag scenarioId={selectedScenarioId} />
       
       {chartToggles.includes('weekly') && (
@@ -83,18 +85,16 @@ function VisuView() {
       {chartToggles.includes('midterm') && (
         <Paper p="md" withBorder>
           <Title order={4} mb="md" c="dimmed">Langzeit</Title>
-          <Box h={400}>
-            <ChartErrorBoundary>
-              <MidtermChart hideFilters scenarioId={selectedScenarioId} />
-            </ChartErrorBoundary>
-          </Box>
+          <ChartErrorBoundary>
+            <MidtermChart hideFilters scenarioId={selectedScenarioId} />
+          </ChartErrorBoundary>
         </Paper>
       )}
 
       {chartToggles.includes('ageHistogram') && (
         <Paper p="md" withBorder>
           <Title order={4} mb="md" c="dimmed">Alters-Histogramm</Title>
-          <Box h={400}>
+          <Box h={{ base: 300, sm: 350, lg: 400 }}>
             <ChartErrorBoundary>
               <AgeHistogram />
             </ChartErrorBoundary>
@@ -105,7 +105,7 @@ function VisuView() {
       {chartToggles.includes('histogram') && (
         <Paper p="md" withBorder>
           <Title order={4} mb="md" c="dimmed">Buchungsverteilung</Title>
-          <Box h={400}>
+          <Box h={{ base: 300, sm: 350, lg: 400 }}>
             <ChartErrorBoundary>
               <BookingHistogram />
             </ChartErrorBoundary>

@@ -589,7 +589,7 @@ test('Chart Tooltip Accuracy - Time Category Displayed', async ({ page }) => {
   try {
     await page.waitForSelector('.highcharts-tooltip, .highcharts-tooltip-box', { timeout: 2000 });
     tooltipContent = await page.locator('.highcharts-tooltip, .highcharts-tooltip-box').first().textContent();
-  } catch (e) {
+  } catch {
     // tooltip might not be rendered as HTML in some modes; leave empty and fall back
     tooltipContent = '';
   }

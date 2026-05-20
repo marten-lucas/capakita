@@ -15,7 +15,9 @@ async function createMinimalTestDataSimple(page) {
       if (!state.simScenario || !state.simScenario.scenarios || state.simScenario.scenarios.length === 0) {
         store.dispatch({ type: 'simScenario/addScenario', payload: { name: 'Test Szenario', id: 'test-sz' } });
       }
-    } catch (e) {}
+    } catch {
+      // ignore test store seeding errors here
+    }
   });
 
   // (Will seed chart and data after navigation to avoid page reload wiping state)
@@ -62,10 +64,12 @@ async function createMinimalTestDataSimple(page) {
       store.dispatch({ type: 'simData/simDataItemAdd', payload: { scenarioId: sid, item: { id: 'child-test-1', type: 'demand', name: 'Child1', startdate: '2025-11-01' } } });
       store.dispatch({ type: 'chart/setChartData', payload: { scenarioId: sid, chartType: 'midterm', data: { categories: ['2025-11'], demand: [0], capacity: [0], flags: [{ x: 0, title: 'T', text: 'seeded flag' }] } } });
       store.dispatch({ type: 'ui/setActivePage', payload: 'visu' });
-    } catch (e) {}
+    } catch {
+      // ignore store mutation failures in fallback seeding
+    }
   });
   const nodeStoreSnap = await page.evaluate(() => {
-    try { return window.__APP_STORE ? window.__APP_STORE.getState() : null } catch (e) { return { err: e.message } }
+    try { return window.__APP_STORE ? window.__APP_STORE.getState() : null; } catch (e) { return { err: e.message }; }
   });
   console.log('NODE DEBUG store snapshot after seeding:', JSON.stringify(nodeStoreSnap && { simScenarioLen: nodeStoreSnap.simScenario?.scenarios?.length, selectedScenarioId: nodeStoreSnap.simScenario?.selectedScenarioId, simDataCount: Object.keys(nodeStoreSnap.simData?.dataByScenario?.[nodeStoreSnap.simScenario?.selectedScenarioId] || {}).length, activePage: nodeStoreSnap.ui?.activePage, chartState: nodeStoreSnap.chart?.[nodeStoreSnap.simScenario?.selectedScenarioId] || null }, null, 2));
   // Debug info: current URL and small page snapshot
@@ -99,7 +103,9 @@ test('Midterm chart shows flags for events', async ({ page }, testInfo) => {
       const state = store.getState();
       const sid = state.simScenario.selectedScenarioId;
       return state.chart?.[sid]?.chartData?.midterm?.flags?.length || 0;
-    } catch (e) { return 0; }
+    } catch {
+      return 0;
+    }
   });
 
   let found = flagsCount;
@@ -114,7 +120,9 @@ test('Midterm chart shows flags for events', async ({ page }, testInfo) => {
         const mid = (state.chart?.[sid]?.chartData?.midterm) || { categories: ['2025-11'] };
         const data = Object.assign({}, mid, { flags: [{ x: 0, title: 'T', text: 'injected test flag' }] });
         store.dispatch({ type: 'chart/setChartData', payload: { scenarioId: sid, chartType: 'midterm', data } });
-      } catch (e) {}
+      } catch {
+        // ignore store mutation failures in fallback seeding
+      }
     });
     // Give a small moment for any listeners to run
     await page.waitForTimeout(300);
@@ -125,7 +133,9 @@ test('Midterm chart shows flags for events', async ({ page }, testInfo) => {
         const state = store.getState();
         const sid = state.simScenario.selectedScenarioId;
         return state.chart?.[sid]?.chartData?.midterm?.flags?.length || 0;
-      } catch (e) { return 0; }
+      } catch {
+        return 0;
+      }
     });
   }
 
@@ -134,7 +144,7 @@ test('Midterm chart shows flags for events', async ({ page }, testInfo) => {
   await page.screenshot({ path: screenshotPath, fullPage: true });
   try {
     testInfo.attach('screenshot', { path: screenshotPath, contentType: 'image/png' });
-  } catch (_) {
+  } catch {
     // attach may fail in some runner configs, ignore
   }
 

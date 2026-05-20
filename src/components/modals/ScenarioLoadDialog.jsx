@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Button, Checkbox, Stack, Text, Group, FileButton, PasswordInput, Loader } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { IconUpload } from '@tabler/icons-react';
 import { useSaveLoad } from '../../hooks/useSaveLoad';
 import { useSelector, useDispatch } from 'react-redux';
@@ -7,6 +8,7 @@ import { setLoadDialogOpen } from '../../store/simScenarioSlice';
 
 function ScenarioLoadDialog({ onLoaded }) {
   const dispatch = useDispatch();
+  const isMobile = useMediaQuery('(max-width: 48em)');
   const opened = useSelector(state => state.simScenario.loadDialogOpen);
   const { loadData } = useSaveLoad();
   
@@ -52,18 +54,25 @@ function ScenarioLoadDialog({ onLoaded }) {
   };
 
   return (
-    <Modal opened={opened} onClose={handleClose} title="Szenario laden" centered>
+    <Modal
+      opened={opened}
+      onClose={handleClose}
+      title="Szenario laden"
+      centered
+      fullScreen={isMobile}
+      size={isMobile ? '100%' : 'md'}
+    >
       <Stack>
         <FileButton onChange={setFile} accept=".capakita,.enc,.txt">
           {(props) => (
-            <Button {...props} leftSection={<IconUpload size={16} />} disabled={isLoading}>
+            <Button {...props} leftSection={<IconUpload size={16} />} disabled={isLoading} fullWidth={isMobile}>
               Datei auswählen
             </Button>
           )}
         </FileButton>
 
         {file && (
-          <Text size="sm" c="dimmed">
+          <Text size="sm" c="dimmed" style={{ wordBreak: 'break-word' }}>
             Ausgewählte Datei: {file.name}
           </Text>
         )}
@@ -84,11 +93,11 @@ function ScenarioLoadDialog({ onLoaded }) {
           disabled={isLoading}
         />
 
-        <Group justify="flex-end" mt="md">
-          <Button variant="subtle" onClick={handleClose} disabled={isLoading}>
+        <Group justify="flex-end" mt="md" wrap="wrap">
+          <Button variant="subtle" onClick={handleClose} disabled={isLoading} fullWidth={isMobile}>
             Abbrechen
           </Button>
-          <Button onClick={handleLoad} disabled={!file || !pwValue || isLoading}>
+          <Button onClick={handleLoad} disabled={!file || !pwValue || isLoading} fullWidth={isMobile}>
             {isLoading ? <Loader size="xs" color="white" /> : 'Laden'}
           </Button>
         </Group>

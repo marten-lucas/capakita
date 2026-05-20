@@ -1,5 +1,6 @@
-import { generateExpertRatioTimeDimension, generateCareRatioTimeDimension, filterBookings } from '../chartUtils/chartUtils';
+import { generateExpertRatioTimeDimension, generateCareRatioTimeDimension } from '../chartUtils/chartUtils';
 import { sumBookingHours } from '../bookingUtils';
+import { getPeriodBoundsForCategory, rangesOverlap } from '../financeUtils';
 
 /**
  * Generate categories for midterm chart from today until the latest event date.
@@ -133,22 +134,94 @@ export function calculateChartDataMidterm(
         qualificationDefs,
         groupsByScenario,
         qualificationAssignmentsByScenario,
-        overlaysByScenario,
         scenarioId,
         timedimension
     }
 ) {
-    // No scenario chain logic here, only use the passed-in data
-    const { demand: filteredDemandBookings, capacity: filteredCapacityBookings } = filterBookings({
-        bookingsByScenario,
-        dataByScenario,
-        qualificationAssignmentsByScenario,
-        overlaysByScenario,
-        scenarioId,
-        referenceDate,
-        selectedGroups,
-        selectedQualifications,
-        groupsByScenario
+    const categoryBounds = (categories || [])
+        .map((category) => getPeriodBoundsForCategory(timedimension, category))
+        .filter(Boolean);
+    const chartRange = categoryBounds.length > 0
+        ? {
+            start: categoryBounds[0].start,
+            end: categoryBounds[categoryBounds.length - 1].end,
+        }
+        : { start: referenceDate, end: referenceDate };
+
+    const bookings = bookingsByScenario[scenarioId] || {};
+    const dataItems = dataByScenario[scenarioId] || {};
+    const qualificationAssignments = qualificationAssignmentsByScenario[scenarioId] || {};
+    const groupAssignments = groupsByScenario?.[scenarioId] || {};
+
+    function resolveGroupId(itemId, date) {
+        const assignments = groupAssignments[itemId] || {};
+        const activeAssignment = Object.values(assignments).find((assignment) => {
+            const startOk = !assignment.start || assignment.start <= date;
+            const endOk = !assignment.end || assignment.end >= date;
+            return startOk && endOk;
+        });
+        return activeAssignment?.groupId || null;
+    }
+
+    const filteredDemandBookings = [];
+    const filteredCapacityBookings = [];
+
+    Object.entries(dataItems).forEach(([itemId, item]) => {
+        if (!item || !rangesOverlap(item.startdate || '', item.enddate || '', chartRange.start, chartRange.end)) {
+            return;
+        }
+
+        const groupId = resolveGroupId(itemId, referenceDate) || item.groupId || null;
+
+        let groupMatch = false;
+        if (selectedGroups.length === 0) {
+            groupMatch = true;
+        } else if (groupId && selectedGroups.includes(groupId)) {
+            groupMatch = true;
+        } else if (Array.isArray(groupId) && groupId.some((groupKey) => selectedGroups.includes(groupKey))) {
+            groupMatch = true;
+        } else if (selectedGroups.includes('__NO_GROUP__') && (!groupId || groupId === '')) {
+            groupMatch = true;
+        }
+
+        if (!groupMatch) {
+            return;
+        }
+
+        const itemBookings = Object.values(bookings[itemId] || {});
+        if (item.type === 'demand') {
+            itemBookings.forEach((booking) => {
+                if (rangesOverlap(booking.startdate || '', booking.enddate || '', chartRange.start, chartRange.end) && sumBookingHours(booking) > 0) {
+                    filteredDemandBookings.push({ ...booking, itemId, groupId });
+                }
+            });
+            return;
+        }
+
+        if (item.type === 'capacity') {
+            const qualiAssignments = Object.values(qualificationAssignments[itemId] || {});
+            const qualiKeys = qualiAssignments.map((assignment) => assignment.qualification);
+
+            let qualificationMatch = false;
+            if (selectedQualifications.length === 0) {
+                qualificationMatch = true;
+            } else if (qualiKeys.some((qualification) => selectedQualifications.includes(qualification))) {
+                qualificationMatch = true;
+            } else if (selectedQualifications.includes('__NO_QUALI__') && qualiKeys.length === 0) {
+                qualificationMatch = true;
+            }
+
+            if (!qualificationMatch) {
+                return;
+            }
+
+            itemBookings.forEach((booking) => {
+                if (rangesOverlap(booking.startdate || '', booking.enddate || '', chartRange.start, chartRange.end)
+                    && sumBookingHours(booking, { mode: 'pedagogical' }) > 0) {
+                    filteredCapacityBookings.push({ ...booking, itemId, groupId, qualifications: qualiKeys });
+                }
+            });
+        }
     });
 
     // Demand/capacity per category: sum booking hours
@@ -157,10 +230,12 @@ export function calculateChartDataMidterm(
         if (!categories || categories.length === 0) return [];
         categories.forEach((cat, idx) => {
             let totalHours = 0;
+            const periodBounds = getPeriodBoundsForCategory(timedimension, cat);
             filteredBookings.forEach(booking => {
-                // For midterm, booking must be active at the category date
-                const isActive = (!booking.startdate || booking.startdate <= cat)
-                    && (!booking.enddate || booking.enddate >= cat);
+                const isActive = periodBounds
+                    ? rangesOverlap(booking.startdate || '', booking.enddate || '', periodBounds.start, periodBounds.end)
+                    : ((!booking.startdate || booking.startdate <= cat)
+                        && (!booking.enddate || booking.enddate >= cat));
                 if (isActive) {
                     totalHours += sumBookingHours(booking, { mode });
                 }

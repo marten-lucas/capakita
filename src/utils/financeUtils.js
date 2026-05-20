@@ -123,10 +123,7 @@ export function getPeriodBoundsForCategory(timedimension, category) {
     if (!match) return null;
     const year = Number(match[1]);
     const quarter = Number(match[2]);
-    const startMonth = (quarter - 1) * 3;
-    const start = new Date(Date.UTC(year, startMonth, 1));
-    const end = new Date(Date.UTC(year, startMonth + 3, 0));
-    return { start: formatIsoDate(start), end: formatIsoDate(end) };
+    return getQuarterBounds(`${year}-${String((quarter - 1) * 3 + 1).padStart(2, '0')}-01`);
   }
 
   if (timedimension === 'year') {

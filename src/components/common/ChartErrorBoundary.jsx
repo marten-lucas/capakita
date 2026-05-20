@@ -27,7 +27,7 @@ class ChartErrorBoundary extends React.Component {
     if (this.state.hasError) {
       return (
         <Alert icon={<IconAlertTriangle size={16} />} color="red" variant="light">
-          <Group justify="space-between" align="center" wrap="nowrap">
+          <Group justify="space-between" align="center" wrap="wrap">
             <Text size="sm">Das Diagramm konnte nicht gerendert werden.</Text>
             <Button size="xs" variant="light" color="red" onClick={this.handleRetry}>
               Erneut versuchen

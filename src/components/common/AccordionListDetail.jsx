@@ -24,7 +24,7 @@ function AccordionListDetail({
         <Accordion variant="separated">
           {items.map((item, index) => (
             <Accordion.Item key={item.id || index} value={item.id || index.toString()}>
-              <Group justify="space-between" align="flex-start" wrap="nowrap" gap="xs">
+              <Group justify="space-between" align="flex-start" wrap="wrap" gap="xs">
                 <Accordion.Control style={{ alignItems: 'flex-start', paddingTop: 4 }}>
                   {renderSummary(item, index)}
                 </Accordion.Control>

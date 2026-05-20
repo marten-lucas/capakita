@@ -15,7 +15,7 @@ import { chromium } from '@playwright/test';
 
   try {
     await page.goto('http://localhost:3000', { waitUntil: 'networkidle', timeout: 30000 });
-  } catch (e) {
+  } catch {
     console.log('Could not connect to localhost:3000. Is the app running?');
     process.exit(1);
   }

@@ -13,6 +13,13 @@ import { Provider } from 'react-redux'
 import store from './store/store'
 import Highcharts from 'highcharts'
 import 'highcharts/modules/stock'
+import 'highcharts/modules/timeline'
+
+Highcharts.setOptions({
+  accessibility: {
+    enabled: false,
+  },
+})
 
 // Configure Highcharts to handle rapid updates gracefully
 Highcharts.Chart.prototype.series = Highcharts.Chart.prototype.series || [];

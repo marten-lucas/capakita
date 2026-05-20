@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { AppShell, Container } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import TopNav from './components/TopNav'
 import AppFooter from './components/AppFooter';
 import DataView from './views/DataView'
@@ -29,6 +30,7 @@ const VIEW_COMPONENTS = {
 
 function App() {
   const dispatch = useDispatch();
+  const isMobile = useMediaQuery('(max-width: 48em)');
   const scenarios = useSelector(state => state.simScenario.scenarios);
   const activePage = useSelector(state => state.ui.activePage);
   const hasAdebisImport = useSelector(selectSelectedScenarioHasAdebisImport);
@@ -56,8 +58,8 @@ function App() {
 
   return (
     <AppShell
-      header={hasScenarios ? { height: 60 } : undefined}
-      padding="md"
+      header={hasScenarios ? { height: isMobile ? 68 : 64 } : undefined}
+      padding={{ base: 'xs', sm: 'md' }}
     >
       <Notifications />
       <ScenarioSaveDialog />
@@ -70,7 +72,7 @@ function App() {
       )}
 
       <AppShell.Main>
-        <Container size="xl">
+        <Container size="xl" px={{ base: 'xs', sm: 'md' }}>
           <ViewComponent />
           <AppFooter />
         </Container>

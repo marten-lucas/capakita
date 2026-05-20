@@ -5,6 +5,7 @@ import Highcharts from 'highcharts';
 import { useSelector } from 'react-redux';
 import { selectEventsForScenario } from '../store/eventSlice';
 import { Group, Text, Card, Divider, SegmentedControl, Stack, Badge, ActionIcon, Box, Paper, useMantineTheme } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { IconChevronDown, IconChevronUp } from '@tabler/icons-react';
 
 function isUnknownEntityName(name) {
@@ -13,6 +14,7 @@ function isUnknownEntityName(name) {
 
 function EventsView() {
   const theme = useMantineTheme();
+  const isMobile = useMediaQuery('(max-width: 48em)');
   const isTestEnvironment = import.meta.env.MODE === 'test';
   const selectedScenarioId = useSelector((state) => state.simScenario.selectedScenarioId);
   const events = useSelector((state) => selectEventsForScenario(state, selectedScenarioId));
@@ -188,6 +190,7 @@ function EventsView() {
             { label: 'Automatisch', value: 'auto' },
             { label: 'Reale', value: 'real' },
           ]}
+          fullWidth={isMobile}
         />
 
         {timelineVisible && (
@@ -197,7 +200,7 @@ function EventsView() {
             </Text>
 
             {isTestEnvironment ? (
-              <Box data-testid="events-timeline" style={{ display: 'flex', gap: theme.spacing.sm, width: '100%' }}>
+              <Box data-testid="events-timeline" style={{ display: 'flex', gap: theme.spacing.sm, width: '100%', flexWrap: 'wrap' }}>
                 {timelinePoints.length === 0 ? (
                   <Text size="sm" c="dimmed">
                     Keine Timeline-Einträge vorhanden.
@@ -257,7 +260,7 @@ function EventsView() {
           <Divider />
           {Object.entries(items).map(([name, evs]) => (
             <Card key={name} withBorder shadow="xs" style={{ marginTop: 8 }}>
-              <Group position="apart">
+              <Group justify="space-between" wrap="wrap">
                 <Text fw={700}>{name}</Text>
                 <Text color="dimmed">{evs.length} Ereignisse</Text>
               </Group>

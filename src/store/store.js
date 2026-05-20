@@ -41,6 +41,15 @@ const store = configureStore({
     datesOfInterest: datesOfInterestReducer,
   },
   preloadedState,
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware({
+      serializableCheck: {
+        warnAfter: 128,
+      },
+      immutableCheck: {
+        warnAfter: 128,
+      },
+    }),
 });
 
 if (store.getState().ui.browserAutoSaveEnabled && !isSaveAllowed(store.getState())) {

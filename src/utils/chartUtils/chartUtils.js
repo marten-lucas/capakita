@@ -43,7 +43,7 @@ export function generateExpertRatioSeries(categories, filteredCapacityBookings, 
   // For each category, count total personnel and expert personnel
   return categories.map((cat) => {
     // Parse category to day and time
-    const [day, time] = cat.split(' ');
+    const [day] = cat.split(' ');
     const categoryMinutes = getCategoryMinutes(cat);
     let total = 0;
     let expert = 0;
@@ -85,7 +85,7 @@ export function generateCareRatioSeries(categories, filteredDemandBookings, filt
 
   return categories.map(cat => {
     // Parse category zu day und time
-    const [day, time] = cat.split(' ');
+    const [day] = cat.split(' ');
     const categoryMinutes = getCategoryMinutes(cat);
 
     // Summe gewichtete Bedarfe (Kinderstunden)

@@ -414,7 +414,7 @@ export default function WeeklyChart() {
     <Box ref={chartContainerRef}>
       <Stack gap="md">
       <Paper withBorder radius="md" p="xs">
-        <Group justify="space-between" align="center" wrap="nowrap" gap="xs">
+        <Group justify="space-between" align="center" wrap="wrap" gap="xs">
           <Group gap={6} wrap="wrap">
             <Badge variant="light" color="gray">{currentLabel}</Badge>
             <Badge variant="light" color="blue">Bedarf: {currentDemand}</Badge>
@@ -444,7 +444,7 @@ export default function WeeklyChart() {
           {pinnedIndex !== null ? 'Werte fixiert' : 'Hover über das Diagramm zeigt aktuelle Werte'}
         </Text>
       </Paper>
-      <Box h={250}>
+      <Box h={{ base: 260, sm: 320 }}>
         <HighchartsReact
           highcharts={Highcharts}
           options={weeklyOptions}
@@ -452,7 +452,7 @@ export default function WeeklyChart() {
           containerProps={{ style: { height: '100%' } }}
         />
       </Box>
-      <Box h={250}>
+      <Box h={{ base: 260, sm: 320 }}>
         <HighchartsReact
           highcharts={Highcharts}
           options={weeklyRatioOptions}
