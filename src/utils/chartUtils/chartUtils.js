@@ -455,8 +455,12 @@ function isBookingActiveInTimePeriod(booking, category, timedimension) {
   // Check if booking overlaps with the time period
   const bookingStart = booking.startdate || '1900-01-01';
   const bookingEnd = booking.enddate || '2100-12-31';
-  
-  return bookingStart <= endDate && bookingEnd >= startDate;
+
+  // If booking contains item validity information, require the item to be active as well
+  const itemStart = booking.itemStart || booking.item_start || booking.itemstart || booking.startdate || '1900-01-01';
+  const itemEnd = booking.itemEnd || booking.item_end || booking.itemend || booking.enddate || '2100-12-31';
+
+  return bookingStart <= endDate && bookingEnd >= startDate && itemStart <= endDate && itemEnd >= startDate;
 }
 
 /**

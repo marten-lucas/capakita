@@ -196,7 +196,13 @@ export function calculateChartDataMidterm(
         if (item.type === 'demand') {
             itemBookings.forEach((booking) => {
                 if (rangesOverlap(booking.startdate || '', booking.enddate || '', chartRange.start, chartRange.end) && sumBookingHours(booking) > 0) {
-                    filteredDemandBookings.push({ ...booking, itemId, groupId });
+                    filteredDemandBookings.push({
+                        ...booking,
+                        itemId,
+                        groupId,
+                        itemStart: item.startdate || '',
+                        itemEnd: item.enddate || '',
+                    });
                 }
             });
             return;
@@ -222,7 +228,14 @@ export function calculateChartDataMidterm(
             itemBookings.forEach((booking) => {
                 if (rangesOverlap(booking.startdate || '', booking.enddate || '', chartRange.start, chartRange.end)
                     && sumBookingHours(booking, { mode: 'pedagogical' }) > 0) {
-                    filteredCapacityBookings.push({ ...booking, itemId, groupId, qualifications: qualiKeys });
+                    filteredCapacityBookings.push({
+                        ...booking,
+                        itemId,
+                        groupId,
+                        qualifications: qualiKeys,
+                        itemStart: item.startdate || '',
+                        itemEnd: item.enddate || '',
+                    });
                 }
             });
         }
@@ -236,11 +249,15 @@ export function calculateChartDataMidterm(
             let totalHours = 0;
             const periodBounds = getPeriodBoundsForCategory(timedimension, cat);
             filteredBookings.forEach(booking => {
-                const isActive = periodBounds
+                const bookingOverlaps = periodBounds
                     ? rangesOverlap(booking.startdate || '', booking.enddate || '', periodBounds.start, periodBounds.end)
-                    : ((!booking.startdate || booking.startdate <= cat)
-                        && (!booking.enddate || booking.enddate >= cat));
-                if (isActive) {
+                    : ((!booking.startdate || booking.startdate <= cat) && (!booking.enddate || booking.enddate >= cat));
+
+                const itemOverlaps = periodBounds
+                    ? rangesOverlap(booking.itemStart || '', booking.itemEnd || '', periodBounds.start, periodBounds.end)
+                    : ((!booking.itemStart || booking.itemStart <= cat) && (!booking.itemEnd || booking.itemEnd >= cat));
+
+                if (bookingOverlaps && itemOverlaps) {
                     totalHours += sumBookingHours(booking, { mode });
                 }
             });
