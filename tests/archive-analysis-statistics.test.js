@@ -100,10 +100,9 @@ test('archived items are excluded from analyse but still counted in statistics',
   await seedArchiveScenario(page);
 
   await page.getByText('Kind Archiv Eins').first().click();
-  const archiveCheckbox = page.getByLabel('Archiviert (nur Statistik, nicht Analyse)');
-  await expect(archiveCheckbox).toBeVisible();
-  await archiveCheckbox.check({ force: true });
-  await expect(archiveCheckbox).toBeChecked();
+  const archiveToggle = page.getByTestId('toggle-archive-archive-child-1');
+  await expect(archiveToggle).toBeVisible();
+  await archiveToggle.click();
 
   await page.getByRole('button', { name: 'Analyse' }).click();
   await expect(page.getByRole('heading', { name: 'Regelbetrieb' })).toBeVisible({ timeout: 10000 });

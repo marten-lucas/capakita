@@ -1,5 +1,5 @@
 import React from 'react';
-import { Stack, TextInput, Radio, Group, Text, Paper, Button, ActionIcon, Select, Badge, Divider, SimpleGrid, Checkbox } from '@mantine/core';
+import { Stack, TextInput, Radio, Group, Text, Paper, Button, ActionIcon, Select, Badge, Divider, SimpleGrid } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import { useSelector, useDispatch } from 'react-redux';
 import { IconPlus, IconTrash } from '@tabler/icons-react';
@@ -165,12 +165,6 @@ function SimDataGeneralTab() {
             clearable
           />
         </SimpleGrid>
-        <Checkbox
-          mt="md"
-          label="Archiviert (nur Statistik, nicht Analyse)"
-          checked={Boolean(item.archived)}
-          onChange={(event) => handleUpdate({ archived: event.currentTarget.checked })}
-        />
       </Paper>
 
       {itemType === 'capacity' && (

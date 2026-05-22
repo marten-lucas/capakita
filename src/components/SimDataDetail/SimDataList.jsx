@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { Group, Avatar, Badge, Text, ActionIcon, Stack, Tooltip, Checkbox, Button, Paper, TextInput, NumberInput, SimpleGrid } from '@mantine/core';
+import { Group, Avatar, Badge, Text, ActionIcon, Stack, Tooltip, Checkbox, Button, Paper, TextInput, NumberInput, SimpleGrid, Switch } from '@mantine/core';
 import { useSelector, useDispatch } from 'react-redux';
 import { setSelectedItem, setSelectedItems, selectSelectedItemIds } from '../../store/simScenarioSlice';
 import {
@@ -8,9 +8,10 @@ import {
   bulkUpdateDataItemsThunk,
   bulkSetQualificationThunk,
   bulkUpsertPersonnelCostThunk,
+  updateDataItemThunk,
 } from '../../store/simDataSlice';
 import { useOverlayData } from '../../hooks/useOverlayData';
-import { IconTrash, IconUser, IconBabyCarriage, IconChevronRight, IconCheck } from '@tabler/icons-react';
+import { IconTrash, IconUser, IconBabyCarriage, IconChevronRight, IconCheck, IconArchive, IconArchiveOff } from '@tabler/icons-react';
 import { getDateRangeString } from '../../utils/dateUtils';
 import { sumBookingHours } from '../../utils/bookingUtils';
 import { shouldShowDataItemInEditor } from '../../utils/dataVisibility';
@@ -27,7 +28,6 @@ function BulkEditPanel({ canEditCapacityOnly, onApply }) {
   const [applySalary, setApplySalary] = useState(false);
   const [applyOnCost, setApplyOnCost] = useState(false);
   const [applyNote, setApplyNote] = useState(false);
-  const [applyArchived, setApplyArchived] = useState(false);
 
   const [validFrom, setValidFrom] = useState('');
   const [validUntil, setValidUntil] = useState('');
@@ -35,12 +35,10 @@ function BulkEditPanel({ canEditCapacityOnly, onApply }) {
   const [annualGrossSalary, setAnnualGrossSalary] = useState('');
   const [employerOnCostPercent, setEmployerOnCostPercent] = useState('');
   const [note, setNote] = useState('');
-  const [archived, setArchived] = useState(false);
 
   const canApply =
     applyValidFrom ||
     applyValidUntil ||
-    applyArchived ||
     (canEditCapacityOnly && (applyQualification || applySalary || applyOnCost || applyNote));
 
   return (
@@ -78,16 +76,6 @@ function BulkEditPanel({ canEditCapacityOnly, onApply }) {
             disabled={!applyValidUntil}
           />
 
-          <Group gap="xs" align="center">
-            <Checkbox checked={applyArchived} onChange={(event) => setApplyArchived(event.currentTarget.checked)} />
-            <Text size="sm" fw={500}>Archivstatus setzen</Text>
-          </Group>
-          <Checkbox
-            label="Archiviert (nur Statistik, nicht Analyse)"
-            checked={archived}
-            onChange={(event) => setArchived(event.currentTarget.checked)}
-            disabled={!applyArchived}
-          />
         </Stack>
       </Paper>
 
@@ -179,14 +167,12 @@ function BulkEditPanel({ canEditCapacityOnly, onApply }) {
               applySalary,
               applyOnCost,
               applyNote,
-              applyArchived,
               validFrom,
               validUntil,
               qualification,
               annualGrossSalary,
               employerOnCostPercent,
               note,
-              archived,
             })
           }
         >
@@ -223,6 +209,7 @@ function SimDataList() {
   const effectiveDataItems = getEffectiveDataItems();
   const groupDefs = getEffectiveGroupDefs();
   const qualificationDefs = getEffectiveQualificationDefs();
+  const [showArchivedItems, setShowArchivedItems] = useState(false);
 
   const data = useMemo(
     () => {
@@ -234,9 +221,10 @@ function SimDataList() {
           id: key,
           _key: key,
         }))
-        .filter((item) => shouldShowDataItemInEditor(item, today));
+        .filter((item) => shouldShowDataItemInEditor(item, today))
+        .filter((item) => showArchivedItems || !item.archived);
     },
-    [effectiveDataItems]
+    [effectiveDataItems, showArchivedItems]
   );
 
   const selectedItems = useMemo(
@@ -298,13 +286,24 @@ function SimDataList() {
     clearSelection();
   };
 
+  const handleArchiveSelected = (archived) => {
+    if (!selectedScenarioId || selectedItemIds.length === 0) return;
+    dispatch(bulkUpdateDataItemsThunk({
+      scenarioId: selectedScenarioId,
+      itemIds: selectedItemIds,
+      updates: { archived: Boolean(archived) },
+    }));
+    if (!showArchivedItems || archived) {
+      clearSelection();
+    }
+  };
+
   const handleApplyBulkEdits = (values) => {
     if (!selectedScenarioId || selectedItemIds.length < 2) return;
 
     const updates = {};
     if (values.applyValidFrom) updates.validFrom = values.validFrom || '';
     if (values.applyValidUntil) updates.validUntil = values.validUntil || '';
-    if (values.applyArchived) updates.archived = Boolean(values.archived);
 
     if (Object.keys(updates).length > 0) {
       dispatch(bulkUpdateDataItemsThunk({ scenarioId: selectedScenarioId, itemIds: selectedItemIds, updates }));
@@ -417,11 +416,29 @@ function SimDataList() {
 
   return (
     <Stack gap="sm">
+      <Paper withBorder p="sm" radius="md">
+        <Group justify="space-between" wrap="wrap">
+          <Text size="sm" c="dimmed">Datenliste</Text>
+          <Switch
+            size="sm"
+            checked={showArchivedItems}
+            onChange={(event) => setShowArchivedItems(event.currentTarget.checked)}
+            label="Archivierte anzeigen"
+          />
+        </Group>
+      </Paper>
+
       {selectedItemIds.length > 0 && (
         <Paper withBorder p="sm" radius="md">
           <Group justify="space-between" wrap="wrap">
             <Text size="sm" fw={500}>{selectedItemIds.length} ausgewählt</Text>
             <Group gap="xs">
+              <Button size="xs" variant="light" leftSection={<IconArchive size={14} />} onClick={() => handleArchiveSelected(true)}>
+                Auswahl archivieren
+              </Button>
+              <Button size="xs" variant="light" leftSection={<IconArchiveOff size={14} />} onClick={() => handleArchiveSelected(false)}>
+                Aus Archiv holen
+              </Button>
               {isMultiSelected && (
                 <Button size="xs" color="red" variant="light" leftSection={<IconTrash size={14} />} onClick={handleBulkDelete}>
                   Auswahl löschen
@@ -448,6 +465,25 @@ function SimDataList() {
         )}
         actions={(item) => (
           <Group gap="xs">
+            <Tooltip label={item.archived ? 'Aus Archiv holen' : 'Archivieren'}>
+              <ActionIcon
+                data-testid={`toggle-archive-${item._key}`}
+                color={item.archived ? 'blue' : 'gray'}
+                variant="subtle"
+                onClick={() => {
+                  dispatch(updateDataItemThunk({
+                    scenarioId: selectedScenarioId,
+                    itemId: item._key,
+                    updates: { archived: !item.archived },
+                  }));
+                  if (!showArchivedItems && !item.archived) {
+                    dispatch(setSelectedItems(selectedItemIds.filter((id) => id !== item._key)));
+                  }
+                }}
+              >
+                {item.archived ? <IconArchiveOff size={18} /> : <IconArchive size={18} />}
+              </ActionIcon>
+            </Tooltip>
             <Tooltip label="Löschen">
               <ActionIcon
                 color="red"
