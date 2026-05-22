@@ -161,3 +161,8 @@ vite.config.ts.timestamp-*
 
 #test results
 test-results
+
+# local testdata artifacts (masked patterns)
+tests/testdata/*Image*.jpeg
+tests/testdata/*.capakita
+tests/testdata/*.capakita.json
