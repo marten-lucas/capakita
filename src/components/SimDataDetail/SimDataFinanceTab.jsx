@@ -60,6 +60,49 @@ function PersonnelCostSummary({ item }) {
 }
 
 function PersonnelCostDetail({ item, scenarioId, selectedItemId, dispatch }) {
+  const [localAnnualGrossSalary, setLocalAnnualGrossSalary] = React.useState(item.annualGrossSalary ?? '');
+  const [localEmployerOnCostPercent, setLocalEmployerOnCostPercent] = React.useState(item.employerOnCostPercent ?? '');
+  const [localNote, setLocalNote] = React.useState(item.note ?? '');
+
+  React.useEffect(() => {
+    setLocalAnnualGrossSalary(item.annualGrossSalary ?? '');
+  }, [item.annualGrossSalary]);
+
+  React.useEffect(() => {
+    setLocalEmployerOnCostPercent(item.employerOnCostPercent ?? '');
+  }, [item.employerOnCostPercent]);
+
+  React.useEffect(() => {
+    setLocalNote(item.note ?? '');
+  }, [item.note]);
+
+  const commitAnnualGrossSalary = () => {
+    dispatch(updatePersonnelCostEntry({
+      scenarioId,
+      itemId: selectedItemId,
+      entryId: item.id,
+      updates: { annualGrossSalary: localAnnualGrossSalary ?? '' },
+    }));
+  };
+
+  const commitEmployerOnCostPercent = () => {
+    dispatch(updatePersonnelCostEntry({
+      scenarioId,
+      itemId: selectedItemId,
+      entryId: item.id,
+      updates: { employerOnCostPercent: localEmployerOnCostPercent ?? '' },
+    }));
+  };
+
+  const commitNote = () => {
+    dispatch(updatePersonnelCostEntry({
+      scenarioId,
+      itemId: selectedItemId,
+      entryId: item.id,
+      updates: { note: localNote ?? '' },
+    }));
+  };
+
   return (
     <Stack gap="sm">
       <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
@@ -88,13 +131,9 @@ function PersonnelCostDetail({ item, scenarioId, selectedItemId, dispatch }) {
       </SimpleGrid>
       <NumberInput
         label="Bruttojahresgehalt"
-        value={item.annualGrossSalary}
-        onChange={(value) => dispatch(updatePersonnelCostEntry({
-          scenarioId,
-          itemId: selectedItemId,
-          entryId: item.id,
-          updates: { annualGrossSalary: value ?? '' },
-        }))}
+        value={localAnnualGrossSalary}
+        onChange={(value) => setLocalAnnualGrossSalary(value ?? '')}
+        onBlur={commitAnnualGrossSalary}
         decimalScale={2}
         min={0}
         thousandSeparator="."
@@ -103,13 +142,9 @@ function PersonnelCostDetail({ item, scenarioId, selectedItemId, dispatch }) {
       />
       <NumberInput
         label="AG-Nebenkosten"
-        value={item.employerOnCostPercent}
-        onChange={(value) => dispatch(updatePersonnelCostEntry({
-          scenarioId,
-          itemId: selectedItemId,
-          entryId: item.id,
-          updates: { employerOnCostPercent: value ?? '' },
-        }))}
+        value={localEmployerOnCostPercent}
+        onChange={(value) => setLocalEmployerOnCostPercent(value ?? '')}
+        onBlur={commitEmployerOnCostPercent}
         decimalScale={2}
         min={0}
         max={200}
@@ -117,13 +152,9 @@ function PersonnelCostDetail({ item, scenarioId, selectedItemId, dispatch }) {
       />
       <TextInput
         label="Notiz"
-        value={item.note || ''}
-        onChange={(event) => dispatch(updatePersonnelCostEntry({
-          scenarioId,
-          itemId: selectedItemId,
-          entryId: item.id,
-          updates: { note: event.currentTarget.value },
-        }))}
+        value={localNote}
+        onChange={(event) => setLocalNote(event.currentTarget.value)}
+        onBlur={commitNote}
       />
     </Stack>
   );

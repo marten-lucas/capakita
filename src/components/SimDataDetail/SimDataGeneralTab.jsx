@@ -33,6 +33,12 @@ function SimDataGeneralTab() {
     dispatch(updateDataItemThunk({ scenarioId, itemId: item.id, updates }));
   };
 
+  const toDateStr = (date) => {
+    if (!date) return '';
+    if (typeof date === 'string') return date.slice(0, 10);
+    return date.toISOString().slice(0, 10);
+  };
+
   const handleQualificationChange = (qualification) => {
     if (!qualification && currentQualificationAssignment) {
       dispatch(
@@ -154,14 +160,14 @@ function SimDataGeneralTab() {
             label="Gültig von"
             placeholder="Datum wählen"
             value={validFrom}
-            onChange={(date) => handleUpdate({ validFrom: date ? date.toISOString().slice(0, 10) : '' })}
+            onChange={(date) => handleUpdate({ validFrom: toDateStr(date) })}
             clearable
           />
           <DatePickerInput
             label="Gültig bis"
             placeholder="Datum wählen"
-            value={validUntil}
-            onChange={(date) => handleUpdate({ validUntil: date ? date.toISOString().slice(0, 10) : '' })}
+              value={validUntil}
+              onChange={(date) => handleUpdate({ validUntil: toDateStr(date) })}
             clearable
           />
         </SimpleGrid>
@@ -207,14 +213,14 @@ function SimDataGeneralTab() {
                           label="Von"
                           placeholder="Datum wählen"
                           value={absence.start ? new Date(absence.start) : null}
-                          onChange={(date) => handleAbsenceUpdate(absence.id, { start: date ? date.toISOString().slice(0, 10) : '' })}
+                          onChange={(date) => handleAbsenceUpdate(absence.id, { start: toDateStr(date) })}
                           clearable
                         />
                         <DatePickerInput
                           label="Bis"
                           placeholder="Datum wählen"
                           value={absence.end ? new Date(absence.end) : null}
-                          onChange={(date) => handleAbsenceUpdate(absence.id, { end: date ? date.toISOString().slice(0, 10) : '' })}
+                          onChange={(date) => handleAbsenceUpdate(absence.id, { end: toDateStr(date) })}
                           clearable
                         />
                       </SimpleGrid>
