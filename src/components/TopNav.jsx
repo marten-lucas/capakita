@@ -146,7 +146,6 @@ function TopNav() {
                 </Menu.Item>
                 <Menu.Item
                   leftSection={<IconDeviceFloppy size={16} />}
-                  disabled={!canSave}
                   onClick={() => dispatch(setSaveDialogOpen(true))}
                 >
                   Szenario speichern
