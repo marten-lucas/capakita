@@ -407,9 +407,44 @@ function OrgaTabFinance() {
       const content = await file.text();
       const parsed = JSON.parse(content);
       const catalogs = parseFeeCatalogImportPayload(parsed);
+
+      // Try to map parsed catalog keys to existing group IDs/names in this scenario
+      const finalCatalogs = {};
+      const parsedKeys = Object.keys(catalogs || {});
+      const usedKeys = new Set();
+
+      if (Array.isArray(groupDefs) && groupDefs.length > 0) {
+        groupDefs.forEach((group) => {
+          const gid = String(group.id);
+          const gname = (group.name || '').toLowerCase();
+
+          // heuristics to find matching parsed key
+          let foundKey = parsedKeys.find((k) => String(k) === gid);
+          if (!foundKey && gname) foundKey = parsedKeys.find((k) => String(k).toLowerCase() === gname);
+          if (!foundKey && gname) foundKey = parsedKeys.find((k) => String(k).toLowerCase().includes(gname));
+          if (!foundKey && gname) foundKey = parsedKeys.find((k) => gname.includes(String(k).toLowerCase()));
+          if (!foundKey) {
+            // try stripping common prefixes like 'group-'
+            foundKey = parsedKeys.find((k) => String(k).replace(/^group-/, '') === gid || String(k).replace(/^group-/, '') === gname);
+          }
+
+          if (foundKey) {
+            finalCatalogs[gid] = catalogs[foundKey];
+            usedKeys.add(foundKey);
+          }
+        });
+
+        // Add any leftover parsed catalogs under their original keys
+        parsedKeys.forEach((k) => {
+          if (!usedKeys.has(k)) finalCatalogs[k] = catalogs[k];
+        });
+      } else {
+        Object.assign(finalCatalogs, catalogs);
+      }
+
       dispatch(setGroupFeeCatalogs({
         scenarioId: selectedScenarioId,
-        catalogs,
+        catalogs: finalCatalogs,
       }));
       setFeeCatalogFile(null);
     } catch (error) {

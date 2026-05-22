@@ -27,13 +27,17 @@ export function parseFeeCatalogImportPayload(parsed) {
 
     if (obj.groupFeeCatalog && typeof obj.groupFeeCatalog === 'object') {
       // Convert legacy/grouped shape into normalized mapping
-      return Object.fromEntries(
-        Object.entries(obj.groupFeeCatalog).map(([key, val]) => {
-          const id = String(val?.groupId || key);
-          const entries = Array.isArray(val?.feeBands) ? val.feeBands : (Array.isArray(val?.entries) ? val.entries : []);
-          return [id, entries];
-        })
-      );
+      // Build mapping and include both the original key and any explicit groupId
+      const pairs = [];
+      Object.entries(obj.groupFeeCatalog).forEach(([key, val]) => {
+        const originalKey = String(key);
+        const explicitId = val?.groupId ? String(val.groupId) : null;
+        const entries = Array.isArray(val?.feeBands) ? val.feeBands : (Array.isArray(val?.entries) ? val.entries : []);
+        // prefer explicitId for canonical mapping but also expose originalKey
+        if (explicitId) pairs.push([explicitId, entries]);
+        if (originalKey !== explicitId) pairs.push([originalKey, entries]);
+      });
+      return Object.fromEntries(pairs);
     }
 
     if (Array.isArray(obj.catalogs)) {
