@@ -1,5 +1,14 @@
 import { createSlice, createSelector } from '@reduxjs/toolkit';
 import { createId } from '../utils/idUtils';
+import {
+  addQualificationAssignment,
+  updateQualificationAssignment,
+  deleteQualificationAssignment,
+} from './simQualificationSlice';
+import {
+  addPersonnelCostEntry,
+  updatePersonnelCostEntry,
+} from './simFinanceSlice';
 
 const initialState = {
   dataByScenario: {},
@@ -16,6 +25,7 @@ const simDataSlice = createSlice({
       state.dataByScenario[scenarioId][key] = {
         ...item,
         id: key,
+        archived: Boolean(item.archived),
         absences: Array.isArray(item.absences)
           ? item.absences.map(a => ({
               ...a,
@@ -87,6 +97,7 @@ const simDataSlice = createSlice({
         const key = createId('simdata');
         state.dataByScenario[scenarioId][key] = {
           ...item,
+          archived: Boolean(item.archived),
           id: key
         };
       });
@@ -105,6 +116,7 @@ const simDataSlice = createSlice({
         dateofbirth: item.dateofbirth || '',
         groupId: item.groupId || '',
         rawdata: { source: item.source || 'manual entry', ...item.rawdata },
+        archived: Boolean(item.archived),
         absences: Array.isArray(item.absences) ? item.absences : [],
         id
       };
@@ -134,6 +146,7 @@ export const addDataItemAndSelect = ({ scenarioId, item }) => (dispatch, getStat
     ...item,
     id,
     name: defaultName,
+    archived: Boolean(item.archived),
     absences: Array.isArray(item.absences) ? item.absences : [],
     source: item.source || 'manual entry',
     rawdata: { source: item.source || 'manual entry', ...item.rawdata }
@@ -263,6 +276,97 @@ export const deleteDataItemThunk = ({ scenarioId, itemId }) => (dispatch, getSta
   dispatch({ type: 'simGroup/deleteAllGroupAssignmentsForItem', payload: { scenarioId, itemId } });
   dispatch({ type: 'simQualification/deleteAllQualificationAssignmentsForItem', payload: { scenarioId, itemId } });
   dispatch({ type: 'simFinance/deleteItemFinance', payload: { scenarioId, itemId } });
+};
+
+export const deleteDataItemsThunk = ({ scenarioId, itemIds }) => (dispatch) => {
+  const ids = Array.isArray(itemIds) ? itemIds : [];
+  ids.forEach((itemId) => {
+    dispatch(deleteDataItemThunk({ scenarioId, itemId }));
+  });
+};
+
+export const bulkUpdateDataItemsThunk = ({ scenarioId, itemIds, updates }) => (dispatch) => {
+  const ids = Array.isArray(itemIds) ? itemIds : [];
+  ids.forEach((itemId) => {
+    dispatch(updateDataItemThunk({ scenarioId, itemId, updates }));
+  });
+};
+
+export const bulkSetQualificationThunk = ({ scenarioId, itemIds, qualification }) => (dispatch, getState) => {
+  const ids = Array.isArray(itemIds) ? itemIds : [];
+  const state = getState();
+  const assignmentsByScenario = state.simQualification.qualificationAssignmentsByScenario?.[scenarioId] || {};
+
+  ids.forEach((itemId) => {
+    const itemAssignments = Object.values(assignmentsByScenario[String(itemId)] || {});
+
+    if (!qualification) {
+      itemAssignments.forEach((assignment) => {
+        dispatch(deleteQualificationAssignment({
+          scenarioId,
+          dataItemId: itemId,
+          assignmentId: assignment.id,
+        }));
+      });
+      return;
+    }
+
+    if (itemAssignments.length > 0) {
+      const [firstAssignment, ...rest] = itemAssignments;
+      dispatch(updateQualificationAssignment({
+        scenarioId,
+        dataItemId: itemId,
+        assignmentId: firstAssignment.id,
+        updates: { qualification },
+      }));
+      rest.forEach((assignment) => {
+        dispatch(deleteQualificationAssignment({
+          scenarioId,
+          dataItemId: itemId,
+          assignmentId: assignment.id,
+        }));
+      });
+      return;
+    }
+
+    dispatch(addQualificationAssignment({
+      scenarioId,
+      dataItemId: itemId,
+      assignment: {
+        id: `${qualification}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        qualification,
+        dataItemId: itemId,
+      },
+    }));
+  });
+};
+
+export const bulkUpsertPersonnelCostThunk = ({ scenarioId, itemIds, entryUpdates }) => (dispatch, getState) => {
+  const ids = Array.isArray(itemIds) ? itemIds : [];
+  const state = getState();
+  const itemFinances = state.simFinance.financeByScenario?.[scenarioId]?.itemFinances || {};
+
+  ids.forEach((itemId) => {
+    const history = itemFinances[String(itemId)]?.personnelCostHistory || [];
+    if (history.length > 0) {
+      dispatch(updatePersonnelCostEntry({
+        scenarioId,
+        itemId,
+        entryId: history[0].id,
+        updates: entryUpdates,
+      }));
+      return;
+    }
+
+    dispatch(addPersonnelCostEntry({
+      scenarioId,
+      itemId,
+      entry: {
+        id: createId('personnel'),
+        ...entryUpdates,
+      },
+    }));
+  });
 };
 
 // Thunk: delete all data items for a scenario and all related data

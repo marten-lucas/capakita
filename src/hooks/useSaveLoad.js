@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import CryptoJS from 'crypto-js';
 import { validatePassword } from '../utils/saveLoadUtils';
-import { setScenarios, setSelectedScenarioId, setSelectedItem } from '../store/simScenarioSlice';
+import { setScenarios, setSelectedScenarioId, setSelectedItems } from '../store/simScenarioSlice';
 
 
 export function useSaveLoad() {
@@ -125,7 +125,7 @@ export function useSaveLoad() {
           dispatch({ type: 'chart/loadChartState', payload: data.chartStore });
         }
 
-        dispatch(setSelectedItem(data.selectedItems?.[data.selectedScenarioId] || null));
+        dispatch(setSelectedItems(data.selectedItems?.[data.selectedScenarioId] || []));
 
         return { success: true };
       } catch {

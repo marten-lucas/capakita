@@ -183,12 +183,15 @@ test.describe('BASIC: Export/Import Roundtrip', () => {
 
     await page.goto('/');
     await page.getByRole('button', { name: /Szenario laden/i }).click();
-    const loadDialog = page.getByRole('dialog');
+    const loadDialog = page.getByRole('dialog', { name: 'Szenario laden' });
     await loadDialog.locator('input[type="file"]').setInputFiles(savedFile);
-    await loadDialog.getByLabel(/^Passwort$/).fill(exportPassword);
-    await loadDialog.getByRole('button', { name: /^Laden$/ }).click();
+    await loadDialog.getByLabel('Passwort für .capakita').fill(exportPassword);
+    await loadDialog.getByLabel('Passwort bestätigen').fill(exportPassword);
+    await loadDialog.getByRole('button', { name: /Datei analysieren/i }).click();
+    await loadDialog.getByRole('button', { name: /Weiter zur Vorschau/i }).click();
+    await loadDialog.getByRole('button', { name: /Import ausführen/i }).click();
 
-    await expect(page.getByLabel('Hinzufügen')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Hinzufügen' })).toBeVisible();
     await expect(page.locator('text=Lina').first()).toBeVisible();
     await expect(page.locator('text=Mara').first()).toBeVisible();
 
@@ -213,7 +216,9 @@ test.describe('IMPORT: Adebis Data & Visualization', () => {
       await page.getByRole('button', { name: /Daten importieren/i }).click();
       const importDialog = page.getByRole('dialog');
       await importDialog.locator('input[type="file"]').setInputFiles(importZip);
-      await importDialog.getByRole('button', { name: /^Importieren$/ }).click();
+      await importDialog.getByRole('button', { name: /Datei analysieren/i }).click();
+      await importDialog.getByRole('button', { name: /Weiter zur Vorschau/i }).click();
+      await importDialog.getByRole('button', { name: /Import ausführen/i }).click();
 
       await expect(page.getByLabel('Hinzufügen')).toBeVisible();
       await expect(page.locator('.mantine-Avatar-root').first()).toBeVisible();
@@ -239,7 +244,9 @@ if (shouldRunFullTests()) {
         await page.getByRole('button', { name: /Daten importieren/i }).click();
         const importDialog = page.getByRole('dialog');
         await importDialog.locator('input[type="file"]').setInputFiles(importZip);
-        await importDialog.getByRole('button', { name: /^Importieren$/ }).click();
+        await importDialog.getByRole('button', { name: /Datei analysieren/i }).click();
+        await importDialog.getByRole('button', { name: /Weiter zur Vorschau/i }).click();
+        await importDialog.getByRole('button', { name: /Import ausführen/i }).click();
 
         await page.getByRole('button', { name: /Optionen/i }).click();
         await page.getByRole('tab', { name: 'Ereignisse' }).click();
@@ -263,7 +270,9 @@ if (shouldRunFullTests()) {
         await page.getByRole('button', { name: /Daten importieren/i }).click();
         const importDialog = page.getByRole('dialog');
         await importDialog.locator('input[type="file"]').setInputFiles(importZip);
-        await importDialog.getByRole('button', { name: /^Importieren$/ }).click();
+        await importDialog.getByRole('button', { name: /Datei analysieren/i }).click();
+        await importDialog.getByRole('button', { name: /Weiter zur Vorschau/i }).click();
+        await importDialog.getByRole('button', { name: /Import ausführen/i }).click();
 
         await page.getByRole('button', { name: 'Analyse' }).click();
 

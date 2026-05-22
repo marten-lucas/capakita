@@ -1,6 +1,7 @@
 import { generateExpertRatioTimeDimension, generateCareRatioTimeDimension } from '../chartUtils/chartUtils';
 import { sumBookingHours } from '../bookingUtils';
 import { getPeriodBoundsForCategory, rangesOverlap } from '../financeUtils';
+import { shouldIncludeDataItemInAnalysis } from '../dataVisibility';
 
 /**
  * Generate categories for midterm chart from today until the latest event date.
@@ -168,6 +169,9 @@ export function calculateChartDataMidterm(
 
     Object.entries(dataItems).forEach(([itemId, item]) => {
         if (!item || !rangesOverlap(item.startdate || '', item.enddate || '', chartRange.start, chartRange.end)) {
+            return;
+        }
+        if (!shouldIncludeDataItemInAnalysis(item)) {
             return;
         }
 

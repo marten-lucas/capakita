@@ -15,3 +15,40 @@ code {
 .mantine-AppShell-header {
   border-bottom: 1px solid var(--mantine-color-blue-1);
 }
+
+.statistics-print-only {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 14mm;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .mantine-AppShell-header,
+  .app-footer,
+  .statistics-print-hide {
+    display: none !important;
+  }
+
+  .statistics-print-only {
+    display: block !important;
+  }
+
+  .statistics-print-block {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .mantine-AppShell-main {
+    padding-top: 0 !important;
+  }
+}

@@ -2,6 +2,7 @@ import React from 'react';
 import { Box } from '@mantine/core';
 import { useSelector, useDispatch } from 'react-redux';
 import { useOverlayData } from '../../../hooks/useOverlayData';
+import { selectPrimarySelectedItemId } from '../../../store/simScenarioSlice';
 import AccordionListDetail from '../../common/AccordionListDetail';
 import GroupCards from './GroupCards';
 import GroupDetail from './GroupDetail';
@@ -10,7 +11,7 @@ import { addGroup } from '../../../store/simGroupSlice';
 function SimDataGroupsTab() {
   const dispatch = useDispatch();
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
-  const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
+  const selectedItemId = useSelector(selectPrimarySelectedItemId);
   const { isBasedScenario, getEffectiveGroupAssignments } = useOverlayData();
 
   if (!selectedItemId) return null;

@@ -43,10 +43,12 @@ async function importAdebisDataset(page) {
   await page.waitForLoadState('networkidle');
   await page.getByRole('button', { name: /Daten importieren/i }).click();
 
-  const importDialog = page.getByRole('dialog', { name: 'Daten importieren' });
+  const importDialog = page.getByRole('dialog', { name: 'Datenimport-Wizard' });
   await expect(importDialog).toBeVisible();
   await importDialog.locator('input[type="file"]').setInputFiles(importZip);
-  await importDialog.getByRole('button', { name: /^Importieren$/ }).click();
+  await importDialog.getByRole('button', { name: /Datei analysieren/i }).click();
+  await importDialog.getByRole('button', { name: /Weiter zur Vorschau/i }).click();
+  await importDialog.getByRole('button', { name: /Import ausführen/i }).click();
 
   await expect(page.getByLabel('Hinzufügen')).toBeVisible({ timeout: 30000 });
 }
@@ -91,6 +93,7 @@ test(`imported dataset ${dataset.name} stays responsive across main pages`, asyn
 
   await openMainPage(page, 'Statistik');
   await expect(page.getByTestId('statistics-view')).toBeVisible();
+  await expect(page.getByRole('button', { name: /Als PDF exportieren/i })).toBeVisible();
   await expectNoHorizontalOverflow(page, 'realdata statistics view');
   await expectLayoutScreenshot(page, 'responsive-realdata-statistics-view.png', { fullPage: false });
 });

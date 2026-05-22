@@ -4,6 +4,7 @@ import { Tabs, Box, Text, Center } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { IconUser, IconClock, IconUsers, IconTools } from '@tabler/icons-react';
 import { useOverlayData } from '../../hooks/useOverlayData';
+import { selectPrimarySelectedItemId } from '../../store/simScenarioSlice';
 import SimDataGeneralTab from './SimDataGeneralTab';
 import SimDataBookingTab from './Bookings/SimDataBookingTab';
 import SimDataGroupsTab from './Groups/SimDataGroupsTab';
@@ -14,8 +15,7 @@ function SimDataTabs() {
   const isMobile = useMediaQuery('(max-width: 48em)');
 
   // Get selected scenario and item id from Redux
-  const scenarioId = useSelector(state => state.simScenario.selectedScenarioId);
-  const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[scenarioId]);
+  const selectedItemId = useSelector(selectPrimarySelectedItemId);
 
   // Use overlay hook to get effective data
   const { getEffectiveDataItem } = useOverlayData();

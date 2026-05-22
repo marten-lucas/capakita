@@ -15,6 +15,7 @@ import { DatePickerInput } from '@mantine/dates';
 import { IconPlus } from '@tabler/icons-react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useOverlayData } from '../../hooks/useOverlayData';
+import { selectPrimarySelectedItemId } from '../../store/simScenarioSlice';
 import AccordionListDetail from '../common/AccordionListDetail';
 import {
   addPersonnelCostEntry,
@@ -132,7 +133,7 @@ function SimDataFinanceTab() {
   const dispatch = useDispatch();
   const isMobile = useMediaQuery('(max-width: 48em)');
   const scenarioId = useSelector((state) => state.simScenario.selectedScenarioId);
-  const selectedItemId = useSelector((state) => state.simScenario.selectedItems?.[scenarioId]);
+  const selectedItemId = useSelector(selectPrimarySelectedItemId);
   const referenceDate = useSelector((state) => state.chart?.[scenarioId]?.referenceDate || dayjs().format('YYYY-MM-DD'));
   const financeScenario = useSelector((state) => state.simFinance.financeByScenario[scenarioId] || {
     settings: { partialAbsenceThresholdDays: 42, partialAbsenceEmployerSharePercent: 0 },

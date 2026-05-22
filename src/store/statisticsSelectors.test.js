@@ -117,6 +117,44 @@ describe('statisticsSelectors', () => {
     });
   });
 
+  it('counts and transitions only include demand children with STATUS +', () => {
+    const statusState = {
+      ...baseState,
+      simData: {
+        ...baseState.simData,
+        dataByScenario: {
+          ...baseState.simData.dataByScenario,
+          s1: {
+            ...baseState.simData.dataByScenario.s1,
+            k2: {
+              ...baseState.simData.dataByScenario.s1.k2,
+              rawdata: { STATUS: 'A' },
+            },
+          },
+        },
+      },
+    };
+
+    const historical = selectHistoricalStatistics(statusState, {
+      aggregation: 'month',
+      asOfDate: '2024-03-31',
+    });
+
+    expect(historical.buckets[1]).toMatchObject({
+      label: '02.2024',
+      childrenCount: 1,
+      bookingHours: 4,
+    });
+
+    const transitions = selectGroupTransitionStatistics(statusState, {
+      asOfDate: '2024-06-30',
+      windowDays: 90,
+    });
+
+    expect(transitions.transitions.every((entry) => entry.itemId !== 'k2')).toBe(true);
+    expect(transitions.summary.count).toBe(2);
+  });
+
   it('returns empty buckets when no selected scenario exists', () => {
     const result = selectHistoricalStatistics(
       {

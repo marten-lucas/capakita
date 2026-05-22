@@ -4,6 +4,7 @@ import { calculateChartDataWeekly } from '../utils/chartUtils/chartUtilsWeekly';
 import { calculateChartDataMidterm, generateMidtermCategories, formatDateToCategory } from '../utils/chartUtils/chartUtilsMidterm';
 import { calculateChartDataHistogram } from '../utils/chartUtils/chartUtilsHistogram';
 import { calculateChartDataAgeHistogram } from '../utils/chartUtils/chartUtilsAgeHistogram';
+import { isArchivedDataItem } from '../utils/dataVisibility';
 import {
   calculateScenarioMonthlyFinance,
   convertMonthlyAmountToPeriod,
@@ -307,6 +308,7 @@ function buildGroupedCountSeries({
 
     Object.entries(effectiveDataItems || {}).forEach(([itemId, item]) => {
       if (item?.type !== itemType) return;
+      if (isArchivedDataItem(item)) return;
       if (!itemOverlapsBounds(item, bounds)) return;
 
       const hasBooking = Object.values(effectiveBookingsByItem?.[itemId] || {}).some((booking) => bookingOverlapsBounds(booking, bounds));
@@ -451,6 +453,69 @@ export const selectWeeklyChartData = createSelector(
   }
 );
 
+export const selectWeeklyChartDataByGroup = createSelector(
+  [selectSelectedScenarioId, selectChartFilters, selectOverlayAwareChartData],
+  (scenarioId, { referenceDate, selectedGroups, selectedQualifications }, overlayData) => {
+    if (!scenarioId || !overlayData) {
+      return EMPTY_ARRAY;
+    }
+
+    const {
+      effectiveDataItems,
+      effectiveBookingsByItem,
+      effectiveGroupAssignmentsByItem,
+      effectiveQualificationAssignmentsByItem,
+      effectiveGroupDefs,
+      effectiveQualificationDefs,
+    } = overlayData;
+
+    const wrappedPayload = {
+      bookingsByScenario: { [scenarioId]: effectiveBookingsByItem },
+      dataByScenario: { [scenarioId]: effectiveDataItems },
+      groupDefs: effectiveGroupDefs,
+      qualificationDefs: effectiveQualificationDefs,
+      groupsByScenario: { [scenarioId]: effectiveGroupAssignmentsByItem },
+      qualificationAssignmentsByScenario: { [scenarioId]: effectiveQualificationAssignmentsByItem },
+      overlaysByScenario: EMPTY_OBJECT,
+      scenarioId,
+    };
+
+    const groupLabelById = new Map(
+      (effectiveGroupDefs || []).map((groupDef) => [String(groupDef.id), groupDef.name || String(groupDef.id)])
+    );
+
+    return (selectedGroups || [])
+      .filter((groupId) => groupId !== '__NO_GROUP__')
+      .map((groupId) => {
+        let chartData;
+        try {
+          chartData = calculateChartDataWeekly(referenceDate, [String(groupId)], selectedQualifications, wrappedPayload);
+        } catch {
+          chartData = EMPTY_WEEKLY_DATA;
+        }
+
+        return {
+          groupId: String(groupId),
+          groupName: groupLabelById.get(String(groupId)) || String(groupId),
+          chartData: {
+            categories: chartData?.categories ? [...chartData.categories] : [],
+            demand: chartData?.demand ? chartData.demand.map((value) => (typeof value === 'number' ? value : 0)) : [],
+            maxdemand: chartData?.maxdemand || '',
+            capacity: chartData?.capacity ? chartData.capacity.map((value) => (typeof value === 'number' ? value : 0)) : [],
+            capacity_pedagogical: chartData?.capacity_pedagogical ? chartData.capacity_pedagogical.map((value) => (typeof value === 'number' ? value : 0)) : [],
+            capacity_administrative: chartData?.capacity_administrative ? chartData.capacity_administrative.map((value) => (typeof value === 'number' ? value : 0)) : [],
+            maxcapacity: chartData?.maxcapacity || '',
+            care_ratio: chartData?.care_ratio ? chartData.care_ratio.map((value) => (typeof value === 'number' ? value : 0)) : [],
+            max_care_ratio: chartData?.max_care_ratio || '',
+            expert_ratio: chartData?.expert_ratio ? chartData.expert_ratio.map((value) => (typeof value === 'number' ? value : 0)) : [],
+            maxexpert_ratio: chartData?.maxexpert_ratio || '100',
+            flags: [],
+          },
+        };
+      });
+  }
+);
+
 export const selectMidtermChartData = createSelector(
   [selectSelectedScenarioId, selectChartFilters, selectOverlayAwareChartData, selectEventsByScenario, selectFinanceByScenario, selectWeeklyChartData],
   (
@@ -476,11 +541,14 @@ export const selectMidtermChartData = createSelector(
       effectiveGroupDefs,
       effectiveQualificationDefs,
     } = overlayData;
+    const effectiveAnalysisDataItems = Object.fromEntries(
+      Object.entries(effectiveDataItems || {}).filter(([, item]) => !isArchivedDataItem(item))
+    );
     const financeScenario = financeByScenario?.[scenarioId] || EMPTY_OBJECT;
 
     const wrappedPayload = {
       bookingsByScenario: { [scenarioId]: effectiveBookingsByItem },
-      dataByScenario: { [scenarioId]: effectiveDataItems },
+      dataByScenario: { [scenarioId]: effectiveAnalysisDataItems },
       groupDefs: effectiveGroupDefs,
       qualificationDefs: effectiveQualificationDefs,
       groupsByScenario: { [scenarioId]: effectiveGroupAssignmentsByItem },
@@ -521,7 +589,7 @@ export const selectMidtermChartData = createSelector(
       const financeReferenceDate = bounds?.start || referenceDate;
       const finance = calculateScenarioMonthlyFinance({
         referenceDate: financeReferenceDate,
-        effectiveDataItems,
+        effectiveDataItems: effectiveAnalysisDataItems,
         effectiveBookingsByItem,
         effectiveGroupAssignmentsByItem,
         effectiveGroupDefs,
@@ -565,7 +633,7 @@ export const selectMidtermChartData = createSelector(
 
     const referenceFinance = calculateScenarioMonthlyFinance({
       referenceDate,
-      effectiveDataItems,
+      effectiveDataItems: effectiveAnalysisDataItems,
       effectiveBookingsByItem,
       effectiveGroupAssignmentsByItem,
       effectiveGroupDefs,
@@ -574,6 +642,7 @@ export const selectMidtermChartData = createSelector(
 
     const activeChildrenWithBookings = Object.entries(effectiveDataItems || {}).filter(([itemId, item]) => {
       if (item?.type !== 'demand') return false;
+      if (isArchivedDataItem(item)) return false;
       if (!isRecordActiveOnDate(item, referenceDate)) return false;
       return hasAnyBookingInWeek(Object.values(effectiveBookingsByItem?.[itemId] || {}), referenceDate);
     }).length;

@@ -74,7 +74,9 @@ function App() {
       <AppShell.Main>
         <Container size="xl" px={{ base: 'xs', sm: 'md' }}>
           <ViewComponent />
-          <AppFooter />
+          <div className="app-footer">
+            <AppFooter />
+          </div>
         </Container>
       </AppShell.Main>
     </AppShell>

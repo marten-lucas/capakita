@@ -3,6 +3,7 @@ import { Box } from '@mantine/core';
 import { useSelector, useDispatch } from 'react-redux';
 import { useOverlayData } from '../../../hooks/useOverlayData';
 import { addBookingThunk, deleteBookingThunk } from '../../../store/simBookingSlice';
+import { selectPrimarySelectedItemId } from '../../../store/simScenarioSlice';
 import AccordionListDetail from '../../common/AccordionListDetail';
 import BookingCards from './BookingCards';
 import BookingDetail from './BookingDetail';
@@ -10,7 +11,7 @@ import BookingDetail from './BookingDetail';
 function SimDataBookingTab() {
   const dispatch = useDispatch();
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
-  const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
+  const selectedItemId = useSelector(selectPrimarySelectedItemId);
 
   // Use overlay hook to get effective data
   const { getEffectiveDataItem, getEffectiveBookings } = useOverlayData();

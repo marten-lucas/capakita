@@ -1,5 +1,6 @@
 import { sumBookingHours } from '../bookingUtils';
 import { timeToMinutes } from '../timeUtils';
+import { shouldIncludeDataItemInAnalysis } from '../dataVisibility';
 
 function getBayKiBiGWeightForChild(child, groupDef) {
   if (!child) return 1;
@@ -217,6 +218,7 @@ export function filterBookings({
   Object.entries(dataItems).forEach(([itemId]) => {
     const overlayedItem = getOverlayedDataItem(itemId);
     if (!overlayedItem) return;
+    if (!shouldIncludeDataItemInAnalysis(overlayedItem)) return;
     const type = overlayedItem.type;
 
     // Resolve groupId from group assignments or fallback to item groupId

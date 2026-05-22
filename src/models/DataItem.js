@@ -10,6 +10,7 @@
  * @property {string} dateofbirth
  * @property {string} groupId
  * @property {Object} rawdata
+ * @property {boolean} archived
  * @property {Array<{start: string, end: string, payType?: string}>} absences
  * @property {boolean} hasDisability - For BayKiBiG categories 4 & 7 (disability = 4.5x)
  * @property {string} temporaryDisabilityDate - For BayKiBiG category 5 (6-month window = 4.5x)
@@ -33,6 +34,7 @@ export class DataItem {
     dateofbirth = '',
     groupId = '',
     rawdata = {},
+    archived = false,
     absences = [],
     hasDisability = false,
     temporaryDisabilityDate = '',
@@ -50,6 +52,7 @@ export class DataItem {
     this.dateofbirth = dateofbirth;
     this.groupId = groupId;
     this.rawdata = rawdata;
+    this.archived = Boolean(archived);
     // Ensure absences have payType and id
     this.absences = Array.isArray(absences)
       ? absences.map(a => ({

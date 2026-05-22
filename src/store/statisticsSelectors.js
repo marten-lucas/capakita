@@ -1,5 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { sumBookingHours } from '../utils/bookingUtils';
+import { hasAllowedChildStatus } from '../utils/dataVisibility';
 
 const EMPTY_RESULT = {
   aggregation: 'month',
@@ -380,6 +381,7 @@ export const selectHistoricalStatistics = createSelector(
 
       Object.entries(items).forEach(([itemId, item]) => {
         if (!isActiveOn(evaluationDate, item?.startdate, item?.enddate)) return;
+        if (!hasAllowedChildStatus(item)) return;
 
         if (item?.type === 'demand') {
           childrenCount += 1;
@@ -481,6 +483,7 @@ export const selectGroupTransitionStatistics = createSelector(
 
     Object.entries(items).forEach(([itemId, item]) => {
       if (item?.type !== 'demand') return;
+      if (!hasAllowedChildStatus(item)) return;
 
       const assignments = compressAssignments(
         Object.values(groupAssignmentsByItem[itemId] || {})

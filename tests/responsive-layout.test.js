@@ -263,6 +263,7 @@ test('all main app pages remain usable without horizontal overflow', async ({ pa
 
   await openMainPage(page, 'Statistik');
   await expect(page.getByTestId('statistics-view')).toBeVisible();
+  await expect(page.getByRole('button', { name: /Als PDF exportieren/i })).toBeVisible();
   await expect(page.getByText(/Historische Entwicklung/i)).toBeVisible();
   await expectNoHorizontalOverflow(page, 'statistics view');
   await expectLayoutScreenshot(page, 'responsive-statistics-view.png');
@@ -273,10 +274,10 @@ test('modals and finance forms stay usable across viewports', async ({ page }) =
   await page.waitForLoadState('networkidle');
 
   await page.getByRole('button', { name: /Daten importieren/i }).click();
-  await expect(page.getByRole('dialog', { name: 'Daten importieren' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Datenimport-Wizard' })).toBeVisible();
   await expectNoHorizontalOverflow(page, 'data import modal');
   await expectLayoutScreenshot(page, 'responsive-data-import-modal.png');
-  await closeDialogByTitle(page, 'Daten importieren');
+  await closeDialogByTitle(page, 'Datenimport-Wizard');
 
   await seedResponsiveScenario(page);
 

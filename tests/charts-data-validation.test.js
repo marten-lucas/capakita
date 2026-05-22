@@ -213,8 +213,10 @@ test('Chart Data Validation - Midterm Chart', async ({ page }) => {
   // Wait for chart to render
   await page.waitForTimeout(2000);
   
-  // Verify xAxis label (Zeitraum)
-  await expect(page.locator('text=Zeitraum')).toBeVisible();
+  // Verify xAxis label (Zeitraum) in each midterm chart (strict-mode safe)
+  await expect(page.getByTestId('midterm-demand-capacity-chart').locator('text=Zeitraum')).toBeVisible();
+  await expect(page.getByTestId('midterm-ratio-finance-chart').locator('text=Zeitraum')).toBeVisible();
+  await expect(page.getByTestId('midterm-employee-count-chart').locator('text=Zeitraum')).toBeVisible();
   
   // Check that SVG chart container exists
   const svgCharts = await page.locator('svg').count();

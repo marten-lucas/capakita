@@ -13,6 +13,7 @@ import ChartFilterForm from '../components/SimDataCharts/ChartFilterForm';
 import { useScenarioEvents } from '../hooks/useScenarioEvents';
 import { buildOverlayAwareData } from '../utils/overlayUtils';
 import ChartErrorBoundary from '../components/common/ChartErrorBoundary';
+import { selectWeeklyChartDataByGroup } from '../store/chartSelectors';
 
 const EMPTY_TOGGLES = [];
 
@@ -25,6 +26,8 @@ function VisuView() {
   const scenarios = useSelector(state => state.simScenario.scenarios);
   const chartState = useSelector((state) => state.chart[selectedScenarioId] ?? null);
   const chartToggles = chartState?.chartToggles || EMPTY_TOGGLES;
+  const weeklyChartsByGroup = useSelector(selectWeeklyChartDataByGroup);
+  const weeklySyncGroupKey = selectedScenarioId ? `weekly-sync-${selectedScenarioId}` : null;
 
   React.useEffect(() => {
     if (selectedScenarioId && scenarios.length > 0) {
@@ -74,11 +77,21 @@ function VisuView() {
       <ChartFilterForm showStichtag scenarioId={selectedScenarioId} />
       
       {chartToggles.includes('weekly') && (
-        <Paper p="md" withBorder>
+        <Paper p="md" withBorder style={{ overflow: 'visible' }}>
           <Title order={4} mb="md" c="dimmed">Regelbetrieb</Title>
           <ChartErrorBoundary>
-            <WeeklyChart />
+            <WeeklyChart syncGroupKey={weeklySyncGroupKey} />
           </ChartErrorBoundary>
+          <Stack gap="lg" mt="lg" style={{ overflow: 'visible' }}>
+            {weeklyChartsByGroup.map((groupChart) => (
+              <Paper key={groupChart.groupId} p="sm" withBorder style={{ overflow: 'visible' }}>
+                <Title order={5} mb="sm" c="dimmed">Gruppe: {groupChart.groupName}</Title>
+                <ChartErrorBoundary>
+                  <WeeklyChart chartData={groupChart.chartData} syncGroupKey={weeklySyncGroupKey} showRatioChart={false} />
+                </ChartErrorBoundary>
+              </Paper>
+            ))}
+          </Stack>
         </Paper>
       )}
 

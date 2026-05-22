@@ -9,6 +9,18 @@ const initialState = {
   loadDialogOpen: false,
 };
 
+function normalizeSelectedItemIds(value) {
+  if (Array.isArray(value)) {
+    return value
+      .map((id) => String(id))
+      .filter((id, index, arr) => id && arr.indexOf(id) === index);
+  }
+  if (value === null || value === undefined || value === '') {
+    return [];
+  }
+  return [String(value)];
+}
+
 const simScenarioSlice = createSlice({
   name: 'simScenario',
   initialState,
@@ -23,7 +35,12 @@ const simScenarioSlice = createSlice({
     setSelectedItem(state, action) {
       const scenarioId = state.selectedScenarioId;
       if (!scenarioId) return;
-      state.selectedItems[scenarioId] = action.payload;
+      state.selectedItems[scenarioId] = normalizeSelectedItemIds(action.payload);
+    },
+    setSelectedItems(state, action) {
+      const scenarioId = state.selectedScenarioId;
+      if (!scenarioId) return;
+      state.selectedItems[scenarioId] = normalizeSelectedItemIds(action.payload);
     },
     addScenario(state, action) {
       // Assign a unique id if not present
@@ -107,6 +124,17 @@ export const isSaveAllowed = (state) => {
 export const selectSelectedScenario = (state) => {
   const selectedScenarioId = state.simScenario.selectedScenarioId;
   return state.simScenario.scenarios.find((scenario) => String(scenario.id) === String(selectedScenarioId)) || null;
+};
+
+export const selectSelectedItemIds = (state) => {
+  const selectedScenarioId = state.simScenario.selectedScenarioId;
+  if (!selectedScenarioId) return [];
+  return normalizeSelectedItemIds(state.simScenario.selectedItems?.[selectedScenarioId]);
+};
+
+export const selectPrimarySelectedItemId = (state) => {
+  const ids = selectSelectedItemIds(state);
+  return ids[0] || null;
 };
 
 export const selectSelectedScenarioHasAdebisImport = (state) => {
@@ -276,6 +304,7 @@ export const deleteScenario = (scenarioId) => (dispatch) => {
 export const {
   setSelectedScenarioId,
   setSelectedItem,
+  setSelectedItems,
   addScenario,
   updateScenario,
   deleteScenario: deleteScenarioReducer,

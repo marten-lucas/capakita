@@ -9,12 +9,23 @@ import { createColoredYAxis } from '../../utils/highchartsAxis';
 import { selectWeeklyChartData } from '../../store/chartSelectors';
 
 const WEEK_DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr'];
+const weeklySyncChannels = new Map();
 
-export default function WeeklyChart() {
+function ensureSyncChannel(syncGroupKey) {
+  if (!weeklySyncChannels.has(syncGroupKey)) {
+    weeklySyncChannels.set(syncGroupKey, new Map());
+  }
+
+  return weeklySyncChannels.get(syncGroupKey);
+}
+
+export default function WeeklyChart({ chartData: chartDataOverride = null, syncGroupKey = null, showRatioChart = true }) {
   const theme = useMantineTheme();
+  const instanceIdRef = useRef(`weekly-${Math.random().toString(36).slice(2)}`);
   const chartRefs = useRef([]);
   const chartContainerRef = useRef(null);
   const syncInProgress = useRef(false);
+  const externalSyncInProgress = useRef(false);
   const hoveredIndexRef = useRef(null);
   const hoveredPointsRef = useRef([[], []]);
   const [hoveredIndex, setHoveredIndex] = useState(null);
@@ -29,7 +40,8 @@ export default function WeeklyChart() {
   const careRatioColor = theme.colors.red[6];
   const expertRatioColor = theme.colors.orange[6];
 
-  const chartData = useSelector(selectWeeklyChartData);
+  const defaultChartData = useSelector(selectWeeklyChartData);
+  const chartData = chartDataOverride || defaultChartData;
   const categories = useMemo(() => chartData.categories || [], [chartData.categories]);
   const displayIndex = pinnedIndex ?? hoveredIndex ?? 0;
 
@@ -120,7 +132,15 @@ export default function WeeklyChart() {
     });
 
     syncInProgress.current = false;
-  }, []);
+
+    if (syncGroupKey && !externalSyncInProgress.current) {
+      const listeners = weeklySyncChannels.get(syncGroupKey);
+      listeners?.forEach((handlers, listenerId) => {
+        if (listenerId === instanceIdRef.current) return;
+        handlers.onExtremes?.({ min: event.min, max: event.max });
+      });
+    }
+  }, [syncGroupKey]);
 
   const registerChartRef = useCallback((chart, index) => {
     chartRefs.current[index] = chart;
@@ -140,14 +160,16 @@ export default function WeeklyChart() {
     chartRefs.current.forEach((chart, chartIndex) => clearChartHover(chart, chartIndex));
   }, [clearChartHover]);
 
-  const syncHoverForIndex = useCallback((pointIndex, browserEvent) => {
+  const syncHoverForIndex = useCallback((pointIndex, browserEvent, options = {}) => {
+    const { broadcast = false, force = false } = options;
+
     if (!Number.isFinite(pointIndex) || pointIndex < 0 || pointIndex >= categories.length) {
       clearAllHover();
       if (pinnedIndex === null) setHoveredIndex(null);
       return;
     }
 
-    if (pinnedIndex !== null) {
+    if (pinnedIndex !== null && !force) {
       return;
     }
 
@@ -175,11 +197,21 @@ export default function WeeklyChart() {
       sharedPoints.forEach((point) => point.setState('hover'));
       hoveredPointsRef.current[chartIndex] = sharedPoints;
 
-      const normalizedEvent = chart.pointer.normalize(browserEvent);
       chart.tooltip.refresh(sharedPoints);
-      chart.xAxis[0].drawCrosshair(normalizedEvent, sharedPoints[0]);
+      if (browserEvent) {
+        const normalizedEvent = chart.pointer.normalize(browserEvent);
+        chart.xAxis[0].drawCrosshair(normalizedEvent, sharedPoints[0]);
+      }
     });
-  }, [categories.length, clearAllHover, clearChartHover, pinnedIndex]);
+
+    if (broadcast && syncGroupKey && !externalSyncInProgress.current) {
+      const listeners = weeklySyncChannels.get(syncGroupKey);
+      listeners?.forEach((handlers, listenerId) => {
+        if (listenerId === instanceIdRef.current) return;
+        handlers.onHover?.({ pointIndex });
+      });
+    }
+  }, [categories.length, clearAllHover, clearChartHover, pinnedIndex, syncGroupKey]);
 
   useEffect(() => {
     const container = chartContainerRef.current;
@@ -203,11 +235,19 @@ export default function WeeklyChart() {
 
       const ratio = (chartX - primaryChart.plotLeft) / primaryChart.plotWidth;
       const pointIndex = Math.max(0, Math.min(categories.length - 1, Math.round(ratio * (categories.length - 1))));
-      syncHoverForIndex(pointIndex, event);
+      syncHoverForIndex(pointIndex, event, { broadcast: true });
     };
 
     const handleLeave = () => {
       clearAllHover();
+
+      if (syncGroupKey && !externalSyncInProgress.current) {
+        const listeners = weeklySyncChannels.get(syncGroupKey);
+        listeners?.forEach((handlers, listenerId) => {
+          if (listenerId === instanceIdRef.current) return;
+          handlers.onClear?.();
+        });
+      }
     };
 
     ['mousemove', 'touchmove', 'touchstart'].forEach((eventType) => {
@@ -222,7 +262,7 @@ export default function WeeklyChart() {
       container.removeEventListener('mouseleave', handleLeave);
       clearAllHover();
     };
-  }, [categories.length, clearAllHover, syncHoverForIndex, pinnedIndex]);
+  }, [categories.length, clearAllHover, pinnedIndex, syncGroupKey, syncHoverForIndex]);
 
   useEffect(() => {
     if (pinnedIndex === null || categories.length === 0) return;
@@ -243,6 +283,68 @@ export default function WeeklyChart() {
       hoveredPointsRef.current[chartIndex] = sharedPoints;
     });
   }, [categories.length, clearChartHover, pinnedIndex]);
+
+  useEffect(() => {
+    if (!syncGroupKey) return undefined;
+
+    const listeners = ensureSyncChannel(syncGroupKey);
+
+    const applyExternalExtremes = ({ min, max }) => {
+      externalSyncInProgress.current = true;
+      syncInProgress.current = true;
+
+      chartRefs.current.forEach((chart) => {
+        if (!chart) return;
+        chart.xAxis[0].setExtremes(min, max, false, false, { trigger: 'syncExtremes' });
+      });
+      chartRefs.current.forEach((chart) => chart?.redraw());
+
+      syncInProgress.current = false;
+      externalSyncInProgress.current = false;
+    };
+
+    const applyExternalHover = ({ pointIndex }) => {
+      externalSyncInProgress.current = true;
+      syncHoverForIndex(pointIndex, null, { force: true });
+      externalSyncInProgress.current = false;
+    };
+
+    const applyExternalClear = () => {
+      externalSyncInProgress.current = true;
+      if (pinnedIndex === null) {
+        clearAllHover();
+        setHoveredIndex(null);
+      }
+      externalSyncInProgress.current = false;
+    };
+
+    const applyExternalPin = ({ pointIndex }) => {
+      externalSyncInProgress.current = true;
+      if (Number.isFinite(pointIndex)) {
+        setPinnedIndex(pointIndex);
+      } else {
+        setPinnedIndex(null);
+        clearAllHover();
+        setHoveredIndex(null);
+      }
+      externalSyncInProgress.current = false;
+    };
+
+    listeners.set(instanceIdRef.current, {
+      onExtremes: applyExternalExtremes,
+      onHover: applyExternalHover,
+      onClear: applyExternalClear,
+      onPin: applyExternalPin,
+    });
+
+    return () => {
+      const channel = weeklySyncChannels.get(syncGroupKey);
+      channel?.delete(instanceIdRef.current);
+      if (channel && channel.size === 0) {
+        weeklySyncChannels.delete(syncGroupKey);
+      }
+    };
+  }, [clearAllHover, pinnedIndex, syncGroupKey, syncHoverForIndex]);
 
   // Optimized: Only recalculate when chartData changes
   const buildXAxis = useCallback((showTitle, showDayLabels = true) => ({
@@ -289,7 +391,7 @@ export default function WeeklyChart() {
         type: 'line',
         zoomType: 'xy',
         spacingTop: 20,
-        spacingBottom: 20,
+        spacingBottom: 28,
         spacingRight: 96,
         resetZoomButton: { position: { align: 'right', verticalAlign: 'top', x: -10, y: 10 }, relativeTo: 'plot' },
       },
@@ -359,7 +461,7 @@ export default function WeeklyChart() {
         type: 'line',
         zoomType: 'xy',
         spacingTop: 20,
-        spacingBottom: 20,
+        spacingBottom: 28,
         spacingRight: 96,
         resetZoomButton: { position: { align: 'right', verticalAlign: 'top', x: -10, y: 10 }, relativeTo: 'plot' },
       },
@@ -410,8 +512,34 @@ export default function WeeklyChart() {
     };
   }, [buildXAxis, chartData, careRatioColor, expertRatioColor, getHeadroomMax]);
 
+  const handlePinToggle = useCallback(() => {
+    if (pinnedIndex !== null) {
+      setPinnedIndex(null);
+
+      if (syncGroupKey && !externalSyncInProgress.current) {
+        const listeners = weeklySyncChannels.get(syncGroupKey);
+        listeners?.forEach((handlers, listenerId) => {
+          if (listenerId === instanceIdRef.current) return;
+          handlers.onPin?.({ pointIndex: null });
+        });
+      }
+      return;
+    }
+
+    const nextIndex = hoveredIndex ?? 0;
+    setPinnedIndex(nextIndex);
+
+    if (syncGroupKey && !externalSyncInProgress.current) {
+      const listeners = weeklySyncChannels.get(syncGroupKey);
+      listeners?.forEach((handlers, listenerId) => {
+        if (listenerId === instanceIdRef.current) return;
+        handlers.onPin?.({ pointIndex: nextIndex });
+      });
+    }
+  }, [hoveredIndex, pinnedIndex, syncGroupKey]);
+
   return (
-    <Box ref={chartContainerRef}>
+    <Box ref={chartContainerRef} style={{ overflow: 'visible' }}>
       <Stack gap="md">
       <Paper withBorder radius="md" p="xs">
         <Group justify="space-between" align="center" wrap="wrap" gap="xs">
@@ -427,15 +555,7 @@ export default function WeeklyChart() {
             variant={pinnedIndex !== null ? 'filled' : 'light'}
             color={pinnedIndex !== null ? 'orange' : 'gray'}
             aria-label={pinnedIndex !== null ? 'Fixierung lösen' : 'Aktuelle Werte fixieren'}
-            onClick={() => {
-              if (pinnedIndex !== null) {
-                setPinnedIndex(null);
-                return;
-              }
-
-              const nextIndex = hoveredIndex ?? 0;
-              setPinnedIndex(nextIndex);
-            }}
+            onClick={handlePinToggle}
           >
             <IconPin size={14} />
           </ActionIcon>
@@ -444,7 +564,7 @@ export default function WeeklyChart() {
           {pinnedIndex !== null ? 'Werte fixiert' : 'Hover über das Diagramm zeigt aktuelle Werte'}
         </Text>
       </Paper>
-      <Box h={{ base: 260, sm: 320 }}>
+      <Box mih={{ base: 290, sm: 340 }} style={{ overflow: 'visible' }}>
         <HighchartsReact
           highcharts={Highcharts}
           options={weeklyOptions}
@@ -452,14 +572,16 @@ export default function WeeklyChart() {
           containerProps={{ style: { height: '100%' } }}
         />
       </Box>
-      <Box h={{ base: 260, sm: 320 }}>
-        <HighchartsReact
-          highcharts={Highcharts}
-          options={weeklyRatioOptions}
-          callback={(chart) => registerChartRef(chart, 1)}
-          containerProps={{ style: { height: '100%' } }}
-        />
-      </Box>
+      {showRatioChart && (
+        <Box mih={{ base: 290, sm: 340 }} style={{ overflow: 'visible' }}>
+          <HighchartsReact
+            highcharts={Highcharts}
+            options={weeklyRatioOptions}
+            callback={(chart) => registerChartRef(chart, 1)}
+            containerProps={{ style: { height: '100%' } }}
+          />
+        </Box>
+      )}
       </Stack>
     </Box>
   );

@@ -5,6 +5,7 @@ import {
   Alert,
   Badge,
   Box,
+  Button,
   Group,
   Paper,
   SegmentedControl,
@@ -15,7 +16,7 @@ import {
   useMantineTheme,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
-import { IconInfoCircle } from '@tabler/icons-react';
+import { IconInfoCircle, IconPrinter } from '@tabler/icons-react';
 import { useSelector } from 'react-redux';
 import { selectGroupTransitionStatistics, selectHistoricalStatistics } from '../store/statisticsSelectors';
 import { selectSelectedScenario } from '../store/simScenarioSlice';
@@ -108,6 +109,22 @@ function shortenRouteLabel(label, maxLength = 22) {
   return label.length <= maxLength ? label : `${label.slice(0, maxLength - 1)}…`;
 }
 
+function getAggregationLabel(value) {
+  return {
+    month: 'Monat',
+    quarter: 'Quartal',
+    year: 'Jahr',
+  }[value] || value;
+}
+
+function getTimeframeLabel(value) {
+  return {
+    all: 'Gesamt',
+    last12: 'Letzte 12 Monate',
+    last24: 'Letzte 24 Monate',
+  }[value] || value;
+}
+
 function StatisticsView() {
   const theme = useMantineTheme();
   const isMobile = useMediaQuery('(max-width: 48em)');
@@ -130,10 +147,19 @@ function StatisticsView() {
     })
   );
   const selectedScenario = useSelector(selectSelectedScenario);
+  const scenarios = useSelector((state) => state.simScenario.scenarios);
 
   const latest = statistics.buckets[statistics.buckets.length - 1] || null;
   const statisticsBinding = selectedScenario?.autoEventSettings?.statisticsBinding || null;
+  const baseScenarioName = React.useMemo(() => {
+    if (!selectedScenario?.baseScenarioId) return 'Keins';
+    return scenarios.find((scenario) => String(scenario.id) === String(selectedScenario.baseScenarioId))?.name || selectedScenario.baseScenarioId;
+  }, [scenarios, selectedScenario?.baseScenarioId]);
   const asOfDate = React.useMemo(() => parseIsoDate(transitionStatistics.asOfDate), [transitionStatistics.asOfDate]);
+  const handleExportPdf = React.useCallback(() => {
+    window.print();
+  }, []);
+  const scenarioRemark = selectedScenario?.remark?.trim() || 'Keine Bemerkung hinterlegt.';
 
   const fromGroupOptions = React.useMemo(() => {
     const unique = new Map();
@@ -418,22 +444,43 @@ function StatisticsView() {
     [chartPalette, routeDelta]
   );
 
+  const summaryCards = React.useMemo(
+    () => [
+      { label: 'Aggregation', value: getAggregationLabel(aggregation) },
+      { label: 'Zeitraum', value: getTimeframeLabel(timeframe) },
+      { label: 'Von-Gruppe', value: fromGroupOptions.find((option) => option.value === fromGroupFilter)?.label || 'Alle Von-Gruppen' },
+      { label: 'Zu-Gruppe', value: toGroupOptions.find((option) => option.value === toGroupFilter)?.label || 'Alle Zu-Gruppen' },
+      { label: 'Stichtag', value: transitionStatistics.asOfDate || 'n/a' },
+    ],
+    [aggregation, fromGroupFilter, timeframe, toGroupFilter, fromGroupOptions, toGroupOptions, transitionStatistics.asOfDate]
+  );
+
   return (
     <Paper withBorder p="md" data-testid="statistics-view">
       <Stack gap="sm">
-        <Group justify="space-between" align="center" wrap="wrap">
+        <Group justify="space-between" align="center" wrap="wrap" className="statistics-print-hide">
           <Text size="xl" fw={700}>Statistik</Text>
-          <SegmentedControl
-            value={aggregation}
-            onChange={setAggregation}
-            data={[
-              { label: 'Monat', value: 'month' },
-              { label: 'Quartal', value: 'quarter' },
-              { label: 'Jahr', value: 'year' },
-            ]}
-            data-testid="statistics-aggregation"
-            fullWidth={isMobile}
-          />
+          <Group gap="xs" wrap="wrap" justify="flex-end">
+            <SegmentedControl
+              value={aggregation}
+              onChange={setAggregation}
+              data={[
+                { label: 'Monat', value: 'month' },
+                { label: 'Quartal', value: 'quarter' },
+                { label: 'Jahr', value: 'year' },
+              ]}
+              data-testid="statistics-aggregation"
+              fullWidth={isMobile}
+            />
+            <Button
+              leftSection={<IconPrinter size={16} />}
+              onClick={handleExportPdf}
+              variant="light"
+              data-testid="statistics-export-pdf"
+            >
+              Als PDF exportieren
+            </Button>
+          </Group>
         </Group>
         <Text c="dimmed">
           Diese Seite zeigt historische Kennzahlen auf Basis importierter Adebis-Daten.
@@ -441,6 +488,47 @@ function StatisticsView() {
         <Alert icon={<IconInfoCircle size={16} />} color="blue" variant="light">
           Historische Buckets und Gruppenübergänge basieren direkt auf importierten Daten.
         </Alert>
+
+        <Paper withBorder p="md" radius="md" className="statistics-print-only statistics-print-block">
+          <Stack gap="xs">
+            <Group justify="space-between" align="flex-start" wrap="wrap">
+              <Stack gap={2} style={{ minWidth: 0 }}>
+                <Text size="sm" c="dimmed">Analysebericht</Text>
+                <Text size="xl" fw={700}>{selectedScenario?.name || 'Unbenanntes Szenario'}</Text>
+                <Text size="sm">Basis-Szenario: {baseScenarioName}</Text>
+              </Stack>
+              <Text size="sm" c="dimmed">Erstellt am {new Date().toISOString().slice(0, 10)}</Text>
+            </Group>
+
+            <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
+              {scenarioRemark}
+            </Text>
+
+            <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="sm">
+              {summaryCards.map((card) => (
+                <Paper key={card.label} withBorder p="sm" radius="md" className="statistics-print-block">
+                  <Text size="xs" c="dimmed">{card.label}</Text>
+                  <Text fw={600}>{card.value}</Text>
+                </Paper>
+              ))}
+            </SimpleGrid>
+
+            {statisticsBinding?.snapshot && (
+              <Paper withBorder p="sm" radius="md" className="statistics-print-block">
+                <Text fw={600} mb={4}>Aus Statistik übernommene Auto-Event-Werte</Text>
+                <Text size="sm">
+                  Krippe → Kita: {statisticsBinding.snapshot.kita?.ageYears ?? 'n/a'} Jahre, Delta {statisticsBinding.snapshot.kita?.bookingDeltaHours ?? 'n/a'} h/Woche
+                </Text>
+                <Text size="sm">
+                  Kita → Schulkind: {statisticsBinding.snapshot.school?.ageYears ?? 'n/a'} Jahre, Delta {statisticsBinding.snapshot.school?.bookingDeltaHours ?? 'n/a'} h/Woche
+                </Text>
+                <Text size="xs" c="dimmed">
+                  Stand: {String(statisticsBinding.appliedAt || '').slice(0, 10)}
+                </Text>
+              </Paper>
+            )}
+          </Stack>
+        </Paper>
 
         {statisticsBinding?.snapshot && (
           <Alert icon={<IconInfoCircle size={16} />} color="teal" variant="light" data-testid="statistics-auto-event-binding">
@@ -492,7 +580,7 @@ function StatisticsView() {
 
         <Text size="lg" fw={700} mt="md">Gruppenübergänge</Text>
 
-        <SimpleGrid cols={{ base: 1, md: 3 }} spacing="md" data-testid="statistics-transition-filters">
+        <SimpleGrid cols={{ base: 1, md: 3 }} spacing="md" data-testid="statistics-transition-filters" className="statistics-print-hide">
           <SegmentedControl
             value={timeframe}
             onChange={setTimeframe}
