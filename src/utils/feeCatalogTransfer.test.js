@@ -12,11 +12,13 @@ describe('feeCatalogTransfer roundtrip with PDF data', () => {
     const groupDefs = [
       { id: scenario.groupFeeCatalog.krippe.groupId, name: 'Krippe', type: 'Krippe' },
       { id: scenario.groupFeeCatalog.kindergarten.groupId, name: 'Kindergarten', type: 'Kindergarten' },
+      { id: scenario.groupFeeCatalog.schulkind.groupId, name: 'Schulkind', type: 'Schulkind' },
     ];
 
     const groupFeeCatalogs = {
       [scenario.groupFeeCatalog.krippe.groupId]: scenario.groupFeeCatalog.krippe.feeBands,
       [scenario.groupFeeCatalog.kindergarten.groupId]: scenario.groupFeeCatalog.kindergarten.feeBands,
+      [scenario.groupFeeCatalog.schulkind.groupId]: scenario.groupFeeCatalog.schulkind.feeBands,
     };
 
     const exported = buildFeeCatalogExportPayload({

@@ -127,6 +127,7 @@ describe('StatisticsView', () => {
     );
 
     expect(screen.getByRole('button', { name: /Als PDF exportieren/i })).toBeInTheDocument();
+    expect(screen.getByTestId('statistics-report-period')).toHaveValue('Maximal');
     expect(screen.getByText('Analysebericht')).toBeInTheDocument();
     expect(screen.getByText('Analyse-Szenario')).toBeInTheDocument();
     expect(screen.getByText('Basis-Szenario: Basis-Szenario')).toBeInTheDocument();

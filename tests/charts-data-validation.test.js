@@ -157,6 +157,130 @@ async function createChartTestData(page) {
   await page.waitForFunction(() => window.__APP_STORE?.getState?.().ui?.activePage === 'data', { timeout: 5000 });
 }
 
+async function createMultiGroupSplitTestData(page) {
+  await page.goto('/');
+  await page.waitForFunction(() => typeof window !== 'undefined' && !!window.__APP_STORE, { timeout: 5000 });
+
+  await page.evaluate(() => {
+    const store = window.__APP_STORE;
+    const scenarioId = 'chart-multi-group-split';
+
+    store.dispatch({
+      type: 'simScenario/addScenario',
+      payload: {
+        id: scenarioId,
+        name: 'Chart Multi Group Split',
+        imported: false,
+        importedAnonymized: true,
+      },
+    });
+
+    store.dispatch({
+      type: 'simScenario/setSelectedScenarioId',
+      payload: scenarioId,
+    });
+
+    store.dispatch({
+      type: 'chart/ensureScenario',
+      payload: scenarioId,
+    });
+
+    store.dispatch({
+      type: 'simGroup/addGroupDef',
+      payload: {
+        scenarioId,
+        groupDef: { id: 'g1', name: 'Fuchsgruppe', type: 'Regelgruppe' },
+      },
+    });
+
+    store.dispatch({
+      type: 'simGroup/addGroupDef',
+      payload: {
+        scenarioId,
+        groupDef: { id: 'g2', name: 'Bärchengruppe', type: 'Regelgruppe' },
+      },
+    });
+
+    store.dispatch({
+      type: 'simData/simDataItemAdd',
+      payload: {
+        scenarioId,
+        item: {
+          id: 'staff-split-1',
+          type: 'capacity',
+          source: 'manual entry',
+          name: 'Staff Split',
+          remark: '',
+          startdate: '',
+          enddate: '',
+          dateofbirth: '',
+          groupId: '',
+          rawdata: { source: 'manual entry' },
+          absences: [],
+        },
+      },
+    });
+
+    store.dispatch({
+      type: 'simBooking/addBooking',
+      payload: {
+        scenarioId,
+        dataItemId: 'staff-split-1',
+        booking: {
+          id: 'staff-split-1-booking',
+          startdate: '',
+          enddate: '',
+          times: [
+            { day: 1, day_name: 'Mo', segments: [{ id: 'm', booking_start: '08:00', booking_end: '10:00', category: 'pedagogical' }] },
+            { day: 2, day_name: 'Di', segments: [{ id: 'd', booking_start: '08:00', booking_end: '10:00', category: 'pedagogical' }] },
+            { day: 3, day_name: 'Mi', segments: [{ id: 'w', booking_start: '08:00', booking_end: '10:00', category: 'pedagogical' }] },
+            { day: 4, day_name: 'Do', segments: [{ id: 't', booking_start: '08:00', booking_end: '10:00', category: 'pedagogical' }] },
+            { day: 5, day_name: 'Fr', segments: [{ id: 'f', booking_start: '08:00', booking_end: '10:00', category: 'pedagogical' }] },
+          ],
+          rawdata: {},
+        },
+      },
+    });
+
+    store.dispatch({
+      type: 'simGroup/addGroup',
+      payload: {
+        scenarioId,
+        dataItemId: 'staff-split-1',
+        group: {
+          id: 'ga-split-1',
+          kindId: 'staff-split-1',
+          assignmentMode: 'multiple',
+          groupId: '',
+          start: '',
+          end: '',
+          timeSegments: [
+            { id: 'ts-1', startTime: '08:00', endTime: '09:00', groupId: 'g1' },
+            { id: 'ts-2', startTime: '09:00', endTime: '10:00', groupId: 'g2' },
+          ],
+        },
+      },
+    });
+
+    store.dispatch({
+      type: 'chart/setFilterGroups',
+      payload: { scenarioId, groups: ['g1', 'g2'] },
+    });
+
+    store.dispatch({
+      type: 'chart/setFilterQualifications',
+      payload: { scenarioId, qualifications: ['__NO_QUALI__'] },
+    });
+
+    store.dispatch({
+      type: 'ui/setActivePage',
+      payload: 'data',
+    });
+  });
+
+  await page.waitForFunction(() => window.__APP_STORE?.getState?.().simScenario?.selectedScenarioId === 'chart-multi-group-split', { timeout: 5000 });
+}
+
 async function goToVisu(page) {
   await page.evaluate(() => {
     window.__APP_STORE?.dispatch({
@@ -285,6 +409,21 @@ test('Chart Data Validation - All Charts Present with Correct Scaling', async ({
     els.filter(el => el.offsetHeight > 0).length
   );
   expect(visibleBoxes).toBeGreaterThanOrEqual(4);
+});
+
+test('Chart Group Split - Weekly Group Charts show both split groups', async ({ page }) => {
+  await createMultiGroupSplitTestData(page);
+  await goToVisu(page);
+  await expect(page.getByRole('heading', { name: 'Regelbetrieb' })).toBeVisible();
+
+  const groupChartToggle = page.getByRole('button', { name: /Gruppendiagramme anzeigen/i });
+  await expect(groupChartToggle).toBeVisible();
+  await expect(groupChartToggle).toContainText('Gruppendiagramme anzeigen (2)');
+
+  await groupChartToggle.click();
+
+  await expect(page.getByRole('heading', { name: 'Gruppe: Fuchsgruppe' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Gruppe: Bärchengruppe' })).toBeVisible();
 });
 
 /**

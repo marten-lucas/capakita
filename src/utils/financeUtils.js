@@ -1,4 +1,5 @@
 import { sumBookingHours } from './bookingUtils';
+import { minutesToTime, timeToMinutes } from './timeUtils';
 
 function parseIsoDate(value) {
   if (!value || typeof value !== 'string') return null;
@@ -163,16 +164,203 @@ export function pickApplicableValidityEntry(entries, date, predicate = () => tru
   return applicable[0] || null;
 }
 
+function pickLatestValidityEntry(entries, predicate = () => true) {
+  if (!Array.isArray(entries)) return null;
+
+  const applicable = entries
+    .filter(predicate)
+    .sort((left, right) => {
+      const leftStart = left.validFrom || '';
+      const rightStart = right.validFrom || '';
+      if (leftStart === rightStart) return String(left.id).localeCompare(String(right.id));
+      return rightStart.localeCompare(leftStart);
+    });
+
+  return applicable[0] || null;
+}
+
 export function resolveGroupIdAtDate(groupAssignments, date, fallbackGroupId = null) {
-  const assignments = Array.isArray(groupAssignments)
+  const resolved = resolveGroupIdsAtDate(groupAssignments, date, fallbackGroupId);
+  return resolved[0] || null;
+}
+
+function asAssignmentsArray(groupAssignments) {
+  return Array.isArray(groupAssignments)
     ? groupAssignments
     : Object.values(groupAssignments || {});
+}
 
-  const activeAssignment = assignments
+function pickActiveAssignment(groupAssignments, date) {
+  const assignments = asAssignmentsArray(groupAssignments);
+  return assignments
     .filter((assignment) => isDateWithinRange(date, assignment.start || '', assignment.end || ''))
-    .sort((left, right) => (right.start || '').localeCompare(left.start || ''))[0];
+    .sort((left, right) => (right.start || '').localeCompare(left.start || ''))[0] || null;
+}
 
-  return activeAssignment?.groupId || fallbackGroupId || null;
+function getValidTimeSegments(assignment) {
+  const segments = Array.isArray(assignment?.timeSegments) ? assignment.timeSegments : [];
+
+  return segments
+    .map((segment) => ({
+      groupId: segment?.groupId ? String(segment.groupId) : '',
+      startMinutes: timeToMinutes(segment?.startTime),
+      endMinutes: timeToMinutes(segment?.endTime),
+    }))
+    .filter((segment) => segment.groupId && segment.startMinutes !== null && segment.endMinutes !== null && segment.endMinutes > segment.startMinutes)
+    .sort((left, right) => left.startMinutes - right.startMinutes);
+}
+
+export function resolveGroupIdsAtDate(groupAssignments, date, fallbackGroupId = null) {
+  const activeAssignment = pickActiveAssignment(groupAssignments, date);
+  if (!activeAssignment) {
+    return fallbackGroupId ? [String(fallbackGroupId)] : [];
+  }
+
+  if (activeAssignment.assignmentMode !== 'multiple') {
+    return activeAssignment.groupId ? [String(activeAssignment.groupId)] : (fallbackGroupId ? [String(fallbackGroupId)] : []);
+  }
+
+  const segmentGroupIds = [...new Set(getValidTimeSegments(activeAssignment).map((segment) => segment.groupId))];
+  if (segmentGroupIds.length > 0) return segmentGroupIds;
+
+  return activeAssignment.groupId ? [String(activeAssignment.groupId)] : (fallbackGroupId ? [String(fallbackGroupId)] : []);
+}
+
+export function resolveGroupIdsForBounds(groupAssignments, bounds, fallbackGroupId = null) {
+  if (!bounds?.start || !bounds?.end) {
+    return fallbackGroupId ? [String(fallbackGroupId)] : [];
+  }
+
+  const assignments = asAssignmentsArray(groupAssignments)
+    .filter((assignment) => rangesOverlap(assignment?.start || '', assignment?.end || '', bounds.start, bounds.end))
+    .sort((left, right) => String(left.start || '').localeCompare(String(right.start || '')));
+
+  if (assignments.length === 0) {
+    return fallbackGroupId ? [String(fallbackGroupId)] : [];
+  }
+
+  const collected = new Set();
+  assignments.forEach((assignment) => {
+    if (assignment?.assignmentMode === 'multiple') {
+      getValidTimeSegments(assignment).forEach((segment) => {
+        collected.add(segment.groupId);
+      });
+      return;
+    }
+
+    if (assignment?.groupId) {
+      collected.add(String(assignment.groupId));
+    }
+  });
+
+  if (collected.size > 0) return [...collected];
+  return fallbackGroupId ? [String(fallbackGroupId)] : [];
+}
+
+function subtractInterval(interval, overlapStart, overlapEnd) {
+  if (overlapEnd <= interval.start || overlapStart >= interval.end) {
+    return [interval];
+  }
+
+  const parts = [];
+  if (overlapStart > interval.start) {
+    parts.push({ start: interval.start, end: overlapStart });
+  }
+  if (overlapEnd < interval.end) {
+    parts.push({ start: overlapEnd, end: interval.end });
+  }
+  return parts;
+}
+
+export function splitBookingByGroupAtDate(booking, groupAssignments, date, fallbackGroupId = null) {
+  const activeAssignment = pickActiveAssignment(groupAssignments, date);
+  const baseGroupId = activeAssignment?.groupId || fallbackGroupId || null;
+
+  if (!activeAssignment || activeAssignment.assignmentMode !== 'multiple') {
+    return [{ ...booking, groupId: baseGroupId ? String(baseGroupId) : null }];
+  }
+
+  const timeSegments = getValidTimeSegments(activeAssignment);
+  if (timeSegments.length === 0) {
+    return [{ ...booking, groupId: baseGroupId ? String(baseGroupId) : null }];
+  }
+
+  const groupedTimes = new Map();
+
+  const appendSegment = (groupId, day, dayName, sourceSegment, startMinutes, endMinutes) => {
+    if (endMinutes <= startMinutes) return;
+
+    const key = groupId || '__NO_GROUP__';
+    if (!groupedTimes.has(key)) groupedTimes.set(key, {});
+    const byDay = groupedTimes.get(key);
+
+    if (!byDay[dayName]) {
+      byDay[dayName] = { day, day_name: dayName, segments: [] };
+    }
+
+    byDay[dayName].segments.push({
+      ...sourceSegment,
+      id: `${sourceSegment?.id || 'segment'}-${key}-${dayName}-${startMinutes}-${endMinutes}`,
+      booking_start: minutesToTime(startMinutes),
+      booking_end: minutesToTime(endMinutes),
+    });
+  };
+
+  (booking?.times || []).forEach((dayEntry) => {
+    const day = dayEntry?.day;
+    const dayName = dayEntry?.day_name;
+    if (!dayName || !Array.isArray(dayEntry?.segments)) return;
+
+    dayEntry.segments.forEach((segment) => {
+      const start = timeToMinutes(segment?.booking_start);
+      const end = timeToMinutes(segment?.booking_end);
+      if (start === null || end === null || end <= start) return;
+
+      let uncovered = [{ start, end }];
+      timeSegments.forEach((groupSegment) => {
+        const overlapStart = Math.max(start, groupSegment.startMinutes);
+        const overlapEnd = Math.min(end, groupSegment.endMinutes);
+        if (overlapEnd <= overlapStart) return;
+
+        appendSegment(groupSegment.groupId, day, dayName, segment, overlapStart, overlapEnd);
+
+        uncovered = uncovered.flatMap((interval) => subtractInterval(interval, overlapStart, overlapEnd));
+      });
+
+      uncovered.forEach((interval) => {
+        appendSegment(null, day, dayName, segment, interval.start, interval.end);
+      });
+    });
+  });
+
+  const splitBookings = [];
+  groupedTimes.forEach((byDay, groupId) => {
+    const times = Object.values(byDay)
+      .map((dayEntry) => ({
+        ...dayEntry,
+        segments: dayEntry.segments.sort((left, right) => (
+          timeToMinutes(left.booking_start) - timeToMinutes(right.booking_start)
+        )),
+      }))
+      .filter((dayEntry) => dayEntry.segments.length > 0)
+      .sort((left, right) => Number(left.day || 0) - Number(right.day || 0));
+
+    if (times.length === 0) return;
+
+    const resolvedGroupId = groupId === '__NO_GROUP__' ? null : groupId;
+    splitBookings.push({
+      ...booking,
+      id: `${booking?.id || 'booking'}::${groupId}`,
+      groupId: resolvedGroupId,
+      times,
+    });
+  });
+
+  if (splitBookings.length === 0) {
+    return [{ ...booking, groupId: baseGroupId ? String(baseGroupId) : null }];
+  }
+
+  return splitBookings;
 }
 
 function getAgeInYearsAtDate(dateOfBirth, referenceDate) {
@@ -329,15 +517,38 @@ export function calculateMonthlyStaffCost({
   }
 
   const personnelEntry = pickApplicableValidityEntry(itemFinance?.personnelCostHistory, referenceDate);
+  const activePersonnelEntries = Array.isArray(itemFinance?.personnelCostHistory)
+    ? itemFinance.personnelCostHistory.filter((entry) => isDateWithinRange(referenceDate, entry.validFrom || '', entry.validUntil || ''))
+    : [];
   const salaryEntry = pickApplicableValidityEntry(itemFinance?.salaryHistory, referenceDate);
   const onCostEntry = pickApplicableValidityEntry(itemFinance?.employerOnCostHistory, referenceDate);
-  const annualGrossSalary = Number(
-    personnelEntry?.annualGrossSalary ?? salaryEntry?.annualGrossSalary
-  ) || 0;
-  const employerOnCostPercent = Number(
-    personnelEntry?.employerOnCostPercent ?? onCostEntry?.employerOnCostPercent
-  ) || 0;
-  const baseMonthlyCost = (annualGrossSalary / 12) * (1 + (employerOnCostPercent / 100));
+
+  let annualGrossSalary = 0;
+  let employerOnCostPercent = 0;
+  let baseMonthlyCost = 0;
+
+  if (activePersonnelEntries.length > 0) {
+    let weightedOnCostNumerator = 0;
+    activePersonnelEntries.forEach((entry) => {
+      const annual = Number(entry?.annualGrossSalary) || 0;
+      const onCostPercent = Number(entry?.employerOnCostPercent) || 0;
+      annualGrossSalary += annual;
+      weightedOnCostNumerator += annual * onCostPercent;
+      baseMonthlyCost += (annual / 12) * (1 + (onCostPercent / 100));
+    });
+
+    employerOnCostPercent = annualGrossSalary > 0
+      ? (weightedOnCostNumerator / annualGrossSalary)
+      : 0;
+  } else {
+    annualGrossSalary = Number(
+      personnelEntry?.annualGrossSalary ?? salaryEntry?.annualGrossSalary
+    ) || 0;
+    employerOnCostPercent = Number(
+      personnelEntry?.employerOnCostPercent ?? onCostEntry?.employerOnCostPercent
+    ) || 0;
+    baseMonthlyCost = (annualGrossSalary / 12) * (1 + (employerOnCostPercent / 100));
+  }
 
   const monthBounds = getMonthBounds(referenceDate);
   if (!monthBounds || baseMonthlyCost === 0) {
@@ -408,7 +619,8 @@ export function calculateChildMonthlyRevenue({
       return minOk && maxOk;
     }
   );
-  const bayKiBiGRule = pickApplicableValidityEntry(financeScenario?.bayKiBiGRules, referenceDate);
+  const bayKiBiGRule = pickApplicableValidityEntry(financeScenario?.bayKiBiGRules, referenceDate)
+    || pickLatestValidityEntry(financeScenario?.bayKiBiGRules);
   const bayKiBiGWeight = getBayKiBiGWeightForChild(item, groupDef, referenceDate, bayKiBiGRule?.weightFactors);
   const parentFeeAmount = Number(feeEntry?.monthlyAmount) || 0;
   const bayKiBiGAmount = (Number(bayKiBiGRule?.baseValue) || 0) * bayKiBiGWeight;

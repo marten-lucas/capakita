@@ -6,9 +6,46 @@ import {
   getPeriodBoundsForCategory,
   hasAnyBookingInWeek,
   getBayKiBiGWeightForChild,
+  resolveGroupIdsForBounds,
+  splitBookingByGroupAtDate,
 } from './financeUtils';
 
 describe('financeUtils', () => {
+  it('sums overlapping personnel cost entries at reference date', () => {
+    const result = calculateMonthlyStaffCost({
+      item: {
+        id: 'staff-overlap-1',
+        type: 'capacity',
+        validFrom: '2026-01-01',
+      },
+      itemFinance: {
+        personnelCostHistory: [
+          {
+            id: 'pc-1',
+            validFrom: '2026-01-01',
+            validUntil: '2026-12-31',
+            annualGrossSalary: 24000,
+            employerOnCostPercent: 20,
+          },
+          {
+            id: 'pc-2',
+            validFrom: '2026-01-01',
+            validUntil: '2026-12-31',
+            annualGrossSalary: 12000,
+            employerOnCostPercent: 10,
+          },
+        ],
+      },
+      referenceDate: '2026-06-15',
+      partialAbsenceThresholdDays: 42,
+      partialAbsenceEmployerSharePercent: 0,
+    });
+
+    expect(result.annualGrossSalary).toBe(36000);
+    expect(result.baseMonthlyCost).toBe(3500);
+    expect(result.adjustedMonthlyCost).toBe(3500);
+  });
+
   it('uses the matching group fee catalog and BayKiBiG rule for a child', () => {
     const result = calculateChildMonthlyRevenue({
       item: { id: 'child-1', type: 'demand', dateofbirth: '2024-01-10', validFrom: '2026-01-01' },
@@ -305,9 +342,7 @@ describe('financeUtils', () => {
         },
         groupDefs: [{ id: 'g1', type: 'Krippe', name: 'Krippe A' }],
         financeScenario: {
-          bayKiBiGRules: [
-            { id: 'b1', validFrom: '2025-01-01', validUntil: '2025-06-30', baseValue: 100 },
-          ],
+          bayKiBiGRules: [],
           groupFeeCatalogs: {
             g1: [{ id: 'g1f1', validFrom: '2025-01-01', minHours: 3, maxHours: 10, monthlyAmount: 165 }],
           },
@@ -320,6 +355,111 @@ describe('financeUtils', () => {
       expect(result.bayKiBiGAmount).toBe(0);
       expect(result.totalAmount).toBe(0);
       expect(result.groupId).toBe('g1');
+    });
+
+    it('falls back to latest BayKiBiG rule when no rule is valid for the reference date', () => {
+      const result = calculateChildMonthlyRevenue({
+        item: {
+          id: 'child-fallback-1',
+          type: 'demand',
+          dateofbirth: '2023-08-15',
+          groupId: 'g1',
+          validFrom: '2025-01-01',
+        },
+        bookings: [
+          {
+            id: 'booking-fallback-1',
+            startdate: '2025-01-01',
+            enddate: '',
+            times: [
+              { day_name: 'Mo', segments: [{ booking_start: '08:00', booking_end: '10:00' }] },
+              { day_name: 'Di', segments: [{ booking_start: '08:00', booking_end: '10:00' }] },
+            ],
+          },
+        ],
+        groupAssignments: {
+          a1: { id: 'a1', groupId: 'g1', start: '2025-01-01', end: '' },
+        },
+        groupDefs: [{ id: 'g1', type: 'Krippe', name: 'Krippe A' }],
+        financeScenario: {
+          bayKiBiGRules: [
+            { id: 'b1', validFrom: '2026-01-01', validUntil: '2026-12-31', baseValue: 100 },
+          ],
+          groupFeeCatalogs: {
+            g1: [{ id: 'g1f1', validFrom: '2025-01-01', minHours: 0, maxHours: 20, monthlyAmount: 100 }],
+          },
+        },
+        referenceDate: '2025-06-15',
+      });
+
+      expect(result.parentFeeAmount).toBe(100);
+      expect(result.bayKiBiGAmount).toBe(200);
+      expect(result.totalAmount).toBe(300);
+    });
+  });
+
+  describe('multi-group time-segment helpers', () => {
+    it('resolves all group ids for bounds when assignment mode is multiple', () => {
+      const groupIds = resolveGroupIdsForBounds(
+        {
+          a1: {
+            id: 'a1',
+            assignmentMode: 'multiple',
+            start: '2026-01-01',
+            end: '2026-12-31',
+            timeSegments: [
+              { id: 'ts-1', startTime: '08:00', endTime: '09:00', groupId: 'g1' },
+              { id: 'ts-2', startTime: '09:00', endTime: '10:00', groupId: 'g2' },
+            ],
+          },
+        },
+        { start: '2026-05-01', end: '2026-05-31' },
+        '__NO_GROUP__'
+      );
+
+      expect(groupIds).toEqual(['g1', 'g2']);
+    });
+
+    it('splits a booking by group time segments and preserves uncovered time as no-group', () => {
+      const split = splitBookingByGroupAtDate(
+        {
+          id: 'b1',
+          startdate: '2026-01-01',
+          enddate: '',
+          times: [
+            {
+              day: 1,
+              day_name: 'Mo',
+              segments: [
+                { id: 'seg-1', booking_start: '08:00', booking_end: '11:00', category: 'pedagogical' },
+              ],
+            },
+          ],
+        },
+        {
+          a1: {
+            id: 'a1',
+            assignmentMode: 'multiple',
+            start: '2026-01-01',
+            end: '2026-12-31',
+            timeSegments: [
+              { id: 'ts-1', startTime: '08:00', endTime: '09:00', groupId: 'g1' },
+              { id: 'ts-2', startTime: '09:00', endTime: '10:00', groupId: 'g2' },
+            ],
+          },
+        },
+        '2026-06-01',
+        null
+      );
+
+      const byGroup = Object.fromEntries(split.map((entry) => [entry.groupId || '__NO_GROUP__', entry]));
+
+      expect(byGroup.g1.times[0].segments[0].booking_start).toBe('08:00');
+      expect(byGroup.g1.times[0].segments[0].booking_end).toBe('09:00');
+      expect(byGroup.g2.times[0].segments[0].booking_start).toBe('09:00');
+      expect(byGroup.g2.times[0].segments[0].booking_end).toBe('10:00');
+      expect(byGroup.__NO_GROUP__.times[0].segments[0].booking_start).toBe('10:00');
+      expect(byGroup.__NO_GROUP__.times[0].segments[0].booking_end).toBe('11:00');
     });
   });
 });

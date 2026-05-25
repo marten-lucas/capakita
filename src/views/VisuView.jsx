@@ -28,6 +28,7 @@ function VisuView() {
   const chartToggles = chartState?.chartToggles || EMPTY_TOGGLES;
   const weeklyChartsByGroup = useSelector(selectWeeklyChartDataByGroup);
   const weeklySyncGroupKey = selectedScenarioId ? `weekly-sync-${selectedScenarioId}` : null;
+  const [showGroupWeeklyCharts, setShowGroupWeeklyCharts] = React.useState(false);
 
   React.useEffect(() => {
     if (selectedScenarioId && scenarios.length > 0) {
@@ -82,16 +83,32 @@ function VisuView() {
           <ChartErrorBoundary>
             <WeeklyChart syncGroupKey={weeklySyncGroupKey} />
           </ChartErrorBoundary>
-          <Stack gap="lg" mt="lg" style={{ overflow: 'visible' }}>
-            {weeklyChartsByGroup.map((groupChart) => (
-              <Paper key={groupChart.groupId} p="sm" withBorder style={{ overflow: 'visible' }}>
-                <Title order={5} mb="sm" c="dimmed">Gruppe: {groupChart.groupName}</Title>
-                <ChartErrorBoundary>
-                  <WeeklyChart chartData={groupChart.chartData} syncGroupKey={weeklySyncGroupKey} showRatioChart={false} />
-                </ChartErrorBoundary>
-              </Paper>
-            ))}
-          </Stack>
+          {weeklyChartsByGroup.length > 0 && (
+            <Stack gap="sm" mt="lg" style={{ overflow: 'visible' }}>
+              <Button
+                variant="subtle"
+                size="compact-sm"
+                onClick={() => setShowGroupWeeklyCharts((open) => !open)}
+              >
+                {showGroupWeeklyCharts
+                  ? `Gruppendiagramme ausblenden (${weeklyChartsByGroup.length})`
+                  : `Gruppendiagramme anzeigen (${weeklyChartsByGroup.length})`}
+              </Button>
+
+              {showGroupWeeklyCharts && (
+                <Stack gap="lg" style={{ overflow: 'visible' }}>
+                  {weeklyChartsByGroup.map((groupChart) => (
+                    <Paper key={groupChart.groupId} p="sm" withBorder style={{ overflow: 'visible' }}>
+                      <Title order={5} mb="sm" c="dimmed">Gruppe: {groupChart.groupName}</Title>
+                      <ChartErrorBoundary>
+                        <WeeklyChart chartData={groupChart.chartData} syncGroupKey={weeklySyncGroupKey} showRatioChart={false} />
+                      </ChartErrorBoundary>
+                    </Paper>
+                  ))}
+                </Stack>
+              )}
+            </Stack>
+          )}
         </Paper>
       )}
 

@@ -1,7 +1,74 @@
 import { generateExpertRatioTimeDimension, generateCareRatioTimeDimension } from '../chartUtils/chartUtils';
 import { sumBookingHours } from '../bookingUtils';
-import { getPeriodBoundsForCategory, rangesOverlap } from '../financeUtils';
+import { getPeriodBoundsForCategory, rangesOverlap, resolveGroupIdAtDate, splitBookingByGroupAtDate } from '../financeUtils';
 import { shouldIncludeDataItemInAnalysis } from '../dataVisibility';
+
+function normalizeDateValue(value) {
+    if (value === null || value === undefined) return '';
+
+    const text = String(value).trim();
+    if (!text) return '';
+
+    if (/^\d{4}-\d{2}-\d{2}/.test(text)) {
+        return text.slice(0, 10);
+    }
+
+    const europeanMatch = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(text);
+    if (europeanMatch) {
+        const day = europeanMatch[1].padStart(2, '0');
+        const month = europeanMatch[2].padStart(2, '0');
+        const year = europeanMatch[3];
+        return `${year}-${month}-${day}`;
+    }
+
+    return text;
+}
+
+function getItemStart(item) {
+    return normalizeDateValue(
+        item?.startdate
+        || item?.start
+        || item?.validFrom
+        || item?.valid_from
+        || item?.rawdata?.GUELTIGAB
+        || item?.rawdata?.GULTIGAB
+        || item?.rawdata?.GUELTIG_AB
+        || ''
+    );
+}
+
+function getItemEnd(item) {
+    return normalizeDateValue(
+        item?.enddate
+        || item?.end
+        || item?.validUntil
+        || item?.valid_until
+        || item?.rawdata?.GUELTIGBIS
+        || item?.rawdata?.GULTIGBIS
+        || item?.rawdata?.GUELTIG_BIS
+        || ''
+    );
+}
+
+function getBookingStart(booking) {
+    return normalizeDateValue(
+        booking?.startdate
+        || booking?.start
+        || booking?.validFrom
+        || booking?.valid_from
+        || ''
+    );
+}
+
+function getBookingEnd(booking) {
+    return normalizeDateValue(
+        booking?.enddate
+        || booking?.end
+        || booking?.validUntil
+        || booking?.valid_until
+        || ''
+    );
+}
 
 /**
  * Generate categories for midterm chart from today until the latest event date.
@@ -154,54 +221,50 @@ export function calculateChartDataMidterm(
     const qualificationAssignments = qualificationAssignmentsByScenario[scenarioId] || {};
     const groupAssignments = groupsByScenario?.[scenarioId] || {};
 
-    function resolveGroupId(itemId, date) {
-        const assignments = groupAssignments[itemId] || {};
-        const activeAssignment = Object.values(assignments).find((assignment) => {
-            const startOk = !assignment.start || assignment.start <= date;
-            const endOk = !assignment.end || assignment.end >= date;
-            return startOk && endOk;
-        });
-        return activeAssignment?.groupId || null;
+    function groupMatchesSelection(groupId) {
+        if (selectedGroups.length === 0) return true;
+        if (groupId && selectedGroups.includes(String(groupId))) return true;
+        if (selectedGroups.includes('__NO_GROUP__') && !groupId) return true;
+        return false;
     }
 
     const filteredDemandBookings = [];
     const filteredCapacityBookings = [];
 
     Object.entries(dataItems).forEach(([itemId, item]) => {
-        if (!item || !rangesOverlap(item.startdate || '', item.enddate || '', chartRange.start, chartRange.end)) {
+        const itemStart = getItemStart(item);
+        const itemEnd = getItemEnd(item);
+
+        if (!item || !rangesOverlap(itemStart, itemEnd, chartRange.start, chartRange.end)) {
             return;
         }
         if (!shouldIncludeDataItemInAnalysis(item)) {
             return;
         }
 
-        const groupId = resolveGroupId(itemId, referenceDate) || item.groupId || null;
+        const groupId = resolveGroupIdAtDate(
+            groupAssignments[itemId] || {},
+            referenceDate,
+            item.groupId || null
+        ) || null;
 
-        let groupMatch = false;
-        if (selectedGroups.length === 0) {
-            groupMatch = true;
-        } else if (groupId && selectedGroups.includes(groupId)) {
-            groupMatch = true;
-        } else if (Array.isArray(groupId) && groupId.some((groupKey) => selectedGroups.includes(groupKey))) {
-            groupMatch = true;
-        } else if (selectedGroups.includes('__NO_GROUP__') && (!groupId || groupId === '')) {
-            groupMatch = true;
-        }
-
-        if (!groupMatch) {
-            return;
-        }
+        const groupMatch = groupMatchesSelection(groupId);
 
         const itemBookings = Object.values(bookings[itemId] || {});
         if (item.type === 'demand') {
+            if (!groupMatch) {
+                return;
+            }
             itemBookings.forEach((booking) => {
-                if (rangesOverlap(booking.startdate || '', booking.enddate || '', chartRange.start, chartRange.end) && sumBookingHours(booking) > 0) {
+                if (rangesOverlap(getBookingStart(booking), getBookingEnd(booking), chartRange.start, chartRange.end) && sumBookingHours(booking) > 0) {
                     filteredDemandBookings.push({
                         ...booking,
                         itemId,
                         groupId,
-                        itemStart: item.startdate || '',
-                        itemEnd: item.enddate || '',
+                        bookingStart: getBookingStart(booking),
+                        bookingEnd: getBookingEnd(booking),
+                        itemStart,
+                        itemEnd,
                     });
                 }
             });
@@ -226,17 +289,33 @@ export function calculateChartDataMidterm(
             }
 
             itemBookings.forEach((booking) => {
-                if (rangesOverlap(booking.startdate || '', booking.enddate || '', chartRange.start, chartRange.end)
-                    && sumBookingHours(booking, { mode: 'pedagogical' }) > 0) {
-                    filteredCapacityBookings.push({
-                        ...booking,
-                        itemId,
-                        groupId,
-                        qualifications: qualiKeys,
-                        itemStart: item.startdate || '',
-                        itemEnd: item.enddate || '',
-                    });
+                if (!rangesOverlap(getBookingStart(booking), getBookingEnd(booking), chartRange.start, chartRange.end)
+                    || sumBookingHours(booking, { mode: 'pedagogical' }) <= 0) {
+                    return;
                 }
+
+                const splitBookings = splitBookingByGroupAtDate(
+                    booking,
+                    groupAssignments[itemId] || {},
+                    referenceDate,
+                    item.groupId || null
+                );
+
+                splitBookings.forEach((splitBooking) => {
+                    if (!groupMatchesSelection(splitBooking.groupId)) return;
+                    if (sumBookingHours(splitBooking, { mode: 'pedagogical' }) <= 0) return;
+
+                    filteredCapacityBookings.push({
+                        ...splitBooking,
+                        itemId,
+                        groupId: splitBooking.groupId,
+                        qualifications: qualiKeys,
+                        bookingStart: getBookingStart(splitBooking),
+                        bookingEnd: getBookingEnd(splitBooking),
+                        itemStart,
+                        itemEnd,
+                    });
+                });
             });
         }
     });
@@ -250,8 +329,8 @@ export function calculateChartDataMidterm(
             const periodBounds = getPeriodBoundsForCategory(timedimension, cat);
             filteredBookings.forEach(booking => {
                 const bookingOverlaps = periodBounds
-                    ? rangesOverlap(booking.startdate || '', booking.enddate || '', periodBounds.start, periodBounds.end)
-                    : ((!booking.startdate || booking.startdate <= cat) && (!booking.enddate || booking.enddate >= cat));
+                    ? rangesOverlap(booking.bookingStart || getBookingStart(booking), booking.bookingEnd || getBookingEnd(booking), periodBounds.start, periodBounds.end)
+                    : ((!(booking.bookingStart || getBookingStart(booking)) || (booking.bookingStart || getBookingStart(booking)) <= cat) && (!(booking.bookingEnd || getBookingEnd(booking)) || (booking.bookingEnd || getBookingEnd(booking)) >= cat));
 
                 const itemOverlaps = periodBounds
                     ? rangesOverlap(booking.itemStart || '', booking.itemEnd || '', periodBounds.start, periodBounds.end)

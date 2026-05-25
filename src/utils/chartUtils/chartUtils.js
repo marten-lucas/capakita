@@ -1,6 +1,7 @@
 import { sumBookingHours } from '../bookingUtils';
 import { timeToMinutes } from '../timeUtils';
 import { shouldIncludeDataItemInAnalysis } from '../dataVisibility';
+import { resolveGroupIdAtDate, splitBookingByGroupAtDate } from '../financeUtils';
 
 function getBayKiBiGWeightForChild(child, groupDef) {
   if (!child) return 1;
@@ -204,15 +205,11 @@ export function filterBookings({
     });
   }
 
-  // Helper: resolve groupId from group assignments
-  function resolveGroupId(itemId, date) {
-    const assignments = groupAssignments[itemId] || {};
-    const activeAssignment = Object.values(assignments).find(assignment => {
-      const startOk = !assignment.start || assignment.start <= date;
-      const endOk = !assignment.end || assignment.end >= date;
-      return startOk && endOk;
-    });
-    return activeAssignment?.groupId || null;
+  function groupMatchesSelection(groupId) {
+    if (selectedGroups.length === 0) return true;
+    if (groupId && selectedGroups.includes(String(groupId))) return true;
+    if (selectedGroups.includes('__NO_GROUP__') && !groupId) return true;
+    return false;
   }
 
   Object.entries(dataItems).forEach(([itemId]) => {
@@ -222,23 +219,18 @@ export function filterBookings({
     const type = overlayedItem.type;
 
     // Resolve groupId from group assignments or fallback to item groupId
-    const groupId = resolveGroupId(itemId, referenceDate) || overlayedItem.groupId || null;
+    const groupId = resolveGroupIdAtDate(
+      groupAssignments[itemId] || {},
+      referenceDate,
+      overlayedItem.groupId || null
+    ) || null;
 
     // Check presence and absence
     if (!isDataItemPresent(overlayedItem, referenceDate)) return;
     if (isDataItemAbsent(overlayedItem, referenceDate)) return;
 
     // Group filter
-    let groupMatch = false;
-    if (selectedGroups.length === 0) {
-      groupMatch = true;
-    } else if (groupId && selectedGroups.includes(groupId)) {
-      groupMatch = true;
-    } else if (Array.isArray(groupId) && groupId.some(g => selectedGroups.includes(g))) {
-      groupMatch = true;
-    } else if (selectedGroups.includes('__NO_GROUP__') && (!groupId || groupId === '')) {
-      groupMatch = true;
-    }
+    const groupMatch = groupMatchesSelection(groupId);
 
     // Get all bookings for this item (overlay-aware)
     const itemBookings = Object.values(getOverlayedBookings(itemId));
@@ -253,7 +245,7 @@ export function filterBookings({
     }
 
     // For capacity: group and qualification filter
-    if (type === 'capacity' && groupMatch) {
+    if (type === 'capacity') {
       const qualiAssignments = Object.values(getOverlayedQualifications(itemId));
       const qualiKeys = qualiAssignments.map(a => a.qualification);
 
@@ -268,9 +260,28 @@ export function filterBookings({
 
       if (qualiMatch) {
         itemBookings.forEach(booking => {
-          if (isActiveAt(booking, referenceDate) && sumBookingHours(booking, { mode: 'pedagogical' }) > 0) {
-            capacity.push({ ...booking, itemId, groupId, qualifications: qualiKeys });
+          if (!isActiveAt(booking, referenceDate) || sumBookingHours(booking, { mode: 'pedagogical' }) <= 0) {
+            return;
           }
+
+          const splitBookings = splitBookingByGroupAtDate(
+            booking,
+            groupAssignments[itemId] || {},
+            referenceDate,
+            overlayedItem.groupId || null
+          );
+
+          splitBookings.forEach((splitBooking) => {
+            if (!groupMatchesSelection(splitBooking.groupId)) return;
+            if (sumBookingHours(splitBooking, { mode: 'pedagogical' }) <= 0) return;
+
+            capacity.push({
+              ...splitBooking,
+              itemId,
+              groupId: splitBooking.groupId,
+              qualifications: qualiKeys,
+            });
+          });
         });
       }
     }

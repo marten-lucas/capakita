@@ -249,7 +249,7 @@ describe('statisticsSelectors', () => {
 
     expect(derived).toEqual({
       kita: { ageYears: 3, bookingDeltaHours: 2 },
-      school: { ageYears: 5.5, bookingDeltaHours: -1 },
+      school: { ageYears: 6, bookingDeltaHours: -1 },
     });
   });
 
@@ -278,7 +278,70 @@ describe('statisticsSelectors', () => {
 
     expect(derived).toEqual({
       kita: { ageYears: 2.9, bookingDeltaHours: 2.4 },
-      school: { ageYears: 6.7, bookingDeltaHours: -8.4 },
+      school: { ageYears: 6, bookingDeltaHours: -8.4 },
+    });
+  });
+
+  it('tracks corridor remain probability and excludes age metric for regelgruppe to school transitions', () => {
+    const state = {
+      simScenario: { selectedScenarioId: 's1' },
+      simData: {
+        dataByScenario: {
+          s1: {
+            cStay: { id: 'cStay', type: 'demand', startdate: '2022-01-01', enddate: '', dateofbirth: '2020-07-10' },
+            cSwitch: { id: 'cSwitch', type: 'demand', startdate: '2022-01-01', enddate: '', dateofbirth: '2020-08-15' },
+          },
+        },
+      },
+      simBooking: {
+        bookingsByScenario: {
+          s1: {
+            cStay: {
+              b1: booking('b1', '2022-01-01', '', [segment('08:00', '10:00')]),
+            },
+            cSwitch: {
+              b2: booking('b2', '2022-01-01', '', [segment('08:00', '10:00')]),
+            },
+          },
+        },
+      },
+      simGroup: {
+        groupDefsByScenario: {
+          s1: [
+            { id: 'g2', name: 'Regelgruppe', type: 'Regelgruppe' },
+            { id: 'g3', name: 'Schulkind', type: 'Schulkindgruppe' },
+          ],
+        },
+        groupsByScenario: {
+          s1: {
+            cStay: {
+              ga1: { id: 'ga1', groupId: 'g2', start: '2022-01-01', end: '' },
+            },
+            cSwitch: {
+              ga2: { id: 'ga2', groupId: 'g2', start: '2022-01-01', end: '2026-08-31' },
+              ga3: { id: 'ga3', groupId: 'g3', start: '2026-09-01', end: '' },
+            },
+          },
+        },
+      },
+    };
+
+    const result = selectGroupTransitionStatistics(state, {
+      asOfDate: '2026-10-01',
+      windowDays: 90,
+    });
+
+    const schoolTransition = result.transitions.find(
+      (entry) => entry.transitionKind === 'regelgruppe_to_schulkindbetreuung'
+    );
+
+    expect(schoolTransition?.ageMonths).toBeNull();
+    expect(result.corridor).toMatchObject({
+      eligibleCount: 2,
+      evaluatedCount: 2,
+      remainedInRegelCount: 1,
+      switchedToSchoolCount: 1,
+      remainProbability: 0.5,
     });
   });
 

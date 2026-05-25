@@ -4,7 +4,67 @@ import eventReducer, { refreshAllEvents } from './eventSlice';
 describe('eventSlice automatic transitions', () => {
   const scenarioId = 'scenario-1';
 
-  it('uses configured auto-event timing and booking delta metadata from scenario settings', () => {
+  it('uses data item names for booking and group assignment events when booking/assignment names are missing', () => {
+    const state = eventReducer(
+      undefined,
+      refreshAllEvents({
+        simScenario: {
+          scenarios: [{ id: scenarioId }],
+        },
+        simData: {
+          dataByScenario: {
+            [scenarioId]: {
+              child1: {
+                id: 'child1',
+                firstName: 'Mia',
+                name: 'Sommer',
+                type: 'demand',
+                dateofbirth: '2020-01-15',
+              },
+            },
+          },
+        },
+        simBooking: {
+          bookingsByScenario: {
+            [scenarioId]: {
+              child1: {
+                b1: {
+                  id: 'b1',
+                  startdate: '2026-01-01',
+                  enddate: '2026-01-31',
+                  times: [],
+                },
+              },
+            },
+          },
+        },
+        simGroup: {
+          groupsByScenario: {
+            [scenarioId]: {
+              child1: {
+                ga1: {
+                  id: 'ga1',
+                  start: '2026-01-01',
+                  end: '2026-01-31',
+                  groupId: 'g1',
+                },
+              },
+            },
+          },
+        },
+      })
+    );
+
+    const events = state.eventsByScenario[scenarioId] || [];
+    const bookingStartEvent = events.find((event) => event.id === 'booking_start_child1_b1');
+    const groupStartEvent = events.find((event) => event.id === 'group_assignment_start_child1_ga1');
+
+    expect(bookingStartEvent?.entityName).toBe('Mia Sommer');
+    expect(groupStartEvent?.entityName).toBe('Mia Sommer');
+    expect(events.some((event) => event.entityName === 'Unbekannt')).toBe(false);
+  });
+
+  it('uses configured auto-event timing for kita and Bavarian school-year start for school transitions', () => {
     const state = eventReducer(
       undefined,
       refreshAllEvents({
@@ -42,8 +102,59 @@ describe('eventSlice automatic transitions', () => {
 
     expect(kitaTransition?.effectiveDate).toBe('2022-07-15');
     expect(kitaTransition?.metadata?.bookingDeltaHours).toBe(1.5);
-    expect(schoolTransition?.effectiveDate).toBe('2026-07-15');
+    expect(schoolTransition?.effectiveDate).toBe('2026-09-01');
     expect(schoolTransition?.metadata?.bookingDeltaHours).toBe(-1);
+  });
+
+  it('applies Bavarian school cutoff and corridor boundaries for auto school transitions', () => {
+    const state = eventReducer(
+      undefined,
+      refreshAllEvents({
+        simScenario: {
+          scenarios: [{ id: scenarioId }],
+        },
+        simData: {
+          dataByScenario: {
+            [scenarioId]: {
+              juneChild: {
+                id: 'juneChild',
+                name: 'June',
+                type: 'demand',
+                dateofbirth: '2020-06-30',
+              },
+              julyChild: {
+                id: 'julyChild',
+                name: 'July',
+                type: 'demand',
+                dateofbirth: '2020-07-01',
+              },
+              sepChild: {
+                id: 'sepChild',
+                name: 'Sep',
+                type: 'demand',
+                dateofbirth: '2020-09-30',
+              },
+              octChild: {
+                id: 'octChild',
+                name: 'Oct',
+                type: 'demand',
+                dateofbirth: '2020-10-01',
+              },
+            },
+          },
+        },
+        simBooking: { bookingsByScenario: { [scenarioId]: {} } },
+        simGroup: { groupsByScenario: { [scenarioId]: {} } },
+      })
+    );
+
+    const events = state.eventsByScenario[scenarioId] || [];
+    const findDate = (id) => events.find((event) => event.id === id)?.effectiveDate;
+
+    expect(findDate('auto_transition_school_juneChild')).toBe('2026-09-01');
+    expect(findDate('auto_transition_school_julyChild')).toBe('2026-09-01');
+    expect(findDate('auto_transition_school_sepChild')).toBe('2026-09-01');
+    expect(findDate('auto_transition_school_octChild')).toBe('2027-09-01');
   });
 
   it('suppresses the automatic kita transition when a real group assignment already exists on that date', () => {
@@ -121,5 +232,59 @@ describe('eventSlice automatic transitions', () => {
 
     expect(events.some((event) => event.id === 'auto_transition_kita_child2')).toBe(false);
     expect(events.some((event) => event.id === 'auto_transition_school_child2')).toBe(false);
+  });
+
+  it('does not create booking/group-assignment events for orphan item ids', () => {
+    const state = eventReducer(
+      undefined,
+      refreshAllEvents({
+        simScenario: {
+          scenarios: [{ id: scenarioId }],
+        },
+        simData: {
+          dataByScenario: {
+            [scenarioId]: {
+              child1: {
+                id: 'child1',
+                name: 'Mia',
+                type: 'demand',
+                dateofbirth: '2020-01-15',
+              },
+            },
+          },
+        },
+        simBooking: {
+          bookingsByScenario: {
+            [scenarioId]: {
+              orphan1: {
+                b1: {
+                  id: 'b1',
+                  startdate: '2026-01-01',
+                  enddate: '',
+                  times: [],
+                },
+              },
+            },
+          },
+        },
+        simGroup: {
+          groupsByScenario: {
+            [scenarioId]: {
+              orphan1: {
+                ga1: {
+                  id: 'ga1',
+                  start: '2026-01-01',
+                  end: '',
+                  groupId: 'g1',
+                },
+              },
+            },
+          },
+        },
+      })
+    );
+
+    const events = state.eventsByScenario[scenarioId] || [];
+    expect(events.some((event) => String(event.id || '').includes('orphan1'))).toBe(false);
   });
 });

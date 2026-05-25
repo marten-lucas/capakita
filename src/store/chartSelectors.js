@@ -11,6 +11,7 @@ import {
   getPeriodBoundsForCategory,
   hasAnyBookingInWeek,
   isRecordActiveOnDate,
+  resolveGroupIdsForBounds,
 } from '../utils/financeUtils';
 import { minutesToTime, timeToMinutes } from '../utils/timeUtils';
 
@@ -265,27 +266,9 @@ function bookingOverlapsBounds(booking, bounds) {
   return bookingStart <= bounds.end && (bookingEnd === '' || bookingEnd >= bounds.start);
 }
 
-function resolveGroupIdForBounds(assignmentsByItem, itemId, bounds, fallbackGroupId = null) {
-  const assignments = Object.values(assignmentsByItem?.[itemId] || {});
-  const activeAtStart = assignments.find((assignment) => {
-    const startOk = !assignment.start || assignment.start <= bounds.start;
-    const endOk = !assignment.end || assignment.end >= bounds.start;
-    return startOk && endOk;
-  });
-
-  if (activeAtStart?.groupId) {
-    return String(activeAtStart.groupId);
-  }
-
-  const overlapping = assignments
-    .filter((assignment) => {
-      const assignmentStart = assignment?.start || '';
-      const assignmentEnd = assignment?.end || '';
-      return assignmentStart <= bounds.end && (assignmentEnd === '' || assignmentEnd >= bounds.start);
-    })
-    .sort((left, right) => String(left.start || '').localeCompare(String(right.start || '')))[0];
-
-  return overlapping?.groupId ? String(overlapping.groupId) : fallbackGroupId;
+function hasKnownEntityName(name) {
+  if (!name) return false;
+  return String(name).trim().toLowerCase() !== 'unbekannt';
 }
 
 function buildGroupedCountSeries({
@@ -314,29 +297,60 @@ function buildGroupedCountSeries({
       const hasBooking = Object.values(effectiveBookingsByItem?.[itemId] || {}).some((booking) => bookingOverlapsBounds(booking, bounds));
       if (!hasBooking) return;
 
-      const resolvedGroupId = resolveGroupIdForBounds(
-        effectiveGroupAssignmentsByItem,
-        itemId,
+      const resolvedGroupIds = resolveGroupIdsForBounds(
+        effectiveGroupAssignmentsByItem?.[itemId] || {},
         bounds,
         item?.groupId ? String(item.groupId) : '__NO_GROUP__'
-      ) || '__NO_GROUP__';
-      const groupKey = String(resolvedGroupId);
-      const groupLabel = groupKey === '__NO_GROUP__' ? 'Ohne Gruppe' : (groupLabelById.get(groupKey) || groupKey);
+      );
 
-      if (!groupedCounts.has(groupKey)) {
-        groupedCounts.set(groupKey, {
-          groupId: groupKey,
-          name: groupLabel,
-          data: new Array((categories || []).length).fill(0),
-        });
-      }
+      const groupKeys = resolvedGroupIds.length > 0 ? resolvedGroupIds : ['__NO_GROUP__'];
 
-      groupedCounts.get(groupKey).data[categoryIndex] += 1;
+      groupKeys.forEach((resolvedGroupId) => {
+        const groupKey = String(resolvedGroupId || '__NO_GROUP__');
+        const groupLabel = groupKey === '__NO_GROUP__' ? 'Ohne Gruppe' : (groupLabelById.get(groupKey) || groupKey);
+
+        if (!groupedCounts.has(groupKey)) {
+          groupedCounts.set(groupKey, {
+            groupId: groupKey,
+            name: groupLabel,
+            data: new Array((categories || []).length).fill(0),
+          });
+        }
+
+        groupedCounts.get(groupKey).data[categoryIndex] += 1;
+      });
     });
   });
 
   return Array.from(groupedCounts.values())
     .sort((left, right) => left.name.localeCompare(right.name));
+}
+
+function buildTotalCountSeries({
+  categories,
+  timedimension,
+  effectiveDataItems,
+  effectiveBookingsByItem,
+  itemType,
+}) {
+  return (categories || []).map((category) => {
+    const bounds = getPeriodBoundsForCategory(timedimension, category);
+    if (!bounds) return 0;
+
+    let count = 0;
+    Object.entries(effectiveDataItems || {}).forEach(([itemId, item]) => {
+      if (item?.type !== itemType) return;
+      if (isArchivedDataItem(item)) return;
+      if (!itemOverlapsBounds(item, bounds)) return;
+
+      const hasBooking = Object.values(effectiveBookingsByItem?.[itemId] || {}).some((booking) => bookingOverlapsBounds(booking, bounds));
+      if (!hasBooking) return;
+
+      count += 1;
+    });
+
+    return count;
+  });
 }
 
 export const selectChartScenarioState = createSelector(
@@ -572,6 +586,7 @@ export const selectMidtermChartData = createSelector(
     }
 
     const flags = scenarioEvents
+      .filter((event) => hasKnownEntityName(event?.entityName))
       .map((event) => {
         const label = formatDateToCategory(timedimension, event.effectiveDate);
         const index = chartData?.categories?.indexOf(label) ?? -1;
@@ -623,13 +638,21 @@ export const selectMidtermChartData = createSelector(
       itemType: 'capacity',
     });
 
-    const childCount = (chartData?.categories || []).map((_, index) => (
-      childCountByGroup.reduce((sum, entry) => sum + (entry.data[index] || 0), 0)
-    ));
+    const childCount = buildTotalCountSeries({
+      categories: chartData?.categories || [],
+      timedimension,
+      effectiveDataItems,
+      effectiveBookingsByItem,
+      itemType: 'demand',
+    });
 
-    const employeeCount = (chartData?.categories || []).map((_, index) => (
-      employeeCountByGroup.reduce((sum, entry) => sum + (entry.data[index] || 0), 0)
-    ));
+    const employeeCount = buildTotalCountSeries({
+      categories: chartData?.categories || [],
+      timedimension,
+      effectiveDataItems,
+      effectiveBookingsByItem,
+      itemType: 'capacity',
+    });
 
     const referenceFinance = calculateScenarioMonthlyFinance({
       referenceDate,

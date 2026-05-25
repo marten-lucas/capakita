@@ -25,9 +25,11 @@ function SimDataGroupsTab() {
     const newGroup = {
       id: newGroupId,
       kindId: selectedItemId,
+      assignmentMode: 'single',
       groupId: '',
       start: '',
       end: '',
+      timeSegments: [],
     };
     if (isBasedScenario) {
       dispatch({

@@ -22,6 +22,13 @@ const EMPTY_TRANSITIONS_RESULT = {
     averageDeltaPercent: 0,
   },
   ageHistogram: [],
+  corridor: {
+    eligibleCount: 0,
+    evaluatedCount: 0,
+    remainedInRegelCount: 0,
+    switchedToSchoolCount: 0,
+    remainProbability: 0,
+  },
 };
 
 const ENTRY_STAGE_ID = 'entry';
@@ -120,6 +127,56 @@ function parseIsoDate(value) {
 
 function toIsoDate(date) {
   return date.toISOString().slice(0, 10);
+}
+
+function getSchoolEnrollmentDateByBayRules(dateOfBirth, deferredInCorridor = false) {
+  const birthDate = parseIsoDate(dateOfBirth);
+  if (!birthDate) return null;
+
+  const sixthBirthday = new Date(Date.UTC(
+    birthDate.getUTCFullYear() + 6,
+    birthDate.getUTCMonth(),
+    birthDate.getUTCDate()
+  ));
+
+  const year = sixthBirthday.getUTCFullYear();
+  const month = sixthBirthday.getUTCMonth() + 1;
+  const day = sixthBirthday.getUTCDate();
+
+  const isBeforeOrOnJune30 = month < 7 || (month === 6 && day <= 30);
+  const isCorridor = month === 7 || month === 8 || (month === 9 && day <= 30);
+  const enrollmentYear = isBeforeOrOnJune30
+    ? year
+    : isCorridor
+      ? (deferredInCorridor ? year + 1 : year)
+      : year + 1;
+
+  return new Date(Date.UTC(enrollmentYear, 8, 1));
+}
+
+function isCorridorBirthdayByBayRules(dateOfBirth) {
+  const birthDate = parseIsoDate(dateOfBirth);
+  if (!birthDate) return false;
+
+  const sixthBirthday = new Date(Date.UTC(
+    birthDate.getUTCFullYear() + 6,
+    birthDate.getUTCMonth(),
+    birthDate.getUTCDate()
+  ));
+
+  const month = sixthBirthday.getUTCMonth() + 1;
+  const day = sixthBirthday.getUTCDate();
+  return month === 7 || month === 8 || (month === 9 && day <= 30);
+}
+
+function findStageAtDate(assignments, date) {
+  if (!Array.isArray(assignments) || !date) return null;
+
+  const active = assignments.find((assignment) => (
+    normalizeStart(assignment?.start) <= date && normalizeEnd(assignment?.end) >= date
+  ));
+
+  return active?.stageId || null;
 }
 
 function normalizeStart(dateValue) {
@@ -319,9 +376,11 @@ export function deriveAutoEventSettingsFromStatistics(transitionStatistics, grou
   return ['kita', 'school'].reduce((accumulator, key) => {
     const routeTransitions = groupedTransitions[key];
     const fallback = fallbackSettings?.[key] || {};
-    const ages = routeTransitions
-      .map((transition) => transition.ageMonths)
-      .filter((value) => Number.isFinite(value));
+    const ages = key === 'kita'
+      ? routeTransitions
+        .map((transition) => transition.ageMonths)
+        .filter((value) => Number.isFinite(value))
+      : [];
     const deltas = routeTransitions
       .map((transition) => transition.deltaHours)
       .filter((value) => Number.isFinite(value));
@@ -444,8 +503,15 @@ export const selectGroupTransitionStatistics = createSelector(
     const groupDefsById = Object.fromEntries((groupDefs || []).map((def) => [String(def.id), def]));
 
     const transitions = [];
+    const corridor = {
+      eligibleCount: 0,
+      evaluatedCount: 0,
+      remainedInRegelCount: 0,
+      switchedToSchoolCount: 0,
+      remainProbability: 0,
+    };
 
-    function pushTransition({ itemId, item, transitionDate, fromStageId, toStageId, transitionKind }) {
+    function pushTransition({ itemId, item, transitionDate, fromStageId, toStageId, transitionKind, includeAge = true }) {
       const bookingMap = bookingsByItem[itemId] || {};
       const beforeStart = fromStageId === ENTRY_STAGE_ID ? null : addDays(transitionDate, -windowDays);
       const beforeEnd = fromStageId === ENTRY_STAGE_ID ? null : addDays(transitionDate, -1);
@@ -461,7 +527,7 @@ export const selectGroupTransitionStatistics = createSelector(
       const deltaHours = roundTwo(afterHours - beforeHours);
       const deltaPercent = beforeHours > 0 ? roundTwo((deltaHours / beforeHours) * 100) : null;
       const dateOfBirth = parseIsoDate(item?.dateofbirth);
-      const ageMonths = monthsBetween(dateOfBirth, transitionDate);
+      const ageMonths = includeAge ? monthsBetween(dateOfBirth, transitionDate) : null;
 
       transitions.push({
         key: `${itemId}:${toIsoDate(transitionDate)}:${transitionKind}`,
@@ -519,9 +585,8 @@ export const selectGroupTransitionStatistics = createSelector(
         }
       }
 
-      if (classifiedAssignments.length < 2) return;
-
-      for (let index = 1; index < classifiedAssignments.length; index += 1) {
+      if (classifiedAssignments.length >= 2) {
+        for (let index = 1; index < classifiedAssignments.length; index += 1) {
         const previous = classifiedAssignments[index - 1];
         const current = classifiedAssignments[index];
         const transitionDate = parseIsoDate(current?.start) || parseIsoDate(previous?.end);
@@ -546,7 +611,26 @@ export const selectGroupTransitionStatistics = createSelector(
             fromStageId: REGEL_STAGE_ID,
             toStageId: SCHOOL_STAGE_ID,
             transitionKind: TRANSITION_KIND.REGEL_TO_SCHOOL,
+            includeAge: false,
           });
+        }
+      }
+      }
+
+      if (isCorridorBirthdayByBayRules(item?.dateofbirth)) {
+        const firstPossibleSchoolStart = getSchoolEnrollmentDateByBayRules(item?.dateofbirth, false);
+        if (firstPossibleSchoolStart && firstPossibleSchoolStart <= asOfDate) {
+          corridor.eligibleCount += 1;
+          const stageAtSchoolStart = findStageAtDate(classifiedAssignments, firstPossibleSchoolStart);
+          if (stageAtSchoolStart) {
+            corridor.evaluatedCount += 1;
+            if (stageAtSchoolStart === REGEL_STAGE_ID) {
+              corridor.remainedInRegelCount += 1;
+            }
+            if (stageAtSchoolStart === SCHOOL_STAGE_ID) {
+              corridor.switchedToSchoolCount += 1;
+            }
+          }
         }
       }
     });
@@ -560,6 +644,10 @@ export const selectGroupTransitionStatistics = createSelector(
     const deltaPercentValues = transitions
       .map((transition) => transition.deltaPercent)
       .filter((value) => Number.isFinite(value));
+
+    corridor.remainProbability = corridor.evaluatedCount > 0
+      ? roundTwo(corridor.remainedInRegelCount / corridor.evaluatedCount)
+      : 0;
 
     return {
       asOfDate: toIsoDate(asOfDate),
@@ -575,6 +663,7 @@ export const selectGroupTransitionStatistics = createSelector(
         averageDeltaPercent: average(deltaPercentValues),
       },
       ageHistogram: buildAgeHistogram(ages),
+      corridor,
     };
   }
 );

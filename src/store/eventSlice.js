@@ -58,6 +58,59 @@ function addYearsToIsoDate(dateStr, years) {
     return d.toISOString().slice(0, 10);
 }
 
+function parseIsoDateUtc(dateStr) {
+    if (!dateStr) return null;
+    const match = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) return null;
+
+    const year = Number(match[1]);
+    const month = Number(match[2]) - 1;
+    const day = Number(match[3]);
+    const date = new Date(Date.UTC(year, month, day));
+    if (isNaN(date.getTime())) return null;
+    return date;
+}
+
+function toIsoDateUtc(date) {
+    return date.toISOString().slice(0, 10);
+}
+
+function isCorridorDeferred(item = {}) {
+    const candidates = [
+        item?.corridorDeferred,
+        item?.schoolEntryDeferred,
+        item?.postponeSchoolStart,
+    ];
+
+    return candidates.some((value) => value === true);
+}
+
+function calculateSchoolEntryDateBavaria(dateOfBirth, deferredInCorridor = false) {
+    const birthDate = parseIsoDateUtc(dateOfBirth);
+    if (!birthDate) return null;
+
+    const sixthBirthday = new Date(Date.UTC(
+        birthDate.getUTCFullYear() + 6,
+        birthDate.getUTCMonth(),
+        birthDate.getUTCDate()
+    ));
+
+    const year = sixthBirthday.getUTCFullYear();
+    const month = sixthBirthday.getUTCMonth() + 1;
+    const day = sixthBirthday.getUTCDate();
+
+    const isBeforeOrOnJune30 = month < 7 || (month === 6 && day <= 30);
+    const isCorridor = (month === 7) || (month === 8) || (month === 9 && day <= 30);
+    const enrollmentYear = isBeforeOrOnJune30
+        ? year
+        : isCorridor
+            ? (deferredInCorridor ? year + 1 : year)
+            : year + 1;
+
+    // In the simulator, school transition is applied at September start.
+    return `${String(enrollmentYear).padStart(4, '0')}-09-01`;
+}
+
 function hasConflictingRealEvent({ existingEvents = [], itemKey, effectiveDate }) {
     return existingEvents.some((event) => {
         if (event?.entityId !== itemKey || event?.effectiveDate !== effectiveDate) return false;
@@ -91,7 +144,7 @@ function buildAutomaticTransitionEvents({ dataItems, existingEvents = [], scenar
             },
             {
                 id: `auto_transition_school_${itemKey}`,
-                effectiveDate: addYearsToIsoDate(item.dateofbirth, settings.school.ageYears),
+                effectiveDate: calculateSchoolEntryDateBavaria(item.dateofbirth, isCorridorDeferred(item)),
                 description: 'Automatischer Gruppenwechsel: Kita → Schulkindbetreuung',
                 targetStage: 'school',
                 bookingDeltaHours: settings.school.bookingDeltaHours,
@@ -126,6 +179,21 @@ function buildAutomaticTransitionEvents({ dataItems, existingEvents = [], scenar
     });
 
     return events;
+}
+
+function resolveEntityName(dataItems, itemId, explicitName) {
+    const valueFromArg = String(explicitName || '').trim();
+    if (valueFromArg) return valueFromArg;
+
+    const item = dataItems?.[itemId] || {};
+    const firstName = String(item.firstName || '').trim();
+    const name = String(item.name || '').trim();
+
+    if (firstName && name) return `${firstName} ${name}`;
+    if (name) return name;
+    if (firstName) return firstName;
+
+    return 'Unbekannt';
 }
 
 // Extract events for a scenario from state
@@ -251,7 +319,10 @@ function extractEventsForScenario(state, scenarioId, disabledIds = {}) {
 
     // Bookings: start/end
     Object.entries(bookingsByItem).forEach(([itemId, bookings]) => {
+        if (!dataItems?.[itemId]) return;
         Object.values(bookings).forEach(booking => {
+            const bookingEntityType = dataItems?.[itemId]?.type === 'capacity' ? 'capacity' : 'demand';
+            const bookingEntityName = resolveEntityName(dataItems, itemId, booking.name);
             if (booking.startdate) {
                 events.push(
                     createEvent({
@@ -260,9 +331,9 @@ function extractEventsForScenario(state, scenarioId, disabledIds = {}) {
                         sourceDate: booking.startdate,
                         type: 'booking_start',
                         category: 'booking',
-                        entityType: 'demand',
+                        entityType: bookingEntityType,
                         entityId: itemId,
-                        entityName: booking.name || 'Unbekannt',
+                        entityName: bookingEntityName,
                         relatedId: booking.id,
                         description: `Buchung beginnt (${booking.id})`,
                         metadata: { bookingTimes: booking.times || [] }
@@ -279,9 +350,9 @@ function extractEventsForScenario(state, scenarioId, disabledIds = {}) {
                             sourceDate: booking.enddate,
                             type: 'booking_end',
                             category: 'booking',
-                            entityType: 'demand',
+                            entityType: bookingEntityType,
                             entityId: itemId,
-                            entityName: booking.name || 'Unbekannt',
+                            entityName: bookingEntityName,
                             relatedId: booking.id,
                             description: `Buchung endet (${booking.id})`,
                             metadata: { bookingTimes: booking.times || [] }
@@ -294,7 +365,10 @@ function extractEventsForScenario(state, scenarioId, disabledIds = {}) {
 
     // Group assignments: start/end
     Object.entries(groupsByItem).forEach(([itemId, assignments]) => {
+        if (!dataItems?.[itemId]) return;
         Object.values(assignments).forEach(assignment => {
+            const groupEntityType = dataItems?.[itemId]?.type === 'capacity' ? 'capacity' : 'demand';
+            const assignmentEntityName = resolveEntityName(dataItems, itemId, assignment.name);
             if (assignment.start) {
                 events.push(
                     createEvent({
@@ -303,9 +377,9 @@ function extractEventsForScenario(state, scenarioId, disabledIds = {}) {
                         sourceDate: assignment.start,
                         type: 'group_assignment_start',
                         category: 'group_assignment',
-                        entityType: 'demand',
+                        entityType: groupEntityType,
                         entityId: itemId,
-                        entityName: assignment.name || 'Unbekannt',
+                        entityName: assignmentEntityName,
                         relatedId: assignment.id,
                         description: `Gruppenzuweisung beginnt (${assignment.groupId})`,
                         metadata: { groupId: assignment.groupId, groupName: assignment.groupName }
@@ -322,9 +396,9 @@ function extractEventsForScenario(state, scenarioId, disabledIds = {}) {
                             sourceDate: assignment.end,
                             type: 'group_assignment_end',
                             category: 'group_assignment',
-                            entityType: 'demand',
+                            entityType: groupEntityType,
                             entityId: itemId,
-                            entityName: assignment.name || 'Unbekannt',
+                            entityName: assignmentEntityName,
                             relatedId: assignment.id,
                             description: `Gruppenzuweisung endet (${assignment.groupId})`,
                             metadata: { groupId: assignment.groupId, groupName: assignment.groupName }
@@ -387,6 +461,10 @@ const eventSlice = createSlice({
             state.eventsByScenario[scenarioId] = events.map((event) =>
                 event.id === eventId ? { ...event, enabled } : event
             );
+        },
+        clearEventOverridesForScenario(state, action) {
+            const { scenarioId } = action.payload;
+            delete state.disabledEventIdsByScenario[scenarioId];
         },
     },
     extraReducers: (builder) => {
@@ -468,6 +546,6 @@ export const selectConsolidatedEventsForScenario = createSelector(
   }
 );
 
-export const { refreshAllEvents, refreshEventsForScenario, setEventEnabled } = eventSlice.actions;
+export const { refreshAllEvents, refreshEventsForScenario, setEventEnabled, clearEventOverridesForScenario } = eventSlice.actions;
 export default eventSlice.reducer;
 

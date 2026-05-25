@@ -11,35 +11,120 @@
       "ageRange": "0-2 Jahre",
       "description": "Beiträge für Kinder unter 3 Jahren",
       "bands": [
-        {"minHours": 3, "maxHours": 4, "monthlyAmountMembers": 165, "monthlyAmountNonMembers": 170},
-        {"minHours": 4.01, "maxHours": 5, "monthlyAmountMembers": 195, "monthlyAmountNonMembers": 200},
-        {"minHours": 5.01, "maxHours": 6, "monthlyAmountMembers": 225, "monthlyAmountNonMembers": 230},
-        {"minHours": 6.01, "maxHours": 7, "monthlyAmountMembers": 255, "monthlyAmountNonMembers": 260},
-        {"minHours": 7.01, "maxHours": 8, "monthlyAmountMembers": 285, "monthlyAmountNonMembers": 290},
-        {"minHours": 8.01, "maxHours": 9, "monthlyAmountMembers": 315, "monthlyAmountNonMembers": 320},
-        {"minHours": 9.01, "maxHours": 10, "monthlyAmountMembers": 345, "monthlyAmountNonMembers": 350}
+        {
+          "minHours": 3,
+          "maxHours": 4,
+          "monthlyAmountMembers": 165,
+          "monthlyAmountNonMembers": 170
+        },
+        {
+          "minHours": 4.01,
+          "maxHours": 5,
+          "monthlyAmountMembers": 195,
+          "monthlyAmountNonMembers": 200
+        },
+        {
+          "minHours": 5.01,
+          "maxHours": 6,
+          "monthlyAmountMembers": 225,
+          "monthlyAmountNonMembers": 230
+        },
+        {
+          "minHours": 6.01,
+          "maxHours": 7,
+          "monthlyAmountMembers": 255,
+          "monthlyAmountNonMembers": 260
+        },
+        {
+          "minHours": 7.01,
+          "maxHours": 8,
+          "monthlyAmountMembers": 285,
+          "monthlyAmountNonMembers": 290
+        },
+        {
+          "minHours": 8.01,
+          "maxHours": 9,
+          "monthlyAmountMembers": 315,
+          "monthlyAmountNonMembers": 320
+        },
+        {
+          "minHours": 9.01,
+          "maxHours": 10,
+          "monthlyAmountMembers": 345,
+          "monthlyAmountNonMembers": 350
+        }
       ]
     },
     "childrenOver3": {
       "ageRange": "3-5 Jahre",
       "description": "Beiträge für Kinder über 3 Jahren (vor Schuleintritt)",
       "bands": [
-        {"minHours": 3, "maxHours": 4, "monthlyAmountMembers": 145, "monthlyAmountNonMembers": 150},
-        {"minHours": 4.01, "maxHours": 5, "monthlyAmountMembers": 165, "monthlyAmountNonMembers": 170},
-        {"minHours": 5.01, "maxHours": 6, "monthlyAmountMembers": 185, "monthlyAmountNonMembers": 190},
-        {"minHours": 6.01, "maxHours": 7, "monthlyAmountMembers": 205, "monthlyAmountNonMembers": 210},
-        {"minHours": 7.01, "maxHours": 8, "monthlyAmountMembers": 225, "monthlyAmountNonMembers": 230},
-        {"minHours": 8.01, "maxHours": 9, "monthlyAmountMembers": 245, "monthlyAmountNonMembers": 250},
-        {"minHours": 9.01, "maxHours": 10, "monthlyAmountMembers": 265, "monthlyAmountNonMembers": 270}
+        {
+          "minHours": 3,
+          "maxHours": 4,
+          "monthlyAmountMembers": 145,
+          "monthlyAmountNonMembers": 150
+        },
+        {
+          "minHours": 4.01,
+          "maxHours": 5,
+          "monthlyAmountMembers": 165,
+          "monthlyAmountNonMembers": 170
+        },
+        {
+          "minHours": 5.01,
+          "maxHours": 6,
+          "monthlyAmountMembers": 185,
+          "monthlyAmountNonMembers": 190
+        },
+        {
+          "minHours": 6.01,
+          "maxHours": 7,
+          "monthlyAmountMembers": 205,
+          "monthlyAmountNonMembers": 210
+        },
+        {
+          "minHours": 7.01,
+          "maxHours": 8,
+          "monthlyAmountMembers": 225,
+          "monthlyAmountNonMembers": 230
+        },
+        {
+          "minHours": 8.01,
+          "maxHours": 9,
+          "monthlyAmountMembers": 245,
+          "monthlyAmountNonMembers": 250
+        },
+        {
+          "minHours": 9.01,
+          "maxHours": 10,
+          "monthlyAmountMembers": 265,
+          "monthlyAmountNonMembers": 270
+        }
       ]
     },
     "schoolChildren": {
       "ageRange": "Schulkinder",
       "description": "Beiträge für die Mittagsbetreuung / Ferienbetreuung der Schulkinder",
       "bands": [
-        {"minHours": 1, "maxHours": 2, "monthlyAmountMembers": 105, "monthlyAmountNonMembers": 110},
-        {"minHours": 2.01, "maxHours": 3, "monthlyAmountMembers": 125, "monthlyAmountNonMembers": 130},
-        {"minHours": 3.01, "maxHours": 4, "monthlyAmountMembers": 145, "monthlyAmountNonMembers": 150}
+        {
+          "minHours": 1,
+          "maxHours": 2,
+          "monthlyAmountMembers": 105,
+          "monthlyAmountNonMembers": 110
+        },
+        {
+          "minHours": 2.01,
+          "maxHours": 3,
+          "monthlyAmountMembers": 125,
+          "monthlyAmountNonMembers": 130
+        },
+        {
+          "minHours": 3.01,
+          "maxHours": 4,
+          "monthlyAmountMembers": 145,
+          "monthlyAmountNonMembers": 150
+        }
       ]
     }
   },
@@ -53,13 +138,55 @@
           "validFrom": "2025-01-01",
           "validUntil": "2025-12-31",
           "feeBands": [
-            {"id": "f1", "minHours": 3, "maxHours": 4, "monthlyAmount": 165, "validFrom": "2025-01-01"},
-            {"id": "f2", "minHours": 4.01, "maxHours": 5, "monthlyAmount": 195, "validFrom": "2025-01-01"},
-            {"id": "f3", "minHours": 5.01, "maxHours": 6, "monthlyAmount": 225, "validFrom": "2025-01-01"},
-            {"id": "f4", "minHours": 6.01, "maxHours": 7, "monthlyAmount": 255, "validFrom": "2025-01-01"},
-            {"id": "f5", "minHours": 7.01, "maxHours": 8, "monthlyAmount": 285, "validFrom": "2025-01-01"},
-            {"id": "f6", "minHours": 8.01, "maxHours": 9, "monthlyAmount": 315, "validFrom": "2025-01-01"},
-            {"id": "f7", "minHours": 9.01, "maxHours": 10, "monthlyAmount": 345, "validFrom": "2025-01-01"}
+            {
+              "id": "f1",
+              "minHours": 3,
+              "maxHours": 4,
+              "monthlyAmount": 165,
+              "validFrom": "2025-01-01"
+            },
+            {
+              "id": "f2",
+              "minHours": 4.01,
+              "maxHours": 5,
+              "monthlyAmount": 195,
+              "validFrom": "2025-01-01"
+            },
+            {
+              "id": "f3",
+              "minHours": 5.01,
+              "maxHours": 6,
+              "monthlyAmount": 225,
+              "validFrom": "2025-01-01"
+            },
+            {
+              "id": "f4",
+              "minHours": 6.01,
+              "maxHours": 7,
+              "monthlyAmount": 255,
+              "validFrom": "2025-01-01"
+            },
+            {
+              "id": "f5",
+              "minHours": 7.01,
+              "maxHours": 8,
+              "monthlyAmount": 285,
+              "validFrom": "2025-01-01"
+            },
+            {
+              "id": "f6",
+              "minHours": 8.01,
+              "maxHours": 9,
+              "monthlyAmount": 315,
+              "validFrom": "2025-01-01"
+            },
+            {
+              "id": "f7",
+              "minHours": 9.01,
+              "maxHours": 10,
+              "monthlyAmount": 345,
+              "validFrom": "2025-01-01"
+            }
           ]
         },
         "kindergarten": {
@@ -68,18 +195,95 @@
           "validFrom": "2025-01-01",
           "validUntil": "2025-12-31",
           "feeBands": [
-            {"id": "f8", "minHours": 3, "maxHours": 4, "monthlyAmount": 145, "validFrom": "2025-01-01"},
-            {"id": "f9", "minHours": 4.01, "maxHours": 5, "monthlyAmount": 165, "validFrom": "2025-01-01"},
-            {"id": "f10", "minHours": 5.01, "maxHours": 6, "monthlyAmount": 185, "validFrom": "2025-01-01"},
-            {"id": "f11", "minHours": 6.01, "maxHours": 7, "monthlyAmount": 205, "validFrom": "2025-01-01"},
-            {"id": "f12", "minHours": 7.01, "maxHours": 8, "monthlyAmount": 225, "validFrom": "2025-01-01"},
-            {"id": "f13", "minHours": 8.01, "maxHours": 9, "monthlyAmount": 245, "validFrom": "2025-01-01"},
-            {"id": "f14", "minHours": 9.01, "maxHours": 10, "monthlyAmount": 265, "validFrom": "2025-01-01"}
+            {
+              "id": "f8",
+              "minHours": 3,
+              "maxHours": 4,
+              "monthlyAmount": 145,
+              "validFrom": "2025-01-01"
+            },
+            {
+              "id": "f9",
+              "minHours": 4.01,
+              "maxHours": 5,
+              "monthlyAmount": 165,
+              "validFrom": "2025-01-01"
+            },
+            {
+              "id": "f10",
+              "minHours": 5.01,
+              "maxHours": 6,
+              "monthlyAmount": 185,
+              "validFrom": "2025-01-01"
+            },
+            {
+              "id": "f11",
+              "minHours": 6.01,
+              "maxHours": 7,
+              "monthlyAmount": 205,
+              "validFrom": "2025-01-01"
+            },
+            {
+              "id": "f12",
+              "minHours": 7.01,
+              "maxHours": 8,
+              "monthlyAmount": 225,
+              "validFrom": "2025-01-01"
+            },
+            {
+              "id": "f13",
+              "minHours": 8.01,
+              "maxHours": 9,
+              "monthlyAmount": 245,
+              "validFrom": "2025-01-01"
+            },
+            {
+              "id": "f14",
+              "minHours": 9.01,
+              "maxHours": 10,
+              "monthlyAmount": 265,
+              "validFrom": "2025-01-01"
+            }
+          ]
+        },
+        "schulkind": {
+          "groupId": "group-schulkind",
+          "groupType": "Schulkind",
+          "validFrom": "2025-01-01",
+          "validUntil": "2025-12-31",
+          "feeBands": [
+            {
+              "id": "f15",
+              "minHours": 1,
+              "maxHours": 2,
+              "monthlyAmount": 105,
+              "validFrom": "2025-01-01"
+            },
+            {
+              "id": "f16",
+              "minHours": 2.01,
+              "maxHours": 3,
+              "monthlyAmount": 125,
+              "validFrom": "2025-01-01"
+            },
+            {
+              "id": "f17",
+              "minHours": 3.01,
+              "maxHours": 4,
+              "monthlyAmount": 145,
+              "validFrom": "2025-01-01"
+            }
           ]
         }
       },
       "bayKiBiGRules": [
-        {"id": "baykibig-1", "label": "BayKiBiG 2025", "baseValue": 120, "validFrom": "2025-01-01", "validUntil": "2025-12-31"}
+        {
+          "id": "baykibig-1",
+          "label": "BayKiBiG 2025",
+          "baseValue": 120,
+          "validFrom": "2025-01-01",
+          "validUntil": "2025-12-31"
+        }
       ],
       "testCases": [
         {

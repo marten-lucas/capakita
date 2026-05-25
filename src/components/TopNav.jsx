@@ -1,10 +1,18 @@
 import React from 'react';
-import { Group, Button, Text, Menu, ActionIcon, Container, Select, Box, Switch, Modal, Alert, Stack } from '@mantine/core';
+import { Group, Button, Text, Menu, ActionIcon, Container, Select, Box, Switch, Modal, Alert, Stack, Checkbox } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
-import { useSelector, useDispatch } from 'react-redux';
+import { useSelector, useDispatch, useStore } from 'react-redux';
 import { isSaveAllowed, selectSelectedScenarioHasAdebisImport, setSaveDialogOpen, setLoadDialogOpen, setSelectedScenarioId } from '../store/simScenarioSlice';
 import { setActivePage, setBrowserAutoSaveEnabled } from '../store/uiSlice';
-import { IconDatabase, IconChartBar, IconSettings, IconDotsVertical, IconUpload, IconDeviceFloppy, IconFolderOpen, IconCalendarEvent, IconInfoCircle, IconChartLine } from '@tabler/icons-react';
+import { IconDatabase, IconChartBar, IconSettings, IconDotsVertical, IconUpload, IconDeviceFloppy, IconFolderOpen, IconCalendarEvent, IconInfoCircle, IconChartLine, IconRefresh, IconBroom } from '@tabler/icons-react';
+import { refreshEventsForScenario, clearEventOverridesForScenario } from '../store/eventSlice';
+import { updateDatesOfInterest } from '../store/datesOfInterestSlice';
+import { loadBookingsByScenario } from '../store/simBookingSlice';
+import { loadGroupsByScenario } from '../store/simGroupSlice';
+import { loadQualificationAssignmentsByScenario } from '../store/simQualificationSlice';
+import { loadOverlaysByScenario } from '../store/simOverlaySlice';
+import { loadFinanceByScenario } from '../store/simFinanceSlice';
+import { buildScenarioCleanupResult } from '../utils/scenarioCleanup';
 import DataImportModal from './modals/DataImportModal';
 
 function TopNav() {
@@ -16,8 +24,11 @@ function TopNav() {
   const selectedScenarioId = useSelector((state) => state.simScenario.selectedScenarioId);
   const browserAutoSaveEnabled = useSelector((state) => state.ui.browserAutoSaveEnabled);
   const hasAdebisImport = useSelector(selectSelectedScenarioHasAdebisImport);
+  const store = useStore();
   const [importModalOpen, setImportModalOpen] = React.useState(false);
   const [privacyModalOpen, setPrivacyModalOpen] = React.useState(false);
+  const [cleanupModalOpen, setCleanupModalOpen] = React.useState(false);
+  const [resetEventOverrides, setResetEventOverrides] = React.useState(true);
   const showScenarioSelector = (scenarios?.length || 0) > 1;
 
   const scenarioOptions = React.useMemo(
@@ -41,6 +52,60 @@ function TopNav() {
   const handleConfirmAutoSave = () => {
     dispatch(setBrowserAutoSaveEnabled(true));
     setPrivacyModalOpen(false);
+  };
+
+  const handleCleanupAndRecompute = ({ resetEventOverrides: shouldResetEventOverrides }) => {
+    if (!selectedScenarioId) return;
+    const appState = store.getState();
+
+    const cleaned = buildScenarioCleanupResult(appState, selectedScenarioId);
+
+    dispatch(loadBookingsByScenario(cleaned.bookingsByScenario));
+    dispatch(loadGroupsByScenario(cleaned.groupsByScenario));
+    dispatch(loadQualificationAssignmentsByScenario(cleaned.qualificationAssignmentsByScenario));
+    dispatch(loadOverlaysByScenario(cleaned.overlaysByScenario));
+    dispatch(loadFinanceByScenario(cleaned.financeByScenario));
+    if (shouldResetEventOverrides) {
+      dispatch(clearEventOverridesForScenario({ scenarioId: selectedScenarioId }));
+    }
+
+    dispatch(
+      refreshEventsForScenario({
+        scenarioId: selectedScenarioId,
+        simData: appState.simData,
+        simBooking: { bookingsByScenario: cleaned.bookingsByScenario },
+        simGroup: { groupsByScenario: cleaned.groupsByScenario },
+        simScenario: appState.simScenario,
+      })
+    );
+    dispatch(updateDatesOfInterest(selectedScenarioId));
+
+    const stats = cleaned.stats;
+    const removedTotal = [
+      stats.removedBookingItemBuckets,
+      stats.removedGroupItemBuckets,
+      stats.removedQualificationItemBuckets,
+      stats.removedOverlayBookingBuckets,
+      stats.removedOverlayGroupBuckets,
+      stats.removedFinanceItemEntries,
+    ].reduce((sum, value) => sum + Number(value || 0), 0);
+
+    const details = [
+      `Buchungen: ${stats.removedBookingItemBuckets}`,
+      `Gruppenzuweisungen: ${stats.removedGroupItemBuckets}`,
+      `Qualifikationen: ${stats.removedQualificationItemBuckets}`,
+      `Overlay-Buchungen: ${stats.removedOverlayBookingBuckets}`,
+      `Overlay-Gruppen: ${stats.removedOverlayGroupBuckets}`,
+      `Finanz-Einträge: ${stats.removedFinanceItemEntries}`,
+    ].join(', ');
+
+    const eventOverrideHint = shouldResetEventOverrides
+      ? 'Manuell deaktivierte Events wurden ebenfalls zurückgesetzt.'
+      : 'Manuell deaktivierte Events wurden beibehalten.';
+
+    alert(`Bereinigung abgeschlossen. Entfernte Artefakte: ${removedTotal}. ${details}. Auto-Events wurden neu berechnet. ${eventOverrideHint}`);
+
+    setCleanupModalOpen(false);
   };
 
   const navButtonProps = {
@@ -156,12 +221,51 @@ function TopNav() {
                 >
                   Szenario laden
                 </Menu.Item>
+                <Menu.Divider />
+                <Menu.Item
+                  leftSection={<IconBroom size={16} />}
+                  rightSection={<IconRefresh size={14} />}
+                  onClick={() => setCleanupModalOpen(true)}
+                >
+                  Bereinigen / neu berechnen
+                </Menu.Item>
               </Menu.Dropdown>
             </Menu>
         </Group>
       </Group>
 
       <DataImportModal opened={importModalOpen} onClose={() => setImportModalOpen(false)} />
+
+      <Modal
+        opened={cleanupModalOpen}
+        onClose={() => setCleanupModalOpen(false)}
+        title="Datensatz bereinigen"
+        centered
+      >
+        <Stack gap="md">
+          <Alert icon={<IconInfoCircle size={16} />} color="blue" variant="light">
+            Entfernt verwaiste Artefakte und berechnet Auto-Events sowie Stichtage neu.
+          </Alert>
+
+          <Checkbox
+            checked={resetEventOverrides}
+            onChange={(event) => setResetEventOverrides(event.currentTarget.checked)}
+            label="Manuell deaktivierte Events zurücksetzen"
+          />
+
+          <Group justify="flex-end">
+            <Button variant="subtle" onClick={() => setCleanupModalOpen(false)}>
+              Abbrechen
+            </Button>
+            <Button
+              leftSection={<IconRefresh size={16} />}
+              onClick={() => handleCleanupAndRecompute({ resetEventOverrides })}
+            >
+              Bereinigen starten
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
 
       <Modal
         opened={privacyModalOpen}

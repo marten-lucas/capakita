@@ -129,17 +129,17 @@ describe('OrgaTabEvents', () => {
 
     expect(getInputValue('auto-events-kita-age')).toBe('3');
     expect(getInputValue('auto-events-kita-delta')).toBe('2');
-    expect(getInputValue('auto-events-school-age')).toBe('5.5');
+    expect(screen.queryByTestId('auto-events-school-age')).toBeNull();
     expect(getInputValue('auto-events-school-delta')).toBe('-1');
 
     const scenario = store.getState().simScenario.scenarios[0];
     expect(scenario.autoEventSettings).toMatchObject({
       kita: { ageYears: 3, bookingDeltaHours: 2 },
-      school: { ageYears: 5.5, bookingDeltaHours: -1 },
+      school: { ageYears: 6, bookingDeltaHours: -1 },
     });
     expect(scenario.autoEventSettings.statisticsBinding?.snapshot).toMatchObject({
       kita: { ageYears: 3, bookingDeltaHours: 2 },
-      school: { ageYears: 5.5, bookingDeltaHours: -1 },
+      school: { ageYears: 6, bookingDeltaHours: -1 },
     });
   });
 });

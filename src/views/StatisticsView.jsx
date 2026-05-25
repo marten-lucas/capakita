@@ -31,6 +31,10 @@ function monthsAgo(baseDate, months) {
   return new Date(Date.UTC(baseDate.getUTCFullYear(), baseDate.getUTCMonth() - months, baseDate.getUTCDate()));
 }
 
+function yearsAgo(baseDate, years) {
+  return new Date(Date.UTC(baseDate.getUTCFullYear() - years, baseDate.getUTCMonth(), baseDate.getUTCDate()));
+}
+
 function roundTwo(value) {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
@@ -117,12 +121,11 @@ function getAggregationLabel(value) {
   }[value] || value;
 }
 
-function getTimeframeLabel(value) {
-  return {
-    all: 'Gesamt',
-    last12: 'Letzte 12 Monate',
-    last24: 'Letzte 24 Monate',
-  }[value] || value;
+function getReportPeriodLabel(value) {
+  if (value === 'max') return 'Maximal';
+  const years = Number(value);
+  if (!Number.isFinite(years) || years <= 0) return 'Maximal';
+  return `${years} Jahr${years > 1 ? 'e' : ''}`;
 }
 
 function StatisticsView() {
@@ -130,7 +133,7 @@ function StatisticsView() {
   const isMobile = useMediaQuery('(max-width: 48em)');
   const isTestEnvironment = import.meta.env.MODE === 'test';
   const [aggregation, setAggregation] = React.useState('month');
-  const [timeframe, setTimeframe] = React.useState('all');
+  const [reportPeriod, setReportPeriod] = React.useState('max');
   const [fromGroupFilter, setFromGroupFilter] = React.useState('all');
   const [toGroupFilter, setToGroupFilter] = React.useState('all');
 
@@ -161,6 +164,58 @@ function StatisticsView() {
   }, []);
   const scenarioRemark = selectedScenario?.remark?.trim() || 'Keine Bemerkung hinterlegt.';
 
+  const minAvailableDate = React.useMemo(() => {
+    const historicalDates = (statistics.buckets || [])
+      .map((bucket) => parseIsoDate(bucket.evaluationDate || bucket.start))
+      .filter(Boolean);
+    const transitionDates = (transitionStatistics.transitions || [])
+      .map((transition) => parseIsoDate(transition.date))
+      .filter(Boolean);
+    const allDates = [...historicalDates, ...transitionDates];
+    if (allDates.length === 0) return null;
+    return allDates.reduce((min, current) => (current < min ? current : min));
+  }, [statistics.buckets, transitionStatistics.transitions]);
+
+  const reportPeriodOptions = React.useMemo(() => {
+    if (!asOfDate || !minAvailableDate) {
+      return [{ value: 'max', label: 'Maximal' }];
+    }
+
+    const options = [];
+    [1, 2, 3, 4, 5].forEach((years) => {
+      if (yearsAgo(asOfDate, years) >= minAvailableDate) {
+        options.push({ value: String(years), label: `${years} Jahr${years > 1 ? 'e' : ''}` });
+      }
+    });
+    options.push({ value: 'max', label: 'Maximal' });
+
+    return options;
+  }, [asOfDate, minAvailableDate]);
+
+  React.useEffect(() => {
+    if (!reportPeriodOptions.some((option) => option.value === reportPeriod)) {
+      setReportPeriod('max');
+    }
+  }, [reportPeriod, reportPeriodOptions]);
+
+  const reportCutoffDate = React.useMemo(() => {
+    if (!asOfDate) return null;
+    if (reportPeriod === 'max') return null;
+    const years = Number(reportPeriod);
+    if (!Number.isFinite(years) || years <= 0) return null;
+    return yearsAgo(asOfDate, years);
+  }, [asOfDate, reportPeriod]);
+
+  const boundedStatisticsBuckets = React.useMemo(() => {
+    if (!reportCutoffDate) return statistics.buckets;
+
+    return statistics.buckets.filter((bucket) => {
+      const bucketDate = parseIsoDate(bucket.evaluationDate || bucket.start);
+      if (!bucketDate) return false;
+      return bucketDate >= reportCutoffDate;
+    });
+  }, [statistics.buckets, reportCutoffDate]);
+
   const fromGroupOptions = React.useMemo(() => {
     const unique = new Map();
     transitionStatistics.transitions.forEach((transition) => {
@@ -188,23 +243,16 @@ function StatisticsView() {
   }, [transitionStatistics.transitions]);
 
   const filteredTransitions = React.useMemo(() => {
-    const cutoffDate = (() => {
-      if (!asOfDate || timeframe === 'all') return null;
-      if (timeframe === 'last12') return monthsAgo(asOfDate, 12);
-      if (timeframe === 'last24') return monthsAgo(asOfDate, 24);
-      return null;
-    })();
-
     return transitionStatistics.transitions.filter((transition) => {
       if (fromGroupFilter !== 'all' && transition.fromGroupId !== fromGroupFilter) return false;
       if (toGroupFilter !== 'all' && transition.toGroupId !== toGroupFilter) return false;
-      if (!cutoffDate) return true;
+      if (!reportCutoffDate) return true;
 
       const transitionDate = parseIsoDate(transition.date);
       if (!transitionDate) return false;
-      return transitionDate >= cutoffDate;
+      return transitionDate >= reportCutoffDate;
     });
-  }, [asOfDate, timeframe, fromGroupFilter, toGroupFilter, transitionStatistics.transitions]);
+  }, [reportCutoffDate, fromGroupFilter, toGroupFilter, transitionStatistics.transitions]);
 
   const filteredSummary = React.useMemo(() => {
     const ages = filteredTransitions.map((entry) => entry.ageMonths).filter((value) => Number.isFinite(value));
@@ -227,8 +275,8 @@ function StatisticsView() {
     [filteredTransitions]
   );
   const historicalCategories = React.useMemo(
-    () => statistics.buckets.map((bucket) => bucket.label),
-    [statistics.buckets]
+    () => boundedStatisticsBuckets.map((bucket) => bucket.label),
+    [boundedStatisticsBuckets]
   );
   const routeCounts = React.useMemo(() => buildRouteCounts(filteredTransitions), [filteredTransitions]);
   const routeDelta = React.useMemo(() => buildRouteDelta(filteredTransitions), [filteredTransitions]);
@@ -277,25 +325,25 @@ function StatisticsView() {
       series: [
         {
           name: 'Kinder',
-          data: statistics.buckets.map((bucket) => bucket.childrenCount),
+          data: boundedStatisticsBuckets.map((bucket) => bucket.childrenCount),
           color: chartPalette.children,
           yAxis: 0,
         },
         {
           name: 'Buchungsstunden',
-          data: statistics.buckets.map((bucket) => bucket.bookingHours),
+          data: boundedStatisticsBuckets.map((bucket) => bucket.bookingHours),
           color: chartPalette.bookingHours,
           yAxis: 1,
         },
         {
           name: 'Betreuungsstunden',
-          data: statistics.buckets.map((bucket) => bucket.careHours),
+          data: boundedStatisticsBuckets.map((bucket) => bucket.careHours),
           color: chartPalette.careHours,
           yAxis: 1,
         },
       ],
     }),
-    [chartPalette, historicalCategories, statistics.buckets]
+    [boundedStatisticsBuckets, chartPalette, historicalCategories]
   );
 
   const histogramOptions = React.useMemo(
@@ -447,12 +495,12 @@ function StatisticsView() {
   const summaryCards = React.useMemo(
     () => [
       { label: 'Aggregation', value: getAggregationLabel(aggregation) },
-      { label: 'Zeitraum', value: getTimeframeLabel(timeframe) },
+      { label: 'Berichtszeitraum', value: getReportPeriodLabel(reportPeriod) },
       { label: 'Von-Gruppe', value: fromGroupOptions.find((option) => option.value === fromGroupFilter)?.label || 'Alle Von-Gruppen' },
       { label: 'Zu-Gruppe', value: toGroupOptions.find((option) => option.value === toGroupFilter)?.label || 'Alle Zu-Gruppen' },
       { label: 'Stichtag', value: transitionStatistics.asOfDate || 'n/a' },
     ],
-    [aggregation, fromGroupFilter, timeframe, toGroupFilter, fromGroupOptions, toGroupOptions, transitionStatistics.asOfDate]
+    [aggregation, fromGroupFilter, reportPeriod, toGroupFilter, fromGroupOptions, toGroupOptions, transitionStatistics.asOfDate]
   );
 
   return (
@@ -520,7 +568,7 @@ function StatisticsView() {
                   Krippe → Kita: {statisticsBinding.snapshot.kita?.ageYears ?? 'n/a'} Jahre, Delta {statisticsBinding.snapshot.kita?.bookingDeltaHours ?? 'n/a'} h/Woche
                 </Text>
                 <Text size="sm">
-                  Kita → Schulkind: {statisticsBinding.snapshot.school?.ageYears ?? 'n/a'} Jahre, Delta {statisticsBinding.snapshot.school?.bookingDeltaHours ?? 'n/a'} h/Woche
+                  Kita → Schulkind: September-Schuljahreswechsel, Delta {statisticsBinding.snapshot.school?.bookingDeltaHours ?? 'n/a'} h/Woche
                 </Text>
                 <Text size="xs" c="dimmed">
                   Stand: {String(statisticsBinding.appliedAt || '').slice(0, 10)}
@@ -538,7 +586,7 @@ function StatisticsView() {
                 Krippe → Kita: {statisticsBinding.snapshot.kita?.ageYears ?? 'n/a'} Jahre, Delta {statisticsBinding.snapshot.kita?.bookingDeltaHours ?? 'n/a'} h/Woche
               </Text>
               <Text size="sm">
-                Kita → Schulkind: {statisticsBinding.snapshot.school?.ageYears ?? 'n/a'} Jahre, Delta {statisticsBinding.snapshot.school?.bookingDeltaHours ?? 'n/a'} h/Woche
+                Kita → Schulkind: September-Schuljahreswechsel, Delta {statisticsBinding.snapshot.school?.bookingDeltaHours ?? 'n/a'} h/Woche
               </Text>
               <Text size="xs" c="dimmed">
                 Stand: {String(statisticsBinding.appliedAt || '').slice(0, 10)}
@@ -557,11 +605,11 @@ function StatisticsView() {
 
         <Paper withBorder p="sm" data-testid="statistics-historical-chart-shell">
           <Text size="sm" fw={600} mb="xs">Historische Entwicklung</Text>
-          {statistics.buckets.length === 0 ? (
+          {boundedStatisticsBuckets.length === 0 ? (
             <Text size="sm" c="dimmed">Keine historischen Daten vorhanden.</Text>
           ) : isTestEnvironment ? (
             <Box data-testid="statistics-historical-chart" style={{ display: 'flex', gap: theme.spacing.sm, flexWrap: 'wrap' }}>
-              {statistics.buckets.map((bucket) => (
+              {boundedStatisticsBuckets.map((bucket) => (
                 <Badge key={bucket.key} variant="light">
                   {bucket.label}: K {bucket.childrenCount} | B {bucket.bookingHours} | Bt {bucket.careHours}
                 </Badge>
@@ -581,16 +629,13 @@ function StatisticsView() {
         <Text size="lg" fw={700} mt="md">Gruppenübergänge</Text>
 
         <SimpleGrid cols={{ base: 1, md: 3 }} spacing="md" data-testid="statistics-transition-filters" className="statistics-print-hide">
-          <SegmentedControl
-            value={timeframe}
-            onChange={setTimeframe}
-            data={[
-              { label: 'Gesamt', value: 'all' },
-              { label: 'Letzte 12M', value: 'last12' },
-              { label: 'Letzte 24M', value: 'last24' },
-            ]}
-            data-testid="statistics-transition-timeframe"
-            fullWidth
+          <Select
+            label="Berichtszeitraum"
+            data={reportPeriodOptions}
+            value={reportPeriod}
+            onChange={(value) => setReportPeriod(value || 'max')}
+            allowDeselect={false}
+            data-testid="statistics-report-period"
           />
           <Select
             label="Von Gruppe"
@@ -617,10 +662,13 @@ function StatisticsView() {
           <Badge variant="light" size="lg">Ø Vorher: {filteredSummary.averageBeforeHours} h</Badge>
           <Badge variant="light" size="lg">Ø Nachher: {filteredSummary.averageAfterHours} h</Badge>
           <Badge variant="light" size="lg">Ø Delta Buchungszeit: {filteredSummary.averageDeltaHours} h</Badge>
+          <Badge variant="light" size="lg" data-testid="statistics-corridor-remain-probability">
+            Korridor Verbleib Regelgruppe: {Math.round((transitionStatistics.corridor?.remainProbability || 0) * 100)}% ({transitionStatistics.corridor?.remainedInRegelCount || 0}/{transitionStatistics.corridor?.evaluatedCount || 0})
+          </Badge>
         </Group>
 
         <Paper withBorder p="sm" data-testid="statistics-transition-histogram-shell">
-          <Text size="sm" fw={600} mb="xs">Histogramm: Alter beim Gruppenübergang</Text>
+          <Text size="sm" fw={600} mb="xs">Histogramm: Alter bei Einstieg und Wechsel in die Regelgruppe</Text>
           {filteredHistogram.length === 0 ? (
             <Text size="sm" c="dimmed">Keine Daten für das Histogramm verfügbar.</Text>
           ) : isTestEnvironment ? (

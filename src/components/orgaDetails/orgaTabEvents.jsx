@@ -64,14 +64,6 @@ function OrgaTabEvents() {
       warnings.push('Krippe -> Kita: Alter liegt außerhalb des üblichen Bereichs (1 bis 8 Jahre).');
     }
 
-    if (autoEventSettings.school.ageYears < 4 || autoEventSettings.school.ageYears > 12) {
-      warnings.push('Kita -> Schulkind: Alter liegt außerhalb des üblichen Bereichs (4 bis 12 Jahre).');
-    }
-
-    if (autoEventSettings.school.ageYears <= autoEventSettings.kita.ageYears) {
-      warnings.push('Kita -> Schulkind sollte nach Krippe -> Kita liegen.');
-    }
-
     if (Math.abs(autoEventSettings.kita.bookingDeltaHours) > 15) {
       warnings.push('Krippe -> Kita: Buchungsdelta ist sehr hoch (>|15| h/Woche).');
     }
@@ -159,7 +151,7 @@ function OrgaTabEvents() {
         <Stack gap="sm">
           <Text fw={600}>Auto-Event Einstellungen</Text>
           <Text size="sm" c="dimmed">
-            Definiere, wann automatische Gruppenwechsel stattfinden und wie stark sich Buchungszeiten dabei ändern sollen.
+            Definiere den Alterswechsel Krippe → Kita und die Buchungsdeltas. Der Wechsel Kita → Schulkind erfolgt automatisch zum September-Schuljahresstart nach Bayern-Regeln.
           </Text>
 
           <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
@@ -183,26 +175,14 @@ function OrgaTabEvents() {
             />
           </SimpleGrid>
 
-          <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
-            <NumberInput
-              label="Kita → Schulkind: Alter (Jahre)"
-              min={0}
-              max={12}
-              step={0.5}
-              decimalScale={1}
-              value={autoEventSettings.school.ageYears}
-              onChange={(value) => updateTransitionRule('school', 'ageYears', Number(value) || 0)}
-              data-testid="auto-events-school-age"
-            />
-            <NumberInput
-              label="Kita → Schulkind: Buchungsdelta (h/Woche)"
-              step={0.5}
-              decimalScale={1}
-              value={autoEventSettings.school.bookingDeltaHours}
-              onChange={(value) => updateTransitionRule('school', 'bookingDeltaHours', Number(value) || 0)}
-              data-testid="auto-events-school-delta"
-            />
-          </SimpleGrid>
+          <NumberInput
+            label="Kita → Schulkind: Buchungsdelta (h/Woche)"
+            step={0.5}
+            decimalScale={1}
+            value={autoEventSettings.school.bookingDeltaHours}
+            onChange={(value) => updateTransitionRule('school', 'bookingDeltaHours', Number(value) || 0)}
+            data-testid="auto-events-school-delta"
+          />
 
           <Group justify="space-between" align="center" wrap="wrap">
             <Button onClick={bindToStatistics} data-testid="auto-events-bind-statistics">
