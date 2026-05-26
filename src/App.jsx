@@ -15,7 +15,6 @@ import { Notifications } from '@mantine/notifications';
 import ScenarioSaveDialog from './components/modals/ScenarioSaveDialog';
 import ScenarioLoadDialog from './components/modals/ScenarioLoadDialog';
 import { setActivePage } from './store/uiSlice';
-import { selectSelectedScenarioHasAdebisImport } from './store/simScenarioSlice';
 import './App.css'
 
 const VIEW_COMPONENTS = {
@@ -33,7 +32,6 @@ function App() {
   const isMobile = useMediaQuery('(max-width: 48em)');
   const scenarios = useSelector(state => state.simScenario.scenarios);
   const activePage = useSelector(state => state.ui.activePage);
-  const hasAdebisImport = useSelector(selectSelectedScenarioHasAdebisImport);
   
   const hasScenarios = scenarios && scenarios.length > 0;
 
@@ -43,15 +41,15 @@ function App() {
       dispatch(setActivePage('welcome'));
     }
 
-    if (hasScenarios && activePage === 'statistics' && !hasAdebisImport) {
-      dispatch(setActivePage('data'));
+    if (hasScenarios && activePage === 'statistics') {
+      dispatch(setActivePage('visu'));
     }
 
     // Wenn Szenarien geladen, automatisch zu 'data' navigieren
     if (hasScenarios && activePage === 'welcome') {
       dispatch(setActivePage('data'));
     }
-  }, [hasScenarios, activePage, hasAdebisImport, dispatch]);
+  }, [hasScenarios, activePage, dispatch]);
 
   // View-Komponente auswählen
   const ViewComponent = VIEW_COMPONENTS[activePage] || WelcomeView;

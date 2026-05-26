@@ -2,9 +2,9 @@ import React from 'react';
 import { Group, Button, Text, Menu, ActionIcon, Container, Select, Box, Switch, Modal, Alert, Stack, Checkbox } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { useSelector, useDispatch, useStore } from 'react-redux';
-import { isSaveAllowed, selectSelectedScenarioHasAdebisImport, setSaveDialogOpen, setLoadDialogOpen, setSelectedScenarioId } from '../store/simScenarioSlice';
+import { isSaveAllowed, setSaveDialogOpen, setLoadDialogOpen, setSelectedScenarioId } from '../store/simScenarioSlice';
 import { setActivePage, setBrowserAutoSaveEnabled } from '../store/uiSlice';
-import { IconDatabase, IconChartBar, IconSettings, IconDotsVertical, IconUpload, IconDeviceFloppy, IconFolderOpen, IconCalendarEvent, IconInfoCircle, IconChartLine, IconRefresh, IconTrash } from '@tabler/icons-react';
+import { IconDatabase, IconChartBar, IconSettings, IconDotsVertical, IconUpload, IconDeviceFloppy, IconFolderOpen, IconCalendarEvent, IconInfoCircle, IconRefresh, IconTrash } from '@tabler/icons-react';
 import { refreshEventsForScenario, clearEventOverridesForScenario } from '../store/eventSlice';
 import { updateDatesOfInterest } from '../store/datesOfInterestSlice';
 import { loadBookingsByScenario } from '../store/simBookingSlice';
@@ -23,7 +23,6 @@ function TopNav() {
   const scenarios = useSelector((state) => state.simScenario.scenarios);
   const selectedScenarioId = useSelector((state) => state.simScenario.selectedScenarioId);
   const browserAutoSaveEnabled = useSelector((state) => state.ui.browserAutoSaveEnabled);
-  const hasAdebisImport = useSelector(selectSelectedScenarioHasAdebisImport);
   const store = useStore();
   const [importModalOpen, setImportModalOpen] = React.useState(false);
   const [privacyModalOpen, setPrivacyModalOpen] = React.useState(false);
@@ -165,15 +164,6 @@ function TopNav() {
               >
                 Ereignisse
               </Button>
-              {hasAdebisImport && (
-                <Button
-                  onClick={() => dispatch(setActivePage('statistics'))}
-                  leftSection={<IconChartLine size={20} />}
-                  {...navButtonProps}
-                >
-                  Statistik
-                </Button>
-              )}
             </Group>
           </Box>
 

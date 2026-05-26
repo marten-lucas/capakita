@@ -92,9 +92,6 @@ test(`imported dataset ${dataset.name} stays responsive across main pages`, asyn
   await expectNoHorizontalOverflow(page, 'realdata events view');
   await expectLayoutScreenshot(page, 'responsive-realdata-events-view.png', { fullPage: false });
 
-  await openMainPage(page, 'Statistik');
-  await expect(page.getByTestId('statistics-view')).toBeVisible();
-  await expect(page.getByRole('button', { name: /Als PDF exportieren/i })).toBeVisible();
-  await expectNoHorizontalOverflow(page, 'realdata statistics view');
-  await expectLayoutScreenshot(page, 'responsive-realdata-statistics-view.png', { fullPage: false });
+  await openMainPage(page, 'Analyse');
+  await expect(page.getByTestId('analysis-storyflow-view')).toBeVisible();
 });

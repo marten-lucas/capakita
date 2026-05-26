@@ -96,7 +96,7 @@ async function readWeeklyDemandMax(page) {
   return value;
 }
 
-test('archived items are excluded from analyse but still counted in statistics', async ({ page }) => {
+test('archived items are excluded from Regelbetrieb demand chart', async ({ page }) => {
   await seedArchiveScenario(page);
 
   await page.getByText('Kind Archiv Eins').first().click();
@@ -111,8 +111,5 @@ test('archived items are excluded from analyse but still counted in statistics',
   const maxDemand = await readWeeklyDemandMax(page);
   expect(maxDemand).toBe(1);
 
-  await page.getByRole('button', { name: 'Statistik' }).click();
-  await expect(page.getByTestId('statistics-latest-kpis')).toBeVisible({ timeout: 10000 });
-  await expect(page.getByTestId('statistics-latest-kpis')).toContainText('Kinder: 2');
 });
 
