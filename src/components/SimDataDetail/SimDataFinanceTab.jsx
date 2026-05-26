@@ -7,6 +7,7 @@ import {
   Paper,
   SimpleGrid,
   Stack,
+  Tabs,
   Text,
   TextInput,
 } from '@mantine/core';
@@ -187,6 +188,11 @@ function SimDataFinanceTab() {
   const itemFinance = financeScenario.itemFinances?.[selectedItemId] || {
     personnelCostHistory: [],
   };
+  const [financeSubTab, setFinanceSubTab] = React.useState('overview');
+
+  React.useEffect(() => {
+    setFinanceSubTab('overview');
+  }, [selectedItemId]);
 
   if (item.type === 'demand') {
     const childFinance = calculateChildMonthlyRevenue({
@@ -246,71 +252,80 @@ function SimDataFinanceTab() {
   const weeklyAdministrativeHours = calculateWorktimeFromBookings(activeStaffBookings, { mode: 'administrative' });
 
   return (
-    <Stack gap="md">
-      <Paper withBorder p="md" radius="md">
-        <Stack gap="sm">
-          <Text fw={600}>Personalkosten zum Stichtag</Text>
-          <Group justify="space-between" wrap="wrap">
-            <Text>Wochenarbeitszeit (paedagogisch)</Text>
-            <Text fw={600}>{weeklyPedagogicalHours.toFixed(1)} h</Text>
-          </Group>
-          <Group justify="space-between" wrap="wrap">
-            <Text>Wochenarbeitszeit (administrativ)</Text>
-            <Text fw={600}>{weeklyAdministrativeHours.toFixed(1)} h</Text>
-          </Group>
-          <Group justify="space-between" wrap="wrap">
-            <Text>Monatliche Basiskosten</Text>
-            <Text fw={600}>{formatCurrency(staffFinance.baseMonthlyCost)}</Text>
-          </Group>
-          <Group justify="space-between" wrap="wrap">
-            <Text>Anwesenheitsfaktor</Text>
-            <Text fw={600}>{(staffFinance.absenceCostFactor * 100).toFixed(0)} %</Text>
-          </Group>
-          <Group justify="space-between" wrap="wrap">
-            <Text fw={600}>Monatliche Personalkosten</Text>
-            <Text fw={700}>{formatCurrency(staffFinance.adjustedMonthlyCost)}</Text>
-          </Group>
-        </Stack>
-      </Paper>
+    <Tabs value={financeSubTab} onChange={(value) => setFinanceSubTab(value || 'overview')} variant="outline" styles={{ root: { height: '100%' } }}>
+      <Tabs.List>
+        <Tabs.Tab value="overview">Übersicht</Tabs.Tab>
+        <Tabs.Tab value="history">Historie</Tabs.Tab>
+      </Tabs.List>
 
-      <Paper withBorder p="md" radius="md">
-        <Stack gap="md">
-          <Group justify="space-between" wrap="wrap">
-            <div>
-              <Text fw={600}>Personalkosten</Text>
-              <Text size="sm" c="dimmed">Historie mit Bruttojahresgehalt und AG-Nebenkosten. Der Rest bleibt unveraendert.</Text>
-            </div>
-            <Button
-              size="xs"
-              leftSection={<IconPlus size={14} />}
-              onClick={() => dispatch(addPersonnelCostEntry({
+      <Tabs.Panel value="overview" pt="md">
+        <Paper withBorder p="md" radius="md">
+          <Stack gap="sm">
+            <Text fw={600}>Personalkosten zum Stichtag</Text>
+            <Group justify="space-between" wrap="wrap">
+              <Text>Wochenarbeitszeit (paedagogisch)</Text>
+              <Text fw={600}>{weeklyPedagogicalHours.toFixed(1)} h</Text>
+            </Group>
+            <Group justify="space-between" wrap="wrap">
+              <Text>Wochenarbeitszeit (administrativ)</Text>
+              <Text fw={600}>{weeklyAdministrativeHours.toFixed(1)} h</Text>
+            </Group>
+            <Group justify="space-between" wrap="wrap">
+              <Text>Monatliche Basiskosten</Text>
+              <Text fw={600}>{formatCurrency(staffFinance.baseMonthlyCost)}</Text>
+            </Group>
+            <Group justify="space-between" wrap="wrap">
+              <Text>Anwesenheitsfaktor</Text>
+              <Text fw={600}>{(staffFinance.absenceCostFactor * 100).toFixed(0)} %</Text>
+            </Group>
+            <Group justify="space-between" wrap="wrap">
+              <Text fw={600}>Monatliche Personalkosten</Text>
+              <Text fw={700}>{formatCurrency(staffFinance.adjustedMonthlyCost)}</Text>
+            </Group>
+          </Stack>
+        </Paper>
+      </Tabs.Panel>
+
+      <Tabs.Panel value="history" pt="md">
+        <Paper withBorder p="md" radius="md">
+          <Stack gap="md">
+            <Group justify="space-between" wrap="wrap">
+              <div>
+                <Text fw={600}>Personalkosten</Text>
+                <Text size="sm" c="dimmed">Historie mit Bruttojahresgehalt und AG-Nebenkosten. Der Rest bleibt unveraendert.</Text>
+              </div>
+              <Button
+                size="xs"
+                leftSection={<IconPlus size={14} />}
+                onClick={() => dispatch(addPersonnelCostEntry({
+                  scenarioId,
+                  itemId: selectedItemId,
+                  entry: { validFrom: '', validUntil: '', annualGrossSalary: '', employerOnCostPercent: '' },
+                }))}
+                fullWidth={isMobile}
+              >
+                Personalkosten-Eintrag
+              </Button>
+            </Group>
+            <AccordionListDetail
+              items={itemFinance.personnelCostHistory || []}
+              SummaryComponent={({ item: historyItem }) => (
+                <PersonnelCostSummary item={historyItem} />
+              )}
+              DetailComponent={({ item: historyItem }) => (
+                <PersonnelCostDetail item={historyItem} scenarioId={scenarioId} selectedItemId={selectedItemId} dispatch={dispatch} />
+              )}
+              emptyText="Noch kein Personalkosten-Eintrag hinterlegt."
+              onDelete={(_, historyItem) => dispatch(deletePersonnelCostEntry({
                 scenarioId,
                 itemId: selectedItemId,
-                entry: { validFrom: '', validUntil: '', annualGrossSalary: '', employerOnCostPercent: '' },
+                entryId: historyItem.id,
               }))}
-              fullWidth={isMobile}
-            >
-              Personalkosten-Eintrag
-            </Button>
-          </Group>
-          <AccordionListDetail
-            items={itemFinance.personnelCostHistory || []}
-            SummaryComponent={({ item: historyItem }) => (
-              <PersonnelCostSummary item={historyItem} />
-            )}
-            DetailComponent={({ item: historyItem }) => (
-              <PersonnelCostDetail item={historyItem} scenarioId={scenarioId} selectedItemId={selectedItemId} dispatch={dispatch} />
-            )}
-            emptyText="Noch kein Personalkosten-Eintrag hinterlegt."
-            onDelete={(_, historyItem) => dispatch(deletePersonnelCostEntry({
-              scenarioId,
-              itemId: selectedItemId,
-              entryId: historyItem.id,
-            }))}
-          />
-        </Stack>
-      </Paper>
-    </Stack>
+            />
+          </Stack>
+        </Paper>
+      </Tabs.Panel>
+    </Tabs>
   );
 }
 

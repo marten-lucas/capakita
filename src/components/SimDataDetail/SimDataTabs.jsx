@@ -37,8 +37,8 @@ function SimDataTabs() {
   }
 
   return (
-    <Box h={isMobile ? 'auto' : '100%'} style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-      <Tabs value={activeTab} onChange={setActiveTab} variant="outline">
+    <Box h="100%" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      <Tabs value={activeTab} onChange={setActiveTab} variant="outline" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
         <Tabs.List
           grow={!isMobile}
           style={{
@@ -60,17 +60,17 @@ function SimDataTabs() {
           </Tabs.Tab>
         </Tabs.List>
 
-        <Box pt="md" style={{ flex: 1, overflow: 'auto', minHeight: isMobile ? 320 : 0 }}>
-          <Tabs.Panel value="general">
+        <Box pt="md" style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+          <Tabs.Panel value="general" style={{ height: '100%' }}>
             <SimDataGeneralTab />
           </Tabs.Panel>
-          <Tabs.Panel value="bookings">
+          <Tabs.Panel value="bookings" style={{ height: '100%' }}>
             <SimDataBookingTab />
           </Tabs.Panel>
-          <Tabs.Panel value="groups">
+          <Tabs.Panel value="groups" style={{ height: '100%' }}>
             <SimDataGroupsTab />
           </Tabs.Panel>
-          <Tabs.Panel value="finance">
+          <Tabs.Panel value="finance" style={{ height: '100%' }}>
             <SimDataFinanceTab />
           </Tabs.Panel>
         </Box>

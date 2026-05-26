@@ -4,7 +4,7 @@ import { useMediaQuery } from '@mantine/hooks';
 import { useSelector, useDispatch, useStore } from 'react-redux';
 import { isSaveAllowed, selectSelectedScenarioHasAdebisImport, setSaveDialogOpen, setLoadDialogOpen, setSelectedScenarioId } from '../store/simScenarioSlice';
 import { setActivePage, setBrowserAutoSaveEnabled } from '../store/uiSlice';
-import { IconDatabase, IconChartBar, IconSettings, IconDotsVertical, IconUpload, IconDeviceFloppy, IconFolderOpen, IconCalendarEvent, IconInfoCircle, IconChartLine, IconRefresh, IconBroom } from '@tabler/icons-react';
+import { IconDatabase, IconChartBar, IconSettings, IconDotsVertical, IconUpload, IconDeviceFloppy, IconFolderOpen, IconCalendarEvent, IconInfoCircle, IconChartLine, IconRefresh, IconTrash } from '@tabler/icons-react';
 import { refreshEventsForScenario, clearEventOverridesForScenario } from '../store/eventSlice';
 import { updateDatesOfInterest } from '../store/datesOfInterestSlice';
 import { loadBookingsByScenario } from '../store/simBookingSlice';
@@ -177,6 +177,35 @@ function TopNav() {
             </Group>
           </Box>
 
+          {!isMobile && (
+            <Group gap="xs" wrap="nowrap" className="topnav-quick-actions">
+              <Button
+                variant="light"
+                size="sm"
+                leftSection={<IconUpload size={16} />}
+                onClick={() => setImportModalOpen(true)}
+              >
+                Import
+              </Button>
+              <Button
+                variant="light"
+                size="sm"
+                leftSection={<IconFolderOpen size={16} />}
+                onClick={() => dispatch(setLoadDialogOpen(true))}
+              >
+                Laden
+              </Button>
+              <Button
+                variant="light"
+                size="sm"
+                leftSection={<IconTrash size={16} />}
+                onClick={() => setCleanupModalOpen(true)}
+              >
+                Bereinigen
+              </Button>
+            </Group>
+          )}
+
           <Menu shadow="md" width={200}>
               <Menu.Target>
                 <ActionIcon variant="subtle" size="lg" aria-label="Aktionen">
@@ -223,7 +252,7 @@ function TopNav() {
                 </Menu.Item>
                 <Menu.Divider />
                 <Menu.Item
-                  leftSection={<IconBroom size={16} />}
+                  leftSection={<IconTrash size={16} />}
                   rightSection={<IconRefresh size={14} />}
                   onClick={() => setCleanupModalOpen(true)}
                 >

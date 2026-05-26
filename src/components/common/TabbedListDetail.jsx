@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Group, Box, Paper, ScrollArea, Stack, ActionIcon, Text, Title, Badge } from '@mantine/core';
+import { Group, Box, Paper, Stack, Text, Title } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 
 function TabbedListDetail({
@@ -41,18 +41,21 @@ function TabbedListDetail({
       align="stretch"
       gap="md"
       wrap={isMobile ? 'wrap' : 'nowrap'}
-      style={{ height: isMobile ? 'auto' : 'calc(100vh - 120px)' }}
+      style={{
+        minHeight: 0,
+        height: isMobile ? 'auto' : 'calc(100dvh - 170px)',
+      }}
     >
       {/* Sidebar / List */}
       <Paper
         withBorder
         shadow="xs"
         w={isMobile ? '100%' : 320}
-        h={isMobile ? 300 : '100%'}
+        h={isMobile ? 'auto' : '100%'}
         display="flex"
-        style={{ flexDirection: 'column' }}
+        style={{ flexDirection: 'column', minHeight: 0 }}
       >
-        <ScrollArea style={{ flex: 1 }} p="xs">
+        <Box p="xs" style={{ overflowY: isMobile ? 'visible' : 'auto', minHeight: 0, flex: isMobile ? undefined : 1 }}>
           {data.length === 0 ? (
             <Text c="dimmed" fs="italic" ta="center" mt="xl">{emptyText}</Text>
           ) : (
@@ -73,7 +76,7 @@ function TabbedListDetail({
               ))}
             </Stack>
           )}
-        </ScrollArea>
+        </Box>
       </Paper>
 
       {/* Main Content / Detail */}
@@ -84,23 +87,25 @@ function TabbedListDetail({
           flex: 1,
           minWidth: isMobile ? '100%' : 0,
           height: isMobile ? 'auto' : '100%',
-          minHeight: isMobile ? 360 : undefined,
+          minHeight: isMobile ? 360 : 0,
           display: 'flex',
           flexDirection: 'column',
+          minWidth: 0,
+          overflow: 'hidden',
         }}
       >
         {selectedItem ? (
-          <Box display="flex" style={{ flexDirection: 'column', height: isMobile ? 'auto' : '100%' }}>
+          <Box display="flex" style={{ flexDirection: 'column', height: isMobile ? 'auto' : '100%', minHeight: 0 }}>
             <Group justify="space-between" p="md" wrap="wrap" style={{ borderBottom: '1px solid var(--mantine-color-gray-3)' }}>
               <Title order={4}>
                 {typeof detailTitle === 'function' ? detailTitle(selectedItem) : detailTitle}
               </Title>
               {actions && actions(selectedItem)}
             </Group>
-            
-            <ScrollArea style={{ flex: isMobile ? 'initial' : 1 }} p="md" h={isMobile ? 'auto' : undefined} mah={isMobile ? '70vh' : undefined}>
+
+            <Box p="md" style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
               {typeof detailContent === 'function' ? detailContent(selectedItem) : detailContent}
-            </ScrollArea>
+            </Box>
           </Box>
         ) : (
           <Box h="100%" display="flex" style={{ alignItems: 'center', justifyContent: 'center' }}>

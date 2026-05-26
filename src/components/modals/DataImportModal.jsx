@@ -18,6 +18,7 @@ function DataImportModal({ opened, onClose, title = 'Datenimport-Wizard', requir
   const [recordScope, setRecordScope] = useState('all');
   const [selectedRecordKeys, setSelectedRecordKeys] = useState([]);
   const [conflictPolicy, setConflictPolicy] = useState('skip');
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
   const [preparedImport, setPreparedImport] = useState(null);
   const [preview, setPreview] = useState(null);
   const [isPreparing, setIsPreparing] = useState(false);
@@ -49,6 +50,7 @@ function DataImportModal({ opened, onClose, title = 'Datenimport-Wizard', requir
       setRecordScope('all');
       setSelectedRecordKeys([]);
       setConflictPolicy('skip');
+      setShowAdvancedOptions(false);
       setPreparedImport(null);
       setPreview(null);
       setIsPreparing(false);
@@ -128,6 +130,32 @@ function DataImportModal({ opened, onClose, title = 'Datenimport-Wizard', requir
     ))
   );
 
+  const handleWizardKeyDownCapture = (event) => {
+    if (event.key !== 'Enter') return;
+    if (event.defaultPrevented) return;
+    if (event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) return;
+
+    const target = event.target;
+    const tagName = target instanceof HTMLElement ? target.tagName.toLowerCase() : '';
+    if (tagName === 'button' || tagName === 'a' || tagName === 'textarea') return;
+
+    event.preventDefault();
+
+    if (step === 1 && canAnalyzeFile) {
+      handlePrepareImport();
+      return;
+    }
+
+    if (step === 2 && canContinueToStep3) {
+      setStep(3);
+      return;
+    }
+
+    if (step === 3 && canImport && !isApplying) {
+      handleApplyImport();
+    }
+  };
+
   return (
     <Modal
       opened={opened}
@@ -137,7 +165,7 @@ function DataImportModal({ opened, onClose, title = 'Datenimport-Wizard', requir
       fullScreen={isMobile}
       size={isMobile ? '100%' : 'lg'}
     >
-      <Stack>
+      <Stack onKeyDownCapture={handleWizardKeyDownCapture}>
         <SegmentedControl
           value={String(step)}
           onChange={(value) => setStep(Number(value))}
@@ -229,35 +257,9 @@ function DataImportModal({ opened, onClose, title = 'Datenimport-Wizard', requir
                     <Radio value="replace" label="Bestehende Daten durch Import ersetzen" />
                   </Stack>
                 </Radio.Group>
-              </Stack>
-            </Paper>
-
-            <Paper withBorder p="md" radius="md">
-              <Stack gap="sm">
-                <Text fw={600}>Datensatz-Auswahl</Text>
-                <Radio.Group value={recordScope} onChange={setRecordScope}>
-                  <Stack gap="xs">
-                    <Radio value="all" label="Alle Datensätze" />
-                    <Radio value="children" label="Nur Kinder" />
-                    <Radio value="employees" label="Nur Eltern/Mitarbeitende" />
-                    <Radio value="selected" label="Nur selektierte Datensätze" />
-                  </Stack>
-                </Radio.Group>
-
-                {recordScope === 'selected' && (
-                  <MultiSelect
-                    searchable
-                    clearable
-                    label="Datensätze auswählen"
-                    value={selectedRecordKeys}
-                    onChange={setSelectedRecordKeys}
-                    data={(preparedImport?.recordOptions || []).map((record) => ({
-                      value: record.value,
-                      label: record.label,
-                    }))}
-                    placeholder="Datensätze auswählen"
-                  />
-                )}
+                <Text size="sm" c="dimmed">
+                  Erweiterte Auswahl- und Konfliktregeln sind im Vorschau-Schritt optional verfügbar.
+                </Text>
               </Stack>
             </Paper>
 
@@ -298,20 +300,59 @@ function DataImportModal({ opened, onClose, title = 'Datenimport-Wizard', requir
               )}
             </Paper>
 
-            <Paper withBorder p="md" radius="md">
-              <Stack gap="sm">
-                <Text fw={600}>Konfliktbehandlung (bei Ergänzen)</Text>
-                <Radio.Group value={conflictPolicy} onChange={setConflictPolicy}>
-                  <Stack gap="xs">
-                    <Radio value="skip" label="Bestehende behalten (Konflikte überspringen)" disabled={conflictPolicyDisabled} />
-                    <Radio value="overwrite" label="Bestehende bei Konflikt überschreiben" disabled={conflictPolicyDisabled} />
-                    <Radio value="duplicate" label="Als Duplikat hinzufügen" disabled={conflictPolicyDisabled} />
-                  </Stack>
-                </Radio.Group>
-              </Stack>
-            </Paper>
+            <Checkbox
+              label="Erweiterte Importoptionen anzeigen"
+              checked={showAdvancedOptions}
+              onChange={(event) => setShowAdvancedOptions(event.currentTarget.checked)}
+            />
 
-            {(preview?.conflicts?.length || 0) > 0 && (
+            {showAdvancedOptions && (
+              <Paper withBorder p="md" radius="md">
+                <Stack gap="sm">
+                  <Text fw={600}>Datensatz-Auswahl</Text>
+                  <Radio.Group value={recordScope} onChange={setRecordScope}>
+                    <Stack gap="xs">
+                      <Radio value="all" label="Alle Datensätze" />
+                      <Radio value="children" label="Nur Kinder" />
+                      <Radio value="employees" label="Nur Eltern/Mitarbeitende" />
+                      <Radio value="selected" label="Nur selektierte Datensätze" />
+                    </Stack>
+                  </Radio.Group>
+
+                  {recordScope === 'selected' && (
+                    <MultiSelect
+                      searchable
+                      clearable
+                      label="Datensätze auswählen"
+                      value={selectedRecordKeys}
+                      onChange={setSelectedRecordKeys}
+                      data={(preparedImport?.recordOptions || []).map((record) => ({
+                        value: record.value,
+                        label: record.label,
+                      }))}
+                      placeholder="Datensätze auswählen"
+                    />
+                  )}
+                </Stack>
+              </Paper>
+            )}
+
+            {showAdvancedOptions && (
+              <Paper withBorder p="md" radius="md">
+                <Stack gap="sm">
+                  <Text fw={600}>Konfliktbehandlung (bei Ergänzen)</Text>
+                  <Radio.Group value={conflictPolicy} onChange={setConflictPolicy}>
+                    <Stack gap="xs">
+                      <Radio value="skip" label="Bestehende behalten (Konflikte überspringen)" disabled={conflictPolicyDisabled} />
+                      <Radio value="overwrite" label="Bestehende bei Konflikt überschreiben" disabled={conflictPolicyDisabled} />
+                      <Radio value="duplicate" label="Als Duplikat hinzufügen" disabled={conflictPolicyDisabled} />
+                    </Stack>
+                  </Radio.Group>
+                </Stack>
+              </Paper>
+            )}
+
+            {showAdvancedOptions && (preview?.conflicts?.length || 0) > 0 && (
               <Paper withBorder p="md" radius="md">
                 <Stack gap="xs">
                   <Text fw={600}>Konfliktliste (Auszug)</Text>

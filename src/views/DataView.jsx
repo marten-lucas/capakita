@@ -7,7 +7,6 @@ import SimDataList from '../components/SimDataDetail/SimDataList';
 import { useSelector, useDispatch } from 'react-redux';
 import { setSelectedScenarioId, addScenario } from '../store/simScenarioSlice';
 import { addDataItemAndSelect } from '../store/simDataSlice';
-import { useOverlayData } from '../hooks/useOverlayData';
 
 function DataPage() {
   const [modalOpen, setModalOpen] = useState(false);
@@ -15,8 +14,6 @@ function DataPage() {
   const dispatch = useDispatch();
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const scenarios = useSelector(state => state.simScenario.scenarios);
-  
-  useOverlayData();
 
   const handleAddCapacity = () => {
     dispatch(addDataItemAndSelect({ scenarioId: selectedScenarioId, item: { type: "capacity", source: "manual entry" } }));

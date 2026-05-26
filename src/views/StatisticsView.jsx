@@ -17,9 +17,10 @@ import {
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { IconInfoCircle, IconPrinter } from '@tabler/icons-react';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { selectGroupTransitionStatistics, selectHistoricalStatistics } from '../store/statisticsSelectors';
 import { selectSelectedScenario } from '../store/simScenarioSlice';
+import { setActivePage, setDataCaptureQueueMode, setDataListFilter } from '../store/uiSlice';
 
 function parseIsoDate(dateValue) {
   if (!dateValue) return null;
@@ -129,6 +130,7 @@ function getReportPeriodLabel(value) {
 }
 
 function StatisticsView() {
+  const dispatch = useDispatch();
   const theme = useMantineTheme();
   const isMobile = useMediaQuery('(max-width: 48em)');
   const isTestEnvironment = import.meta.env.MODE === 'test';
@@ -151,6 +153,10 @@ function StatisticsView() {
   );
   const selectedScenario = useSelector(selectSelectedScenario);
   const scenarios = useSelector((state) => state.simScenario.scenarios);
+  const selectedScenarioId = useSelector((state) => state.simScenario.selectedScenarioId);
+  const dataByScenario = useSelector((state) => state.simData.dataByScenario);
+  const bookingsByScenario = useSelector((state) => state.simBooking.bookingsByScenario);
+  const groupsByScenario = useSelector((state) => state.simGroup.groupsByScenario);
 
   const latest = statistics.buckets[statistics.buckets.length - 1] || null;
   const statisticsBinding = selectedScenario?.autoEventSettings?.statisticsBinding || null;
@@ -503,6 +509,43 @@ function StatisticsView() {
     [aggregation, fromGroupFilter, reportPeriod, toGroupFilter, fromGroupOptions, toGroupOptions, transitionStatistics.asOfDate]
   );
 
+  const dataQualitySummary = React.useMemo(() => {
+    const items = Object.values(dataByScenario?.[selectedScenarioId] || {}).filter((item) => !item.archived);
+    const bookingBuckets = bookingsByScenario?.[selectedScenarioId] || {};
+    const groupBuckets = groupsByScenario?.[selectedScenarioId] || {};
+
+    let missingBooking = 0;
+    let missingGroup = 0;
+    let missingBirthDate = 0;
+    let missingName = 0;
+
+    items.forEach((item) => {
+      if (!String(item.name || '').trim()) missingName += 1;
+
+      const bookings = Object.values(bookingBuckets[String(item.id)] || {});
+      if (bookings.length === 0) missingBooking += 1;
+
+      const groups = Object.values(groupBuckets[String(item.id)] || {});
+      if (groups.length === 0) missingGroup += 1;
+
+      if (item.type === 'demand' && !item.dateofbirth) missingBirthDate += 1;
+    });
+
+    return {
+      total: items.length,
+      missingBooking,
+      missingGroup,
+      missingBirthDate,
+      missingName,
+    };
+  }, [dataByScenario, bookingsByScenario, groupsByScenario, selectedScenarioId]);
+
+  const openDataFixMode = React.useCallback((filter, queueMode = false) => {
+    dispatch(setDataListFilter(filter));
+    dispatch(setDataCaptureQueueMode(queueMode));
+    dispatch(setActivePage('data'));
+  }, [dispatch]);
+
   return (
     <Paper withBorder p="md" data-testid="statistics-view">
       <Stack gap="sm">
@@ -536,6 +579,33 @@ function StatisticsView() {
         <Alert icon={<IconInfoCircle size={16} />} color="blue" variant="light">
           Historische Buckets und Gruppenübergänge basieren direkt auf importierten Daten.
         </Alert>
+
+        <Paper withBorder p="sm" radius="md" data-testid="statistics-data-quality-actions">
+          <Stack gap="sm">
+            <Text fw={600}>Datenqualität und Schnellkorrektur</Text>
+            <Group gap="xs" wrap="wrap">
+              <Badge variant="light">Datensätze: {dataQualitySummary.total}</Badge>
+              <Badge variant="light" color="yellow">Ohne Buchung: {dataQualitySummary.missingBooking}</Badge>
+              <Badge variant="light" color="yellow">Ohne Gruppe: {dataQualitySummary.missingGroup}</Badge>
+              <Badge variant="light" color="yellow">Ohne Geburtsdatum: {dataQualitySummary.missingBirthDate}</Badge>
+              <Badge variant="light" color="red">Ohne Namen: {dataQualitySummary.missingName}</Badge>
+            </Group>
+            <Group gap="xs" wrap="wrap" className="statistics-print-hide">
+              <Button size="xs" variant="light" onClick={() => openDataFixMode('missing_booking')}>
+                Fehlende Buchungen bearbeiten
+              </Button>
+              <Button size="xs" variant="light" onClick={() => openDataFixMode('missing_group')}>
+                Fehlende Gruppen bearbeiten
+              </Button>
+              <Button size="xs" variant="light" onClick={() => openDataFixMode('missing_birthdate')}>
+                Fehlende Geburtsdaten bearbeiten
+              </Button>
+              <Button size="xs" variant="filled" onClick={() => openDataFixMode('incomplete', true)}>
+                Erfassungs-Queue starten
+              </Button>
+            </Group>
+          </Stack>
+        </Paper>
 
         <Paper withBorder p="md" radius="md" className="statistics-print-only statistics-print-block">
           <Stack gap="xs">
