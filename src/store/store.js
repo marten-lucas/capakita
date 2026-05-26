@@ -17,13 +17,17 @@ import { loadBrowserAutoSaveEnabled, loadBrowserAutoSaveState, saveBrowserAutoSa
 
 const browserAutoSaveEnabled = loadBrowserAutoSaveEnabled();
 const browserAutoSaveState = browserAutoSaveEnabled ? loadBrowserAutoSaveState() : null;
+const restoredState = browserAutoSaveState || {};
+const restoredUi = restoredState.ui || {};
 
 const preloadedState = {
+  ...restoredState,
   ui: {
     ...initialUiState,
+    ...restoredUi,
+    analysisStoryDeckEnabled: true,
     browserAutoSaveEnabled,
   },
-  ...(browserAutoSaveState || {}),
 };
 
 const store = configureStore({
