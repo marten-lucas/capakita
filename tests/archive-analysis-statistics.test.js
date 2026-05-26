@@ -21,6 +21,7 @@ async function seedArchiveScenario(page) {
     store.dispatch({ type: 'chart/ensureScenario', payload: scenarioId });
     store.dispatch({ type: 'chart/setFilterGroups', payload: { scenarioId, groups: ['__NO_GROUP__'] } });
     store.dispatch({ type: 'chart/setFilterQualifications', payload: { scenarioId, qualifications: ['__NO_QUALI__'] } });
+    store.dispatch({ type: 'ui/setAnalysisStoryDeckEnabled', payload: false });
 
     const children = [
       { id: 'archive-child-1', name: 'Kind Archiv Eins' },

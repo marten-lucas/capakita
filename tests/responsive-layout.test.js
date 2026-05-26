@@ -262,9 +262,17 @@ test('all main app pages remain usable without horizontal overflow', async ({ pa
   await expectLayoutScreenshot(page, 'responsive-events-view.png');
 
   await openMainPage(page, 'Statistik');
-  await expect(page.getByTestId('statistics-view')).toBeVisible();
+  const legacyStatistics = page.getByTestId('statistics-view');
+  const storyDeckStatistics = page.getByTestId('statistics-storydeck-view');
+  const legacyVisible = await legacyStatistics.isVisible().catch(() => false);
+  const storyDeckVisible = await storyDeckStatistics.isVisible().catch(() => false);
+  expect(legacyVisible || storyDeckVisible).toBe(true);
   await expect(page.getByRole('button', { name: /Als PDF exportieren/i })).toBeVisible();
-  await expect(page.getByText(/Historische Entwicklung/i)).toBeVisible();
+  if (legacyVisible) {
+    await expect(page.getByText(/Historische Entwicklung/i)).toBeVisible();
+  } else {
+    await expect(page.getByText(/Analyse-Story/i)).toBeVisible();
+  }
   await expectNoHorizontalOverflow(page, 'statistics view');
   await expectLayoutScreenshot(page, 'responsive-statistics-view.png');
 });

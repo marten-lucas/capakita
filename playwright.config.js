@@ -5,6 +5,7 @@ const isVerbose = process.env.VERBOSE === 'true';
 
 export default defineConfig({
   testDir: './tests',
+  testIgnore: ['tmp-midterm-debug.test.js'],
   timeout: 120_000,
   fullyParallel: false,
   workers: 1,
