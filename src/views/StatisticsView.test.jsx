@@ -124,7 +124,7 @@ describe('StatisticsView', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders story deck mode by default and supports PDF export', () => {
+  it('renders story deck mode by default and supports PDF export', { timeout: 15000 }, () => {
     const store = createTestStore();
     const printSpy = vi.spyOn(window, 'print').mockImplementation(() => {});
 

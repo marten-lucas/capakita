@@ -8,13 +8,13 @@ describe('ruleEngine', () => {
       latest: { childrenCount: 80 },
     });
 
-    expect(result.dataQuality.missingBookingShare).toBe(12);
-    expect(result.latest.childrenCount).toBe(80);
-    expect(result.finance.net).toBe(0);
+    expect(result.missingBookingShare).toBe(12);
+    expect(result.childrenCount).toBe(80);
+    expect(result.net).toBe(0);
   });
 
-  it('creates deterministic high-priority alerts for critical data', () => {
-    const insights = computeAnalysisInsights({
+  it('creates deterministic high-priority alerts for critical data', async () => {
+    const insights = await computeAnalysisInsights({
       dataQuality: {
         total: 100,
         missingBooking: 15,
@@ -37,8 +37,8 @@ describe('ruleEngine', () => {
     expect(insights.stepStatements.quality).toMatch(/Datensaetze|Buchung/i);
   });
 
-  it('returns no critical summary when inputs are stable', () => {
-    const insights = computeAnalysisInsights({
+  it('returns no critical summary when inputs are stable', async () => {
+    const insights = await computeAnalysisInsights({
       dataQuality: {
         total: 100,
         missingBooking: 0,

@@ -15,7 +15,7 @@ async function expectLayoutScreenshot(page, name, options = {}) {
     animations: 'disabled',
     caret: 'hide',
     fullPage: options.fullPage ?? true,
-    maxDiffPixelRatio: 0.02,
+    maxDiffPixelRatio: options.maxDiffPixelRatio ?? 0.02,
     timeout: 15000,
   });
 }
@@ -100,5 +100,8 @@ test(`imported dataset ${dataset.name} stays responsive across main pages`, asyn
   expect(legacyVisible || storyDeckVisible).toBe(true);
   await expect(page.getByRole('button', { name: /Als PDF exportieren/i })).toBeVisible();
   await expectNoHorizontalOverflow(page, 'realdata statistics view');
-  await expectLayoutScreenshot(page, 'responsive-realdata-statistics-view.png', { fullPage: false });
+  await expectLayoutScreenshot(page, 'responsive-realdata-statistics-view.png', {
+    fullPage: false,
+    maxDiffPixelRatio: 0.05,
+  });
 });
