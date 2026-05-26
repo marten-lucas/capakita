@@ -5,6 +5,7 @@ export const initialUiState = {
   browserAutoSaveEnabled: false,
   dataListFilter: 'all',
   dataCaptureQueueMode: false,
+  analysisStoryDeckEnabled: true,
 };
 
 const uiSlice = createSlice({
@@ -23,6 +24,9 @@ const uiSlice = createSlice({
     setDataCaptureQueueMode: (state, action) => {
       state.dataCaptureQueueMode = Boolean(action.payload);
     },
+    setAnalysisStoryDeckEnabled: (state, action) => {
+      state.analysisStoryDeckEnabled = Boolean(action.payload);
+    },
   },
 });
 
@@ -31,5 +35,6 @@ export const {
   setBrowserAutoSaveEnabled,
   setDataListFilter,
   setDataCaptureQueueMode,
+  setAnalysisStoryDeckEnabled,
 } = uiSlice.actions;
 export default uiSlice.reducer;
