@@ -1,0 +1,43 @@
+.analysis-flow-root {
+  overflow: hidden;
+}
+
+.analysis-flow-thumbnails {
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+}
+
+.analysis-flow-thumb {
+  min-width: 180px;
+  cursor: pointer;
+  transition: transform 120ms ease, border-color 120ms ease;
+}
+
+.analysis-flow-thumb:hover {
+  transform: translateY(-1px);
+}
+
+.analysis-flow-thumb.is-active {
+  border-color: var(--mantine-color-blue-6);
+  box-shadow: 0 0 0 1px var(--mantine-color-blue-2);
+}
+
+.analysis-flow-stage {
+  min-height: 320px;
+}
+
+.analysis-flow-slide {
+  animation: analysis-flow-fade 180ms ease;
+}
+
+@keyframes analysis-flow-fade {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

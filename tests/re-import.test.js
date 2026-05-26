@@ -159,7 +159,7 @@ test.describe('BASIC: Manual Data & Visualization', () => {
     await page.getByRole('button', { name: 'Analyse' }).click();
 
     await expect(page.getByRole('heading', { name: 'Regelbetrieb' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Langzeit' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Langzeit', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Alters-Histogramm' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Buchungsverteilung' })).toBeVisible();
   });
@@ -277,7 +277,7 @@ if (shouldRunFullTests()) {
         await page.getByRole('button', { name: 'Analyse' }).click();
 
         await expect(page.getByRole('heading', { name: 'Regelbetrieb' })).toBeVisible();
-        await expect(page.getByRole('heading', { name: 'Langzeit' })).toBeVisible();
+        await expect(page.getByRole('heading', { name: 'Langzeit', exact: true })).toBeVisible();
         await expect(page.getByRole('heading', { name: 'Alters-Histogramm' })).toBeVisible();
         await expect(page.getByRole('heading', { name: 'Buchungsverteilung' })).toBeVisible();
 
@@ -305,9 +305,9 @@ if (shouldRunFullTests()) {
         await expect(page.getByRole('heading', { name: 'Regelbetrieb' })).toBeVisible();
 
         await longtermCheckbox.uncheck({ force: true });
-        await expect(page.getByRole('heading', { name: 'Langzeit' })).toHaveCount(0);
+        await expect(page.getByRole('heading', { name: 'Langzeit', exact: true })).toHaveCount(0);
         await longtermCheckbox.check({ force: true });
-        await expect(page.getByRole('heading', { name: 'Langzeit' })).toBeVisible();
+        await expect(page.getByRole('heading', { name: 'Langzeit', exact: true })).toBeVisible();
 
         await ageHistogramCheckbox.uncheck({ force: true });
         await expect(page.getByRole('heading', { name: 'Alters-Histogramm' })).toHaveCount(0);

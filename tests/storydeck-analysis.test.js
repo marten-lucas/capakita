@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test('Story deck statistics view renders and navigates steps', async ({ page }) => {
+test('analyse story flow renders and navigates steps', async ({ page }) => {
   await page.goto('/');
   await page.waitForLoadState('networkidle');
 
@@ -13,8 +13,7 @@ test('Story deck statistics view renders and navigates steps', async ({ page }) 
     const sid = 'storydeck-e2e-scenario';
     store.dispatch({ type: 'simScenario/addScenario', payload: { id: sid, name: 'Storydeck E2E', imported: true } });
     store.dispatch({ type: 'simScenario/setSelectedScenarioId', payload: sid });
-    store.dispatch({ type: 'ui/setAnalysisStoryDeckEnabled', payload: true });
-    store.dispatch({ type: 'ui/setActivePage', payload: 'statistics' });
+    store.dispatch({ type: 'ui/setActivePage', payload: 'visu' });
 
     store.dispatch({
       type: 'simData/simDataItemAdd',
@@ -74,12 +73,12 @@ test('Story deck statistics view renders and navigates steps', async ({ page }) 
     });
   });
 
-  await expect(page.getByTestId('statistics-storydeck-view')).toBeVisible();
-  await expect(page.getByText('Analyse-Story')).toBeVisible();
+  await expect(page.getByTestId('analysis-storyflow-view')).toBeVisible();
+  await expect(page.getByText('Analyse-Buehne')).toBeVisible();
 
   await page.getByRole('button', { name: 'Naechster Schritt' }).click();
-  await expect(page.locator('.storydeck-stage').getByText('2. Bestand')).toBeVisible();
+  await expect(page.locator('.analysis-flow-stage').getByText('2. Langzeit-Fokus')).toBeVisible();
 
-  await page.getByTestId('storydeck-thumb-summary').click();
-  await expect(page.locator('.storydeck-stage').getByText('7. Kernaussagen')).toBeVisible();
+  await page.getByTestId('analysis-flow-thumb-summary').click();
+  await expect(page.locator('.analysis-flow-stage').getByText('5. Priorisierung')).toBeVisible();
 });

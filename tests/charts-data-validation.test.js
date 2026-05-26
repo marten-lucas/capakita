@@ -311,7 +311,7 @@ test('Chart Data Validation - Weekly Chart', async ({ page }) => {
   await page.waitForTimeout(2000);
   
   // Verify main axis label is present
-  await expect(page.locator('text=Zeiten')).toBeVisible();
+  await expect(page.getByText('Zeiten', { exact: true })).toBeVisible();
   
   // Check that SVG chart container exists
   const svgCharts = await page.locator('svg').count();
@@ -328,7 +328,7 @@ test('Chart Data Validation - Midterm Chart', async ({ page }) => {
   await goToVisu(page);
   
   // Check Midterm Chart heading
-  const midtermHeading = page.getByRole('heading', { name: 'Langzeit' });
+  const midtermHeading = page.getByRole('heading', { name: 'Langzeit', exact: true });
   await expect(midtermHeading).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Bedarf und Kapazität' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Fachkraftquote und Finanzen' })).toBeVisible();
@@ -399,7 +399,7 @@ test('Chart Data Validation - All Charts Present with Correct Scaling', async ({
   
   // All headings visible
   await expect(page.getByRole('heading', { name: 'Regelbetrieb' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Langzeit' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Langzeit', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Alters-Histogramm' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Buchungsverteilung' })).toBeVisible();
   

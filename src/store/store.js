@@ -25,7 +25,6 @@ const preloadedState = {
   ui: {
     ...initialUiState,
     ...restoredUi,
-    analysisStoryDeckEnabled: true,
     browserAutoSaveEnabled,
   },
 };

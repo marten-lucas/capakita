@@ -15,7 +15,6 @@ import simFinanceReducer from '../store/simFinanceSlice';
 import chartReducer from '../store/chartSlice';
 import eventReducer from '../store/eventSlice';
 import datesOfInterestReducer from '../store/datesOfInterestSlice';
-import uiReducer from '../store/uiSlice';
 
 if (typeof globalThis.ResizeObserver === 'undefined') {
   globalThis.ResizeObserver = class {
@@ -25,11 +24,9 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
   };
 }
 
-function createTestStore(options = {}) {
-  const { analysisStoryDeckEnabled = true } = options;
+function createTestStore() {
   return configureStore({
     reducer: {
-      ui: uiReducer,
       simScenario: simScenarioReducer,
       simData: simDataReducer,
       simBooking: simBookingReducer,
@@ -42,13 +39,6 @@ function createTestStore(options = {}) {
       datesOfInterest: datesOfInterestReducer,
     },
     preloadedState: {
-      ui: {
-        activePage: 'statistics',
-        browserAutoSaveEnabled: false,
-        dataListFilter: 'all',
-        dataCaptureQueueMode: false,
-        analysisStoryDeckEnabled,
-      },
       simScenario: {
         scenarios: [
           {
@@ -124,7 +114,7 @@ describe('StatisticsView', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders story deck mode by default and supports PDF export', { timeout: 15000 }, () => {
+  it('renders the PDF export action and prepares a print summary', () => {
     const store = createTestStore();
     const printSpy = vi.spyOn(window, 'print').mockImplementation(() => {});
 
@@ -136,27 +126,14 @@ describe('StatisticsView', () => {
       </Provider>
     );
 
-    expect(screen.getByText('Analyse-Story')).toBeInTheDocument();
-    expect(screen.getByTestId('statistics-storydeck-view')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Als PDF exportieren/i })).toBeInTheDocument();
+    expect(screen.getByTestId('statistics-report-period')).toHaveValue('Maximal');
+    expect(screen.getByText('Analysebericht')).toBeInTheDocument();
+    expect(screen.getByText('Analyse-Szenario')).toBeInTheDocument();
+    expect(screen.getByText('Basis-Szenario: Basis-Szenario')).toBeInTheDocument();
 
     screen.getByRole('button', { name: /Als PDF exportieren/i }).click();
 
     expect(printSpy).toHaveBeenCalledOnce();
-  });
-
-  it('falls back to legacy statistics view when story deck is disabled', () => {
-    const store = createTestStore({ analysisStoryDeckEnabled: false });
-
-    render(
-      <Provider store={store}>
-        <MantineProvider>
-          <StatisticsView />
-        </MantineProvider>
-      </Provider>
-    );
-
-    expect(screen.getByTestId('statistics-view')).toBeInTheDocument();
-    expect(screen.getByText('Statistik')).toBeInTheDocument();
   });
 });
