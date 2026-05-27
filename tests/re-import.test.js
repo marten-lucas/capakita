@@ -102,6 +102,22 @@ async function createManualDataset(page) {
     });
 
     store.dispatch({
+      type: 'simFinance/addPersonnelCostEntry',
+      payload: {
+        scenarioId,
+        itemId: 'staff-mara',
+        entry: {
+          id: 'pc-staff-mara',
+          validFrom: '2026-01-01',
+          validUntil: '2026-12-31',
+          annualGrossSalary: 54000,
+          employerOnCostPercent: 22,
+          note: 'Roundtrip finance check',
+        },
+      },
+    });
+
+    store.dispatch({
       type: 'simBooking/addBooking',
       payload: {
         scenarioId,
@@ -194,6 +210,27 @@ test.describe('BASIC: Export/Import Roundtrip', () => {
     await expect(page.getByRole('button', { name: 'Hinzufügen' })).toBeVisible();
     await expect(page.locator('text=Lina').first()).toBeVisible();
     await expect(page.locator('text=Mara').first()).toBeVisible();
+
+    const importedStaffFinance = await page.evaluate(() => {
+      const store = window.__APP_STORE;
+      const state = store.getState();
+      const scenarioId = state.simScenario.selectedScenarioId;
+      const itemsById = state.simData.dataByScenario?.[scenarioId] || {};
+      const staffId = Object.keys(itemsById).find((id) => {
+        const item = itemsById[id];
+        return item?.type === 'capacity' && item?.name === 'Mara';
+      });
+
+      if (!staffId) return null;
+      const personnelHistory = state.simFinance.financeByScenario?.[scenarioId]?.itemFinances?.[staffId]?.personnelCostHistory || [];
+      return personnelHistory[0] || null;
+    });
+
+    expect(importedStaffFinance).toMatchObject({
+      annualGrossSalary: 54000,
+      employerOnCostPercent: 22,
+      note: 'Roundtrip finance check',
+    });
 
     await page.getByRole('button', { name: 'Analyse' }).click();
     await expect(page.getByRole('heading', { name: 'Regelbetrieb' })).toBeVisible();

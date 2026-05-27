@@ -155,6 +155,7 @@ function buildPreparedImportFromCapakitaData({
   const bookingsByItem = payload?.bookingsByScenario?.[scenarioId] || {};
   const groupsByItem = payload?.groupsByScenario?.[scenarioId] || {};
   const qualificationAssignmentsByItem = payload?.qualificationAssignmentsByScenario?.[scenarioId] || {};
+  const itemFinancesByItem = payload?.financeByScenario?.[scenarioId]?.itemFinances || {};
 
   const simDataList = Object.values(itemsById || {});
   const groupDefs = payload?.groupDefsByScenario?.[scenarioId] || [];
@@ -164,6 +165,7 @@ function buildPreparedImportFromCapakitaData({
   const bookingsByExternalKey = new Map();
   const groupAssignmentsByExternalKey = new Map();
   const qualificationAssignmentsByExternalKey = new Map();
+  const itemFinancesByExternalKey = new Map();
   const recordOptions = [];
 
   Object.entries(itemsById || {}).forEach(([itemId, item]) => {
@@ -180,6 +182,11 @@ function buildPreparedImportFromCapakitaData({
     bookingsByExternalKey.set(externalKey, Object.values(bookingsByItem[String(itemId)] || {}));
     groupAssignmentsByExternalKey.set(externalKey, Object.values(groupsByItem[String(itemId)] || {}));
     qualificationAssignmentsByExternalKey.set(externalKey, toAssignmentList(qualificationAssignmentsByItem, itemId));
+
+    const itemFinance = itemFinancesByItem[String(itemId)];
+    if (itemFinance && typeof itemFinance === 'object') {
+      itemFinancesByExternalKey.set(externalKey, cloneObject(itemFinance, {}));
+    }
   });
 
   return {
@@ -199,6 +206,7 @@ function buildPreparedImportFromCapakitaData({
     bookingsByExternalKey,
     groupAssignmentsByExternalKey,
     qualificationAssignmentsByExternalKey,
+    itemFinancesByExternalKey,
   };
 }
 
@@ -465,7 +473,12 @@ export function useScenarioImport() {
         delete nextQualAssignments[targetItemId];
       }
 
-      delete nextItemFinances[targetItemId];
+      const incomingItemFinance = preparedImport.itemFinancesByExternalKey?.get(externalKey);
+      if (incomingItemFinance && typeof incomingItemFinance === 'object') {
+        nextItemFinances[targetItemId] = cloneObject(incomingItemFinance, {});
+      } else {
+        delete nextItemFinances[targetItemId];
+      }
     });
 
     nextDataByScenario[targetScenarioId] = nextData;
