@@ -3,6 +3,7 @@ import { createSlice } from '@reduxjs/toolkit';
 export const initialUiState = {
   activePage: 'welcome', // 'welcome' | 'data' | 'visu' | 'settings' | 'legal'
   settingsSubPage: 'groups', // 'scenarios' | 'groups' | 'qualifications' | 'events' | 'finance'
+  analysisSubPage: 'quality', // 'quality' | 'status' | 'transitions' | 'cohort' | 'compare' | 'demography' | 'options' | 'trends'
   browserAutoSaveEnabled: false,
   dataListFilter: 'all',
   dataCaptureQueueMode: false,
@@ -17,6 +18,9 @@ const uiSlice = createSlice({
     },
     setSettingsSubPage: (state, action) => {
       state.settingsSubPage = action.payload || 'groups';
+    },
+    setAnalysisSubPage: (state, action) => {
+      state.analysisSubPage = action.payload || 'quality';
     },
     setBrowserAutoSaveEnabled: (state, action) => {
       state.browserAutoSaveEnabled = Boolean(action.payload);
@@ -33,6 +37,7 @@ const uiSlice = createSlice({
 export const {
   setActivePage,
   setSettingsSubPage,
+  setAnalysisSubPage,
   setBrowserAutoSaveEnabled,
   setDataListFilter,
   setDataCaptureQueueMode,

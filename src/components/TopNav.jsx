@@ -2,8 +2,8 @@ import React from 'react';
 import { Alert, Button, Text, Menu, ActionIcon, Select, Box, Switch, Modal, Stack, Checkbox, Group, UnstyledButton } from '@mantine/core';
 import { useSelector, useDispatch, useStore } from 'react-redux';
 import { isSaveAllowed, setSaveDialogOpen, setLoadDialogOpen, setSelectedScenarioId } from '../store/simScenarioSlice';
-import { setActivePage, setBrowserAutoSaveEnabled, setSettingsSubPage } from '../store/uiSlice';
-import { IconDatabase, IconChartBar, IconSettings, IconDotsVertical, IconUpload, IconDeviceFloppy, IconFolderOpen, IconCalendarEvent, IconInfoCircle, IconRefresh, IconTrash, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconLayersIntersect, IconUsers, IconCertificate, IconTools } from '@tabler/icons-react';
+import { setActivePage, setAnalysisSubPage, setBrowserAutoSaveEnabled, setSettingsSubPage } from '../store/uiSlice';
+import { IconDatabase, IconChartBar, IconSettings, IconDotsVertical, IconUpload, IconDeviceFloppy, IconFolderOpen, IconCalendarEvent, IconInfoCircle, IconRefresh, IconTrash, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconLayersIntersect, IconUsers, IconCertificate, IconTools, IconAlertTriangle, IconRoute, IconClockHour4, IconArrowsSplit, IconUser } from '@tabler/icons-react';
 import { refreshEventsForScenario, clearEventOverridesForScenario } from '../store/eventSlice';
 import { updateDatesOfInterest } from '../store/datesOfInterestSlice';
 import { loadBookingsByScenario } from '../store/simBookingSlice';
@@ -16,7 +16,21 @@ import DataImportModal from './modals/DataImportModal';
 
 const NAV_ITEMS = [
   { value: 'data', label: 'Daten', icon: IconDatabase },
-  { value: 'visu', label: 'Analyse', icon: IconChartBar },
+  {
+    value: 'visu',
+    label: 'Analyse',
+    icon: IconChartBar,
+    subItems: [
+      { value: 'quality', label: 'Datenqualität', icon: IconAlertTriangle },
+      { value: 'status', label: 'Bedarfsdeckung', icon: IconChartBar },
+      { value: 'transitions', label: 'Resilienz', icon: IconRoute },
+      { value: 'cohort', label: 'Finanzen', icon: IconClockHour4 },
+      { value: 'compare', label: 'Vorschau', icon: IconArrowsSplit },
+      { value: 'demography', label: 'Demografie', icon: IconUser },
+      { value: 'options', label: 'Optionen-Check', icon: IconTools },
+      { value: 'trends', label: 'Trend-Radar', icon: IconChartBar },
+    ],
+  },
   {
     value: 'settings',
     label: 'Optionen',
@@ -117,6 +131,7 @@ function TopNav({ variant = 'sidebar', sidebarCollapsed = false, onToggleSidebar
   const selectedScenarioId = useSelector((state) => state.simScenario.selectedScenarioId);
   const activePage = useSelector((state) => state.ui.activePage);
   const activeSettingsSubPage = useSelector((state) => state.ui.settingsSubPage || 'groups');
+  const activeAnalysisSubPage = useSelector((state) => state.ui.analysisSubPage || 'quality');
   const browserAutoSaveEnabled = useSelector((state) => state.ui.browserAutoSaveEnabled);
   const store = useStore();
   const [importModalOpen, setImportModalOpen] = React.useState(false);
@@ -224,25 +239,36 @@ function TopNav({ variant = 'sidebar', sidebarCollapsed = false, onToggleSidebar
             collapsed={variant === 'sidebar' && sidebarCollapsed}
             onClick={() => {
               dispatch(setActivePage(item.value));
+              if (item.value === 'visu' && !activeAnalysisSubPage) {
+                dispatch(setAnalysisSubPage('quality'));
+              }
               if (item.value === 'settings' && !activeSettingsSubPage) {
                 dispatch(setSettingsSubPage('groups'));
               }
             }}
           />
 
-          {variant === 'sidebar' && !sidebarCollapsed && item.value === 'settings' && activePage === 'settings' && Array.isArray(item.subItems) && (
+          {variant === 'sidebar' && !sidebarCollapsed && activePage === item.value && Array.isArray(item.subItems) && (
             <Stack gap={2} className="app-nav-submenu">
               {item.subItems.map((subItem) => (
                 <UnstyledButton
                   key={subItem.value}
-                  className={`app-nav-subitem ${activeSettingsSubPage === subItem.value ? 'is-active' : ''}`}
+                  className={`app-nav-subitem ${(item.value === 'settings' ? activeSettingsSubPage : activeAnalysisSubPage) === subItem.value ? 'is-active' : ''}`}
                   onClick={() => {
-                    dispatch(setActivePage('settings'));
-                    dispatch(setSettingsSubPage(subItem.value));
+                    dispatch(setActivePage(item.value));
+                    if (item.value === 'settings') {
+                      dispatch(setSettingsSubPage(subItem.value));
+                    }
+                    if (item.value === 'visu') {
+                      dispatch(setAnalysisSubPage(subItem.value));
+                    }
                   }}
                 >
                   <subItem.icon size={14} stroke={1.8} />
-                  <Text size="xs" fw={activeSettingsSubPage === subItem.value ? 700 : 600}>
+                  <Text
+                    size="xs"
+                    fw={(item.value === 'settings' ? activeSettingsSubPage : activeAnalysisSubPage) === subItem.value ? 700 : 600}
+                  >
                     {subItem.label}
                   </Text>
                 </UnstyledButton>
@@ -445,9 +471,17 @@ export function MobileBottomNav() {
   const dispatch = useDispatch();
   const activePage = useSelector((state) => state.ui.activePage);
   const activeSettingsSubPage = useSelector((state) => state.ui.settingsSubPage || 'groups');
+  const activeAnalysisSubPage = useSelector((state) => state.ui.analysisSubPage || 'quality');
 
   const mobileItems = React.useMemo(
     () => NAV_ITEMS.map((item) => {
+      if (item.value === 'visu') {
+        const activeSub = item.subItems?.find((entry) => entry.value === activeAnalysisSubPage);
+        return {
+          ...item,
+          label: activeSub ? `Analyse: ${activeSub.label}` : item.label,
+        };
+      }
       if (item.value !== 'settings') return item;
       const activeSub = item.subItems?.find((entry) => entry.value === activeSettingsSubPage);
       return {
@@ -455,7 +489,7 @@ export function MobileBottomNav() {
         label: activeSub ? `Optionen: ${activeSub.label}` : item.label,
       };
     }),
-    [activeSettingsSubPage]
+    [activeAnalysisSubPage, activeSettingsSubPage]
   );
 
   return (

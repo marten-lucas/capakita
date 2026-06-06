@@ -6,7 +6,6 @@ import {
   Badge,
   Box,
   Group,
-  HoverCard,
   Modal,
   Paper,
   RingProgress,
@@ -21,13 +20,15 @@ import HighchartsSankey from 'highcharts/modules/sankey';
 import HighchartsReact from 'highcharts-react-official';
 import ChartFilterForm from '../components/SimDataCharts/ChartFilterForm';
 import WeeklyChart from '../components/SimDataCharts/WeeklyChart';
+import GroupIcon from '../components/common/GroupIcon';
 import { useDispatch, useSelector } from 'react-redux';
-import { setActivePage } from '../store/uiSlice';
+import { setActivePage, setAnalysisSubPage } from '../store/uiSlice';
 import { setSelectedItem, setSelectedItems } from '../store/simScenarioSlice';
 import { ensureScenario } from '../store/chartSlice';
 import { useOverlayData } from '../hooks/useOverlayData';
-import { calculateScenarioMonthlyFinance, isRecordActiveOnDate, resolveGroupIdAtDate } from '../utils/financeUtils';
+import { calculateScenarioMonthlyFinance, isDateWithinRange, isRecordActiveOnDate, resolveGroupIdAtDate } from '../utils/financeUtils';
 import { buildOverlayAwareData } from '../utils/overlayUtils';
+import { shouldIncludeDataItemInAnalysis } from '../utils/dataVisibility';
 import { filterBookings } from '../utils/chartUtils/chartUtils';
 import { generateBookingDataSeries, generateTimeSegments, formatWeeklyAxisLabel } from '../utils/chartUtils/chartUtilsWeekly';
 import {
@@ -816,7 +817,6 @@ function DemographyAgeChart({ demographyData, accent }) {
 
 function StoryCard({ story, isActive, onSelect }) {
   const StoryIcon = story.icon;
-  const RatingIcon = RATING_ICON_BY_KEY[story.rating] || IconAlertTriangle;
 
   return (
     <Paper
@@ -841,9 +841,6 @@ function StoryCard({ story, isActive, onSelect }) {
           <Title order={3} className="analysis-story-title">
             {story.title}
           </Title>
-        </div>
-        <div className="analysis-story-rating" aria-label={`Gesamtbewertung ${story.rating}`}>
-          <RatingIcon size={24} stroke={2} />
         </div>
       </div>
     </Paper>
@@ -920,7 +917,6 @@ function VisuView() {
     (state) => state.simQualification?.qualificationAssignmentsByScenario || {}
   );
   const qualificationDefsByScenario = useSelector((state) => state.simQualification?.qualificationDefsByScenario || {});
-  const events = useSelector((state) => (selectedScenarioId ? state.events?.eventsByScenario?.[selectedScenarioId] || EMPTY_LIST : EMPTY_LIST));
   const qualificationDefs = useSelector(
     (state) =>
       selectedScenarioId
@@ -930,7 +926,11 @@ function VisuView() {
   const financeScenario = useSelector(
     (state) => (selectedScenarioId ? state.simFinance?.financeByScenario?.[selectedScenarioId] || null : null)
   );
-  const [activeStep, setActiveStep] = React.useState(0);
+  const activeAnalysisSubPage = useSelector((state) => state.ui.analysisSubPage || STORY_STEPS[0].id);
+  const [activeStep, setActiveStep] = React.useState(() => {
+    const idx = STORY_STEPS.findIndex((step) => step.id === activeAnalysisSubPage);
+    return idx >= 0 ? idx : 0;
+  });
   const [emblaApi, setEmblaApi] = React.useState(null);
   const [canScrollPrev, setCanScrollPrev] = React.useState(false);
   const [canScrollNext, setCanScrollNext] = React.useState(false);
@@ -1385,8 +1385,7 @@ function VisuView() {
   const qualityMetrics = React.useMemo(() => {
     const activeItems = Object.values(effectiveDataItems || {}).filter(
       (item) =>
-        item &&
-        !item.archived &&
+        shouldIncludeDataItemInAnalysis(item) &&
         (item.type === 'demand' || item.type === 'capacity') &&
         isRecordActiveOnDate(item, todayIso)
     );
@@ -1407,21 +1406,28 @@ function VisuView() {
         const itemType = item.type;
         const currentGroupId = resolveGroupIdAtDate(getEffectiveGroupAssignments(itemId), todayIso, item.groupId || null);
         const hasBooking = Object.values(getEffectiveBookings(itemId) || {}).some((booking) => isRecordActiveOnDate(booking, todayIso));
-        const hasGroup = Boolean(currentGroupId);
 
         let hasFinance = false;
         if (itemType === 'capacity') {
           const personnelHistory = financeScenario?.itemFinances?.[itemId]?.personnelCostHistory || [];
           hasFinance = personnelHistory.some((entry) => isRecordActiveOnDate(entry, todayIso));
         } else {
-          const feeEntries = financeScenario?.groupFeeCatalogs?.[String(currentGroupId)] || [];
-          hasFinance = feeEntries.some((entry) => isRecordActiveOnDate(entry, todayIso));
+          // Kinder benötigen für diese KPI keine eigenen Finanzdaten.
+          hasFinance = true;
         }
+
+        const hasActiveAbsence = itemType === 'capacity'
+          ? (Array.isArray(item.absences)
+            && item.absences.some((absence) => isDateWithinRange(
+              todayIso,
+              absence?.start || absence?.startdate || '',
+              absence?.end || absence?.enddate || ''
+            )))
+          : false;
 
         const missingReasons = [];
         if (!hasBooking) missingReasons.push('keine Buchung');
         if (!hasFinance) missingReasons.push('keine Finanzen');
-        if (!hasGroup) missingReasons.push('keine Gruppe');
 
         return {
           id: itemId,
@@ -1430,20 +1436,46 @@ function VisuView() {
           groupId: currentGroupId ? String(currentGroupId) : null,
           isComplete: missingReasons.length === 0,
           missingReasons,
+          hasActiveAbsence,
         };
       })
       .filter((entry) => applyGroupFilter(entry.groupId));
 
-    const completeChildren = itemAnalyses.filter((entry) => entry.type === 'demand' && entry.isComplete).length;
-    const completeEmployees = itemAnalyses.filter((entry) => entry.type === 'capacity' && entry.isComplete).length;
+    const childrenEntries = itemAnalyses.filter((entry) => entry.type === 'demand');
+    const employeeEntries = itemAnalyses.filter((entry) => entry.type === 'capacity');
+
+    const completeChildren = childrenEntries.filter((entry) => entry.isComplete).length;
+    const completeEmployees = employeeEntries.filter((entry) => entry.isComplete).length;
     const totalChildren = itemAnalyses.filter((entry) => entry.type === 'demand').length;
     const totalEmployees = itemAnalyses.filter((entry) => entry.type === 'capacity').length;
     const incompleteRecords = itemAnalyses.filter((entry) => !entry.isComplete);
 
-    const enabledEvents = (events || []).filter((event) => event.enabled !== false);
-    const autoEvents = enabledEvents.filter(
-      (event) => event?.metadata?.autoGenerated || event?.category === 'auto_transition' || event?.type === 'auto_group_transition'
-    );
+    const incompleteChildren = childrenEntries.filter((entry) => !entry.isComplete);
+    const incompleteEmployees = employeeEntries.filter((entry) => !entry.isComplete);
+    const activeEmployees = employeeEntries.filter((entry) => !entry.hasActiveAbsence).length;
+    const passiveEmployees = employeeEntries.filter((entry) => entry.hasActiveAbsence).length;
+
+    const groupDefById = new Map((groupDefs || []).map((group) => [String(group.id), group]));
+    const childCountsByGroup = new Map();
+    childrenEntries.forEach((entry) => {
+      const key = entry.groupId || '__NO_GROUP__';
+      childCountsByGroup.set(key, (childCountsByGroup.get(key) || 0) + 1);
+    });
+
+    const childGroupBreakdown = Array.from(childCountsByGroup.entries())
+      .map(([groupId, count]) => {
+        if (groupId === '__NO_GROUP__') {
+          return { id: groupId, name: 'Ohne Gruppe', icon: null, count: Number(count || 0) };
+        }
+        const group = groupDefById.get(String(groupId));
+        return {
+          id: String(groupId),
+          name: group?.name || 'Gruppe',
+          icon: group?.icon,
+          count: Number(count || 0),
+        };
+      })
+      .sort((a, b) => b.count - a.count);
 
     const groupFeeCatalogs = financeScenario?.groupFeeCatalogs || {};
     const hasAnyFeeCatalog = Object.values(groupFeeCatalogs).some((entries) => Array.isArray(entries) && entries.length > 0);
@@ -1460,12 +1492,15 @@ function VisuView() {
       completeChildren,
       completeEmployees,
       incompleteRecords,
-      autoEventShare: enabledEvents.length > 0 ? (autoEvents.length / enabledEvents.length) * 100 : 0,
+      incompleteChildren,
+      incompleteEmployees,
+      activeEmployees,
+      passiveEmployees,
+      childGroupBreakdown,
       alerts,
     };
   }, [
     effectiveDataItems,
-    events,
     financeScenario,
     getEffectiveBookings,
     getEffectiveGroupAssignments,
@@ -1678,32 +1713,34 @@ function VisuView() {
       ? [
           {
             key: 'kpi-children',
-            title: 'Kinder (aktiv)',
+            title: 'Aktuelle Anzahl Kinder',
             value: `${qualityMetrics.totalChildren}`,
-            text: 'Aktuelle Bedarfseinträge.',
+            text: 'Aufschlüsselung nach Gruppen.',
+            groupBreakdown: qualityMetrics.childGroupBreakdown,
             tone: 'good',
           },
           {
             key: 'kpi-employees',
-            title: 'Mitarbeiter (aktiv)',
+            title: 'Aktuelle Anzahl Mitarbeiter',
             value: `${qualityMetrics.totalEmployees}`,
-            text: 'Aktuelle Kapazitätseinträge.',
+            text: `Aktive Kapazität: ${qualityMetrics.activeEmployees} · Pausierend (z. B. Elternzeit): ${qualityMetrics.passiveEmployees}`,
             tone: 'good',
           },
           {
-            key: 'kpi-incomplete',
-            title: 'Lückenhafte Datensätze',
-            value: `${qualityMetrics.incompleteRecords.length}`,
-            text: 'Fehlende Buchung, Finanzen oder Gruppe.',
-            tone: qualityMetrics.incompleteRecords.length > 0 ? 'warn' : 'good',
-            records: qualityMetrics.incompleteRecords,
+            key: 'kpi-incomplete-employees',
+            title: 'Lückenhafte Daten Mitarbeiter',
+            value: `${qualityMetrics.incompleteEmployees.length}`,
+            text: 'Fehlende Buchung oder Finanzdaten.',
+            tone: qualityMetrics.incompleteEmployees.length > 0 ? 'warn' : 'good',
+            records: qualityMetrics.incompleteEmployees,
           },
           {
-            key: 'kpi-auto-events',
-            title: 'Autogenerierte Events',
-            value: `${qualityMetrics.autoEventShare.toFixed(1)}%`,
-            text: 'Anteil an allen aktuell aktiven Events.',
-            tone: 'good',
+            key: 'kpi-incomplete-children',
+            title: 'Lückenhafte Daten Kinder',
+            value: `${qualityMetrics.incompleteChildren.length}`,
+            text: 'Fehlende Buchung.',
+            tone: qualityMetrics.incompleteChildren.length > 0 ? 'warn' : 'good',
+            records: qualityMetrics.incompleteChildren,
           },
         ]
       : activeStory.id === 'status'
@@ -1904,18 +1941,36 @@ function VisuView() {
     };
   }, [emblaApi]);
 
+  const handleStepChange = React.useCallback((index) => {
+    const safeIndex = Math.max(0, Math.min(STORY_STEPS.length - 1, Number(index) || 0));
+    setActiveStep(safeIndex);
+
+    const stepId = STORY_STEPS[safeIndex]?.id;
+    if (stepId && stepId !== activeAnalysisSubPage) {
+      dispatch(setAnalysisSubPage(stepId));
+    }
+  }, [activeAnalysisSubPage, dispatch]);
+
   const slides = STORY_STEPS.map((story, index) => (
     <Carousel.Slide key={story.id} className="analysis-story-slide">
       <StoryCard
         story={story}
         isActive={index === activeStep}
         onSelect={() => {
-          setActiveStep(index);
+          handleStepChange(index);
           emblaApi?.scrollTo(index);
         }}
       />
     </Carousel.Slide>
   ));
+
+  React.useEffect(() => {
+    const stepIndex = STORY_STEPS.findIndex((step) => step.id === activeAnalysisSubPage);
+    if (stepIndex >= 0 && stepIndex !== activeStep) {
+      setActiveStep(stepIndex);
+      emblaApi?.scrollTo(stepIndex);
+    }
+  }, [activeAnalysisSubPage, activeStep, emblaApi]);
 
   return (
     <Box
@@ -1928,7 +1983,7 @@ function VisuView() {
           <Carousel
             withIndicators
             getEmblaApi={setEmblaApi}
-            onSlideChange={setActiveStep}
+            onSlideChange={handleStepChange}
             slideSize={{ base: '86%', sm: '52%', lg: '42%' }}
             slideGap="md"
             emblaOptions={{ align: 'center', slidesToScroll: 1, loop: false, containScroll: false }}
@@ -1962,30 +2017,9 @@ function VisuView() {
                   {item.title}
                 </Text>
                 {Array.isArray(item.records) && item.records.length > 0 && (
-                  <HoverCard width={320} shadow="md" openDelay={100} closeDelay={120} withinPortal>
-                    <HoverCard.Target>
-                      <ActionIcon variant="subtle" size="sm" className="analysis-kpi-info-btn" aria-label="Lückenhafte Datensätze anzeigen">
-                        <IconInfoCircle size={16} />
-                      </ActionIcon>
-                    </HoverCard.Target>
-                    <HoverCard.Dropdown>
-                      <Stack gap={4} className="analysis-kpi-tooltip-list">
-                        {item.records.map((record) => (
-                          <Anchor
-                            key={record.id}
-                            size="xs"
-                            href="#"
-                            onClick={(event) => {
-                              event.preventDefault();
-                              openDataItem(record.id);
-                            }}
-                          >
-                            {record.name} ({record.missingReasons.join(', ')})
-                          </Anchor>
-                        ))}
-                      </Stack>
-                    </HoverCard.Dropdown>
-                  </HoverCard>
+                  <ActionIcon variant="subtle" size="sm" className="analysis-kpi-info-btn" aria-label="Lückenhafte Datensätze vorhanden">
+                    <IconInfoCircle size={16} />
+                  </ActionIcon>
                 )}
               </Group>
               <Text size="lg" fw={800} className="analysis-stage-recommendation-value">
@@ -1994,6 +2028,41 @@ function VisuView() {
               <Text size="xs" className="analysis-stage-recommendation-text">
                 {item.text}
               </Text>
+
+              {Array.isArray(item.records) && item.records.length > 0 && (
+                <Stack gap={2} mt={6} className="analysis-kpi-tooltip-list">
+                  {item.records.slice(0, 4).map((record) => (
+                    <Anchor
+                      key={record.id}
+                      size="xs"
+                      href="#"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        openDataItem(record.id);
+                      }}
+                    >
+                      {record.name} ({record.missingReasons.join(', ')})
+                    </Anchor>
+                  ))}
+                  {item.records.length > 4 && (
+                    <Text size="xs" c="dimmed">+{item.records.length - 4} weitere</Text>
+                  )}
+                </Stack>
+              )}
+
+              {Array.isArray(item.groupBreakdown) && item.groupBreakdown.length > 0 && (
+                <Group gap={8} mt={6} wrap="wrap">
+                  {item.groupBreakdown.slice(0, 5).map((entry) => (
+                    <Group key={entry.id} gap={4} wrap="nowrap">
+                      {entry.icon ? <GroupIcon icon={entry.icon} size={14} /> : <IconInfoCircle size={12} />}
+                      <Text size="xs" c="dimmed">{entry.count}</Text>
+                    </Group>
+                  ))}
+                  {item.groupBreakdown.length > 5 && (
+                    <Text size="xs" c="dimmed">+{item.groupBreakdown.length - 5}</Text>
+                  )}
+                </Group>
+              )}
             </Paper>
           ))}
         </Group>

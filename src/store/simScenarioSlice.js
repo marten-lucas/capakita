@@ -1,4 +1,4 @@
-import { createSlice } from '@reduxjs/toolkit';
+import { createSelector, createSlice } from '@reduxjs/toolkit';
 import { isRecordActiveOnDate } from '../utils/financeUtils';
 
 const initialState = {
@@ -8,6 +8,8 @@ const initialState = {
   saveDialogOpen: false,
   loadDialogOpen: false,
 };
+
+const EMPTY_SELECTED_ITEM_IDS = [];
 
 function normalizeSelectedItemIds(value) {
   if (Array.isArray(value)) {
@@ -126,11 +128,16 @@ export const selectSelectedScenario = (state) => {
   return state.simScenario.scenarios.find((scenario) => String(scenario.id) === String(selectedScenarioId)) || null;
 };
 
-export const selectSelectedItemIds = (state) => {
-  const selectedScenarioId = state.simScenario.selectedScenarioId;
-  if (!selectedScenarioId) return [];
-  return normalizeSelectedItemIds(state.simScenario.selectedItems?.[selectedScenarioId]);
-};
+const selectSelectedScenarioId = (state) => state.simScenario.selectedScenarioId;
+const selectSelectedItemsByScenario = (state) => state.simScenario.selectedItems;
+
+export const selectSelectedItemIds = createSelector(
+  [selectSelectedScenarioId, selectSelectedItemsByScenario],
+  (selectedScenarioId, selectedItemsByScenario) => {
+    if (!selectedScenarioId) return EMPTY_SELECTED_ITEM_IDS;
+    return normalizeSelectedItemIds(selectedItemsByScenario?.[selectedScenarioId]);
+  }
+);
 
 export const selectPrimarySelectedItemId = (state) => {
   const ids = selectSelectedItemIds(state);
