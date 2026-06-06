@@ -7,7 +7,7 @@ import { generateHistogramTooltip } from '../../utils/chartUtils/chartUtilsHisto
 import { createColoredYAxis } from '../../utils/highchartsAxis';
 import { selectHistogramChartData } from '../../store/chartSelectors';
 
-export default function BookingHistogram() {
+export default function BookingHistogram({ compact = false }) {
   const theme = useMantineTheme();
 
   const demandColor = theme.colors.blue[6];
@@ -81,7 +81,7 @@ export default function BookingHistogram() {
   }, [chartData, demandColor, capacityPedagogicalColor, capacityAdministrativeColor]);
 
   return (
-    <Box h={{ base: 280, sm: 340, lg: 400 }}>
+    <Box h={compact ? '100%' : { base: 280, sm: 340, lg: 400 }}>
       <HighchartsReact highcharts={Highcharts} options={histogramOptions} containerProps={{ style: { height: '100%' } }} />
     </Box>
   );

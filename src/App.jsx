@@ -1,7 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { AppShell, Container } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
-import TopNav from './components/TopNav'
+import TopNav, { MobileBottomNav } from './components/TopNav'
 import AppFooter from './components/AppFooter';
 import DataView from './views/DataView'
 import VisuView from './views/VisuView'
@@ -32,6 +32,7 @@ function App() {
   const isMobile = useMediaQuery('(max-width: 48em)');
   const scenarios = useSelector(state => state.simScenario.scenarios);
   const activePage = useSelector(state => state.ui.activePage);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   
   const hasScenarios = scenarios && scenarios.length > 0;
 
@@ -53,28 +54,58 @@ function App() {
 
   // View-Komponente auswählen
   const ViewComponent = VIEW_COMPONENTS[activePage] || WelcomeView;
+  const isAnalysisPage = activePage === 'visu';
+  const isSettingsPage = activePage === 'settings';
+  const isFullWidthPage = isAnalysisPage || isSettingsPage;
+  const showDesktopNavigation = hasScenarios && !isMobile;
+  const showMobileNavigation = hasScenarios && isMobile;
+  const desktopNavbarWidth = sidebarCollapsed ? 92 : 248;
 
   return (
     <AppShell
-      header={hasScenarios ? { height: isMobile ? 68 : 64 } : undefined}
-      padding={{ base: 'xs', sm: 'md' }}
+      header={showMobileNavigation ? { height: 56 } : undefined}
+      navbar={showDesktopNavigation ? { width: desktopNavbarWidth, breakpoint: 'sm' } : undefined}
+      footer={showMobileNavigation ? { height: 74 } : undefined}
+      padding={isAnalysisPage ? 0 : { base: 'xs', sm: 'md' }}
     >
       <Notifications />
       <ScenarioSaveDialog />
       <ScenarioLoadDialog />
       
-      {hasScenarios && (
+      {showMobileNavigation && (
         <AppShell.Header>
-          <TopNav />
+          <TopNav variant="mobile-header" />
         </AppShell.Header>
       )}
 
-      <AppShell.Main>
-        <Container size="xl" px={{ base: 'xs', sm: 'md' }}>
+      {showDesktopNavigation && (
+        <AppShell.Navbar>
+          <TopNav
+            variant="sidebar"
+            sidebarCollapsed={sidebarCollapsed}
+            onToggleSidebar={() => setSidebarCollapsed((collapsed) => !collapsed)}
+          />
+        </AppShell.Navbar>
+      )}
+
+      {showMobileNavigation && (
+        <AppShell.Footer>
+          <MobileBottomNav />
+        </AppShell.Footer>
+      )}
+
+      <AppShell.Main className={isAnalysisPage ? 'app-main--analysis' : undefined}>
+        <Container
+          size={isFullWidthPage ? '100%' : 'xl'}
+          px={isAnalysisPage ? 0 : (isSettingsPage ? 0 : { base: 'xs', sm: 'md' })}
+          className={isAnalysisPage ? 'app-view-shell app-view-shell--full app-view-shell--analysis' : isSettingsPage ? 'app-view-shell app-view-shell--full' : 'app-view-shell'}
+        >
           <ViewComponent />
-          <div className="app-footer">
-            <AppFooter />
-          </div>
+          {!isAnalysisPage && (
+            <div className="app-footer">
+              <AppFooter />
+            </div>
+          )}
         </Container>
       </AppShell.Main>
     </AppShell>

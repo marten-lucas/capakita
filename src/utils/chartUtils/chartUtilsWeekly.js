@@ -23,12 +23,6 @@ function parseWeeklyCategory(value) {
   return { day, hour, minute };
 }
 
-function getWeeklyCategoryMinutes(category) {
-  const slot = parseWeeklyCategory(category);
-  if (!slot) return null;
-  return timeToMinutes(`${slot.hour}:${String(slot.minute).padStart(2, '0')}`);
-}
-
 // Hilfsfunktion für Zeitsegmente
 export function generateTimeSegments() {
   const segments = [];
@@ -67,54 +61,54 @@ export function formatWeeklyAxisLabel(value, categories = []) {
  */
 export function generateBookingDataSeries(referenceDate, filteredBookings, categories, mode = 'all') {
   // categories: e.g. ["Mo 7:00", "Mo 7:30", ...]
-  // Always return a new array, not a reference to a constant or reused array
-  const series = new Array(categories.length).fill(0);
-
-  // If categories is empty, still return a new array (not a shared constant)
   if (!categories || categories.length === 0) {
     return [];
   }
 
-  // Helper: parse category to day and time
-  function parseCategory(cat) {
-    const [day, time] = cat.split(' ');
-    return { day, time };
-  }
-
-  // Helper: check if a booking covers a category (supports nested segments)
-  function bookingCoversCategory(booking, catDay, catTime) {
-    if (!Array.isArray(booking.times)) return false;
-    // booking.times: [{ day_name: 'Mo', segments: [{ booking_start, booking_end }] }, ...]
-    const categoryMinutes = getWeeklyCategoryMinutes(`${catDay} ${catTime}`);
-    if (categoryMinutes === null) return false;
-
-    return booking.times.some(dayObj => {
-      if (dayObj.day_name !== catDay) return false;
-      if (!Array.isArray(dayObj.segments)) return false;
-      return dayObj.segments.some(seg =>
-        timeToMinutes(seg.booking_start) !== null
-        && timeToMinutes(seg.booking_end) !== null
-        && segmentMatchesMode(seg, mode)
-        && timeToMinutes(seg.booking_start) <= categoryMinutes
-        && timeToMinutes(seg.booking_end) > categoryMinutes // exclusive end
-      );
-    });
-  }
-
-  // For each category, count bookings that cover it
-  categories.forEach((cat, idx) => {
-    const { day, time } = parseCategory(cat);
-    let count = 0;
-    filteredBookings.forEach(booking => {
-      if (bookingCoversCategory(booking, day, time)) {
-        count++;
-      }
-    });
-    series[idx] = count;
+  const series = new Array(categories.length).fill(0);
+  const categoryIndex = new Map();
+  categories.forEach((category, idx) => {
+    categoryIndex.set(String(category), idx);
   });
 
-  // Always return a new array (never a reference to a constant)
-  return series.map(val => val); // Create a new array with copied values
+  // Build counts segment-wise to avoid repeated full scans per category.
+  (filteredBookings || []).forEach((booking) => {
+    if (!Array.isArray(booking?.times)) return;
+
+    booking.times.forEach((dayObj) => {
+      const dayName = dayObj?.day_name;
+      if (!dayName || !Array.isArray(dayObj?.segments)) return;
+
+      dayObj.segments.forEach((seg) => {
+        if (!segmentMatchesMode(seg, mode)) return;
+
+        const startMinutes = timeToMinutes(seg?.booking_start);
+        const endMinutes = timeToMinutes(seg?.booking_end);
+        if (startMinutes === null || endMinutes === null || endMinutes <= startMinutes) return;
+
+        // A slot minute m is covered when start <= m < end.
+        const firstSlot = Math.ceil((startMinutes - WEEKLY_SLOT_START_MINUTES) / WEEKLY_SLOT_MINUTES);
+        const lastSlot = Math.floor(((endMinutes - 1) - WEEKLY_SLOT_START_MINUTES) / WEEKLY_SLOT_MINUTES);
+
+        const boundedFirstSlot = Math.max(0, firstSlot);
+        const boundedLastSlot = Math.min(WEEKLY_SLOTS_PER_DAY - 1, lastSlot);
+        if (boundedLastSlot < boundedFirstSlot) return;
+
+        for (let slotIndex = boundedFirstSlot; slotIndex <= boundedLastSlot; slotIndex += 1) {
+          const totalMinutes = WEEKLY_SLOT_START_MINUTES + (slotIndex * WEEKLY_SLOT_MINUTES);
+          const hour = Math.floor(totalMinutes / 60);
+          const minute = totalMinutes % 60;
+          const category = `${dayName} ${hour}:${String(minute).padStart(2, '0')}`;
+          const idx = categoryIndex.get(category);
+          if (idx !== undefined) {
+            series[idx] += 1;
+          }
+        }
+      });
+    });
+  });
+
+  return [...series];
 }
 
 export function generateWeeklyChartTooltip(points, x, categories = []) {

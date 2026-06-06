@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
-import { Paper, Tabs, Box } from '@mantine/core';
-import { useMediaQuery } from '@mantine/hooks';
-import { IconCalendarEvent, IconCertificate, IconLayersIntersect, IconTools, IconUsers } from '@tabler/icons-react';
+import React from 'react';
+import { Paper, Box } from '@mantine/core';
+import { useSelector } from 'react-redux';
 import OrgaTabGroupDefs from '../components/orgaDetails/orgaTabGroupDefs';
 import OrgaTabQualificationDefs from '../components/orgaDetails/orgaTabQualificatoinDefs';
 import OrgaTabScenarioDefs from '../components/orgaDetails/orgaTabScenarioDefs';
@@ -9,60 +8,31 @@ import OrgaTabEvents from '../components/orgaDetails/orgaTabEvents';
 import OrgaTabFinance from '../components/orgaDetails/orgaTabFinance';
 
 function SettingsView() {
-  const [activeTab, setActiveTab] = useState('groups');
-  const isMobile = useMediaQuery('(max-width: 48em)');
+  const activeSubPage = useSelector((state) => state.ui.settingsSubPage || 'groups');
 
-  const handleTabChange = (value) => {
-    setActiveTab(value);
-  };
+  const panel = React.useMemo(() => {
+    switch (activeSubPage) {
+      case 'scenarios':
+        return <OrgaTabScenarioDefs />;
+      case 'groups':
+        return <OrgaTabGroupDefs />;
+      case 'qualifications':
+        return <OrgaTabQualificationDefs />;
+      case 'events':
+        return <OrgaTabEvents />;
+      case 'finance':
+        return <OrgaTabFinance />;
+      default:
+        return <OrgaTabGroupDefs />;
+    }
+  }, [activeSubPage]);
 
   return (
-    <>
-      <Paper shadow="sm" withBorder p={0}>
-        <Tabs value={activeTab} onChange={handleTabChange}>
-          <Tabs.List
-            style={{
-              overflowX: 'auto',
-              flexWrap: 'nowrap',
-            }}
-          >
-            <Tabs.Tab value="scenarios" leftSection={<IconLayersIntersect size={16} />}>
-              Szenarien
-            </Tabs.Tab>
-            <Tabs.Tab value="groups" leftSection={<IconUsers size={16} />}>
-              Gruppen
-            </Tabs.Tab>
-            <Tabs.Tab value="qualifications" leftSection={<IconCertificate size={16} />}>
-              Qualifikationen
-            </Tabs.Tab>
-            <Tabs.Tab value="events" leftSection={<IconCalendarEvent size={16} />}>
-              Ereignisse
-            </Tabs.Tab>
-            <Tabs.Tab value="finance" leftSection={<IconTools size={16} />}>
-              Finanzen
-            </Tabs.Tab>
-          </Tabs.List>
-
-          <Box p={isMobile ? 'sm' : 'md'}>
-            <Tabs.Panel value="scenarios">
-              <OrgaTabScenarioDefs />
-            </Tabs.Panel>
-            <Tabs.Panel value="groups">
-              <OrgaTabGroupDefs />
-            </Tabs.Panel>
-            <Tabs.Panel value="qualifications">
-              <OrgaTabQualificationDefs />
-            </Tabs.Panel>
-            <Tabs.Panel value="events">
-              <OrgaTabEvents />
-            </Tabs.Panel>
-            <Tabs.Panel value="finance">
-              <OrgaTabFinance />
-            </Tabs.Panel>
-          </Box>
-        </Tabs>
-      </Paper>
-    </>
+    <Paper shadow="sm" withBorder p={0}>
+      <Box px={{ base: 4, sm: 'xs' }} py={{ base: 'sm', sm: 'md' }}>
+        {panel}
+      </Box>
+    </Paper>
   );
 }
 

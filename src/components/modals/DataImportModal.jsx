@@ -129,18 +129,16 @@ function DataImportModal({ opened, onClose, title = 'Datenimport-Wizard', requir
       && (!requirePasswordConfirmation || (importPasswordConfirm && !hasPasswordMismatch))
     ))
   );
+  const contentAreaStyle = isMobile
+    ? undefined
+    : {
+      minHeight: 360,
+      maxHeight: 360,
+      overflowY: 'auto',
+      paddingRight: 4,
+    };
 
-  const handleWizardKeyDownCapture = (event) => {
-    if (event.key !== 'Enter') return;
-    if (event.defaultPrevented) return;
-    if (event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) return;
-
-    const target = event.target;
-    const tagName = target instanceof HTMLElement ? target.tagName.toLowerCase() : '';
-    if (tagName === 'button' || tagName === 'a' || tagName === 'textarea') return;
-
-    event.preventDefault();
-
+  const handlePrimaryStepAction = () => {
     if (step === 1 && canAnalyzeFile) {
       handlePrepareImport();
       return;
@@ -156,6 +154,42 @@ function DataImportModal({ opened, onClose, title = 'Datenimport-Wizard', requir
     }
   };
 
+  const handleWizardSubmit = (event) => {
+    event.preventDefault();
+    handlePrimaryStepAction();
+  };
+
+  const handleWizardKeyDownCapture = (event) => {
+    if (event.key !== 'Enter' && event.key !== 'NumpadEnter') return;
+    if (event.defaultPrevented) return;
+    if (event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) return;
+
+    const target = event.target;
+    const tagName = target instanceof HTMLElement ? target.tagName.toLowerCase() : '';
+    if (tagName === 'textarea') return;
+
+    const inputType = target instanceof HTMLInputElement ? String(target.type || '').toLowerCase() : '';
+    const isTextLikeInput = inputType === 'text'
+      || inputType === 'search'
+      || inputType === 'email'
+      || inputType === 'password'
+      || inputType === 'number'
+      || inputType === 'tel'
+      || inputType === 'url';
+    if (isTextLikeInput) return;
+
+    if (step === 2 || step === 3) {
+      event.preventDefault();
+      handlePrimaryStepAction();
+      return;
+    }
+
+    if (tagName === 'button' || tagName === 'a') return;
+
+    event.preventDefault();
+    handlePrimaryStepAction();
+  };
+
   return (
     <Modal
       opened={opened}
@@ -165,7 +199,7 @@ function DataImportModal({ opened, onClose, title = 'Datenimport-Wizard', requir
       fullScreen={isMobile}
       size={isMobile ? '100%' : 'lg'}
     >
-      <Stack onKeyDownCapture={handleWizardKeyDownCapture}>
+      <Stack component="form" onSubmit={handleWizardSubmit} onKeyDownCapture={handleWizardKeyDownCapture}>
         <SegmentedControl
           value={String(step)}
           onChange={(value) => setStep(Number(value))}
@@ -177,8 +211,9 @@ function DataImportModal({ opened, onClose, title = 'Datenimport-Wizard', requir
           fullWidth
         />
 
-        {step === 1 && (
-          <Stack>
+        <Stack style={contentAreaStyle}>
+          {step === 1 && (
+            <Stack>
             <FileButton onChange={setFile} accept=".zip,application/zip,.capakita,.enc,.txt,.json">
               {(props) => (
                 <Button {...props} leftSection={<IconUpload size={16} />} fullWidth={isMobile}>
@@ -230,24 +265,11 @@ function DataImportModal({ opened, onClose, title = 'Datenimport-Wizard', requir
               </>
             )}
 
-            <Group justify="space-between" mt="md" wrap="wrap">
-              <Button variant="subtle" onClick={onClose} fullWidth={isMobile}>
-                Abbrechen
-              </Button>
-              <Button
-                onClick={handlePrepareImport}
-                disabled={!canAnalyzeFile}
-                loading={isPreparing}
-                fullWidth={isMobile}
-              >
-                Datei analysieren
-              </Button>
-            </Group>
-          </Stack>
-        )}
+            </Stack>
+          )}
 
-        {step === 2 && (
-          <Stack>
+          {step === 2 && (
+            <Stack>
             <Paper withBorder p="md" radius="md">
               <Stack gap="sm">
                 <Text fw={600}>Merge-Strategie</Text>
@@ -263,19 +285,11 @@ function DataImportModal({ opened, onClose, title = 'Datenimport-Wizard', requir
               </Stack>
             </Paper>
 
-            <Group justify="space-between" mt="md" wrap="wrap">
-              <Button variant="subtle" onClick={() => setStep(1)} fullWidth={isMobile}>
-                Zurück
-              </Button>
-              <Button onClick={() => setStep(3)} disabled={!canContinueToStep3} fullWidth={isMobile}>
-                Weiter zur Vorschau
-              </Button>
-            </Group>
-          </Stack>
-        )}
+            </Stack>
+          )}
 
-        {step === 3 && (
-          <Stack>
+          {step === 3 && (
+            <Stack>
             <Paper withBorder p="md" radius="md">
               {!preview?.supported ? (
                 <Group gap="xs" c="red">
@@ -370,16 +384,50 @@ function DataImportModal({ opened, onClose, title = 'Datenimport-Wizard', requir
 
             <Divider />
 
-            <Group justify="space-between" mt="sm" wrap="wrap">
-              <Button variant="subtle" onClick={() => setStep(2)} fullWidth={isMobile}>
+            </Stack>
+          )}
+        </Stack>
+
+        <Group justify="space-between" wrap="wrap">
+          {step === 1 && (
+            <>
+              <Button type="button" variant="subtle" onClick={onClose} fullWidth={isMobile}>
+                Abbrechen
+              </Button>
+              <Button
+                type="submit"
+                onClick={handlePrepareImport}
+                disabled={!canAnalyzeFile}
+                loading={isPreparing}
+                fullWidth={isMobile}
+              >
+                Datei analysieren
+              </Button>
+            </>
+          )}
+
+          {step === 2 && (
+            <>
+              <Button type="button" variant="subtle" onClick={() => setStep(1)} fullWidth={isMobile}>
                 Zurück
               </Button>
-              <Button onClick={handleApplyImport} loading={isApplying} disabled={!canImport || isApplying} fullWidth={isMobile}>
+              <Button type="submit" onClick={() => setStep(3)} disabled={!canContinueToStep3} fullWidth={isMobile}>
+                Weiter zur Vorschau
+              </Button>
+            </>
+          )}
+
+          {step === 3 && (
+            <>
+              <Button type="button" variant="subtle" onClick={() => setStep(2)} fullWidth={isMobile}>
+                Zurück
+              </Button>
+              <Button type="submit" onClick={handleApplyImport} loading={isApplying} disabled={!canImport || isApplying} fullWidth={isMobile}>
                 Import ausführen
               </Button>
-            </Group>
-          </Stack>
-        )}
+            </>
+          )}
+        </Group>
       </Stack>
     </Modal>
   );

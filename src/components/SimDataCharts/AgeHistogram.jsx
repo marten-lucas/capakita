@@ -6,7 +6,7 @@ import { useSelector } from 'react-redux';
 import { createColoredYAxis } from '../../utils/highchartsAxis';
 import { selectAgeHistogramChartData } from '../../store/chartSelectors';
 
-export default function AgeHistogram() {
+export default function AgeHistogram({ compact = false }) {
   const theme = useMantineTheme();
   const chartData = useSelector(selectAgeHistogramChartData);
 
@@ -41,7 +41,7 @@ export default function AgeHistogram() {
   }), [chartData, theme.colors.indigo]);
 
   return (
-    <Box h={{ base: 280, sm: 340, lg: 400 }}>
+    <Box h={compact ? '100%' : { base: 280, sm: 340, lg: 400 }}>
       <HighchartsReact highcharts={Highcharts} options={options} containerProps={{ style: { height: '100%' } }} />
     </Box>
   );

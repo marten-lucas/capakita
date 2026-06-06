@@ -20,3 +20,30 @@ if (typeof window.matchMedia !== 'function') {
 		dispatchEvent: () => false,
 	});
 }
+
+if (typeof window.IntersectionObserver !== 'function') {
+	class IntersectionObserverMock {
+		constructor() {}
+		disconnect() {}
+		observe() {}
+		unobserve() {}
+		takeRecords() {
+			return [];
+		}
+	}
+
+	window.IntersectionObserver = IntersectionObserverMock;
+	globalThis.IntersectionObserver = IntersectionObserverMock;
+}
+
+if (typeof window.ResizeObserver !== 'function') {
+	class ResizeObserverMock {
+		constructor() {}
+		disconnect() {}
+		observe() {}
+		unobserve() {}
+	}
+
+	window.ResizeObserver = ResizeObserverMock;
+	globalThis.ResizeObserver = ResizeObserverMock;
+}

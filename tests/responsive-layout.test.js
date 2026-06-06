@@ -244,8 +244,9 @@ test('all main app pages remain usable without horizontal overflow', async ({ pa
   await expectLayoutScreenshot(page, 'responsive-data-view.png');
 
   await openMainPage(page, 'Analyse');
-  await expect(page.getByRole('heading', { name: 'Regelbetrieb' })).toBeVisible();
-  await expect(page.getByText('Filter', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('analysis-clean-sheet')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Datenqualität' })).toBeVisible();
+  await expect(page.getByTestId('story-card-quality')).toHaveAttribute('data-active', 'true');
   await expectNoHorizontalOverflow(page, 'analysis view');
   await expectLayoutScreenshot(page, 'responsive-analysis-view.png');
 
@@ -257,12 +258,13 @@ test('all main app pages remain usable without horizontal overflow', async ({ pa
 
   await openMainPage(page, 'Ereignisse');
   await expect(page.getByText('Ereignisse', { exact: true }).first()).toBeVisible();
-  await expect(page.getByText(/Kind Mobil beginnt Anwesenheit/i)).toBeVisible();
+  await expect(page.getByTestId('events-timeline-toggle')).toBeVisible();
+  await expect(page.getByText('Gefiltert:', { exact: false })).toBeVisible();
   await expectNoHorizontalOverflow(page, 'events view');
   await expectLayoutScreenshot(page, 'responsive-events-view.png');
 
   await openMainPage(page, 'Analyse');
-  await expect(page.getByTestId('analysis-storyflow-view')).toBeVisible();
+  await expect(page.getByTestId('analysis-clean-sheet')).toBeVisible();
 });
 
 test('modals and finance forms stay usable across viewports', async ({ page }) => {

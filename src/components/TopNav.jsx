@@ -1,10 +1,9 @@
 import React from 'react';
-import { Group, Button, Text, Menu, ActionIcon, Container, Select, Box, Switch, Modal, Alert, Stack, Checkbox } from '@mantine/core';
-import { useMediaQuery } from '@mantine/hooks';
+import { Alert, Button, Text, Menu, ActionIcon, Select, Box, Switch, Modal, Stack, Checkbox, Group, UnstyledButton } from '@mantine/core';
 import { useSelector, useDispatch, useStore } from 'react-redux';
 import { isSaveAllowed, setSaveDialogOpen, setLoadDialogOpen, setSelectedScenarioId } from '../store/simScenarioSlice';
-import { setActivePage, setBrowserAutoSaveEnabled } from '../store/uiSlice';
-import { IconDatabase, IconChartBar, IconSettings, IconDotsVertical, IconUpload, IconDeviceFloppy, IconFolderOpen, IconCalendarEvent, IconInfoCircle, IconRefresh, IconTrash } from '@tabler/icons-react';
+import { setActivePage, setBrowserAutoSaveEnabled, setSettingsSubPage } from '../store/uiSlice';
+import { IconDatabase, IconChartBar, IconSettings, IconDotsVertical, IconUpload, IconDeviceFloppy, IconFolderOpen, IconCalendarEvent, IconInfoCircle, IconRefresh, IconTrash, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconLayersIntersect, IconUsers, IconCertificate, IconTools } from '@tabler/icons-react';
 import { refreshEventsForScenario, clearEventOverridesForScenario } from '../store/eventSlice';
 import { updateDatesOfInterest } from '../store/datesOfInterestSlice';
 import { loadBookingsByScenario } from '../store/simBookingSlice';
@@ -15,13 +14,109 @@ import { loadFinanceByScenario } from '../store/simFinanceSlice';
 import { buildScenarioCleanupResult } from '../utils/scenarioCleanup';
 import DataImportModal from './modals/DataImportModal';
 
-function TopNav() {
+const NAV_ITEMS = [
+  { value: 'data', label: 'Daten', icon: IconDatabase },
+  { value: 'visu', label: 'Analyse', icon: IconChartBar },
+  {
+    value: 'settings',
+    label: 'Optionen',
+    icon: IconSettings,
+    subItems: [
+      { value: 'scenarios', label: 'Szenarien', icon: IconLayersIntersect },
+      { value: 'groups', label: 'Gruppen', icon: IconUsers },
+      { value: 'qualifications', label: 'Qualifikationen', icon: IconCertificate },
+      { value: 'events', label: 'Ereignisse', icon: IconCalendarEvent },
+      { value: 'finance', label: 'Finanzen', icon: IconTools },
+    ],
+  },
+  { value: 'events', label: 'Ereignisse', icon: IconCalendarEvent },
+];
+
+function NavigationItem({ item, active, compact = false, collapsed = false, onClick }) {
+  const Icon = item.icon;
+
+  return (
+    <UnstyledButton
+      type="button"
+      onClick={onClick}
+      className={`app-nav-item ${active ? 'is-active' : ''} ${compact ? 'is-compact' : ''} ${collapsed ? 'is-collapsed' : ''}`}
+      aria-current={active ? 'page' : undefined}
+      title={collapsed ? item.label : undefined}
+      aria-label={collapsed ? item.label : undefined}
+    >
+      <Icon size={compact ? 18 : 20} stroke={1.8} />
+      <Text className="app-nav-item-label" size={compact ? 'xs' : 'sm'} fw={active ? 700 : 600}>
+        {item.label}
+      </Text>
+    </UnstyledButton>
+  );
+}
+
+function ActionMenu({
+  browserAutoSaveEnabled,
+  canSave,
+  handleAutoSaveToggle,
+  onImport,
+  onSave,
+  onLoad,
+  onCleanup,
+}) {
+  return (
+    <Menu shadow="md" width={220} position="bottom-end">
+      <Menu.Target>
+        <ActionIcon variant="subtle" size="lg" aria-label="Aktionen">
+          <IconDotsVertical size={20} />
+        </ActionIcon>
+      </Menu.Target>
+
+      <Menu.Dropdown>
+        <Menu.Label>Aktionen</Menu.Label>
+        <Menu.Item
+          leftSection={<IconInfoCircle size={16} />}
+          disabled={!canSave && !browserAutoSaveEnabled}
+          onClick={() => handleAutoSaveToggle(!browserAutoSaveEnabled)}
+        >
+          <Group justify="space-between" w="100%" wrap="nowrap" gap="md">
+            <Stack gap={0} miw={0}>
+              <Text size="sm">Auto-Save im Browser</Text>
+              {!canSave && (
+                <Text size="xs" c="dimmed">
+                  Nur für anonymisierte Imports
+                </Text>
+              )}
+            </Stack>
+            <Switch checked={browserAutoSaveEnabled} readOnly size="xs" />
+          </Group>
+        </Menu.Item>
+        <Menu.Item leftSection={<IconUpload size={16} />} onClick={onImport}>
+          Adebis Import
+        </Menu.Item>
+        <Menu.Item leftSection={<IconDeviceFloppy size={16} />} onClick={onSave}>
+          Szenario speichern
+        </Menu.Item>
+        <Menu.Item leftSection={<IconFolderOpen size={16} />} onClick={onLoad}>
+          Szenario laden
+        </Menu.Item>
+        <Menu.Divider />
+        <Menu.Item
+          leftSection={<IconTrash size={16} />}
+          rightSection={<IconRefresh size={14} />}
+          onClick={onCleanup}
+        >
+          Bereinigen / neu berechnen
+        </Menu.Item>
+      </Menu.Dropdown>
+    </Menu>
+  );
+}
+
+function TopNav({ variant = 'sidebar', sidebarCollapsed = false, onToggleSidebar }) {
   const dispatch = useDispatch();
-  const isTablet = useMediaQuery('(max-width: 75em)');
-  const isMobile = useMediaQuery('(max-width: 48em)');
   const canSave = useSelector(isSaveAllowed);
   const scenarios = useSelector((state) => state.simScenario.scenarios);
   const selectedScenarioId = useSelector((state) => state.simScenario.selectedScenarioId);
+  const activePage = useSelector((state) => state.ui.activePage);
+  const activeSettingsSubPage = useSelector((state) => state.ui.settingsSubPage || 'groups');
   const browserAutoSaveEnabled = useSelector((state) => state.ui.browserAutoSaveEnabled);
   const store = useStore();
   const [importModalOpen, setImportModalOpen] = React.useState(false);
@@ -107,23 +202,68 @@ function TopNav() {
     setCleanupModalOpen(false);
   };
 
-  const navButtonProps = {
-    variant: 'subtle',
-    size: isMobile ? 'xs' : 'sm',
-    px: isTablet ? 'xs' : 'sm',
-    style: { flexShrink: 0 },
-  };
+  const openActionMenu = (
+    <ActionMenu
+      browserAutoSaveEnabled={browserAutoSaveEnabled}
+      canSave={canSave}
+      handleAutoSaveToggle={handleAutoSaveToggle}
+      onImport={() => setImportModalOpen(true)}
+      onSave={() => dispatch(setSaveDialogOpen(true))}
+      onLoad={() => dispatch(setLoadDialogOpen(true))}
+      onCleanup={() => setCleanupModalOpen(true)}
+    />
+  );
+
+  const navigation = (
+    <Stack gap="xs">
+      {NAV_ITEMS.map((item) => (
+        <Stack key={item.value} gap={4}>
+          <NavigationItem
+            item={item}
+            active={activePage === item.value}
+            collapsed={variant === 'sidebar' && sidebarCollapsed}
+            onClick={() => {
+              dispatch(setActivePage(item.value));
+              if (item.value === 'settings' && !activeSettingsSubPage) {
+                dispatch(setSettingsSubPage('groups'));
+              }
+            }}
+          />
+
+          {variant === 'sidebar' && !sidebarCollapsed && item.value === 'settings' && activePage === 'settings' && Array.isArray(item.subItems) && (
+            <Stack gap={2} className="app-nav-submenu">
+              {item.subItems.map((subItem) => (
+                <UnstyledButton
+                  key={subItem.value}
+                  className={`app-nav-subitem ${activeSettingsSubPage === subItem.value ? 'is-active' : ''}`}
+                  onClick={() => {
+                    dispatch(setActivePage('settings'));
+                    dispatch(setSettingsSubPage(subItem.value));
+                  }}
+                >
+                  <subItem.icon size={14} stroke={1.8} />
+                  <Text size="xs" fw={activeSettingsSubPage === subItem.value ? 700 : 600}>
+                    {subItem.label}
+                  </Text>
+                </UnstyledButton>
+              ))}
+            </Stack>
+          )}
+        </Stack>
+      ))}
+    </Stack>
+  );
 
   return (
-    <Container fluid px={{ base: 'xs', sm: 'md' }} h="100%">
-      <Group justify="space-between" h="100%" wrap="nowrap" align="center">
-        <Text size="xl" fw={700} variant="gradient" gradient={{ from: 'blue', to: 'cyan' }} style={{ flexShrink: 0 }}>
-          CapaKita
-        </Text>
+    <>
+      {variant === 'mobile-header' ? (
+        <Box className="app-mobile-topbar">
+          <Group justify="space-between" align="center" wrap="nowrap" h="100%" gap="sm">
+            <Text className="app-mobile-brand" fw={700}>
+              CapaKita
+            </Text>
 
-        <Group wrap="nowrap" align="center" style={{ flex: 1, minWidth: 0, justifyContent: 'flex-end' }}>
-          <Box style={{ flex: 1, minWidth: 0, overflowX: 'auto', overflowY: 'hidden' }}>
-            <Group gap="xs" wrap="nowrap" align="center" style={{ minWidth: 'max-content', marginLeft: 'auto', width: 'max-content' }}>
+            <Group wrap="nowrap" gap="xs" style={{ flex: 1, minWidth: 0, justifyContent: 'flex-end' }}>
               {showScenarioSelector && (
                 <Select
                   aria-label="Szenario auswählen"
@@ -132,126 +272,112 @@ function TopNav() {
                   value={selectedScenarioId ? String(selectedScenarioId) : null}
                   onChange={(value) => value && dispatch(setSelectedScenarioId(value))}
                   allowDeselect={false}
-                  w={isMobile ? 170 : isTablet ? 220 : 280}
-                  size="sm"
+                  size="xs"
+                  className="app-mobile-scenario-select"
                 />
               )}
-              <Button
-                onClick={() => dispatch(setActivePage('data'))}
-                leftSection={<IconDatabase size={20} />}
-                {...navButtonProps}
-              >
-                Daten
-              </Button>
-              <Button
-                onClick={() => dispatch(setActivePage('visu'))}
-                leftSection={<IconChartBar size={20} />}
-                {...navButtonProps}
-              >
-                Analyse
-              </Button>
-              <Button
-                onClick={() => dispatch(setActivePage('settings'))}
-                leftSection={<IconSettings size={20} />}
-                {...navButtonProps}
-              >
-                Optionen
-              </Button>
-              <Button
-                onClick={() => dispatch(setActivePage('events'))}
-                leftSection={<IconCalendarEvent size={20} />}
-                {...navButtonProps}
-              >
-                Ereignisse
-              </Button>
+              {openActionMenu}
             </Group>
-          </Box>
-
-          {!isMobile && (
-            <Group gap="xs" wrap="nowrap" className="topnav-quick-actions">
-              <Button
-                variant="light"
+          </Group>
+        </Box>
+      ) : (
+        <Box className={`app-sidebar ${sidebarCollapsed ? 'is-collapsed' : ''}`}>
+          <Stack gap="lg" className="app-sidebar-stack">
+            <Group justify="space-between" align="flex-start" wrap="nowrap" gap="xs">
+              <div className="app-sidebar-brand-wrap">
+                <Text className="app-sidebar-brand" fw={800}>
+                  {sidebarCollapsed ? 'CK' : 'CapaKita'}
+                </Text>
+                {!sidebarCollapsed && (
+                  <Text size="xs" c="dimmed" mt={4}>
+                    Arbeitsbereiche
+                  </Text>
+                )}
+              </div>
+              <ActionIcon
+                variant="subtle"
                 size="sm"
-                leftSection={<IconUpload size={16} />}
-                onClick={() => setImportModalOpen(true)}
+                onClick={onToggleSidebar}
+                aria-label={sidebarCollapsed ? 'Seitenleiste ausklappen' : 'Seitenleiste einklappen'}
+                title={sidebarCollapsed ? 'Ausklappen' : 'Einklappen'}
               >
-                Import
-              </Button>
-              <Button
-                variant="light"
-                size="sm"
-                leftSection={<IconFolderOpen size={16} />}
-                onClick={() => dispatch(setLoadDialogOpen(true))}
-              >
-                Laden
-              </Button>
-              <Button
-                variant="light"
-                size="sm"
-                leftSection={<IconTrash size={16} />}
-                onClick={() => setCleanupModalOpen(true)}
-              >
-                Bereinigen
-              </Button>
+                {sidebarCollapsed ? <IconLayoutSidebarLeftExpand size={16} /> : <IconLayoutSidebarLeftCollapse size={16} />}
+              </ActionIcon>
             </Group>
-          )}
 
-          <Menu shadow="md" width={200}>
-              <Menu.Target>
-                <ActionIcon variant="subtle" size="lg" aria-label="Aktionen">
-                  <IconDotsVertical size={20} />
-                </ActionIcon>
-              </Menu.Target>
+            {!sidebarCollapsed && showScenarioSelector && (
+              <Select
+                aria-label="Szenario auswählen"
+                placeholder="Szenario wählen"
+                data={scenarioOptions}
+                value={selectedScenarioId ? String(selectedScenarioId) : null}
+                onChange={(value) => value && dispatch(setSelectedScenarioId(value))}
+                allowDeselect={false}
+                size="sm"
+              />
+            )}
 
-              <Menu.Dropdown>
-                <Menu.Label>Aktionen</Menu.Label>
-                <Menu.Item
-                  leftSection={<IconInfoCircle size={16} />}
-                  disabled={!canSave && !browserAutoSaveEnabled}
-                  onClick={() => handleAutoSaveToggle(!browserAutoSaveEnabled)}
-                >
-                  <Group justify="space-between" w="100%" wrap="nowrap" gap="md">
-                    <Stack gap={0} miw={0}>
-                      <Text size="sm">Auto-Save im Browser</Text>
-                      {!canSave && (
-                        <Text size="xs" c="dimmed">
-                          Nur für anonymisierte Imports
-                        </Text>
-                      )}
-                    </Stack>
-                    <Switch checked={browserAutoSaveEnabled} readOnly size="xs" />
-                  </Group>
-                </Menu.Item>
-                <Menu.Item
-                  leftSection={<IconUpload size={16} />}
-                  onClick={() => setImportModalOpen(true)}
-                >
-                  Adebis Import
-                </Menu.Item>
-                <Menu.Item
-                  leftSection={<IconDeviceFloppy size={16} />}
-                  onClick={() => dispatch(setSaveDialogOpen(true))}
-                >
-                  Szenario speichern
-                </Menu.Item>
-                <Menu.Item
-                  leftSection={<IconFolderOpen size={16} />}
-                  onClick={() => dispatch(setLoadDialogOpen(true))}
-                >
-                  Szenario laden
-                </Menu.Item>
-                <Menu.Divider />
-                <Menu.Item
-                  leftSection={<IconTrash size={16} />}
-                  rightSection={<IconRefresh size={14} />}
-                  onClick={() => setCleanupModalOpen(true)}
-                >
-                  Bereinigen / neu berechnen
-                </Menu.Item>
-              </Menu.Dropdown>
-            </Menu>
-        </Group>
-      </Group>
+            {navigation}
+
+            <Box className="app-sidebar-spacer" />
+
+            <Stack gap="xs">
+              {!sidebarCollapsed ? (
+                <>
+                  <Button
+                    variant="light"
+                    size="sm"
+                    fullWidth
+                    justify="flex-start"
+                    leftSection={<IconUpload size={16} />}
+                    onClick={() => setImportModalOpen(true)}
+                  >
+                    Import
+                  </Button>
+                  <Button
+                    variant="light"
+                    size="sm"
+                    fullWidth
+                    justify="flex-start"
+                    leftSection={<IconFolderOpen size={16} />}
+                    onClick={() => dispatch(setLoadDialogOpen(true))}
+                  >
+                    Laden
+                  </Button>
+                  <Button
+                    variant="light"
+                    size="sm"
+                    fullWidth
+                    justify="flex-start"
+                    leftSection={<IconTrash size={16} />}
+                    onClick={() => setCleanupModalOpen(true)}
+                  >
+                    Bereinigen
+                  </Button>
+                </>
+              ) : (
+                <Group justify="center" gap="xs" wrap="nowrap">
+                  <ActionIcon variant="light" size="lg" onClick={() => setImportModalOpen(true)} aria-label="Import" title="Import">
+                    <IconUpload size={16} />
+                  </ActionIcon>
+                  <ActionIcon variant="light" size="lg" onClick={() => dispatch(setLoadDialogOpen(true))} aria-label="Laden" title="Laden">
+                    <IconFolderOpen size={16} />
+                  </ActionIcon>
+                </Group>
+              )}
+
+              <Group justify="space-between" align="center" wrap="nowrap" className="app-sidebar-menu-row">
+                {!sidebarCollapsed && (
+                  <Text size="xs" c="dimmed">
+                    Weitere Aktionen
+                  </Text>
+                )}
+                {openActionMenu}
+              </Group>
+            </Stack>
+          </Stack>
+        </Box>
+      )}
 
       <DataImportModal opened={importModalOpen} onClose={() => setImportModalOpen(false)} />
 
@@ -311,7 +437,41 @@ function TopNav() {
           </Group>
         </Stack>
       </Modal>
-    </Container>
+    </>
+  );
+}
+
+export function MobileBottomNav() {
+  const dispatch = useDispatch();
+  const activePage = useSelector((state) => state.ui.activePage);
+  const activeSettingsSubPage = useSelector((state) => state.ui.settingsSubPage || 'groups');
+
+  const mobileItems = React.useMemo(
+    () => NAV_ITEMS.map((item) => {
+      if (item.value !== 'settings') return item;
+      const activeSub = item.subItems?.find((entry) => entry.value === activeSettingsSubPage);
+      return {
+        ...item,
+        label: activeSub ? `Optionen: ${activeSub.label}` : item.label,
+      };
+    }),
+    [activeSettingsSubPage]
+  );
+
+  return (
+    <Box className="app-mobile-bottomnav">
+      <Group grow align="stretch" gap={0} wrap="nowrap" h="100%">
+        {mobileItems.map((item) => (
+          <NavigationItem
+            key={item.value}
+            item={item}
+            compact
+            active={activePage === item.value}
+            onClick={() => dispatch(setActivePage(item.value))}
+          />
+        ))}
+      </Group>
+    </Box>
   );
 }
 

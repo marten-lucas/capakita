@@ -1,11 +1,10 @@
 import React from 'react';
-import { Paper, Stack, Text, Group, Checkbox, MultiSelect, Select, Button, Box } from '@mantine/core';
+import { Paper, Stack, Text, Group, MultiSelect, Select, Button, Box, Badge, NumberInput } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { IconChevronDown, IconChevronUp } from '@tabler/icons-react';
 import { useSelector, useDispatch } from 'react-redux';
 import {
   setTimedimension,
-  setChartToggles,
   setFilterGroups,
   setFilterQualifications,
   ensureScenario,
@@ -13,13 +12,23 @@ import {
 import { useOverlayData } from '../../hooks/useOverlayData';
 import EventPicker from '../EventCalendar/EventPicker';
 
-const DEFAULT_CHART_TOGGLES = ['weekly', 'midterm', 'ageHistogram', 'histogram'];
 const EMPTY_SELECTION = [];
 
-function ChartFilterForm({ showStichtag = false, scenarioId, onTimedimensionChange }) {
+function ChartFilterForm({
+  showStichtag = false,
+  scenarioId,
+  onTimedimensionChange,
+  compactBar = false,
+  groupsOnly = false,
+  showMonteCarloControls = false,
+  monteCarloParams = null,
+  onMonteCarloParamsChange,
+  onRerunMonteCarlo,
+  isMonteCarloRunning = false,
+}) {
   const dispatch = useDispatch();
   const isMobile = useMediaQuery('(max-width: 62em)');
-  const [filtersOpen, setFiltersOpen] = React.useState(true);
+  const [filtersOpen, setFiltersOpen] = React.useState(false);
 
   React.useEffect(() => {
     if (scenarioId) {
@@ -28,12 +37,14 @@ function ChartFilterForm({ showStichtag = false, scenarioId, onTimedimensionChan
   }, [dispatch, scenarioId]);
 
   const chartState = useSelector((state) => state.chart[scenarioId] ?? null);
-  
-  // Memoize selections to prevent new references every render
+
   const timedimension = React.useMemo(() => chartState?.timedimension || 'month', [chartState?.timedimension]);
-  const chartToggles = React.useMemo(() => chartState?.chartToggles || DEFAULT_CHART_TOGGLES, [chartState?.chartToggles]);
   const selectedGroups = React.useMemo(() => chartState?.filter?.Groups || EMPTY_SELECTION, [chartState?.filter?.Groups]);
-  const selectedQualifications = React.useMemo(() => chartState?.filter?.Qualifications || EMPTY_SELECTION, [chartState?.filter?.Qualifications]);
+  const selectedQualifications = React.useMemo(
+    () => chartState?.filter?.Qualifications || EMPTY_SELECTION,
+    [chartState?.filter?.Qualifications]
+  );
+
   const { getEffectiveGroupDefs, getEffectiveQualificationDefs } = useOverlayData();
   const groupDefs = getEffectiveGroupDefs();
   const qualificationDefs = getEffectiveQualificationDefs();
@@ -64,6 +75,7 @@ function ChartFilterForm({ showStichtag = false, scenarioId, onTimedimensionChan
   }, [dispatch, scenarioId, selectedGroups.length, groupOptions]);
 
   React.useEffect(() => {
+    if (groupsOnly) return;
     if (scenarioId && selectedQualifications.length === 0 && qualificationOptions.length > 0) {
       dispatch(
         setFilterQualifications({
@@ -72,13 +84,16 @@ function ChartFilterForm({ showStichtag = false, scenarioId, onTimedimensionChan
         })
       );
     }
-  }, [dispatch, scenarioId, selectedQualifications.length, qualificationOptions]);
+  }, [dispatch, scenarioId, selectedQualifications.length, qualificationOptions, groupsOnly]);
 
   return (
-    <Paper withBorder p="md">
-      <Stack gap="md">
+    <Paper withBorder={!compactBar} p={compactBar ? 'xs' : 'md'} className={compactBar ? 'analysis-filter-compact-shell' : undefined}>
+      <Stack gap={compactBar ? 'xs' : 'md'}>
         <Group justify="space-between" align="center">
-          <Text fw={600}>Filter</Text>
+          <Group gap="xs">
+            <Text fw={600}>Kontextfilter</Text>
+            {!compactBar && <Badge variant="light" size="sm">dezent</Badge>}
+          </Group>
           <Button
             variant="subtle"
             size="compact-sm"
@@ -94,62 +109,120 @@ function ChartFilterForm({ showStichtag = false, scenarioId, onTimedimensionChan
         {filtersOpen && (
           <Box data-testid="analysis-filter-content">
             <Stack gap="md">
-              <Checkbox.Group
-                value={chartToggles}
-                onChange={(value) => dispatch(setChartToggles({ scenarioId, toggles: value }))}
-              >
-                <Group wrap="wrap">
-                  <Checkbox value="weekly" label="Regelbetrieb" />
-                  <Checkbox value="midterm" label="Langzeit" />
-                  <Checkbox value="ageHistogram" label="Alters-Histogramm" />
-                  <Checkbox value="histogram" label="Buchungsverteilung" />
-                </Group>
-              </Checkbox.Group>
-
               <Group align="flex-start" grow={!isMobile} wrap={isMobile ? 'wrap' : 'nowrap'}>
-              <MultiSelect
-                label="Gruppen"
-                data={groupOptions}
-                value={selectedGroups}
-                onChange={(value) => dispatch(setFilterGroups({ scenarioId, groups: value }))}
-                searchable
-                clearable
-                w={isMobile ? '100%' : undefined}
-              />
-
-              <MultiSelect
-                label="Qualifikationen"
-                data={qualificationOptions}
-                value={selectedQualifications}
-                onChange={(value) => dispatch(setFilterQualifications({ scenarioId, qualifications: value }))}
-                searchable
-                clearable
-                w={isMobile ? '100%' : undefined}
-              />
-
-              {chartToggles.includes('midterm') && (
-                <Select
-                  label="Zeitdimension"
-                  data={[
-                    { value: 'week', label: 'Woche' },
-                    { value: 'month', label: 'Monat' },
-                    { value: 'quarter', label: 'Quartal' },
-                    { value: 'year', label: 'Jahr' },
-                  ]}
-                  value={timedimension}
-                  onChange={(value) => {
-                    if (!value) return;
-                    dispatch(setTimedimension({ scenarioId, timedimension: value }));
-                    onTimedimensionChange?.(value);
-                  }}
+                <MultiSelect
+                  label="Gruppen"
+                  data={groupOptions}
+                  value={selectedGroups}
+                  onChange={(value) => dispatch(setFilterGroups({ scenarioId, groups: value }))}
+                  searchable
+                  clearable
+                  size={compactBar ? 'xs' : 'sm'}
                   w={isMobile ? '100%' : undefined}
                 />
-              )}
+
+                {!groupsOnly && (
+                  <MultiSelect
+                    label="Qualifikationen"
+                    data={qualificationOptions}
+                    value={selectedQualifications}
+                    onChange={(value) => dispatch(setFilterQualifications({ scenarioId, qualifications: value }))}
+                    searchable
+                    clearable
+                    size={compactBar ? 'xs' : 'sm'}
+                    w={isMobile ? '100%' : undefined}
+                  />
+                )}
+
+                {!groupsOnly && (
+                  <Select
+                    label="Zeitdimension"
+                    data={[
+                      { value: 'week', label: 'Woche' },
+                      { value: 'month', label: 'Monat' },
+                      { value: 'quarter', label: 'Quartal' },
+                      { value: 'year', label: 'Jahr' },
+                    ]}
+                    value={timedimension}
+                    onChange={(value) => {
+                      if (!value) return;
+                      dispatch(setTimedimension({ scenarioId, timedimension: value }));
+                      onTimedimensionChange?.(value);
+                    }}
+                    size={compactBar ? 'xs' : 'sm'}
+                    w={isMobile ? '100%' : undefined}
+                  />
+                )}
               </Group>
 
-            {showStichtag && (chartToggles.includes('weekly') || chartToggles.includes('histogram')) && (
-              <EventPicker scenarioId={scenarioId} />
-            )}
+              {!groupsOnly && showStichtag && <EventPicker scenarioId={scenarioId} />}
+
+              {showMonteCarloControls && monteCarloParams && (
+                <Stack gap="xs" data-testid="analysis-monte-carlo-controls">
+                  <Text fw={600} size={compactBar ? 'xs' : 'sm'}>Monte-Carlo</Text>
+                  <Group align="flex-end" grow={!isMobile} wrap={isMobile ? 'wrap' : 'nowrap'}>
+                    <NumberInput
+                      label="Läufe"
+                      value={monteCarloParams.runs}
+                      min={100}
+                      max={10000}
+                      step={100}
+                      onChange={(value) => {
+                        const nextValue = Number(value);
+                        if (!Number.isFinite(nextValue)) return;
+                        onMonteCarloParamsChange?.({
+                          ...monteCarloParams,
+                          runs: Math.max(100, Math.min(10000, Math.round(nextValue))),
+                        });
+                      }}
+                      size={compactBar ? 'xs' : 'sm'}
+                      w={isMobile ? '100%' : undefined}
+                    />
+                    <NumberInput
+                      label="Ausfallrate (%)"
+                      value={monteCarloParams.absenceRatePct}
+                      min={1}
+                      max={80}
+                      step={1}
+                      onChange={(value) => {
+                        const nextValue = Number(value);
+                        if (!Number.isFinite(nextValue)) return;
+                        onMonteCarloParamsChange?.({
+                          ...monteCarloParams,
+                          absenceRatePct: Math.max(1, Math.min(80, Math.round(nextValue))),
+                        });
+                      }}
+                      size={compactBar ? 'xs' : 'sm'}
+                      w={isMobile ? '100%' : undefined}
+                    />
+                    <NumberInput
+                      label="Max. gleichz. Ausfälle"
+                      value={monteCarloParams.maxConcurrentOutages}
+                      min={1}
+                      max={12}
+                      step={1}
+                      onChange={(value) => {
+                        const nextValue = Number(value);
+                        if (!Number.isFinite(nextValue)) return;
+                        onMonteCarloParamsChange?.({
+                          ...monteCarloParams,
+                          maxConcurrentOutages: Math.max(1, Math.min(12, Math.round(nextValue))),
+                        });
+                      }}
+                      size={compactBar ? 'xs' : 'sm'}
+                      w={isMobile ? '100%' : undefined}
+                    />
+                    <Button
+                      onClick={() => onRerunMonteCarlo?.()}
+                      loading={isMonteCarloRunning}
+                      size={compactBar ? 'xs' : 'sm'}
+                      variant="light"
+                    >
+                      Simulation wiederholen
+                    </Button>
+                  </Group>
+                </Stack>
+              )}
             </Stack>
           </Box>
         )}
