@@ -25,11 +25,12 @@ import { useDispatch, useSelector } from 'react-redux';
 import { setActivePage, setAnalysisSubPage } from '../store/uiSlice';
 import { setSelectedItem, setSelectedItems } from '../store/simScenarioSlice';
 import { ensureScenario } from '../store/chartSlice';
+import { selectWeeklyChartData } from '../store/chartSelectors';
 import { useOverlayData } from '../hooks/useOverlayData';
 import { calculateScenarioMonthlyFinance, isDateWithinRange, isRecordActiveOnDate, resolveGroupIdAtDate } from '../utils/financeUtils';
 import { buildOverlayAwareData } from '../utils/overlayUtils';
 import { shouldIncludeDataItemInAnalysis } from '../utils/dataVisibility';
-import { filterBookings } from '../utils/chartUtils/chartUtils';
+import { filterBookings, generateCareRatioSeries } from '../utils/chartUtils/chartUtils';
 import { generateBookingDataSeries, generateTimeSegments, formatWeeklyAxisLabel } from '../utils/chartUtils/chartUtilsWeekly';
 import {
   IconChevronLeft,
@@ -75,6 +76,17 @@ const ANALYSIS_LOADING_STAGES = [
     weight: 20,
   },
 ];
+
+const LEGAL_EXPERT_RATIO_MIN_PCT = 50;
+const SLOT_HOURS = 0.5;
+const MONTHS_PER_WEEK = 4.33;
+const MONTHLY_HOURS_PER_FTE = 160;
+
+const HEATMAP_MODES = {
+  UNWEIGHTED_QUOTIENT: 'unweightedQuotient',
+  CARE_KEY: 'careKey',
+  PRESENT_STAFF: 'presentStaff',
+};
 
 function parseIsoDateSafe(dateValue) {
   if (!dateValue) return null;
@@ -138,7 +150,7 @@ const STORY_STEPS = [
     accent: '#0f766e',
     icon: IconChartHistogram,
     rating: 'good',
-    diagramType: '2-Panel Wochenanalyse',
+    diagramType: 'Diagramm-Karussell',
   },
   {
     id: 'transitions',
@@ -149,7 +161,7 @@ const STORY_STEPS = [
     accent: '#6d28d9',
     icon: IconRoute,
     rating: 'warn',
-    diagramType: 'Heatmap + Kritikalitätsranking',
+    diagramType: 'Kritikalität + Monte-Carlo',
   },
   {
     id: 'cohort',
@@ -325,8 +337,21 @@ function QualityDonutChart({ data }) {
   );
 }
 
-function CoverageHeatmap({ categories, groups, heatValues, accent }) {
+function CoverageHeatmap({ categories, groups, heatValues, accent, mode }) {
   const slotsPerDay = React.useMemo(() => Math.max(Math.floor(categories.length / 5), 0), [categories.length]);
+  const majorTickPositions = React.useMemo(() => {
+    if (slotsPerDay === 0) return [];
+
+    const positions = [];
+    for (let dayIndex = 0; dayIndex < 5; dayIndex += 1) {
+      for (let slotIndex = 0; slotIndex < slotsPerDay; slotIndex += 2) {
+        positions.push((dayIndex * slotsPerDay) + slotIndex);
+      }
+    }
+
+    return positions;
+  }, [slotsPerDay]);
+
   const dayBands = React.useMemo(() => {
     if (!slotsPerDay) return [];
     return ['Mo', 'Di', 'Mi', 'Do', 'Fr'].map((label, idx) => ({
@@ -337,35 +362,96 @@ function CoverageHeatmap({ categories, groups, heatValues, accent }) {
     }));
   }, [slotsPerDay]);
 
-  const maxAbs = React.useMemo(
-    () => Math.max(1, ...heatValues.map(([, , value]) => Math.abs(Number(value) || 0))),
-    [heatValues]
-  );
+  const metricRange = React.useMemo(() => {
+    const values = heatValues.map(([, , value]) => Number(value || 0));
+    const min = values.length ? Math.min(...values) : 0;
+    const max = values.length ? Math.max(...values) : 1;
+    if (min === max) {
+      return { min: min - 0.5, max: max + 0.5 };
+    }
+    return { min, max };
+  }, [heatValues]);
+
+  const colorStops = React.useMemo(() => {
+    if (mode === HEATMAP_MODES.PRESENT_STAFF) {
+      return [
+        [0, '#ef4444'],
+        [0.5, '#f59e0b'],
+        [1, '#7c3aed'],
+      ];
+    }
+
+    return [
+      [0, '#7c3aed'],
+      [0.5, '#f59e0b'],
+      [1, '#ef4444'],
+    ];
+  }, [mode]);
+
+  const metricLabel = React.useMemo(() => {
+    if (mode === HEATMAP_MODES.UNWEIGHTED_QUOTIENT) return 'Quotient';
+    if (mode === HEATMAP_MODES.CARE_KEY) return 'Betreuungsschlüssel';
+    return 'Päd. Mitarbeiter';
+  }, [mode]);
+
+  const daySeparatorLines = React.useMemo(() => {
+    if (slotsPerDay === 0) return [];
+
+    const separators = [];
+    for (let dayIndex = 1; dayIndex < 5; dayIndex += 1) {
+      separators.push({
+        color: 'rgba(255,255,255,0.95)',
+        width: 8,
+        zIndex: 4,
+        value: (dayIndex * slotsPerDay) - 0.5,
+      });
+    }
+
+    return separators;
+  }, [slotsPerDay]);
 
   const options = React.useMemo(
     () => ({
       chart: {
         type: 'heatmap',
+        zoomType: 'xy',
         backgroundColor: 'transparent',
-        spacing: [10, 10, 10, 10],
+        spacingTop: 20,
+        spacingBottom: 28,
+        spacingRight: 96,
+        resetZoomButton: { position: { align: 'right', verticalAlign: 'top', x: -10, y: 10 }, relativeTo: 'plot' },
       },
       title: { text: null },
       credits: { enabled: false },
-      legend: {
-        align: 'right',
-        verticalAlign: 'middle',
-        layout: 'vertical',
-        symbolHeight: 120,
-      },
+      legend: { enabled: false },
       xAxis: {
+        type: 'linear',
         categories,
-        tickInterval: 2,
+        min: 0,
+        max: Math.max(categories.length - 1, 0),
+        tickPositions: majorTickPositions,
+        minorTickInterval: 1,
+        minorTicks: true,
+        tickLength: 8,
+        tickWidth: 1,
+        tickColor: '#0f172a',
+        minorTickLength: 5,
+        minorTickWidth: 1,
+        minorTickColor: '#94a3b8',
+        startOnTick: false,
+        endOnTick: false,
+        title: { text: null },
         labels: {
+          autoRotation: false,
+          allowOverlap: true,
+          crop: false,
+          overflow: 'allow',
           formatter() {
             return formatWeeklyAxisLabel(this.value, categories);
           },
-          style: { fontSize: '10px' },
+          style: { fontSize: '10px', whiteSpace: 'nowrap' },
         },
+        plotLines: daySeparatorLines,
         plotBands: dayBands,
       },
       yAxis: {
@@ -374,21 +460,16 @@ function CoverageHeatmap({ categories, groups, heatValues, accent }) {
         reversed: true,
       },
       colorAxis: {
-        min: -maxAbs,
-        max: maxAbs,
-        stops: [
-          [0, '#ef4444'],
-          [0.5, '#f59e0b'],
-          [1, '#7c3aed'],
-        ],
+        min: metricRange.min,
+        max: metricRange.max,
+        stops: colorStops,
       },
       tooltip: {
         formatter() {
           const slot = categories[this.point.x] || '';
           const groupName = groups[this.point.y]?.name || 'Gruppe';
-          const delta = Number(this.point.value || 0);
-          const state = delta < 0 ? 'Unterdeckung' : delta > 0 ? 'Überdeckung' : 'ausgeglichen';
-          return `<b>${groupName}</b><br/>${slot}<br/>Delta: <b>${delta.toFixed(1)}</b> (${state})`;
+          const value = Number(this.point.value || 0);
+          return `<b>${groupName}</b><br/>${slot}<br/>${metricLabel}: <b>${value.toFixed(2)}</b>`;
         },
       },
       series: [
@@ -407,18 +488,177 @@ function CoverageHeatmap({ categories, groups, heatValues, accent }) {
         },
       ],
     }),
-    [accent, categories, dayBands, groups, heatValues, maxAbs]
+    [accent, categories, colorStops, dayBands, daySeparatorLines, groups, heatValues, majorTickPositions, metricLabel, metricRange.max, metricRange.min]
   );
 
+  const legendEntries = React.useMemo(() => {
+    if (mode === HEATMAP_MODES.PRESENT_STAFF) {
+      return [
+        { color: '#ef4444', label: 'Wenige Mitarbeiter' },
+        { color: '#f59e0b', label: 'Mittlere Besetzung' },
+        { color: '#7c3aed', label: 'Viele Mitarbeiter' },
+      ];
+    }
+
+    if (mode === HEATMAP_MODES.CARE_KEY) {
+      return [
+        { color: '#7c3aed', label: 'Niedriger Schlüssel' },
+        { color: '#f59e0b', label: 'Mittlerer Schlüssel' },
+        { color: '#ef4444', label: 'Hoher Schlüssel' },
+      ];
+    }
+
+    return [
+      { color: '#7c3aed', label: 'Niedriger Quotient' },
+      { color: '#f59e0b', label: 'Mittlerer Quotient' },
+      { color: '#ef4444', label: 'Hoher Quotient' },
+    ];
+  }, [mode]);
+
   return (
-    <Paper withBorder p="xs" className="analysis-coverage-heatmap-panel">
-      <Text size="xs" fw={700} className="analysis-stage-recommendation-title" mb={4}>
-        Gruppen-Heatmap (Unterdeckung bis Überdeckung)
-      </Text>
-      <Box h={220}>
+    <Stack style={{ height: '100%', minHeight: 0 }} gap={4}>
+      <Group gap={10} wrap="nowrap" justify="center">
+        {legendEntries.map((entry) => (
+          <Group key={entry.label} gap={6} wrap="nowrap">
+            <Box w={10} h={10} style={{ borderRadius: 999, background: entry.color, border: '1px solid rgba(15,23,42,0.18)' }} />
+            <Text size="xs" c="dimmed">{entry.label}</Text>
+          </Group>
+        ))}
+      </Group>
+
+      <Box style={{ flex: '1 1 auto', minHeight: 0, overflow: 'visible' }}>
         <HighchartsReact highcharts={Highcharts} options={options} containerProps={{ style: { height: '100%' } }} />
       </Box>
-    </Paper>
+    </Stack>
+  );
+}
+
+const STATUS_CHART_SLIDES = [
+  { id: 'demand', title: 'Kapazität & Bedarf' },
+  { id: 'ratio', title: 'Schlüssel' },
+  { id: 'heatmap', title: 'Heatmap (alle Gruppen)' },
+];
+
+function CoverageStageCarousel({ weeklyData, categories, groups, heatValues, accent, onHoverChange, heatmapMode }) {
+  const [activeIndex, setActiveIndex] = React.useState(0);
+  const [emblaApi, setEmblaApi] = React.useState(null);
+  const [canGoPrev, setCanGoPrev] = React.useState(false);
+  const [canGoNext, setCanGoNext] = React.useState(true);
+
+  React.useEffect(() => {
+    if (!emblaApi) return undefined;
+
+    const updateState = () => {
+      setActiveIndex(emblaApi.selectedScrollSnap());
+      setCanGoPrev(emblaApi.canScrollPrev());
+      setCanGoNext(emblaApi.canScrollNext());
+    };
+
+    updateState();
+    emblaApi.on('select', updateState);
+    emblaApi.on('reInit', updateState);
+
+    return () => {
+      emblaApi.off('select', updateState);
+      emblaApi.off('reInit', updateState);
+    };
+  }, [emblaApi]);
+
+  const goPrev = React.useCallback(() => {
+    if (!canGoPrev) return;
+    emblaApi?.scrollPrev();
+  }, [canGoPrev, emblaApi]);
+
+  const goNext = React.useCallback(() => {
+    if (!canGoNext) return;
+    emblaApi?.scrollNext();
+  }, [canGoNext, emblaApi]);
+
+  return (
+    <Box className="analysis-coverage-carousel-wrap">
+      <Group className="analysis-coverage-carousel-header" justify="space-between" wrap="nowrap">
+        <Text size="xs" fw={700} className="analysis-stage-recommendation-title">
+          {STATUS_CHART_SLIDES[activeIndex]?.title || 'Diagramm'}
+        </Text>
+        <Group gap={6} wrap="nowrap">
+          <Badge variant="filled" size="md" className="analysis-coverage-carousel-counter">
+            {activeIndex + 1}/{STATUS_CHART_SLIDES.length}
+          </Badge>
+          <ActionIcon
+            variant="filled"
+            size="md"
+            className="analysis-coverage-carousel-nav"
+            aria-label="Vorheriges Diagramm"
+            onClick={goPrev}
+            disabled={!canGoPrev}
+          >
+            <IconChevronLeft size={14} />
+          </ActionIcon>
+          <ActionIcon
+            variant="filled"
+            size="md"
+            className="analysis-coverage-carousel-nav"
+            aria-label="Nächstes Diagramm"
+            onClick={goNext}
+            disabled={!canGoNext}
+          >
+            <IconChevronRight size={14} />
+          </ActionIcon>
+        </Group>
+      </Group>
+
+      <Carousel
+        withIndicators
+        withControls={false}
+        getEmblaApi={setEmblaApi}
+        className="analysis-coverage-carousel"
+        slideSize="100%"
+        slideGap={0}
+        emblaOptions={{ loop: false, align: 'start', dragFree: false }}
+      >
+        <Carousel.Slide>
+          <Box className="analysis-coverage-carousel-slide">
+            {activeIndex === 0 ? (
+              <WeeklyChart
+                chartData={weeklyData}
+                chartMode="demand"
+                showRatioChart={false}
+                syncGroupKey="analysis-step-2"
+                onHoverChange={onHoverChange}
+              />
+            ) : null}
+          </Box>
+        </Carousel.Slide>
+
+        <Carousel.Slide>
+          <Box className="analysis-coverage-carousel-slide">
+            {activeIndex === 1 ? (
+              <WeeklyChart
+                chartData={weeklyData}
+                chartMode="ratio"
+                showRatioChart
+                syncGroupKey="analysis-step-2"
+                onHoverChange={onHoverChange}
+              />
+            ) : null}
+          </Box>
+        </Carousel.Slide>
+
+        <Carousel.Slide>
+          <Box className="analysis-coverage-carousel-slide">
+            {activeIndex === 2 ? (
+              <CoverageHeatmap
+                categories={categories}
+                groups={groups}
+                heatValues={heatValues}
+                accent={accent}
+                mode={heatmapMode}
+              />
+            ) : null}
+          </Box>
+        </Carousel.Slide>
+      </Carousel>
+    </Box>
   );
 }
 
@@ -521,12 +761,11 @@ function MonteCarloResultPanel({ monteCarlo }) {
   );
 }
 
-function ResilienceCompositeChart({ categories, groups, heatValues, ranking, accent, monteCarlo }) {
+function ResilienceCompositeChart({ ranking, accent, monteCarlo }) {
   return (
     <Box className="analysis-resilience-chart-wrap">
-      <CoverageHeatmap categories={categories} groups={groups} heatValues={heatValues} accent={accent} />
+      <CriticalityRankingChart ranking={ranking} accent={accent} />
       <Stack gap="xs" className="analysis-resilience-right-column">
-        <CriticalityRankingChart ranking={ranking} accent={accent} />
         <MonteCarloResultPanel monteCarlo={monteCarlo} />
       </Stack>
     </Box>
@@ -907,6 +1146,7 @@ function VisuView() {
   const dispatch = useDispatch();
   const selectedScenarioId = useSelector((state) => state.simScenario.selectedScenarioId);
   const chartState = useSelector((state) => (selectedScenarioId ? state.chart?.[selectedScenarioId] : null));
+  const weeklyChartData = useSelector(selectWeeklyChartData);
   const scenarios = useSelector((state) => state.simScenario.scenarios || EMPTY_LIST);
   const overlaysByScenario = useSelector((state) => state.simOverlay?.overlaysByScenario || {});
   const dataByScenario = useSelector((state) => state.simData?.dataByScenario || {});
@@ -954,6 +1194,9 @@ function VisuView() {
   const [coverageData, setCoverageData] = React.useState(null);
   const [isAnalysisLoading, setIsAnalysisLoading] = React.useState(false);
   const [analysisLoadingStage, setAnalysisLoadingStage] = React.useState(0);
+  const [statusHoverData, setStatusHoverData] = React.useState(null);
+  const [heatmapMode, setHeatmapMode] = React.useState(HEATMAP_MODES.UNWEIGHTED_QUOTIENT);
+  const handleStatusHoverChange = React.useCallback((data) => setStatusHoverData(data), []);
 
   const computeCoverageData = React.useCallback(() => {
     if (!selectedScenarioId) return null;
@@ -970,16 +1213,19 @@ function VisuView() {
       },
     });
     const referenceDate = chartState?.referenceDate || new Date().toISOString().slice(0, 10);
-    const categories = generateTimeSegments();
-
-    const weeklyData = chartState?.chartData?.weekly || {
-      categories,
-      demand: [],
-      capacity_pedagogical: [],
-      capacity_administrative: [],
-      care_ratio: [],
-      expert_ratio: [],
-    };
+    const fallbackCategories = generateTimeSegments();
+    const weeklyData = weeklyChartData?.categories?.length
+      ? weeklyChartData
+      : {
+          categories: fallbackCategories,
+          demand: [],
+          capacity: [],
+          capacity_pedagogical: [],
+          capacity_administrative: [],
+          care_ratio: [],
+          expert_ratio: [],
+        };
+    const categories = weeklyData.categories?.length ? weeklyData.categories : fallbackCategories;
 
     const availableGroups = (overlayAware.effectiveGroupDefs || [])
       .filter((group) => group && group.id)
@@ -1052,12 +1298,34 @@ function VisuView() {
 
         const groupDemandSeries = generateBookingDataSeries(referenceDate, groupDemand, categories);
         const groupCapacitySeries = generateBookingDataSeries(referenceDate, groupCapacity, categories, 'all');
+        const groupPedCapacitySeries = generateBookingDataSeries(referenceDate, groupCapacity, categories, 'pedagogical');
+        const groupCareRatioSeries = generateCareRatioSeries(
+          categories,
+          groupDemand,
+          groupCapacity,
+          scopedDataItems,
+          overlayAware.effectiveGroupDefs || []
+        );
         let groupMinutes = 0;
 
         categories.forEach((_, slotIndex) => {
           const delta = Number(groupCapacitySeries[slotIndex] || 0) - Number(groupDemandSeries[slotIndex] || 0);
           if (delta < 0) groupMinutes += Math.abs(delta) * 30;
-          heatValues.push([slotIndex, groupIndex, delta]);
+
+          const demandValue = Number(groupDemandSeries[slotIndex] || 0);
+          const pedagogicalValue = Number(groupPedCapacitySeries[slotIndex] || 0);
+
+          let heatValue;
+          if (heatmapMode === HEATMAP_MODES.CARE_KEY) {
+            heatValue = Number(groupCareRatioSeries[slotIndex] || 0);
+          } else if (heatmapMode === HEATMAP_MODES.PRESENT_STAFF) {
+            heatValue = pedagogicalValue;
+          } else {
+            // Default and primary mode: Kinder pro pädagogischer Mitarbeiter.
+            heatValue = pedagogicalValue > 0 ? demandValue / pedagogicalValue : (demandValue > 0 ? demandValue : 0);
+          }
+
+          heatValues.push([slotIndex, groupIndex, heatValue]);
         });
 
         groupUndercoverageMinutes.push({
@@ -1213,10 +1481,16 @@ function VisuView() {
     const maxCareRatio = careValues.length ? Math.max(...careValues) : 0;
 
     const avgExpertRatio = expertValues.length ? expertValues.reduce((sum, value) => sum + value, 0) / expertValues.length : 0;
+    const expertRatioUnderLegalSlots = expertValues.filter((value) => value < LEGAL_EXPERT_RATIO_MIN_PCT).length;
 
     const deficits = demandSeries.map((demandValue, index) => demandValue - Number(capacitySeries[index] || 0));
     const deficitSlots = deficits.filter((value) => value > 0).length;
     const worstDeficit = deficits.length ? Math.max(0, ...deficits) : 0;
+
+    const weeklyCapacityHours = capacitySeries.reduce((sum, value) => sum + (Number(value || 0) * SLOT_HOURS), 0);
+    const weeklyDemandHours = demandSeries.reduce((sum, value) => sum + (Number(value || 0) * SLOT_HOURS), 0);
+    const monthlyCapacityFte = (weeklyCapacityHours * MONTHS_PER_WEEK) / MONTHLY_HOURS_PER_FTE;
+    const monthlyDemandFte = (weeklyDemandHours * MONTHS_PER_WEEK) / MONTHLY_HOURS_PER_FTE;
 
     const monthFormatter = new Intl.DateTimeFormat('de-DE', { month: 'short', year: '2-digit' });
     const baseDate = new Date(referenceDate);
@@ -1279,6 +1553,9 @@ function VisuView() {
         minCareRatio,
         maxCareRatio,
         avgExpertRatio,
+        expertRatioUnderLegalSlots,
+        monthlyCapacityFte,
+        monthlyDemandFte,
         deficitSlots,
         worstDeficit,
       },
@@ -1328,6 +1605,8 @@ function VisuView() {
     selectedGroups,
     selectedQualifications,
     selectedScenarioId,
+    weeklyChartData,
+    heatmapMode,
   ]);
 
   React.useEffect(() => {
@@ -1747,24 +2026,31 @@ function VisuView() {
         ? [
             {
               key: 'kpi-care-ratio',
-              title: 'Ø Betreuungsschlüssel',
-              value: `${coverageData?.kpis?.avgCareRatio?.toFixed(1) || '0.0'} (Min ${coverageData?.kpis?.minCareRatio?.toFixed(1) || '0.0'} / Max ${coverageData?.kpis?.maxCareRatio?.toFixed(1) || '0.0'})`,
-              text: 'Mittelwert über alle 30-Minuten-Slots.',
+              title: 'Betreuungsschlüssel',
+              value: `${coverageData?.kpis?.avgCareRatio?.toFixed(2) || '0.00'}`,
+              text: `Min ${coverageData?.kpis?.minCareRatio?.toFixed(2) || '0.00'} · Max ${coverageData?.kpis?.maxCareRatio?.toFixed(2) || '0.00'}`,
               tone: 'good',
             },
             {
               key: 'kpi-expert-ratio',
-              title: 'Ø Fachkraftquote',
+              title: 'Fachkräftequote',
               value: `${coverageData?.kpis?.avgExpertRatio?.toFixed(1) || '0.0'}%`,
-              text: 'Durchschnitt über alle Slots.',
-              tone: 'good',
+              text: `${coverageData?.kpis?.expertRatioUnderLegalSlots || 0} Slots unter ${LEGAL_EXPERT_RATIO_MIN_PCT}%`,
+              tone: (coverageData?.kpis?.expertRatioUnderLegalSlots || 0) > 0 ? 'warn' : 'good',
             },
             {
-              key: 'kpi-deficit-slots',
-              title: 'Unterdeckte Slots',
-              value: `${coverageData?.kpis?.deficitSlots || 0}`,
-              text: `Größte Unterdeckung: ${coverageData?.kpis?.worstDeficit?.toFixed(1) || '0.0'} Kinder`,
-              tone: (coverageData?.kpis?.deficitSlots || 0) > 0 ? 'warn' : 'good',
+              key: 'kpi-monthly-fte',
+              title: 'Monatliche Kapazität (FTE)',
+              value: `${coverageData?.kpis?.monthlyCapacityFte?.toFixed(2) || '0.00'}`,
+              text: `Monatlicher Bedarf: ${coverageData?.kpis?.monthlyDemandFte?.toFixed(2) || '0.00'} FTE`,
+              tone: (coverageData?.kpis?.monthlyCapacityFte || 0) >= (coverageData?.kpis?.monthlyDemandFte || 0) ? 'good' : 'warn',
+            },
+            {
+              key: 'kpi-hover-slot',
+              title: statusHoverData?.label || 'Aktuelle Diagrammwerte',
+              value: statusHoverData ? `${statusHoverData.demand} Kinder / ${statusHoverData.capacityPedagogical + statusHoverData.capacityAdministrative} MA` : '–',
+              text: statusHoverData ? `Schlüssel ${statusHoverData.careRatio.toFixed(2)} · Fachkraft ${statusHoverData.expertRatio.toFixed(0)}%` : 'Hover über das Diagramm',
+              tone: statusHoverData && statusHoverData.demand > (statusHoverData.capacityPedagogical + statusHoverData.capacityAdministrative) ? 'warn' : 'good',
             },
           ]
       : activeStory.id === 'transitions'
@@ -2071,16 +2357,17 @@ function VisuView() {
           {activeStory.id === 'quality' ? (
             <QualityDonutChart data={qualityDonutData} />
           ) : activeStory.id === 'status' ? (
-            <WeeklyChart
+            <CoverageStageCarousel
               weeklyData={coverageData?.weeklyData || { categories: coverageData?.categories || [] }}
-              showRatioChart
-              syncGroupKey="analysis-step-2"
+              categories={coverageData?.categories || []}
+              groups={coverageData?.groupsForHeatmap || []}
+              heatValues={coverageData?.heatValues || []}
+              accent={activeStory.accent}
+              onHoverChange={handleStatusHoverChange}
+              heatmapMode={heatmapMode}
             />
           ) : activeStory.id === 'transitions' ? (
             <ResilienceCompositeChart
-              categories={coverageData?.categories || []}
-              groups={coverageData?.groupsForHeatmap || []}
-              heatValues={coverageData?.resilience?.heatValues || []}
               ranking={coverageData?.resilience?.criticalityRanking || []}
               monteCarlo={coverageData?.resilience?.monteCarlo || null}
               accent={activeStory.accent}
@@ -2114,10 +2401,14 @@ function VisuView() {
             scenarioId={selectedScenarioId}
             compactBar
             groupsOnly={activeStory.id === 'quality'}
+            showHeatmapModeControl={activeStory.id === 'status'}
+            heatmapMode={heatmapMode}
+            onHeatmapModeChange={setHeatmapMode}
             showMonteCarloControls={activeStory.id === 'transitions'}
             monteCarloParams={monteCarloConfig}
             onMonteCarloParamsChange={setMonteCarloConfig}
             onRerunMonteCarlo={() => setMonteCarloRunId((prev) => prev + 1)}
+            showTrigger
           />
         </Box>
       </Paper>
