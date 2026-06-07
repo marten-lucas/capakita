@@ -190,7 +190,7 @@
   padding: 0 0.15rem 0.9rem;
 }
 
-.analysis-coverage-carousel-slide > * {
+.analysis-coverage-carousel-slide>* {
   min-width: 0;
   max-width: 100%;
 }

@@ -1,7 +1,6 @@
 import React from 'react';
 import {
   ActionIcon,
-  Alert,
   Anchor,
   Badge,
   Box,
@@ -29,7 +28,7 @@ import { selectWeeklyChartData } from '../store/chartSelectors';
 import { useOverlayData } from '../hooks/useOverlayData';
 import { calculateScenarioMonthlyFinance, isDateWithinRange, isRecordActiveOnDate, resolveGroupIdAtDate } from '../utils/financeUtils';
 import { buildOverlayAwareData } from '../utils/overlayUtils';
-import { shouldIncludeDataItemInAnalysis } from '../utils/dataVisibility';
+import { isArchivedDataItem, shouldIncludeDataItemInAnalysis } from '../utils/dataVisibility';
 import { filterBookings, generateCareRatioSeries } from '../utils/chartUtils/chartUtils';
 import { generateBookingDataSeries, generateTimeSegments, formatWeeklyAxisLabel } from '../utils/chartUtils/chartUtilsWeekly';
 import {
@@ -77,6 +76,12 @@ const ANALYSIS_LOADING_STAGES = [
   },
 ];
 
+const ANALYSIS_LOADING_STAGES_BY_STORY = {
+  status: [ANALYSIS_LOADING_STAGES[0], ANALYSIS_LOADING_STAGES[1]],
+  transitions: [ANALYSIS_LOADING_STAGES[0], ANALYSIS_LOADING_STAGES[2]],
+  cohort: [ANALYSIS_LOADING_STAGES[0], ANALYSIS_LOADING_STAGES[3]],
+};
+
 const LEGAL_EXPERT_RATIO_MIN_PCT = 50;
 const SLOT_HOURS = 0.5;
 const MONTHS_PER_WEEK = 4.33;
@@ -87,6 +92,17 @@ const HEATMAP_MODES = {
   CARE_KEY: 'careKey',
   PRESENT_STAFF: 'presentStaff',
 };
+
+const QUALITY_GROUP_COLOR_PALETTE = ['#2563eb', '#059669', '#d97706', '#dc2626', '#7c3aed', '#0891b2', '#be123c', '#4d7c0f'];
+const QUALITY_ADMIN_TIME_COLOR = '#8b5cf6';
+
+const RESILIENCE_CASCADE_STAGES = [
+  'Regelbetrieb',
+  'Mehrarbeit',
+  'Zeiteinschränkung',
+  'Notbetreuung',
+  'Schließung',
+];
 
 function parseIsoDateSafe(dateValue) {
   if (!dateValue) return null;
@@ -139,7 +155,7 @@ const STORY_STEPS = [
     accent: '#1d4ed8',
     icon: IconAlertTriangle,
     rating: 'warn',
-    diagramType: 'Donut-Charts',
+    diagramType: 'Diagramm-Karussell',
   },
   {
     id: 'status',
@@ -334,6 +350,266 @@ function QualityDonutChart({ data }) {
     <Paper className="analysis-diagram-placeholder analysis-quality-chart" withBorder p="xs">
       <HighchartsReact highcharts={Highcharts} options={options} containerProps={{ style: { height: '100%' } }} />
     </Paper>
+  );
+}
+
+function QualityStaffScheduleChart({ scheduleData, accent }) {
+  const categories = React.useMemo(() => scheduleData?.categories || [], [scheduleData?.categories]);
+  const employees = React.useMemo(() => scheduleData?.employees || [], [scheduleData?.employees]);
+  const heatValues = React.useMemo(() => scheduleData?.heatValues || [], [scheduleData?.heatValues]);
+  const groupLegend = React.useMemo(() => scheduleData?.groupLegend || [], [scheduleData?.groupLegend]);
+
+  const slotsPerDay = React.useMemo(() => Math.max(Math.floor(categories.length / 5), 0), [categories.length]);
+
+  const majorTickPositions = React.useMemo(() => {
+    if (slotsPerDay === 0) return [];
+
+    const positions = [];
+    for (let dayIndex = 0; dayIndex < 5; dayIndex += 1) {
+      for (let slotIndex = 0; slotIndex < slotsPerDay; slotIndex += 1) {
+        positions.push((dayIndex * slotsPerDay) + slotIndex);
+      }
+    }
+
+    return positions;
+  }, [slotsPerDay]);
+
+  const dayBands = React.useMemo(() => {
+    if (!slotsPerDay) return [];
+    return ['Mo', 'Di', 'Mi', 'Do', 'Fr'].map((label, idx) => ({
+      from: idx * slotsPerDay - 0.5,
+      to: ((idx + 1) * slotsPerDay) - 0.5,
+      color: idx % 2 === 0 ? 'rgba(241,245,249,0.55)' : 'rgba(226,232,240,0.48)',
+      label: { text: label, y: -6, style: { color: '#334155', fontSize: '10px' } },
+    }));
+  }, [slotsPerDay]);
+
+  const daySeparatorLines = React.useMemo(() => {
+    if (slotsPerDay === 0) return [];
+
+    const separators = [];
+    for (let dayIndex = 1; dayIndex < 5; dayIndex += 1) {
+      separators.push({
+        color: 'rgba(255,255,255,0.95)',
+        width: 8,
+        zIndex: 4,
+        value: (dayIndex * slotsPerDay) - 0.5,
+      });
+    }
+
+    return separators;
+  }, [slotsPerDay]);
+
+  const options = React.useMemo(
+    () => ({
+      chart: {
+        type: 'heatmap',
+        backgroundColor: 'transparent',
+        spacingTop: 20,
+        spacingBottom: 28,
+        spacingRight: 96,
+      },
+      title: { text: null },
+      credits: { enabled: false },
+      legend: { enabled: false },
+      xAxis: {
+        categories,
+        min: 0,
+        max: Math.max(categories.length - 1, 0),
+        tickPositions: majorTickPositions,
+        minorTickInterval: 1,
+        minorTicks: true,
+        tickLength: 8,
+        tickWidth: 1,
+        tickColor: '#0f172a',
+        minorTickLength: 5,
+        minorTickWidth: 1,
+        minorTickColor: '#94a3b8',
+        startOnTick: false,
+        endOnTick: false,
+        title: { text: null },
+        labels: {
+          autoRotation: false,
+          allowOverlap: true,
+          crop: false,
+          overflow: 'allow',
+          formatter() {
+            return formatWeeklyAxisLabel(this.value, categories);
+          },
+          style: { fontSize: '10px', whiteSpace: 'nowrap' },
+        },
+        plotLines: daySeparatorLines,
+        plotBands: dayBands,
+      },
+      yAxis: {
+        categories: employees.map((employee) => employee.name),
+        title: { text: null },
+        reversed: true,
+        labels: { style: { fontSize: '10px' } },
+      },
+      tooltip: {
+        formatter() {
+          const slot = categories[this.point.x] || '';
+          const employeeName = employees[this.point.y]?.name || 'Mitarbeiter';
+          const roleLabel = this.point.options?.roleLabel || '';
+          const planned = Number(this.point.value || 0) > 0 ? 'Ja' : 'Nein';
+          const groupName = this.point.options?.groupName || employees[this.point.y]?.groupName || 'Gruppe';
+          return `<b>${employeeName}</b><br/>Typ: <b>${roleLabel}</b><br/>Gruppe: <b>${groupName}</b><br/>${slot}<br/>Geplant: <b>${planned}</b>`;
+        },
+      },
+      series: [
+        {
+          type: 'heatmap',
+          borderWidth: 1,
+          borderColor: 'rgba(255,255,255,0.6)',
+          data: heatValues,
+          nullColor: '#e2e8f0',
+          states: {
+            hover: {
+              borderColor: accent,
+              borderWidth: 1.5,
+            },
+          },
+        },
+      ],
+    }),
+    [accent, categories, dayBands, daySeparatorLines, employees, heatValues, majorTickPositions]
+  );
+
+  if (!employees.length || !categories.length) {
+    return (
+      <Paper className="analysis-diagram-placeholder" withBorder p="lg">
+        <Stack gap={6} align="center" justify="center" className="analysis-diagram-placeholder-inner">
+          <Badge variant="light" size="lg" className="analysis-diagram-placeholder-badge">
+            Wochen-Dienstplan
+          </Badge>
+          <Title order={3} className="analysis-diagram-placeholder-title">
+            Keine aktiven Mitarbeiter am Stichtag
+          </Title>
+          <Text size="sm" c="dimmed" ta="center" className="analysis-diagram-placeholder-text">
+            Prufe Gruppenfilter und Stichtag in der Filterleiste.
+          </Text>
+        </Stack>
+      </Paper>
+    );
+  }
+
+  return (
+    <Paper className="analysis-diagram-placeholder analysis-quality-chart" withBorder p="xs">
+      {groupLegend.length > 0 && (
+        <Group gap={10} wrap="wrap" mb={6}>
+          {groupLegend.map((entry) => (
+            <Group key={entry.id} gap={6} wrap="nowrap">
+              <Box w={10} h={10} style={{ borderRadius: 999, background: entry.color, border: '1px solid rgba(15,23,42,0.2)' }} />
+              <Text size="xs" c="dimmed">{entry.name}</Text>
+            </Group>
+          ))}
+          <Group gap={6} wrap="nowrap">
+            <Box w={10} h={10} style={{ borderRadius: 999, background: QUALITY_ADMIN_TIME_COLOR, border: '1px solid rgba(15,23,42,0.2)' }} />
+            <Text size="xs" c="dimmed">Administrative Zeit</Text>
+          </Group>
+        </Group>
+      )}
+      <HighchartsReact highcharts={Highcharts} options={options} containerProps={{ style: { height: '100%' } }} />
+    </Paper>
+  );
+}
+
+const QUALITY_CHART_SLIDES = [
+  { id: 'quality-donut', title: 'Datenvollstandigkeit' },
+  { id: 'quality-plan', title: 'Wochen-Dienstplan (Stichtag)' },
+];
+
+function QualityStageCarousel({ qualityDonutData, qualityStaffScheduleData, accent }) {
+  const [activeIndex, setActiveIndex] = React.useState(0);
+  const [emblaApi, setEmblaApi] = React.useState(null);
+  const [canGoPrev, setCanGoPrev] = React.useState(false);
+  const [canGoNext, setCanGoNext] = React.useState(true);
+
+  React.useEffect(() => {
+    if (!emblaApi) return undefined;
+
+    const updateState = () => {
+      setActiveIndex(emblaApi.selectedScrollSnap());
+      setCanGoPrev(emblaApi.canScrollPrev());
+      setCanGoNext(emblaApi.canScrollNext());
+    };
+
+    updateState();
+    emblaApi.on('select', updateState);
+    emblaApi.on('reInit', updateState);
+
+    return () => {
+      emblaApi.off('select', updateState);
+      emblaApi.off('reInit', updateState);
+    };
+  }, [emblaApi]);
+
+  const goPrev = React.useCallback(() => {
+    if (!canGoPrev) return;
+    emblaApi?.scrollPrev();
+  }, [canGoPrev, emblaApi]);
+
+  const goNext = React.useCallback(() => {
+    if (!canGoNext) return;
+    emblaApi?.scrollNext();
+  }, [canGoNext, emblaApi]);
+
+  return (
+    <Box className="analysis-coverage-carousel-wrap">
+      <Group className="analysis-coverage-carousel-header" justify="space-between" wrap="nowrap">
+        <Text size="xs" fw={700} className="analysis-stage-recommendation-title">
+          {QUALITY_CHART_SLIDES[activeIndex]?.title || 'Diagramm'}
+        </Text>
+        <Group gap={6} wrap="nowrap">
+          <Badge variant="filled" size="md" className="analysis-coverage-carousel-counter">
+            {activeIndex + 1}/{QUALITY_CHART_SLIDES.length}
+          </Badge>
+          <ActionIcon
+            variant="filled"
+            size="md"
+            className="analysis-coverage-carousel-nav"
+            aria-label="Vorheriges Diagramm"
+            onClick={goPrev}
+            disabled={!canGoPrev}
+          >
+            <IconChevronLeft size={14} />
+          </ActionIcon>
+          <ActionIcon
+            variant="filled"
+            size="md"
+            className="analysis-coverage-carousel-nav"
+            aria-label="Nachstes Diagramm"
+            onClick={goNext}
+            disabled={!canGoNext}
+          >
+            <IconChevronRight size={14} />
+          </ActionIcon>
+        </Group>
+      </Group>
+
+      <Carousel
+        withIndicators
+        getEmblaApi={setEmblaApi}
+        onSlideChange={setActiveIndex}
+        slideSize="100%"
+        slideGap={0}
+        emblaOptions={{ loop: false, align: 'start', dragFree: false }}
+        className="analysis-coverage-carousel"
+      >
+        <Carousel.Slide>
+          <Box className="analysis-coverage-carousel-slide">
+            {activeIndex === 0 ? <QualityDonutChart data={qualityDonutData} /> : null}
+          </Box>
+        </Carousel.Slide>
+
+        <Carousel.Slide>
+          <Box className="analysis-coverage-carousel-slide">
+            {activeIndex === 1 ? <QualityStaffScheduleChart scheduleData={qualityStaffScheduleData} accent={accent} /> : null}
+          </Box>
+        </Carousel.Slide>
+      </Carousel>
+    </Box>
   );
 }
 
@@ -662,112 +938,373 @@ function CoverageStageCarousel({ weeklyData, categories, groups, heatValues, acc
   );
 }
 
-function CriticalityRankingChart({ ranking, accent }) {
-  const categories = ranking.map((entry) => entry.name);
-  const seriesData = ranking.map((entry) => Number(entry.impactMinutes || 0));
-
-  const options = React.useMemo(
-    () => ({
-      chart: {
-        type: 'bar',
-        backgroundColor: 'transparent',
-        spacing: [8, 8, 8, 8],
-      },
-      title: { text: null },
-      credits: { enabled: false },
-      xAxis: {
-        categories,
-        title: { text: null },
-        labels: { style: { fontSize: '10px' } },
-      },
-      yAxis: {
-        min: 0,
-        title: { text: 'Zusätzliche Unterdeckung (Min.)', style: { fontSize: '11px' } },
-      },
-      tooltip: {
-        formatter() {
-          const row = ranking[this.point.index];
-          if (!row) return '';
-          return `<b>${row.name}</b><br/>Zusätzliche Unterdeckung: <b>${row.impactMinutes.toFixed(1)} Min.</b><br/>Angebotsverlust: <b>${row.offerLossPct.toFixed(1)}%</b>`;
-        },
-      },
-      legend: { enabled: false },
-      plotOptions: {
-        series: {
-          animation: false,
-          borderRadius: 3,
-          color: accent,
-        },
-      },
-      series: [
-        {
-          type: 'bar',
-          name: 'Kritikalität',
-          data: seriesData,
-        },
-      ],
-    }),
-    [accent, categories, ranking, seriesData]
-  );
-
-  if (!ranking.length) {
-    return (
-      <Paper withBorder p="xs" className="analysis-coverage-heatmap-panel">
-        <Text size="xs" fw={700} className="analysis-stage-recommendation-title" mb={4}>
-          Kritikalitäts-Ranking
-        </Text>
-        <Text size="sm" c="dimmed">
-          Keine Kapazitätseinträge für Ausfallsimulation vorhanden.
-        </Text>
-      </Paper>
-    );
-  }
+function ResilienceScorePanel({ monteCarlo }) {
+  const resilienceScore = Number(monteCarlo?.resilienceScorePct || 0);
+  const regularDaysPct = Number(monteCarlo?.regularDaysPct || 0);
+  const closurePct = Number(monteCarlo?.closurePct || 0);
 
   return (
-    <Paper withBorder p="xs" className="analysis-coverage-heatmap-panel">
-      <Text size="xs" fw={700} className="analysis-stage-recommendation-title" mb={4}>
-        Kritikalitäts-Ranking (Top-Ausfälle)
-      </Text>
-      <Box h={220}>
+    <Paper withBorder p="md" className="analysis-coverage-heatmap-panel" style={{ height: '100%' }}>
+      <Stack gap="md" align="center" justify="center" style={{ height: '100%' }}>
+        <RingProgress
+          size={180}
+          thickness={16}
+          roundCaps
+          sections={[{ value: resilienceScore, color: resilienceScore >= 75 ? 'teal' : resilienceScore >= 55 ? 'yellow' : 'red' }]}
+          label={<Text ta="center" fw={800} size="xl">{resilienceScore.toFixed(1)}%</Text>}
+        />
+        <Text fw={700}>Resilienz-Score</Text>
+        <Text size="xs" c="dimmed" ta="center">
+          Toleranzgewichtet: Tage mit wenig Schließung senken den Score nur anteilig.
+        </Text>
+        <Group gap="xl">
+          <Text size="sm">Toleranz-Tage: <b>{regularDaysPct.toFixed(1)}%</b></Text>
+          <Text size="sm">Schließung: <b>{closurePct.toFixed(1)}%</b></Text>
+        </Group>
+      </Stack>
+    </Paper>
+  );
+}
+
+function ResilienceCascadeChart({ monteCarlo, accent }) {
+  const counts = monteCarlo?.cascadeCounts || [];
+  const total = counts.reduce((sum, value) => sum + Number(value || 0), 0);
+  const data = RESILIENCE_CASCADE_STAGES.map((label, index) => {
+    const absolute = Number(counts[index] || 0);
+    const pct = total > 0 ? (absolute / total) * 100 : 0;
+    return { name: label, y: pct, absolute };
+  });
+
+  const options = {
+    chart: { type: 'column', backgroundColor: 'transparent', spacing: [8, 8, 8, 8] },
+    title: { text: null },
+    credits: { enabled: false },
+    xAxis: {
+      categories: RESILIENCE_CASCADE_STAGES,
+      labels: { style: { fontSize: '10px' } },
+    },
+    yAxis: {
+      min: 0,
+      max: 100,
+      title: { text: 'Anteil (%)', style: { fontSize: '11px' } },
+    },
+    legend: { enabled: false },
+    tooltip: {
+      pointFormatter() {
+        return `Anteil: <b>${this.y.toFixed(1)}%</b><br/>Treffer: <b>${this.absolute}</b>`;
+      },
+    },
+    plotOptions: {
+      series: {
+        animation: false,
+        borderRadius: 3,
+      },
+    },
+    series: [{
+      type: 'column',
+      data: data.map((entry, index) => ({ ...entry, color: index === 4 ? '#dc2626' : index === 3 ? '#f59e0b' : accent })),
+    }],
+  };
+
+  return (
+    <Paper withBorder p="xs" className="analysis-coverage-heatmap-panel" style={{ height: '100%' }}>
+      <HighchartsReact highcharts={Highcharts} options={options} containerProps={{ style: { height: '100%' } }} />
+    </Paper>
+  );
+}
+
+function ResilienceHeatmapChart({ xCategories, yCategories, values, accent, title }) {
+  const max = Math.max(0.01, ...values.map(([, , value]) => Number(value || 0)));
+  const options = {
+    chart: { type: 'heatmap', backgroundColor: 'transparent', spacing: [8, 8, 8, 8] },
+    title: { text: null },
+    credits: { enabled: false },
+    xAxis: {
+      categories: xCategories,
+      labels: { style: { fontSize: '10px' } },
+    },
+    yAxis: {
+      categories: yCategories,
+      title: { text: null },
+      reversed: true,
+    },
+    colorAxis: {
+      min: 0,
+      max,
+      stops: [
+        [0, '#e2e8f0'],
+        [0.45, '#f59e0b'],
+        [1, '#dc2626'],
+      ],
+    },
+    legend: { enabled: false },
+    tooltip: {
+      formatter() {
+        const x = xCategories[this.point.x] || '';
+        const y = yCategories[this.point.y] || '';
+        return `<b>${y}</b><br/>${x}<br/>Risiko: <b>${(Number(this.point.value || 0) * 100).toFixed(1)}%</b>`;
+      },
+    },
+    series: [{
+      type: 'heatmap',
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.6)',
+      data: values,
+      states: { hover: { borderColor: accent, borderWidth: 1.5 } },
+    }],
+  };
+
+  return (
+    <Paper withBorder p="xs" className="analysis-coverage-heatmap-panel" style={{ height: '100%' }}>
+      <Text size="xs" fw={700} className="analysis-stage-recommendation-title" mb={4}>{title}</Text>
+      <Box h="calc(100% - 1.2rem)">
         <HighchartsReact highcharts={Highcharts} options={options} containerProps={{ style: { height: '100%' } }} />
       </Box>
     </Paper>
   );
 }
 
-function MonteCarloResultPanel({ monteCarlo }) {
-  const distribution = monteCarlo?.undercoverageMinutes || [];
-  const hasData = distribution.length > 0;
+function ResilienceClosurePatternsChart({ monteCarlo, accent }) {
+  const closurePatterns = monteCarlo?.closurePatterns || [];
+  const topPatterns = closurePatterns.slice(0, 8);
+
+  if (!topPatterns.length) {
+    return (
+      <Paper withBorder p="xs" className="analysis-coverage-heatmap-panel" style={{ height: '100%' }}>
+        <Text size="xs" fw={700} className="analysis-stage-recommendation-title" mb={4}>
+          Schließungs-Muster
+        </Text>
+        <Text size="sm" c="dimmed">Keine Schließungsereignisse in der Simulation.</Text>
+      </Paper>
+    );
+  }
+
+  const options = {
+    chart: { type: 'bar', backgroundColor: 'transparent', spacing: [8, 8, 8, 8] },
+    title: { text: null },
+    credits: { enabled: false },
+    xAxis: {
+      categories: topPatterns.map((pattern) => pattern.label),
+      labels: { style: { fontSize: '10px' } },
+      title: { text: null },
+    },
+    yAxis: {
+      min: 0,
+      title: { text: 'Anzahl Schließungsereignisse', style: { fontSize: '11px' } },
+    },
+    legend: { enabled: false },
+    tooltip: {
+      formatter() {
+        const pattern = topPatterns[this.point.index];
+        if (!pattern) return '';
+        return `Muster: <b>${pattern.label}</b><br/>Ereignisse: <b>${pattern.count}</b><br/>Ø Dauer: <b>${pattern.avgDurationMinutes.toFixed(0)} Min.</b><br/>Max Dauer: <b>${pattern.maxDurationMinutes.toFixed(0)} Min.</b>`;
+      },
+    },
+    plotOptions: {
+      series: {
+        animation: false,
+        borderRadius: 3,
+      },
+    },
+    series: [{
+      type: 'bar',
+      data: topPatterns.map((pattern) => ({
+        y: Number(pattern.count || 0),
+        color: accent,
+      })),
+    }],
+  };
 
   return (
-    <Paper withBorder p="xs" className="analysis-coverage-heatmap-panel">
+    <Paper withBorder p="xs" className="analysis-coverage-heatmap-panel" style={{ height: '100%' }}>
       <Text size="xs" fw={700} className="analysis-stage-recommendation-title" mb={4}>
-        Monte-Carlo-Ergebnis
+        Schließungs-Muster und Dauer
       </Text>
-      {!hasData ? (
-        <Text size="sm" c="dimmed">Keine Simulationsergebnisse verfügbar.</Text>
-      ) : (
-        <Stack gap={4}>
-          <Text size="sm">Läufe: <b>{monteCarlo.runs}</b></Text>
-          <Text size="sm">Wahrscheinlichkeit Angebotsreduktion: <b>{monteCarlo.reductionProbabilityPct.toFixed(1)}%</b></Text>
-          <Text size="sm">Ø Unterdeckung: <b>{monteCarlo.meanUndercoverageMinutes.toFixed(0)} Min.</b></Text>
-          <Text size="sm">P95 Unterdeckung: <b>{monteCarlo.p95UndercoverageMinutes.toFixed(0)} Min.</b></Text>
-          <Text size="xs" c="dimmed">
-            Parameter: {monteCarlo.absenceRatePct}% Ausfallrate, max. {monteCarlo.maxConcurrentOutages} gleichzeitige Ausfälle
-          </Text>
-        </Stack>
-      )}
+      <Box h="calc(100% - 1.2rem)">
+        <HighchartsReact highcharts={Highcharts} options={options} containerProps={{ style: { height: '100%' } }} />
+      </Box>
     </Paper>
   );
 }
 
-function ResilienceCompositeChart({ ranking, accent, monteCarlo }) {
+function ResilienceClosureDurationChart({ monteCarlo, accent }) {
+  const durationDistribution = monteCarlo?.closureDurationDistribution || [];
+  const stats = monteCarlo?.closureDurationStats || null;
+
+  if (!durationDistribution.length) {
+    return (
+      <Paper withBorder p="xs" className="analysis-coverage-heatmap-panel" style={{ height: '100%' }}>
+        <Text size="xs" fw={700} className="analysis-stage-recommendation-title" mb={4}>
+          Schließungsdauer
+        </Text>
+        <Text size="sm" c="dimmed">Keine Schließungsereignisse in der Simulation.</Text>
+      </Paper>
+    );
+  }
+
+  const options = {
+    chart: { type: 'column', backgroundColor: 'transparent', spacing: [8, 8, 8, 8] },
+    title: { text: null },
+    credits: { enabled: false },
+    xAxis: {
+      categories: durationDistribution.map((entry) => entry.label),
+      labels: { style: { fontSize: '10px' } },
+      title: { text: 'Dauer-Klasse' },
+    },
+    yAxis: {
+      min: 0,
+      title: { text: 'Ereignisse', style: { fontSize: '11px' } },
+    },
+    legend: { enabled: false },
+    tooltip: {
+      formatter() {
+        const row = durationDistribution[this.point.index];
+        if (!row) return '';
+        return `Dauer: <b>${row.label}</b><br/>Ereignisse: <b>${row.count}</b><br/>Anteil: <b>${row.sharePct.toFixed(1)}%</b>`;
+      },
+    },
+    plotOptions: {
+      series: {
+        animation: false,
+        borderRadius: 3,
+      },
+    },
+    series: [{
+      type: 'column',
+      data: durationDistribution.map((entry, index) => ({
+        y: Number(entry.count || 0),
+        color: index >= 3 ? '#dc2626' : accent,
+      })),
+    }],
+  };
+
   return (
-    <Box className="analysis-resilience-chart-wrap">
-      <CriticalityRankingChart ranking={ranking} accent={accent} />
-      <Stack gap="xs" className="analysis-resilience-right-column">
-        <MonteCarloResultPanel monteCarlo={monteCarlo} />
-      </Stack>
+    <Paper withBorder p="xs" className="analysis-coverage-heatmap-panel" style={{ height: '100%' }}>
+      <Text size="xs" fw={700} className="analysis-stage-recommendation-title" mb={4}>
+        Schließungsdauer-Verteilung
+      </Text>
+      <Group gap={12} mb={6}>
+        <Text size="xs" c="dimmed">Ø {Number(stats?.avgMinutes || 0).toFixed(0)} Min.</Text>
+        <Text size="xs" c="dimmed">P95 {Number(stats?.p95Minutes || 0).toFixed(0)} Min.</Text>
+        <Text size="xs" c="dimmed">Max {Number(stats?.maxMinutes || 0).toFixed(0)} Min.</Text>
+      </Group>
+      <Box h="calc(100% - 2.4rem)">
+        <HighchartsReact highcharts={Highcharts} options={options} containerProps={{ style: { height: '100%' } }} />
+      </Box>
+    </Paper>
+  );
+}
+
+const RESILIENCE_CHART_SLIDES = [
+  { id: 'score', title: 'Resilienz-Score' },
+  { id: 'cascade', title: 'Kompensations-Kaskade' },
+  { id: 'closures', title: 'Schließungs-Muster' },
+  { id: 'duration', title: 'Schließungsdauer' },
+  { id: 'weekday', title: 'Heatmap Wochentage' },
+  { id: 'period', title: 'Heatmap Zeitraum' },
+];
+
+function ResilienceMonteCarloCarousel({ monteCarlo, categories, accent }) {
+  const [activeIndex, setActiveIndex] = React.useState(0);
+  const [emblaApi, setEmblaApi] = React.useState(null);
+  const [canGoPrev, setCanGoPrev] = React.useState(false);
+  const [canGoNext, setCanGoNext] = React.useState(true);
+
+  React.useEffect(() => {
+    if (!emblaApi) return undefined;
+    const updateState = () => {
+      setActiveIndex(emblaApi.selectedScrollSnap());
+      setCanGoPrev(emblaApi.canScrollPrev());
+      setCanGoNext(emblaApi.canScrollNext());
+    };
+    updateState();
+    emblaApi.on('select', updateState);
+    emblaApi.on('reInit', updateState);
+    return () => {
+      emblaApi.off('select', updateState);
+      emblaApi.off('reInit', updateState);
+    };
+  }, [emblaApi]);
+
+  return (
+    <Box className="analysis-coverage-carousel-wrap">
+      <Group className="analysis-coverage-carousel-header" justify="space-between" wrap="nowrap">
+        <Text size="xs" fw={700} className="analysis-stage-recommendation-title">
+          {RESILIENCE_CHART_SLIDES[activeIndex]?.title || 'Resilienz'}
+        </Text>
+        <Group gap={6} wrap="nowrap">
+          <Badge variant="filled" size="md" className="analysis-coverage-carousel-counter">
+            {activeIndex + 1}/{RESILIENCE_CHART_SLIDES.length}
+          </Badge>
+          <ActionIcon variant="filled" size="md" className="analysis-coverage-carousel-nav" onClick={() => emblaApi?.scrollPrev()} disabled={!canGoPrev}>
+            <IconChevronLeft size={14} />
+          </ActionIcon>
+          <ActionIcon variant="filled" size="md" className="analysis-coverage-carousel-nav" onClick={() => emblaApi?.scrollNext()} disabled={!canGoNext}>
+            <IconChevronRight size={14} />
+          </ActionIcon>
+        </Group>
+      </Group>
+
+      <Carousel
+        withIndicators
+        withControls={false}
+        getEmblaApi={setEmblaApi}
+        className="analysis-coverage-carousel"
+        slideSize="100%"
+        slideGap={0}
+        emblaOptions={{ loop: false, align: 'start', dragFree: false }}
+      >
+        <Carousel.Slide>
+          <Box className="analysis-coverage-carousel-slide">
+            {activeIndex === 0 ? <ResilienceScorePanel monteCarlo={monteCarlo} /> : null}
+          </Box>
+        </Carousel.Slide>
+        <Carousel.Slide>
+          <Box className="analysis-coverage-carousel-slide">
+            {activeIndex === 1 ? <ResilienceCascadeChart monteCarlo={monteCarlo} accent={accent} /> : null}
+          </Box>
+        </Carousel.Slide>
+        <Carousel.Slide>
+          <Box className="analysis-coverage-carousel-slide">
+            {activeIndex === 2 ? (
+              <ResilienceClosurePatternsChart monteCarlo={monteCarlo} accent={accent} />
+            ) : null}
+          </Box>
+        </Carousel.Slide>
+        <Carousel.Slide>
+          <Box className="analysis-coverage-carousel-slide">
+            {activeIndex === 3 ? (
+              <ResilienceClosureDurationChart monteCarlo={monteCarlo} accent={accent} />
+            ) : null}
+          </Box>
+        </Carousel.Slide>
+        <Carousel.Slide>
+          <Box className="analysis-coverage-carousel-slide">
+            {activeIndex === 4 ? (
+              <ResilienceHeatmapChart
+                xCategories={categories}
+                yCategories={monteCarlo?.weekdayLabels || ['Mo', 'Di', 'Mi', 'Do', 'Fr']}
+                values={monteCarlo?.weekdayHeatValues || []}
+                accent={accent}
+                title="Kritische Slots nach Wochentag"
+              />
+            ) : null}
+          </Box>
+        </Carousel.Slide>
+        <Carousel.Slide>
+          <Box className="analysis-coverage-carousel-slide">
+            {activeIndex === 5 ? (
+              <ResilienceHeatmapChart
+                xCategories={monteCarlo?.periodLabels || []}
+                yCategories={monteCarlo?.weekdayLabels || ['Mo', 'Di', 'Mi', 'Do', 'Fr']}
+                values={monteCarlo?.periodHeatValues || []}
+                accent={accent}
+                title="Kritische Wochen im Zeitraum"
+              />
+            ) : null}
+          </Box>
+        </Carousel.Slide>
+      </Carousel>
     </Box>
   );
 }
@@ -1086,10 +1623,11 @@ function StoryCard({ story, isActive, onSelect }) {
   );
 }
 
-function AnalysisProgressPanel({ stageIndex, isLoading }) {
-  const safeIndex = Math.min(Math.max(stageIndex, 0), ANALYSIS_LOADING_STAGES.length - 1);
-  const activeStage = ANALYSIS_LOADING_STAGES[safeIndex] || ANALYSIS_LOADING_STAGES[0];
-  const completed = ANALYSIS_LOADING_STAGES
+function AnalysisProgressPanel({ stageIndex, isLoading, stages }) {
+  const panelStages = stages?.length ? stages : [ANALYSIS_LOADING_STAGES[0]];
+  const safeIndex = Math.min(Math.max(stageIndex, 0), panelStages.length - 1);
+  const activeStage = panelStages[safeIndex] || panelStages[0];
+  const completed = panelStages
     .slice(0, safeIndex)
     .reduce((sum, stage) => sum + Number(stage.weight || 0), 0);
   const activeWeight = Number(activeStage?.weight || 0);
@@ -1126,7 +1664,7 @@ function AnalysisProgressPanel({ stageIndex, isLoading }) {
         </Text>
 
         <Stack gap={4} w="100%" className="analysis-loading-stage-list">
-          {ANALYSIS_LOADING_STAGES.map((stage, index) => (
+          {panelStages.map((stage, index) => (
             <Text
               key={stage.key}
               size="xs"
@@ -1175,14 +1713,33 @@ function VisuView() {
   const [canScrollPrev, setCanScrollPrev] = React.useState(false);
   const [canScrollNext, setCanScrollNext] = React.useState(false);
   const [monteCarloConfig, setMonteCarloConfig] = React.useState({
-    runs: 800,
-    absenceRatePct: 14,
+    runs: 1200,
+    baseAbsenceProbabilityPct: 14,
+    simulationWeeks: 26,
     maxConcurrentOutages: 3,
+    minExpertRatioPct: LEGAL_EXPERT_RATIO_MIN_PCT,
+    maxCareRatio: 8,
+    minGroupHeadcount: 1,
+    maxUndercoverageSlots: 4,
+    maxOvertimeHoursPerEmployeePerWeek: 2,
+    maxTimeReductionHoursPerWeek: 3,
+    emergencyDemandReductionPct: 18,
+    seasonalityEnabled: true,
+    contagionEnabled: true,
+    contagionBoostPct: 28,
+    contagionDays: 3,
+    childCompensationEnabled: true,
+    childCompensationRatePct: 6,
   });
   const [monteCarloRunId, setMonteCarloRunId] = React.useState(0);
   const todayIso = React.useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const qualityReferenceDate = React.useMemo(() => chartState?.referenceDate || todayIso, [chartState?.referenceDate, todayIso]);
   const { getEffectiveDataItems, getEffectiveBookings, getEffectiveGroupAssignments, getEffectiveGroupDefs } = useOverlayData();
   const activeStory = STORY_STEPS[activeStep] || STORY_STEPS[0];
+  const activeLoadingStages = React.useMemo(
+    () => ANALYSIS_LOADING_STAGES_BY_STORY[activeStory.id] || [ANALYSIS_LOADING_STAGES[0]],
+    [activeStory.id]
+  );
   const effectiveDataItems = React.useMemo(() => getEffectiveDataItems(), [getEffectiveDataItems]);
   const groupDefs = React.useMemo(() => getEffectiveGroupDefs(), [getEffectiveGroupDefs]);
   const selectedGroups = React.useMemo(() => chartState?.filter?.Groups || EMPTY_LIST, [chartState?.filter?.Groups]);
@@ -1196,10 +1753,20 @@ function VisuView() {
   const [analysisLoadingStage, setAnalysisLoadingStage] = React.useState(0);
   const [statusHoverData, setStatusHoverData] = React.useState(null);
   const [heatmapMode, setHeatmapMode] = React.useState(HEATMAP_MODES.UNWEIGHTED_QUOTIENT);
+  const [qualityOnlyPlannedStaff, setQualityOnlyPlannedStaff] = React.useState(false);
   const handleStatusHoverChange = React.useCallback((data) => setStatusHoverData(data), []);
 
   const computeCoverageData = React.useCallback(() => {
     if (!selectedScenarioId) return null;
+
+    const storyId = activeStory.id;
+    const needsCoverage = storyId === 'status' || storyId === 'transitions';
+    const needsResilience = storyId === 'transitions';
+    const needsFinance = storyId === 'cohort';
+
+    if (!needsCoverage && !needsFinance) {
+      return null;
+    }
 
     const overlayAware = buildOverlayAwareData(selectedScenarioId, {
       simScenario: { scenarios },
@@ -1349,127 +1916,359 @@ function VisuView() {
       };
     };
 
-    const baselineSnapshot = buildSnapshot([]);
+    const baselineSnapshot = needsCoverage
+      ? buildSnapshot([])
+      : {
+          demandSeries: [],
+          capacitySeries: [],
+          deficits: [],
+          deficitSlots: 0,
+          worstDeficit: 0,
+          undercoverageMinutes: 0,
+          totalDemand: 0,
+          totalCapacity: 0,
+          heatValues: [],
+          groupUndercoverageMinutes: [],
+        };
 
-    const activeCapacityItems = Object.values(rawDataItems)
-      .filter(
-        (item) =>
-          item
-          && !item.archived
-          && item.type === 'capacity'
-          && isRecordActiveOnDate(item, referenceDate)
-      )
-      .filter((item) => {
-        if (!selectedGroups.length) return true;
-        const groupId = resolveGroupIdAtDate(rawGroupAssignments?.[String(item.id)] || {}, referenceDate, item.groupId || null);
-        if (!groupId && selectedGroups.includes('__NO_GROUP__')) return true;
-        return Boolean(groupId && selectedGroups.includes(String(groupId)));
+    let monteCarloResult = null;
+    if (needsResilience) {
+      const runs = Math.max(200, Math.min(20000, Number(monteCarloConfig?.runs || 1200)));
+      const simulationWeeks = Math.max(4, Math.min(52, Number(monteCarloConfig?.simulationWeeks || 26)));
+      const baseAbsenceProb = Math.max(0.01, Math.min(0.9, Number(monteCarloConfig?.baseAbsenceProbabilityPct || 14) / 100));
+      const maxConcurrentOutages = Math.max(1, Math.min(12, Number(monteCarloConfig?.maxConcurrentOutages || 3)));
+      const minExpertRatioPct = Math.max(0, Math.min(100, Number(monteCarloConfig?.minExpertRatioPct || LEGAL_EXPERT_RATIO_MIN_PCT)));
+      const maxCareRatioAllowed = Math.max(1, Math.min(30, Number(monteCarloConfig?.maxCareRatio || 8)));
+      const minGroupHeadcount = Math.max(0, Math.min(10, Number(monteCarloConfig?.minGroupHeadcount || 1)));
+      const maxUndercoverageSlots = Math.max(0, Math.min(200, Number(monteCarloConfig?.maxUndercoverageSlots || 4)));
+      const maxOvertimeHoursPerEmployeePerWeek = Math.max(0, Math.min(20, Number(monteCarloConfig?.maxOvertimeHoursPerEmployeePerWeek || 2)));
+      const maxTimeReductionHoursPerWeek = Math.max(0, Math.min(20, Number(monteCarloConfig?.maxTimeReductionHoursPerWeek || 3)));
+      const emergencyDemandReductionPct = Math.max(0, Math.min(80, Number(monteCarloConfig?.emergencyDemandReductionPct || 18)));
+      const seasonalityEnabled = Boolean(monteCarloConfig?.seasonalityEnabled);
+      const contagionEnabled = Boolean(monteCarloConfig?.contagionEnabled);
+      const contagionBoostPct = Math.max(0, Math.min(200, Number(monteCarloConfig?.contagionBoostPct || 28)));
+      const contagionDays = Math.max(0, Math.min(14, Number(monteCarloConfig?.contagionDays || 3)));
+      const childCompensationEnabled = Boolean(monteCarloConfig?.childCompensationEnabled);
+      const childCompensationRatePct = Math.max(0, Math.min(30, Number(monteCarloConfig?.childCompensationRatePct || 6)));
+
+      const slotsPerDay = Math.max(1, Math.floor(categories.length / 5));
+      const dayLabels = ['Mo', 'Di', 'Mi', 'Do', 'Fr'];
+      const groupCount = Math.max(1, groupsForHeatmap.length);
+      const expertSeriesBase = (weeklyData?.expert_ratio || []).map((value) => Number(value || 0));
+      const demandSeriesBase = (weeklyData?.demand || []).map((value) => Number(value || 0));
+      const pedSeriesBase = (weeklyData?.capacity_pedagogical || []).map((value) => Number(value || 0));
+      const adminSeriesBase = (weeklyData?.capacity_administrative || []).map((value) => Number(value || 0));
+      const avgPedHeadcount = pedSeriesBase.length
+        ? pedSeriesBase.reduce((sum, value) => sum + value, 0) / pedSeriesBase.length
+        : 1;
+
+      const weeklySeasonality = [1.16, 1.14, 1.08, 1.0, 0.95, 0.9, 0.86, 0.88, 0.94, 1.0, 1.08, 1.15];
+
+      const scenarioSeed = String(selectedScenarioId || '')
+        .split('')
+        .reduce((acc, char) => ((acc * 31) + char.charCodeAt(0)) >>> 0, 0);
+
+      let seed = (scenarioSeed ^ ((monteCarloRunId + 1) * 2654435761)) >>> 0;
+      const nextRandom = () => {
+        seed += 0x6D2B79F5;
+        let t = seed;
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+
+      const cascadeCounts = [0, 0, 0, 0, 0];
+      const weekdayRiskAccumulator = Array.from({ length: dayLabels.length }, () => Array.from({ length: slotsPerDay }, () => 0));
+      const periodRiskAccumulator = Array.from({ length: simulationWeeks }, () => Array.from({ length: dayLabels.length }, () => 0));
+      const toleratedClosuresPerDay = Math.max(0, maxUndercoverageSlots / dayLabels.length);
+      const closureCombinationLabels = new Map();
+      const closurePatternStats = new Map();
+      const closureIncidentDurationsSlots = [];
+
+      let regularDaysAllRuns = 0;
+      let resiliencePointsAllRuns = 0;
+      let closedSlotsAllRuns = 0;
+      let totalSlotsAllRuns = 0;
+
+      const registerClosureIncident = (combinationKey, durationSlots) => {
+        if (!combinationKey || durationSlots <= 0) return;
+        closureIncidentDurationsSlots.push(durationSlots);
+        const existing = closurePatternStats.get(combinationKey) || {
+          count: 0,
+          totalDurationSlots: 0,
+          maxDurationSlots: 0,
+        };
+        existing.count += 1;
+        existing.totalDurationSlots += durationSlots;
+        existing.maxDurationSlots = Math.max(existing.maxDurationSlots, durationSlots);
+        closurePatternStats.set(combinationKey, existing);
+      };
+
+      for (let run = 0; run < runs; run += 1) {
+        for (let weekIndex = 0; weekIndex < simulationWeeks; weekIndex += 1) {
+          const monthIndex = Math.floor((weekIndex / 4.33) % 12);
+          const seasonalFactor = seasonalityEnabled ? weeklySeasonality[monthIndex] : 1;
+          const overtimeBudgetSlots = Math.max(0, Math.round(avgPedHeadcount * (maxOvertimeHoursPerEmployeePerWeek / SLOT_HOURS)));
+          let remainingOvertimeBudget = overtimeBudgetSlots;
+          let remainingTimeReductionSlots = Math.max(0, Math.round(maxTimeReductionHoursPerWeek / SLOT_HOURS));
+          let contagionRemaining = 0;
+          const dayClosedSlots = Array.from({ length: dayLabels.length }, () => 0);
+          const dayClosureCombinationKeys = Array.from({ length: dayLabels.length }, () => Array.from({ length: slotsPerDay }, () => null));
+
+          for (let slotIndex = 0; slotIndex < categories.length; slotIndex += 1) {
+            totalSlotsAllRuns += 1;
+
+            const dayIndex = Math.floor(slotIndex / slotsPerDay);
+            const slotInDay = slotIndex % slotsPerDay;
+            const demandBase = Number(demandSeriesBase[slotIndex] || 0);
+            const pedBase = Number(pedSeriesBase[slotIndex] || 0);
+            const adminBase = Number(adminSeriesBase[slotIndex] || 0);
+            const expertBase = Number(expertSeriesBase[slotIndex] || 0);
+
+            const contagionFactor = contagionEnabled && contagionRemaining > 0 ? (1 + (contagionBoostPct / 100)) : 1;
+            const absenceProb = Math.max(0.01, Math.min(0.95, baseAbsenceProb * seasonalFactor * contagionFactor));
+
+            let absentPed = 0;
+            const outageCap = Math.min(Math.round(pedBase), maxConcurrentOutages);
+            for (let workerIdx = 0; workerIdx < outageCap; workerIdx += 1) {
+              if (nextRandom() < absenceProb) absentPed += 1;
+            }
+
+            if (contagionEnabled && absentPed > 0) {
+              contagionRemaining = contagionDays;
+            } else if (contagionRemaining > 0) {
+              contagionRemaining -= 1;
+            }
+
+            let effectivePed = Math.max(0, pedBase - absentPed);
+            let effectiveDemand = demandBase;
+            if (childCompensationEnabled && absentPed > 0) {
+              const demandFactor = Math.max(0.55, 1 - ((childCompensationRatePct / 100) * absentPed));
+              effectiveDemand *= demandFactor;
+            }
+
+            let totalStaff = effectivePed + adminBase;
+            const minimumStaffRequired = minGroupHeadcount * groupCount;
+            let currentCareRatio = totalStaff > 0 ? effectiveDemand / totalStaff : Number.POSITIVE_INFINITY;
+            let currentExpertRatio = expertBase;
+
+            let stage = 0;
+            let isCompliant = (
+              totalStaff >= minimumStaffRequired
+              && currentCareRatio <= maxCareRatioAllowed
+              && currentExpertRatio >= minExpertRatioPct
+            );
+
+            if (!isCompliant) {
+              const targetStaffForCare = Math.max(0, Math.ceil((effectiveDemand / Math.max(1, maxCareRatioAllowed)) - totalStaff));
+              const overtimeSlotsUsed = Math.min(targetStaffForCare, remainingOvertimeBudget);
+              if (overtimeSlotsUsed > 0) {
+                remainingOvertimeBudget -= overtimeSlotsUsed;
+                effectivePed += overtimeSlotsUsed;
+                totalStaff += overtimeSlotsUsed;
+                currentCareRatio = totalStaff > 0 ? effectiveDemand / totalStaff : Number.POSITIVE_INFINITY;
+                isCompliant = (
+                  totalStaff >= minimumStaffRequired
+                  && currentCareRatio <= maxCareRatioAllowed
+                  && currentExpertRatio >= minExpertRatioPct
+                );
+                stage = 1;
+              }
+            }
+
+            if (!isCompliant && remainingTimeReductionSlots > 0) {
+              const reductionFactor = Math.min(0.45, remainingTimeReductionSlots / Math.max(1, categories.length));
+              effectiveDemand *= (1 - reductionFactor);
+              remainingTimeReductionSlots -= 1;
+              currentCareRatio = totalStaff > 0 ? effectiveDemand / totalStaff : Number.POSITIVE_INFINITY;
+              isCompliant = (
+                totalStaff >= minimumStaffRequired
+                && currentCareRatio <= maxCareRatioAllowed
+                && currentExpertRatio >= minExpertRatioPct
+              );
+              stage = 2;
+            }
+
+            if (!isCompliant) {
+              effectiveDemand *= (1 - (emergencyDemandReductionPct / 100));
+              currentCareRatio = totalStaff > 0 ? effectiveDemand / totalStaff : Number.POSITIVE_INFINITY;
+              isCompliant = (
+                totalStaff >= minimumStaffRequired
+                && currentCareRatio <= maxCareRatioAllowed
+                && currentExpertRatio >= minExpertRatioPct
+              );
+              stage = 3;
+            }
+
+            if (!isCompliant) {
+              stage = 4;
+              dayClosedSlots[dayIndex] += 1;
+              closedSlotsAllRuns += 1;
+              weekdayRiskAccumulator[dayIndex][slotInDay] += 1;
+              periodRiskAccumulator[weekIndex][dayIndex] += 1;
+
+              const isHeadcountIssue = totalStaff < minimumStaffRequired;
+              const isCareRatioIssue = currentCareRatio > maxCareRatioAllowed;
+              const isExpertIssue = currentExpertRatio < minExpertRatioPct;
+              const absenceBucket = absentPed >= 3 ? '3+' : String(absentPed);
+              const factorLabels = [];
+              if (isHeadcountIssue) factorLabels.push('Unterbesetzung');
+              if (isCareRatioIssue) factorLabels.push('Schlüsselgrenze');
+              if (isExpertIssue) factorLabels.push('Fachkraftquote');
+              if (factorLabels.length === 0) factorLabels.push('Sonstige Restriktion');
+
+              const combinationKey = `A${absenceBucket}|H${isHeadcountIssue ? 1 : 0}|C${isCareRatioIssue ? 1 : 0}|E${isExpertIssue ? 1 : 0}`;
+              const combinationLabel = `Ausfälle ${absenceBucket} · ${factorLabels.join(' + ')}`;
+              dayClosureCombinationKeys[dayIndex][slotInDay] = combinationKey;
+              closureCombinationLabels.set(combinationKey, combinationLabel);
+            }
+
+            cascadeCounts[stage] += 1;
+          }
+
+          dayClosedSlots.forEach((closedSlots, dayIndex) => {
+            const overloadSlots = Math.max(0, closedSlots - toleratedClosuresPerDay);
+            const overflowRange = Math.max(1, slotsPerDay - toleratedClosuresPerDay);
+            const dayResilienceScore = Math.max(0, 1 - (overloadSlots / overflowRange));
+            resiliencePointsAllRuns += dayResilienceScore;
+
+            if (closedSlots <= toleratedClosuresPerDay) {
+              regularDaysAllRuns += 1;
+            }
+
+            const closureKeys = dayClosureCombinationKeys[dayIndex] || [];
+            let currentDuration = 0;
+            const incidentCombinationHits = new Map();
+
+            const finalizeIncident = () => {
+              if (currentDuration <= 0 || incidentCombinationHits.size === 0) return;
+              let dominantKey = null;
+              let dominantHits = -1;
+              incidentCombinationHits.forEach((hits, key) => {
+                if (hits > dominantHits) {
+                  dominantHits = hits;
+                  dominantKey = key;
+                }
+              });
+              if (dominantKey) {
+                registerClosureIncident(dominantKey, currentDuration);
+              }
+            };
+
+            for (let slotInDay = 0; slotInDay < slotsPerDay; slotInDay += 1) {
+              const combinationKey = closureKeys[slotInDay];
+              if (!combinationKey) {
+                finalizeIncident();
+                currentDuration = 0;
+                incidentCombinationHits.clear();
+                continue;
+              }
+
+              currentDuration += 1;
+              incidentCombinationHits.set(combinationKey, (incidentCombinationHits.get(combinationKey) || 0) + 1);
+            }
+
+            finalizeIncident();
+          });
+        }
+      }
+
+      const totalDayCount = runs * simulationWeeks * dayLabels.length;
+      const resilienceScorePct = totalDayCount > 0 ? (resiliencePointsAllRuns / totalDayCount) * 100 : 0;
+      const regularDaysPct = totalDayCount > 0 ? (regularDaysAllRuns / totalDayCount) * 100 : 0;
+      const regularOperationPct = totalSlotsAllRuns > 0 ? (Number(cascadeCounts[0] || 0) / totalSlotsAllRuns) * 100 : 0;
+      const closurePct = totalSlotsAllRuns > 0 ? (closedSlotsAllRuns / totalSlotsAllRuns) * 100 : 0;
+      const closurePatterns = Array.from(closurePatternStats.entries())
+        .map(([key, stats]) => {
+          const avgDurationSlots = stats.count > 0 ? stats.totalDurationSlots / stats.count : 0;
+          return {
+            key,
+            label: closureCombinationLabels.get(key) || key,
+            count: stats.count,
+            avgDurationMinutes: avgDurationSlots * SLOT_HOURS * 60,
+            maxDurationMinutes: stats.maxDurationSlots * SLOT_HOURS * 60,
+            totalDurationMinutes: stats.totalDurationSlots * SLOT_HOURS * 60,
+          };
+        })
+        .sort((a, b) => {
+          if (b.count !== a.count) return b.count - a.count;
+          return b.totalDurationMinutes - a.totalDurationMinutes;
+        });
+
+      const durationBuckets = [
+        { key: 'd30', label: 'bis 30 Min.', min: 0, max: 30 },
+        { key: 'd60', label: '31-60 Min.', min: 31, max: 60 },
+        { key: 'd120', label: '61-120 Min.', min: 61, max: 120 },
+        { key: 'd180', label: '121-180 Min.', min: 121, max: 180 },
+        { key: 'd181', label: '> 180 Min.', min: 181, max: Number.POSITIVE_INFINITY },
+      ];
+      const closureIncidentDurationsMinutes = closureIncidentDurationsSlots.map((slots) => slots * SLOT_HOURS * 60);
+      const sortedDurations = [...closureIncidentDurationsMinutes].sort((a, b) => a - b);
+      const totalIncidents = closureIncidentDurationsMinutes.length;
+      const closureDurationDistribution = durationBuckets.map((bucket) => {
+        const count = closureIncidentDurationsMinutes.filter((minutes) => minutes >= bucket.min && minutes <= bucket.max).length;
+        return {
+          key: bucket.key,
+          label: bucket.label,
+          count,
+          sharePct: totalIncidents > 0 ? (count / totalIncidents) * 100 : 0,
+        };
+      });
+      const closureDurationStats = {
+        avgMinutes: totalIncidents > 0
+          ? closureIncidentDurationsMinutes.reduce((sum, minutes) => sum + minutes, 0) / totalIncidents
+          : 0,
+        p95Minutes: totalIncidents > 0
+          ? sortedDurations[Math.min(sortedDurations.length - 1, Math.floor(sortedDurations.length * 0.95))]
+          : 0,
+        maxMinutes: totalIncidents > 0 ? sortedDurations[sortedDurations.length - 1] : 0,
+      };
+
+      const weekdayHeatValues = [];
+      dayLabels.forEach((_, dayIndex) => {
+        for (let slotInDay = 0; slotInDay < slotsPerDay; slotInDay += 1) {
+          const denominator = runs * simulationWeeks;
+          const risk = denominator > 0 ? weekdayRiskAccumulator[dayIndex][slotInDay] / denominator : 0;
+          const x = (dayIndex * slotsPerDay) + slotInDay;
+          weekdayHeatValues.push([x, dayIndex, risk]);
+        }
       });
 
-    const criticalityRanking = activeCapacityItems
-      .map((item) => {
-        const itemId = String(item.id);
-        const snapshot = buildSnapshot([itemId]);
-        const impactMinutes = Math.max(0, snapshot.undercoverageMinutes - baselineSnapshot.undercoverageMinutes);
-        const offerLossPct = baselineSnapshot.totalCapacity > 0
-          ? ((baselineSnapshot.totalCapacity - snapshot.totalCapacity) / baselineSnapshot.totalCapacity) * 100
-          : 0;
-        return {
-          id: itemId,
-          name: item.name || 'Mitarbeiter',
-          impactMinutes,
-          offerLossPct,
-          snapshot,
-        };
-      })
-      .sort((a, b) => b.impactMinutes - a.impactMinutes)
-      .slice(0, 8);
-
-    const topCritical = criticalityRanking[0] || null;
-    const top1GroupMinutes = (topCritical?.snapshot?.groupUndercoverageMinutes || []).map((entry) => Number(entry.minutes || 0));
-    const groupResilienceSpread = top1GroupMinutes.length
-      ? Math.max(...top1GroupMinutes) - Math.min(...top1GroupMinutes)
-      : 0;
-
-    const totalImpact = criticalityRanking.reduce((sum, entry) => sum + Number(entry.impactMinutes || 0), 0);
-    const top3Impact = criticalityRanking.slice(0, 3).reduce((sum, entry) => sum + Number(entry.impactMinutes || 0), 0);
-    const bottleneckConcentration = totalImpact > 0 ? (top3Impact / totalImpact) * 100 : 0;
-
-    let busFactor = 0;
-    if (baselineSnapshot.deficitSlots > 0) {
-      busFactor = 0;
-    } else if (!criticalityRanking.length) {
-      busFactor = 0;
-    } else {
-      const rankedIds = criticalityRanking.map((entry) => entry.id);
-      busFactor = rankedIds.length + 1;
-      for (let count = 1; count <= rankedIds.length; count += 1) {
-        const snapshot = buildSnapshot(rankedIds.slice(0, count));
-        if (snapshot.deficitSlots > 0) {
-          busFactor = count;
-          break;
-        }
-      }
-    }
-
-    const capacityIds = activeCapacityItems.map((item) => String(item.id));
-    const runs = Math.max(100, Math.min(10000, Number(monteCarloConfig?.runs || 800)));
-    const absenceRate = Math.max(0.01, Math.min(0.8, Number(monteCarloConfig?.absenceRatePct || 14) / 100));
-    const maxConcurrentOutages = Math.max(1, Math.min(12, Number(monteCarloConfig?.maxConcurrentOutages || 3)));
-
-    const scenarioSeed = String(selectedScenarioId || '')
-      .split('')
-      .reduce((acc, char) => ((acc * 31) + char.charCodeAt(0)) >>> 0, 0);
-
-    let seed = (scenarioSeed ^ ((monteCarloRunId + 1) * 2654435761)) >>> 0;
-    const nextRandom = () => {
-      seed += 0x6D2B79F5;
-      let t = seed;
-      t = Math.imul(t ^ (t >>> 15), t | 1);
-      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
-
-    const monteCarloUndercoverage = [];
-    const monteCarloOfferLoss = [];
-    let reductionCount = 0;
-
-    for (let run = 0; run < runs; run += 1) {
-      const selectedOutages = [];
-      const shuffledIds = [...capacityIds];
-
-      for (let i = shuffledIds.length - 1; i > 0; i -= 1) {
-        const j = Math.floor(nextRandom() * (i + 1));
-        [shuffledIds[i], shuffledIds[j]] = [shuffledIds[j], shuffledIds[i]];
-      }
-
-      for (let idx = 0; idx < shuffledIds.length; idx += 1) {
-        if (selectedOutages.length >= maxConcurrentOutages) break;
-        if (nextRandom() < absenceRate) {
-          selectedOutages.push(shuffledIds[idx]);
+      const periodLabels = Array.from({ length: simulationWeeks }, (_, idx) => `KW ${idx + 1}`);
+      const periodHeatValues = [];
+      for (let weekIndex = 0; weekIndex < simulationWeeks; weekIndex += 1) {
+        for (let dayIndex = 0; dayIndex < dayLabels.length; dayIndex += 1) {
+          const denominator = runs * slotsPerDay;
+          const risk = denominator > 0 ? periodRiskAccumulator[weekIndex][dayIndex] / denominator : 0;
+          periodHeatValues.push([weekIndex, dayIndex, risk]);
         }
       }
 
-      const snapshot = buildSnapshot(selectedOutages);
-      const additionalUndercoverage = Math.max(0, snapshot.undercoverageMinutes - baselineSnapshot.undercoverageMinutes);
-      const offerLossPct = baselineSnapshot.totalCapacity > 0
-        ? ((baselineSnapshot.totalCapacity - snapshot.totalCapacity) / baselineSnapshot.totalCapacity) * 100
-        : 0;
-
-      if (additionalUndercoverage > 0) reductionCount += 1;
-      monteCarloUndercoverage.push(additionalUndercoverage);
-      monteCarloOfferLoss.push(Math.max(0, offerLossPct));
+      monteCarloResult = {
+        runs,
+        simulationWeeks,
+        baseAbsenceProbabilityPct: baseAbsenceProb * 100,
+        maxConcurrentOutages,
+        resilienceScorePct,
+        regularDaysPct,
+        regularOperationPct,
+        closurePct,
+        closurePatterns,
+        closureDurationDistribution,
+        closureDurationStats,
+        toleratedClosuresPerDay,
+        seasonalityInfo: {
+          enabled: seasonalityEnabled,
+          minFactor: Math.min(...weeklySeasonality),
+          maxFactor: Math.max(...weeklySeasonality),
+        },
+        cascadeCounts,
+        weekdayLabels: dayLabels,
+        weekdayHeatValues,
+        periodLabels,
+        periodHeatValues,
+      };
     }
-
-    const sortedUndercoverage = [...monteCarloUndercoverage].sort((a, b) => a - b);
-    const p95Index = sortedUndercoverage.length > 0 ? Math.min(sortedUndercoverage.length - 1, Math.floor(sortedUndercoverage.length * 0.95)) : 0;
-    const meanUndercoverageMinutes = monteCarloUndercoverage.length
-      ? monteCarloUndercoverage.reduce((sum, value) => sum + value, 0) / monteCarloUndercoverage.length
-      : 0;
-    const meanOfferLossPct = monteCarloOfferLoss.length
-      ? monteCarloOfferLoss.reduce((sum, value) => sum + value, 0) / monteCarloOfferLoss.length
-      : 0;
-    const reductionProbabilityPct = runs > 0 ? (reductionCount / runs) * 100 : 0;
 
     const careValues = (weeklyData?.care_ratio || []).map((value) => Number(value || 0)).filter((value) => value > 0);
     const expertValues = (weeklyData?.expert_ratio || []).map((value) => Number(value || 0)).filter((value) => value >= 0);
@@ -1492,53 +2291,79 @@ function VisuView() {
     const monthlyCapacityFte = (weeklyCapacityHours * MONTHS_PER_WEEK) / MONTHLY_HOURS_PER_FTE;
     const monthlyDemandFte = (weeklyDemandHours * MONTHS_PER_WEEK) / MONTHLY_HOURS_PER_FTE;
 
-    const monthFormatter = new Intl.DateTimeFormat('de-DE', { month: 'short', year: '2-digit' });
-    const baseDate = new Date(referenceDate);
-    const shiftMonth = (date, offsetMonths) => {
-      const shifted = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + offsetMonths, 15));
-      return shifted;
+    let financeTrend = {
+      categories: [],
+      income: [],
+      expenses: [],
+      net: [],
+      kpis: {
+        costPerCarePoint: 0,
+        costCoveragePct: 0,
+        rollingNet: 0,
+      },
     };
 
-    const financeRows = Array.from({ length: 12 }, (_, idx) => {
-      const monthDate = shiftMonth(baseDate, idx - 11);
-      const monthRef = monthDate.toISOString().slice(0, 10);
-      const monthlyFinance = calculateScenarioMonthlyFinance({
-        referenceDate: monthRef,
-        effectiveDataItems: rawDataItems,
-        effectiveBookingsByItem: rawBookings,
-        effectiveGroupAssignmentsByItem: rawGroupAssignments,
-        effectiveGroupDefs: overlayAware.effectiveGroupDefs || [],
-        financeScenario,
+    if (needsFinance) {
+      const monthFormatter = new Intl.DateTimeFormat('de-DE', { month: 'short', year: '2-digit' });
+      const baseDate = new Date(referenceDate);
+      const shiftMonth = (date, offsetMonths) => {
+        const shifted = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + offsetMonths, 15));
+        return shifted;
+      };
+
+      const financeRows = Array.from({ length: 12 }, (_, idx) => {
+        const monthDate = shiftMonth(baseDate, idx - 11);
+        const monthRef = monthDate.toISOString().slice(0, 10);
+        const monthlyFinance = calculateScenarioMonthlyFinance({
+          referenceDate: monthRef,
+          effectiveDataItems: rawDataItems,
+          effectiveBookingsByItem: rawBookings,
+          effectiveGroupAssignmentsByItem: rawGroupAssignments,
+          effectiveGroupDefs: overlayAware.effectiveGroupDefs || [],
+          financeScenario,
+        });
+
+        const carePoints = (monthlyFinance.childRows || []).reduce(
+          (sum, row) => sum + Number(row.bayKiBiGWeight || 0),
+          0
+        );
+
+        return {
+          label: monthFormatter.format(monthDate),
+          income: Number(monthlyFinance.summary?.incomeTotal || 0),
+          expenses: Number(monthlyFinance.summary?.expensesTotal || 0),
+          net: Number(monthlyFinance.summary?.net || 0),
+          carePoints,
+        };
       });
 
-      const carePoints = (monthlyFinance.childRows || []).reduce(
-        (sum, row) => sum + Number(row.bayKiBiGWeight || 0),
-        0
-      );
-
-      return {
-        label: monthFormatter.format(monthDate),
-        income: Number(monthlyFinance.summary?.incomeTotal || 0),
-        expenses: Number(monthlyFinance.summary?.expensesTotal || 0),
-        net: Number(monthlyFinance.summary?.net || 0),
-        carePoints,
+      const latestFinance = financeRows[financeRows.length - 1] || {
+        income: 0,
+        expenses: 0,
+        net: 0,
+        carePoints: 0,
       };
-    });
 
-    const latestFinance = financeRows[financeRows.length - 1] || {
-      income: 0,
-      expenses: 0,
-      net: 0,
-      carePoints: 0,
-    };
+      const costPerCarePoint = latestFinance.carePoints > 0
+        ? latestFinance.expenses / latestFinance.carePoints
+        : 0;
+      const costCoveragePct = latestFinance.expenses > 0
+        ? (latestFinance.income / latestFinance.expenses) * 100
+        : 0;
+      const rollingNet = financeRows.reduce((sum, row) => sum + Number(row.net || 0), 0);
 
-    const costPerCarePoint = latestFinance.carePoints > 0
-      ? latestFinance.expenses / latestFinance.carePoints
-      : 0;
-    const costCoveragePct = latestFinance.expenses > 0
-      ? (latestFinance.income / latestFinance.expenses) * 100
-      : 0;
-    const rollingNet = financeRows.reduce((sum, row) => sum + Number(row.net || 0), 0);
+      financeTrend = {
+        categories: financeRows.map((row) => row.label),
+        income: financeRows.map((row) => row.income),
+        expenses: financeRows.map((row) => row.expenses),
+        net: financeRows.map((row) => row.net),
+        kpis: {
+          costPerCarePoint,
+          costCoveragePct,
+          rollingNet,
+        },
+      };
+    }
 
     return {
       categories,
@@ -1560,36 +2385,12 @@ function VisuView() {
         worstDeficit,
       },
       resilience: {
-        heatValues: topCritical?.snapshot?.heatValues || baselineSnapshot.heatValues,
-        criticalityRanking,
-        busFactor,
-        top1OfferLossPct: topCritical?.offerLossPct || 0,
-        bottleneckConcentration,
-        groupResilienceSpread,
-        monteCarlo: {
-          runs,
-          absenceRatePct: absenceRate * 100,
-          maxConcurrentOutages,
-          reductionProbabilityPct,
-          meanUndercoverageMinutes,
-          p95UndercoverageMinutes: sortedUndercoverage[p95Index] || 0,
-          meanOfferLossPct,
-          undercoverageMinutes: monteCarloUndercoverage,
-        },
+        monteCarlo: monteCarloResult,
       },
-      financeTrend: {
-        categories: financeRows.map((row) => row.label),
-        income: financeRows.map((row) => row.income),
-        expenses: financeRows.map((row) => row.expenses),
-        net: financeRows.map((row) => row.net),
-        kpis: {
-          costPerCarePoint,
-          costCoveragePct,
-          rollingNet,
-        },
-      },
+      financeTrend,
     };
   }, [
+    activeStory.id,
     bookingsByScenario,
     chartState,
     dataByScenario,
@@ -1620,14 +2421,16 @@ function VisuView() {
     setIsAnalysisLoading(true);
     setAnalysisLoadingStage(0);
 
-    stageIntervalId = setInterval(() => {
-      setAnalysisLoadingStage((prev) => Math.min(prev + 1, ANALYSIS_LOADING_STAGES.length - 2));
-    }, 520);
+    if (activeLoadingStages.length > 1) {
+      stageIntervalId = setInterval(() => {
+        setAnalysisLoadingStage((prev) => Math.min(prev + 1, activeLoadingStages.length - 2));
+      }, 520);
+    }
 
     const finishLoading = (nextData) => {
       if (cancelled) return;
       setCoverageData(nextData);
-      setAnalysisLoadingStage(ANALYSIS_LOADING_STAGES.length - 1);
+      setAnalysisLoadingStage(activeLoadingStages.length - 1);
       hideTimerId = setTimeout(() => {
         if (!cancelled) {
           setIsAnalysisLoading(false);
@@ -1659,14 +2462,14 @@ function VisuView() {
         runtime.cancelIdleCallback(idleCallbackId);
       }
     };
-  }, [computeCoverageData]);
+  }, [activeLoadingStages, computeCoverageData]);
 
   const qualityMetrics = React.useMemo(() => {
     const activeItems = Object.values(effectiveDataItems || {}).filter(
       (item) =>
         shouldIncludeDataItemInAnalysis(item) &&
         (item.type === 'demand' || item.type === 'capacity') &&
-        isRecordActiveOnDate(item, todayIso)
+        isRecordActiveOnDate(item, qualityReferenceDate)
     );
 
     const hasGroupFilter = Array.isArray(selectedGroups) && selectedGroups.length > 0;
@@ -1683,13 +2486,13 @@ function VisuView() {
       .map((item) => {
         const itemId = String(item.id);
         const itemType = item.type;
-        const currentGroupId = resolveGroupIdAtDate(getEffectiveGroupAssignments(itemId), todayIso, item.groupId || null);
-        const hasBooking = Object.values(getEffectiveBookings(itemId) || {}).some((booking) => isRecordActiveOnDate(booking, todayIso));
+        const currentGroupId = resolveGroupIdAtDate(getEffectiveGroupAssignments(itemId), qualityReferenceDate, item.groupId || null);
+        const hasBooking = Object.values(getEffectiveBookings(itemId) || {}).some((booking) => isRecordActiveOnDate(booking, qualityReferenceDate));
 
         let hasFinance = false;
         if (itemType === 'capacity') {
           const personnelHistory = financeScenario?.itemFinances?.[itemId]?.personnelCostHistory || [];
-          hasFinance = personnelHistory.some((entry) => isRecordActiveOnDate(entry, todayIso));
+          hasFinance = personnelHistory.some((entry) => isRecordActiveOnDate(entry, qualityReferenceDate));
         } else {
           // Kinder benötigen für diese KPI keine eigenen Finanzdaten.
           hasFinance = true;
@@ -1698,7 +2501,7 @@ function VisuView() {
         const hasActiveAbsence = itemType === 'capacity'
           ? (Array.isArray(item.absences)
             && item.absences.some((absence) => isDateWithinRange(
-              todayIso,
+              qualityReferenceDate,
               absence?.start || absence?.startdate || '',
               absence?.end || absence?.enddate || ''
             )))
@@ -1785,8 +2588,155 @@ function VisuView() {
     getEffectiveGroupAssignments,
     groupDefs,
     qualificationDefs,
+    qualityReferenceDate,
     selectedGroups,
-    todayIso,
+  ]);
+
+  const qualityStaffScheduleData = React.useMemo(() => {
+    const categories = generateTimeSegments();
+    const hasGroupFilter = Array.isArray(selectedGroups) && selectedGroups.length > 0;
+    const groupFilterSet = new Set((selectedGroups || []).map((groupId) => String(groupId)));
+    const rawScenarioItems = dataByScenario?.[selectedScenarioId] || {};
+    const archivedIds = new Set(
+      Object.entries(rawScenarioItems)
+        .filter(([, item]) => isArchivedDataItem(item))
+        .map(([itemId]) => String(itemId))
+    );
+    const groupNameById = new Map((groupDefs || []).map((group) => [String(group.id), group.name || 'Gruppe']));
+    const groupColorById = new Map((groupDefs || []).map((group, index) => [
+      String(group.id),
+      QUALITY_GROUP_COLOR_PALETTE[index % QUALITY_GROUP_COLOR_PALETTE.length],
+    ]));
+
+    const hasActiveAbsenceAtReferenceDate = (item) => (
+      Array.isArray(item?.absences)
+      && item.absences.some((absence) => isDateWithinRange(
+        qualityReferenceDate,
+        absence?.start || absence?.startdate || '',
+        absence?.end || absence?.enddate || ''
+      ))
+    );
+
+    const applyGroupFilter = (groupId) => {
+      if (!hasGroupFilter) return true;
+      if (!groupId && groupFilterSet.has('__NO_GROUP__')) return true;
+      if (!groupId) return false;
+      return groupFilterSet.has(String(groupId));
+    };
+
+    const employeeRows = Object.values(effectiveDataItems || {})
+      .filter(
+        (item) =>
+          item?.type === 'capacity'
+          && !isArchivedDataItem(item)
+          && !archivedIds.has(String(item?.id || ''))
+          && shouldIncludeDataItemInAnalysis(item)
+          && isRecordActiveOnDate(item, qualityReferenceDate)
+          && !hasActiveAbsenceAtReferenceDate(item)
+      )
+      .map((item) => {
+        const itemId = String(item.id);
+        const resolvedGroupId = resolveGroupIdAtDate(
+          getEffectiveGroupAssignments(itemId),
+          qualityReferenceDate,
+          item.groupId || null
+        );
+        const groupId = resolvedGroupId ? String(resolvedGroupId) : null;
+        if (!applyGroupFilter(groupId)) return null;
+
+        const activeBookings = Object.values(getEffectiveBookings(itemId) || {})
+          .filter((booking) => !booking?.archived && isRecordActiveOnDate(booking, qualityReferenceDate));
+        const pedSeries = generateBookingDataSeries(qualityReferenceDate, activeBookings, categories, 'pedagogical')
+          .map((value) => (Number(value || 0) > 0 ? 1 : 0));
+        const adminSeries = generateBookingDataSeries(qualityReferenceDate, activeBookings, categories, 'administrative')
+          .map((value) => (Number(value || 0) > 0 ? 1 : 0));
+        const combinedPresenceSeries = pedSeries.map((value, index) => (
+          (Number(value || 0) > 0 || Number(adminSeries[index] || 0) > 0) ? 1 : 0
+        ));
+
+        return {
+          id: itemId,
+          name: item.name || 'Mitarbeiter',
+          groupId: groupId || '__NO_GROUP__',
+          groupName: groupId ? (groupNameById.get(groupId) || 'Gruppe') : 'Ohne Gruppe',
+          groupColor: groupId ? (groupColorById.get(groupId) || '#64748b') : '#64748b',
+          pedagogicalPresenceSeries: pedSeries,
+          administrativePresenceSeries: adminSeries,
+          isPlannedAtLeastOnce: combinedPresenceSeries.some((value) => Number(value || 0) > 0),
+        };
+      })
+      .filter(Boolean)
+      .filter((row) => (qualityOnlyPlannedStaff ? row.isPlannedAtLeastOnce : true))
+      .sort((a, b) => {
+        const groupCompare = a.groupName.localeCompare(b.groupName, 'de', { sensitivity: 'base' });
+        if (groupCompare !== 0) return groupCompare;
+        return a.name.localeCompare(b.name, 'de', { sensitivity: 'base' });
+      });
+
+    const employees = employeeRows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      groupName: row.groupName,
+      groupColor: row.groupColor,
+    }));
+
+    const groupLegendMap = new Map();
+    employeeRows.forEach((row) => {
+      if (!groupLegendMap.has(row.groupId)) {
+        groupLegendMap.set(row.groupId, {
+          id: row.groupId,
+          name: row.groupName,
+          color: row.groupColor,
+        });
+      }
+    });
+
+    const heatValues = [];
+    employeeRows.forEach((row, rowIndex) => {
+      categories.forEach((_, slotIndex) => {
+        const pedPlanned = Number(row.pedagogicalPresenceSeries[slotIndex] || 0) > 0 ? 1 : 0;
+        const adminPlanned = Number(row.administrativePresenceSeries[slotIndex] || 0) > 0 ? 1 : 0;
+        const hasAnyPlanned = pedPlanned || adminPlanned;
+        const roleLabel = pedPlanned && adminPlanned
+          ? 'Pädagogische + Administrative Zeit'
+          : pedPlanned
+            ? 'Pädagogische Zeit'
+            : adminPlanned
+              ? 'Administrative Zeit'
+              : 'Keine Planung';
+        const cellColor = pedPlanned
+          ? row.groupColor
+          : adminPlanned
+            ? QUALITY_ADMIN_TIME_COLOR
+            : '#e2e8f0';
+
+        heatValues.push({
+          x: slotIndex,
+          y: rowIndex,
+          value: hasAnyPlanned ? 1 : 0,
+          roleLabel,
+          color: cellColor,
+          groupName: row.groupName,
+        });
+      });
+    });
+
+    return {
+      categories,
+      employees,
+      heatValues,
+      groupLegend: Array.from(groupLegendMap.values()).sort((a, b) => a.name.localeCompare(b.name, 'de', { sensitivity: 'base' })),
+    };
+  }, [
+    dataByScenario,
+    effectiveDataItems,
+    getEffectiveBookings,
+    getEffectiveGroupAssignments,
+    groupDefs,
+    qualityOnlyPlannedStaff,
+    qualityReferenceDate,
+    selectedScenarioId,
+    selectedGroups,
   ]);
 
   const previewFlow = React.useMemo(() => {
@@ -2021,6 +2971,16 @@ function VisuView() {
             tone: qualityMetrics.incompleteChildren.length > 0 ? 'warn' : 'good',
             records: qualityMetrics.incompleteChildren,
           },
+          {
+            key: 'kpi-quality-hints',
+            title: 'Hinweise',
+            value: `${qualityMetrics.alerts.length}`,
+            text: qualityMetrics.alerts.length > 0
+              ? 'Strukturelle Hinweise zur Datenbasis.'
+              : 'Keine strukturellen Hinweise.',
+            tone: qualityMetrics.alerts.length > 0 ? 'warn' : 'good',
+            hints: qualityMetrics.alerts,
+          },
         ]
       : activeStory.id === 'status'
         ? [
@@ -2056,32 +3016,32 @@ function VisuView() {
       : activeStory.id === 'transitions'
         ? [
             {
-              key: 'kpi-bus-factor',
-              title: 'Bus-Faktor',
-              value: `${coverageData?.resilience?.busFactor ?? 0}`,
-              text: 'Kleinste Anzahl kritischer Ausfälle bis zur Unterdeckung.',
-              tone: (coverageData?.resilience?.busFactor ?? 0) <= 1 ? 'warn' : 'good',
+              key: 'kpi-resilience-score',
+              title: 'Resilienz-Score',
+              value: `${(coverageData?.resilience?.monteCarlo?.resilienceScorePct || 0).toFixed(1)}%`,
+              text: 'Toleranzgewichteter Tages-Score trotz Schließungsereignissen.',
+              tone: (coverageData?.resilience?.monteCarlo?.resilienceScorePct || 0) >= 70 ? 'good' : 'warn',
             },
             {
-              key: 'kpi-offer-loss',
-              title: 'Angebotsverlust (Top-1)',
-              value: `${(coverageData?.resilience?.top1OfferLossPct || 0).toFixed(1)}%`,
-              text: 'Kapazitätsverlust beim kritischsten Einzelausfall.',
-              tone: (coverageData?.resilience?.top1OfferLossPct || 0) > 15 ? 'warn' : 'good',
+              key: 'kpi-closure-rate',
+              title: 'Schließungsrate',
+              value: `${(coverageData?.resilience?.monteCarlo?.closurePct || 0).toFixed(1)}%`,
+              text: 'Anteil der Slots, die in Stufe Schließung enden.',
+              tone: (coverageData?.resilience?.monteCarlo?.closurePct || 0) > 8 ? 'warn' : 'good',
             },
             {
-              key: 'kpi-bottleneck-concentration',
-              title: 'Engpasskonzentration',
-              value: `${(coverageData?.resilience?.bottleneckConcentration || 0).toFixed(1)}%`,
-              text: 'Risikanteil der Top-3-Ausfälle an der Gesamt-Kritikalität.',
-              tone: (coverageData?.resilience?.bottleneckConcentration || 0) > 70 ? 'warn' : 'good',
+              key: 'kpi-cascade-regular',
+              title: 'Kaskade: Regelbetrieb',
+              value: `${(coverageData?.resilience?.monteCarlo?.regularOperationPct || 0).toFixed(1)}%`,
+              text: 'Slots, die ohne Kompensationsstufe gelöst wurden.',
+              tone: (coverageData?.resilience?.monteCarlo?.regularOperationPct || 0) >= 60 ? 'good' : 'warn',
             },
             {
-              key: 'kpi-group-spread',
-              title: 'Resilienz-Spreizung Gruppen',
-              value: `${(coverageData?.resilience?.groupResilienceSpread || 0).toFixed(0)} Min`,
-              text: 'Differenz schwächste vs. stärkste Gruppe (Top-1-Ausfall).',
-              tone: (coverageData?.resilience?.groupResilienceSpread || 0) > 180 ? 'warn' : 'good',
+              key: 'kpi-simulation-profile',
+              title: 'Simulationsprofil',
+              value: `${coverageData?.resilience?.monteCarlo?.runs || 0} Läufe`,
+              text: `${coverageData?.resilience?.monteCarlo?.simulationWeeks || 0} Wochen · Basis-Ausfall ${(coverageData?.resilience?.monteCarlo?.baseAbsenceProbabilityPct || 0).toFixed(1)}% · Saisonalität ${coverageData?.resilience?.monteCarlo?.seasonalityInfo?.enabled ? `aktiv (${(Number(coverageData?.resilience?.monteCarlo?.seasonalityInfo?.minFactor || 1) * 100).toFixed(0)}-${(Number(coverageData?.resilience?.monteCarlo?.seasonalityInfo?.maxFactor || 1) * 100).toFixed(0)}% Faktor)` : 'aus'}`,
+              tone: 'good',
             },
           ]
       : activeStory.id === 'cohort'
@@ -2302,11 +3262,11 @@ function VisuView() {
                 <Text size="xs" fw={700} className="analysis-stage-recommendation-title">
                   {item.title}
                 </Text>
-                {Array.isArray(item.records) && item.records.length > 0 && (
+                {(Array.isArray(item.records) && item.records.length > 0) || (Array.isArray(item.hints) && item.hints.length > 0) ? (
                   <ActionIcon variant="subtle" size="sm" className="analysis-kpi-info-btn" aria-label="Lückenhafte Datensätze vorhanden">
                     <IconInfoCircle size={16} />
                   </ActionIcon>
-                )}
+                ) : null}
               </Group>
               <Text size="lg" fw={800} className="analysis-stage-recommendation-value">
                 {item.value}
@@ -2349,13 +3309,28 @@ function VisuView() {
                   )}
                 </Group>
               )}
+
+              {Array.isArray(item.hints) && item.hints.length > 0 && (
+                <Stack gap={2} mt={6}>
+                  {item.hints.slice(0, 4).map((hint) => (
+                    <Text key={hint} size="xs" c="dimmed">• {hint}</Text>
+                  ))}
+                  {item.hints.length > 4 && (
+                    <Text size="xs" c="dimmed">+{item.hints.length - 4} weitere</Text>
+                  )}
+                </Stack>
+              )}
             </Paper>
           ))}
         </Group>
 
         <Box className="analysis-stage-content" data-testid="analysis-stage-content">
           {activeStory.id === 'quality' ? (
-            <QualityDonutChart data={qualityDonutData} />
+            <QualityStageCarousel
+              qualityDonutData={qualityDonutData}
+              qualityStaffScheduleData={qualityStaffScheduleData}
+              accent={activeStory.accent}
+            />
           ) : activeStory.id === 'status' ? (
             <CoverageStageCarousel
               weeklyData={coverageData?.weeklyData || { categories: coverageData?.categories || [] }}
@@ -2367,9 +3342,9 @@ function VisuView() {
               heatmapMode={heatmapMode}
             />
           ) : activeStory.id === 'transitions' ? (
-            <ResilienceCompositeChart
-              ranking={coverageData?.resilience?.criticalityRanking || []}
+            <ResilienceMonteCarloCarousel
               monteCarlo={coverageData?.resilience?.monteCarlo || null}
+              categories={coverageData?.categories || []}
               accent={activeStory.accent}
             />
           ) : activeStory.id === 'cohort' ? (
@@ -2383,27 +3358,18 @@ function VisuView() {
           )}
         </Box>
 
-        {activeStory.id === 'quality' && qualityMetrics.alerts.length > 0 && (
-          <Box className="analysis-stage-alerts" data-testid="analysis-stage-alerts">
-            <Stack gap={6}>
-              {qualityMetrics.alerts.map((alert) => (
-                <Alert key={alert} variant="light" color="orange" title="Hinweis" py={6}>
-                  <Text size="xs">{alert}</Text>
-                </Alert>
-              ))}
-            </Stack>
-          </Box>
-        )}
-
         <Box className="analysis-stage-filterbar" data-testid="analysis-stage-filterbar">
           <ChartFilterForm
-            showStichtag={activeStory.id !== 'quality'}
+            showStichtag
             scenarioId={selectedScenarioId}
             compactBar
             groupsOnly={activeStory.id === 'quality'}
             showHeatmapModeControl={activeStory.id === 'status'}
             heatmapMode={heatmapMode}
             onHeatmapModeChange={setHeatmapMode}
+            showPlannedStaffOnlyControl={activeStory.id === 'quality'}
+            plannedStaffOnly={qualityOnlyPlannedStaff}
+            onPlannedStaffOnlyChange={setQualityOnlyPlannedStaff}
             showMonteCarloControls={activeStory.id === 'transitions'}
             monteCarloParams={monteCarloConfig}
             onMonteCarloParamsChange={setMonteCarloConfig}
@@ -2413,7 +3379,11 @@ function VisuView() {
         </Box>
       </Paper>
 
-      <AnalysisProgressPanel stageIndex={analysisLoadingStage} isLoading={isAnalysisLoading} />
+      <AnalysisProgressPanel
+        stageIndex={analysisLoadingStage}
+        isLoading={isAnalysisLoading}
+        stages={activeLoadingStages}
+      />
     </Box>
   );
 }

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Drawer, Stack, Text, Group, MultiSelect, Select, Button, Box, ActionIcon, NumberInput } from '@mantine/core';
+import { Drawer, Stack, Text, Group, MultiSelect, Select, Button, Box, ActionIcon, NumberInput, Switch } from '@mantine/core';
 import { IconAdjustmentsHorizontal } from '@tabler/icons-react';
 import { useSelector, useDispatch } from 'react-redux';
 import {
@@ -21,6 +21,9 @@ function ChartFilterForm({
   showHeatmapModeControl = false,
   heatmapMode = 'unweightedQuotient',
   onHeatmapModeChange,
+  showPlannedStaffOnlyControl = false,
+  plannedStaffOnly = false,
+  onPlannedStaffOnlyChange,
   showMonteCarloControls = false,
   monteCarloParams = null,
   onMonteCarloParamsChange,
@@ -173,9 +176,17 @@ function ChartFilterForm({
                 w="100%"
               />
             )}
+
+            {showPlannedStaffOnlyControl && (
+              <Switch
+                label="Nur geplante Mitarbeiter anzeigen"
+                checked={Boolean(plannedStaffOnly)}
+                onChange={(event) => onPlannedStaffOnlyChange?.(event.currentTarget.checked)}
+              />
+            )}
           </Group>
 
-          {!groupsOnly && showStichtag && <EventPicker scenarioId={scenarioId} />}
+          {showStichtag && <EventPicker scenarioId={scenarioId} />}
 
           {showMonteCarloControls && monteCarloParams && (
             <Stack gap="xs" data-testid="analysis-monte-carlo-controls">
@@ -196,8 +207,8 @@ function ChartFilterForm({
                 }}
               />
               <NumberInput
-                label="Ausfallrate (%)"
-                value={monteCarloParams.absenceRatePct}
+                label="Basis-Ausfallwahrscheinlichkeit (%)"
+                value={monteCarloParams.baseAbsenceProbabilityPct}
                 min={1}
                 max={80}
                 step={1}
@@ -206,7 +217,22 @@ function ChartFilterForm({
                   if (!Number.isFinite(nextValue)) return;
                   onMonteCarloParamsChange?.({
                     ...monteCarloParams,
-                    absenceRatePct: Math.max(1, Math.min(80, Math.round(nextValue))),
+                    baseAbsenceProbabilityPct: Math.max(1, Math.min(80, Math.round(nextValue))),
+                  });
+                }}
+              />
+              <NumberInput
+                label="Simulationswochen"
+                value={monteCarloParams.simulationWeeks}
+                min={4}
+                max={52}
+                step={1}
+                onChange={(value) => {
+                  const nextValue = Number(value);
+                  if (!Number.isFinite(nextValue)) return;
+                  onMonteCarloParamsChange?.({
+                    ...monteCarloParams,
+                    simulationWeeks: Math.max(4, Math.min(52, Math.round(nextValue))),
                   });
                 }}
               />
@@ -225,12 +251,195 @@ function ChartFilterForm({
                   });
                 }}
               />
+              <Text fw={600} size="sm" mt={4}>Hard Constraints</Text>
+              <NumberInput
+                label="Mindest-Fachkräftequote (%)"
+                value={monteCarloParams.minExpertRatioPct}
+                min={0}
+                max={100}
+                step={1}
+                onChange={(value) => {
+                  const nextValue = Number(value);
+                  if (!Number.isFinite(nextValue)) return;
+                  onMonteCarloParamsChange?.({
+                    ...monteCarloParams,
+                    minExpertRatioPct: Math.max(0, Math.min(100, Math.round(nextValue))),
+                  });
+                }}
+              />
+              <NumberInput
+                label="Max. Betreuungsschlüssel"
+                value={monteCarloParams.maxCareRatio}
+                min={1}
+                max={30}
+                step={0.5}
+                decimalScale={1}
+                onChange={(value) => {
+                  const nextValue = Number(value);
+                  if (!Number.isFinite(nextValue)) return;
+                  onMonteCarloParamsChange?.({
+                    ...monteCarloParams,
+                    maxCareRatio: Math.max(1, Math.min(30, nextValue)),
+                  });
+                }}
+              />
+              <NumberInput
+                label="Mindestbesetzung pro Gruppe (Köpfe)"
+                value={monteCarloParams.minGroupHeadcount}
+                min={0}
+                max={10}
+                step={1}
+                onChange={(value) => {
+                  const nextValue = Number(value);
+                  if (!Number.isFinite(nextValue)) return;
+                  onMonteCarloParamsChange?.({
+                    ...monteCarloParams,
+                    minGroupHeadcount: Math.max(0, Math.min(10, Math.round(nextValue))),
+                  });
+                }}
+              />
+              <NumberInput
+                label="Max. tolerierte Unterdeckung (Slots/Woche)"
+                value={monteCarloParams.maxUndercoverageSlots}
+                min={0}
+                max={200}
+                step={1}
+                onChange={(value) => {
+                  const nextValue = Number(value);
+                  if (!Number.isFinite(nextValue)) return;
+                  onMonteCarloParamsChange?.({
+                    ...monteCarloParams,
+                    maxUndercoverageSlots: Math.max(0, Math.min(200, Math.round(nextValue))),
+                  });
+                }}
+              />
+
+              <Text fw={600} size="sm" mt={4}>Kompensations-Kaskade</Text>
+              <NumberInput
+                label="Max. Mehrstunden pro Mitarbeiter/Woche"
+                value={monteCarloParams.maxOvertimeHoursPerEmployeePerWeek}
+                min={0}
+                max={20}
+                step={0.5}
+                decimalScale={1}
+                onChange={(value) => {
+                  const nextValue = Number(value);
+                  if (!Number.isFinite(nextValue)) return;
+                  onMonteCarloParamsChange?.({
+                    ...monteCarloParams,
+                    maxOvertimeHoursPerEmployeePerWeek: Math.max(0, Math.min(20, nextValue)),
+                  });
+                }}
+              />
+              <NumberInput
+                label="Max. Zeiteinschränkung (Std./Woche)"
+                value={monteCarloParams.maxTimeReductionHoursPerWeek}
+                min={0}
+                max={20}
+                step={0.5}
+                decimalScale={1}
+                onChange={(value) => {
+                  const nextValue = Number(value);
+                  if (!Number.isFinite(nextValue)) return;
+                  onMonteCarloParamsChange?.({
+                    ...monteCarloParams,
+                    maxTimeReductionHoursPerWeek: Math.max(0, Math.min(20, nextValue)),
+                  });
+                }}
+              />
+              <NumberInput
+                label="Notbetreuung Nachfrage-Reduktion (%)"
+                value={monteCarloParams.emergencyDemandReductionPct}
+                min={0}
+                max={80}
+                step={1}
+                onChange={(value) => {
+                  const nextValue = Number(value);
+                  if (!Number.isFinite(nextValue)) return;
+                  onMonteCarloParamsChange?.({
+                    ...monteCarloParams,
+                    emergencyDemandReductionPct: Math.max(0, Math.min(80, Math.round(nextValue))),
+                  });
+                }}
+              />
+
+              <Text fw={600} size="sm" mt={4}>Dynamiken</Text>
+              <Switch
+                label="Saisonalität aktiv"
+                checked={Boolean(monteCarloParams.seasonalityEnabled)}
+                onChange={(event) => onMonteCarloParamsChange?.({
+                  ...monteCarloParams,
+                  seasonalityEnabled: event.currentTarget.checked,
+                })}
+              />
+              <Switch
+                label="Ansteckungseffekt aktiv"
+                checked={Boolean(monteCarloParams.contagionEnabled)}
+                onChange={(event) => onMonteCarloParamsChange?.({
+                  ...monteCarloParams,
+                  contagionEnabled: event.currentTarget.checked,
+                })}
+              />
+              <NumberInput
+                label="Ansteckungsschub (%)"
+                value={monteCarloParams.contagionBoostPct}
+                min={0}
+                max={200}
+                step={5}
+                onChange={(value) => {
+                  const nextValue = Number(value);
+                  if (!Number.isFinite(nextValue)) return;
+                  onMonteCarloParamsChange?.({
+                    ...monteCarloParams,
+                    contagionBoostPct: Math.max(0, Math.min(200, Math.round(nextValue))),
+                  });
+                }}
+              />
+              <NumberInput
+                label="Ansteckungsdauer (Tage)"
+                value={monteCarloParams.contagionDays}
+                min={0}
+                max={14}
+                step={1}
+                onChange={(value) => {
+                  const nextValue = Number(value);
+                  if (!Number.isFinite(nextValue)) return;
+                  onMonteCarloParamsChange?.({
+                    ...monteCarloParams,
+                    contagionDays: Math.max(0, Math.min(14, Math.round(nextValue))),
+                  });
+                }}
+              />
+              <Switch
+                label="Kinderkompensation aktiv"
+                checked={Boolean(monteCarloParams.childCompensationEnabled)}
+                onChange={(event) => onMonteCarloParamsChange?.({
+                  ...monteCarloParams,
+                  childCompensationEnabled: event.currentTarget.checked,
+                })}
+              />
+              <NumberInput
+                label="Kinderkompensation pro Ausfall (%)"
+                value={monteCarloParams.childCompensationRatePct}
+                min={0}
+                max={30}
+                step={1}
+                onChange={(value) => {
+                  const nextValue = Number(value);
+                  if (!Number.isFinite(nextValue)) return;
+                  onMonteCarloParamsChange?.({
+                    ...monteCarloParams,
+                    childCompensationRatePct: Math.max(0, Math.min(30, Math.round(nextValue))),
+                  });
+                }}
+              />
+
               <Button
                 onClick={() => onRerunMonteCarlo?.()}
                 loading={isMonteCarloRunning}
                 variant="light"
               >
-                Simulation wiederholen
+                Simulation neu berechnen
               </Button>
             </Stack>
           )}
