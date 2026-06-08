@@ -3,7 +3,7 @@ import { createSlice } from '@reduxjs/toolkit';
 export const initialUiState = {
   activePage: 'welcome', // 'welcome' | 'data' | 'visu' | 'settings' | 'legal'
   settingsSubPage: 'groups', // 'scenarios' | 'groups' | 'qualifications' | 'events' | 'finance'
-  analysisSubPage: 'quality', // 'quality' | 'status' | 'transitions' | 'cohort' | 'compare' | 'demography' | 'options' | 'trends'
+  analysisSubPage: 'quality', // 'quality' | 'status' | 'transitions' | 'cohort' | 'compare' | 'options' | 'trends'
   browserAutoSaveEnabled: false,
   dataListFilter: 'all',
   dataCaptureQueueMode: false,

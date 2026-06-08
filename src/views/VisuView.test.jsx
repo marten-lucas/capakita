@@ -16,7 +16,7 @@ describe('VisuView album flow', () => {
       </Provider>
     );
 
-    expect(screen.getAllByTestId(/story-card-/)).toHaveLength(8);
+    expect(screen.getAllByTestId(/story-card-/)).toHaveLength(7);
     expect(screen.getByTestId('story-card-quality')).toHaveAttribute('data-active', 'true');
 
     fireEvent.click(screen.getByText('Bedarfsdeckung'));

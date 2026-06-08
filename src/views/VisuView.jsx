@@ -95,6 +95,8 @@ const HEATMAP_MODES = {
 
 const QUALITY_GROUP_COLOR_PALETTE = ['#2563eb', '#059669', '#d97706', '#dc2626', '#7c3aed', '#0891b2', '#be123c', '#4d7c0f'];
 const QUALITY_ADMIN_TIME_COLOR = '#8b5cf6';
+const AGE_COHORT_SIZE_MONTHS = 3;
+const AGE_HISTOGRAM_MAX_MONTHS = 96;
 
 const RESILIENCE_CASCADE_STAGES = [
   'Regelbetrieb',
@@ -193,28 +195,17 @@ const STORY_STEPS = [
   {
     id: 'compare',
     category: '05',
-    title: 'Vorschau',
-    subtitle: 'Bevorstehende Personal- & Strukturwechsel',
+    title: 'Ausblick',
+    subtitle: 'Strukturwechsel und Altersprognose',
     gradient: 'linear-gradient(135deg, #4a044e 0%, #be185d 100%)',
     accent: '#be185d',
     icon: IconArrowsSplit,
     rating: 'problem',
-    diagramType: 'Gantt-Chart',
-  },
-  {
-    id: 'demography',
-    category: '06',
-    title: 'Demografie',
-    subtitle: 'Kinderstruktur & Belegungs-Prognose',
-    gradient: 'linear-gradient(135deg, #0f172a 0%, #2563eb 100%)',
-    accent: '#2563eb',
-    icon: IconChartHistogram,
-    rating: 'warn',
-    diagramType: 'Stacked Bar Chart',
+    diagramType: 'Diagramm-Karussell',
   },
   {
     id: 'options',
-    category: '07',
+    category: '06',
     title: 'Optionen-Check',
     subtitle: 'Szenarien-Ranking & Entscheidungshilfe',
     gradient: 'linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%)',
@@ -225,7 +216,7 @@ const STORY_STEPS = [
   },
   {
     id: 'trends',
-    category: '08',
+    category: '07',
     title: 'Trend-Radar',
     subtitle: 'Historischer Vergleich & Entwicklung',
     gradient: 'linear-gradient(135deg, #0f766e 0%, #0ea5e9 100%)',
@@ -268,11 +259,6 @@ const STAGE_RECOMMENDATIONS_BY_STORY = {
     { title: 'KPI 2', value: '--', text: 'Platzhalter für Überbrückung.', tone: 'warn' },
     { title: 'KPI 3', value: '--', text: 'Platzhalter für Aufnahmestopp.', tone: 'warn' },
   ],
-  demography: [
-    { title: 'KPI 1', value: '--', text: 'Platzhalter für Nachrücker-Strategie.', tone: 'good' },
-    { title: 'KPI 2', value: '--', text: 'Platzhalter für Team-Rotation.', tone: 'warn' },
-    { title: 'KPI 3', value: '--', text: 'Platzhalter für Leerstand.', tone: 'warn' },
-  ],
   options: [
     { title: 'KPI 1', value: '--', text: 'Platzhalter für Best-Practice.', tone: 'good' },
     { title: 'KPI 2', value: '--', text: 'Platzhalter für Risiko-Warnung.', tone: 'problem' },
@@ -283,6 +269,10 @@ const STAGE_RECOMMENDATIONS_BY_STORY = {
     { title: 'KPI 2', value: '--', text: 'Platzhalter für Krankheitsquote.', tone: 'warn' },
     { title: 'KPI 3', value: '--', text: 'Platzhalter für Finanz-Trend.', tone: 'problem' },
   ],
+};
+
+const ANALYSIS_SUBPAGE_ALIASES = {
+  demography: 'compare',
 };
 
 function DiagramPlaceholder({ story }) {
@@ -653,21 +643,31 @@ function CoverageHeatmap({ categories, groups, heatValues, accent, mode }) {
       return [
         [0, '#ef4444'],
         [0.5, '#f59e0b'],
-        [1, '#7c3aed'],
+        [1, '#0ea5e9'],
       ];
     }
 
     return [
-      [0, '#7c3aed'],
+      [0, '#0ea5e9'],
       [0.5, '#f59e0b'],
       [1, '#ef4444'],
     ];
   }, [mode]);
 
   const metricLabel = React.useMemo(() => {
-    if (mode === HEATMAP_MODES.UNWEIGHTED_QUOTIENT) return 'Quotient';
+    if (mode === HEATMAP_MODES.UNWEIGHTED_QUOTIENT) return 'Quotient (Kinder pro päd. MA)';
     if (mode === HEATMAP_MODES.CARE_KEY) return 'Betreuungsschlüssel';
     return 'Päd. Mitarbeiter';
+  }, [mode]);
+
+  const legendDescription = React.useMemo(() => {
+    if (mode === HEATMAP_MODES.PRESENT_STAFF) {
+      return 'Je mehr pädagogische Mitarbeitende anwesend sind, desto kälter (blauer) die Zelle.';
+    }
+    if (mode === HEATMAP_MODES.CARE_KEY) {
+      return 'Betreuungsschlüssel = Kinder pro pädagogischer Mitarbeiter. Niedriger Schlüssel bedeutet mehr Mitarbeitende pro Kind (kalt).';
+    }
+    return 'Quotient = Kinder pro pädagogischer Mitarbeiter. Niedriger Quotient bedeutet mehr Mitarbeitende pro Kind (kalt), hoher Quotient bedeutet weniger Mitarbeitende pro Kind (rot).';
   }, [mode]);
 
   const daySeparatorLines = React.useMemo(() => {
@@ -770,29 +770,30 @@ function CoverageHeatmap({ categories, groups, heatValues, accent, mode }) {
   const legendEntries = React.useMemo(() => {
     if (mode === HEATMAP_MODES.PRESENT_STAFF) {
       return [
-        { color: '#ef4444', label: 'Wenige Mitarbeiter' },
-        { color: '#f59e0b', label: 'Mittlere Besetzung' },
-        { color: '#7c3aed', label: 'Viele Mitarbeiter' },
+        { color: '#0ea5e9', label: 'Kalt: viele Mitarbeiter anwesend' },
+        { color: '#f59e0b', label: 'Mittel: normale Besetzung' },
+        { color: '#ef4444', label: 'Heiß: wenige Mitarbeiter anwesend' },
       ];
     }
 
     if (mode === HEATMAP_MODES.CARE_KEY) {
       return [
-        { color: '#7c3aed', label: 'Niedriger Schlüssel' },
-        { color: '#f59e0b', label: 'Mittlerer Schlüssel' },
-        { color: '#ef4444', label: 'Hoher Schlüssel' },
+        { color: '#0ea5e9', label: 'Kalt: niedriger Schlüssel (mehr MA pro Kind)' },
+        { color: '#f59e0b', label: 'Mittel: mittlerer Schlüssel' },
+        { color: '#ef4444', label: 'Heiß: hoher Schlüssel (weniger MA pro Kind)' },
       ];
     }
 
     return [
-      { color: '#7c3aed', label: 'Niedriger Quotient' },
-      { color: '#f59e0b', label: 'Mittlerer Quotient' },
-      { color: '#ef4444', label: 'Hoher Quotient' },
+      { color: '#0ea5e9', label: 'Kalt: niedriger Quotient (mehr MA pro Kind)' },
+      { color: '#f59e0b', label: 'Mittel: mittlerer Quotient' },
+      { color: '#ef4444', label: 'Heiß: hoher Quotient (weniger MA pro Kind)' },
     ];
   }, [mode]);
 
   return (
     <Stack style={{ height: '100%', minHeight: 0 }} gap={4}>
+      <Text size="xs" c="dimmed" ta="center">{legendDescription}</Text>
       <Group gap={10} wrap="nowrap" justify="center">
         {legendEntries.map((entry) => (
           <Group key={entry.label} gap={6} wrap="nowrap">
@@ -1484,7 +1485,25 @@ function DemographyAgeChart({ demographyData, accent }) {
 
   const options = React.useMemo(
     () => {
-      const categories = demographyData?.categories || [];
+      const categories = activeSnapshot?.cohortLabels || demographyData?.cohortLabels || [];
+      const counts = activeSnapshot?.cohortCounts || categories.map(() => 0);
+
+      const indexForMonths = (months) => Math.floor(months / AGE_COHORT_SIZE_MONTHS);
+      const krippeEndIndex = indexForMonths(35);
+      const corridorStartIndex = indexForMonths(33);
+      const corridorEndIndex = indexForMonths(41);
+      const regelStartIndex = indexForMonths(36);
+      const regelEndIndex = indexForMonths(71);
+      const schoolStartIndex = indexForMonths(72);
+
+      const seriesData = counts.map((value, index) => {
+        let color = '#16a34a';
+        if (index <= krippeEndIndex) color = '#3b82f6';
+        if (index >= corridorStartIndex && index <= corridorEndIndex) color = '#f59e0b';
+        if (index >= schoolStartIndex) color = '#64748b';
+        return { y: Number(value || 0), color };
+      });
+
       return {
         chart: {
           type: 'column',
@@ -1495,7 +1514,42 @@ function DemographyAgeChart({ demographyData, accent }) {
         credits: { enabled: false },
         xAxis: {
           categories,
-          title: { text: null },
+          title: { text: 'Alter in Jahren (3-Monats-Cohorten)' },
+          labels: {
+            style: { fontSize: '10px' },
+            formatter() {
+              if (this.pos % 4 !== 0) return '';
+              return categories[this.pos] || '';
+            },
+          },
+          plotBands: [
+            {
+              from: -0.5,
+              to: krippeEndIndex + 0.5,
+              color: 'rgba(59, 130, 246, 0.10)',
+              label: { text: 'Krippe', style: { color: '#1d4ed8', fontSize: '10px' } },
+            },
+            {
+              from: regelStartIndex - 0.5,
+              to: regelEndIndex + 0.5,
+              color: 'rgba(34, 197, 94, 0.10)',
+              label: { text: 'Regelgruppe', style: { color: '#166534', fontSize: '10px' } },
+            },
+            {
+              from: corridorStartIndex - 0.5,
+              to: corridorEndIndex + 0.5,
+              color: 'rgba(245, 158, 11, 0.20)',
+              borderColor: 'rgba(245, 158, 11, 0.55)',
+              borderWidth: 1,
+              label: { text: 'Korridorkinder', style: { color: '#92400e', fontSize: '10px' } },
+            },
+            {
+              from: schoolStartIndex - 0.5,
+              to: categories.length - 0.5,
+              color: 'rgba(100, 116, 139, 0.12)',
+              label: { text: 'Schulkinder', style: { color: '#334155', fontSize: '10px' } },
+            },
+          ],
         },
         yAxis: {
           min: 0,
@@ -1503,7 +1557,10 @@ function DemographyAgeChart({ demographyData, accent }) {
           title: { text: 'Kinder', style: { fontSize: '11px' } },
         },
         tooltip: {
-          pointFormat: '<b>{point.y}</b> Kinder',
+          formatter() {
+            const cohort = categories[this.point.index] || '';
+            return `<b>${cohort} Jahre</b><br/><b>${Number(this.point.y || 0)}</b> Kinder`;
+          },
         },
         legend: { enabled: false },
         plotOptions: {
@@ -1516,13 +1573,13 @@ function DemographyAgeChart({ demographyData, accent }) {
           {
             type: 'column',
             name: 'Altersverteilung',
-            data: activeSnapshot?.counts || categories.map(() => 0),
+            data: seriesData,
             color: accent,
           },
         ],
       };
     },
-    [accent, activeSnapshot?.counts, demographyData]
+    [accent, activeSnapshot?.cohortCounts, activeSnapshot?.cohortLabels, demographyData]
   );
 
   if (!hasData) {
@@ -1588,6 +1645,79 @@ function DemographyAgeChart({ demographyData, accent }) {
         <HighchartsReact highcharts={Highcharts} options={options} containerProps={{ style: { height: '100%' } }} />
       </Box>
     </Paper>
+  );
+}
+
+const FORECAST_CHART_SLIDES = [
+  { id: 'preview', title: 'Ausblick (Sankey)' },
+  { id: 'demography', title: 'Demografie-Prognose' },
+];
+
+function ForecastStageCarousel({ previewFlow, demographyData, accent }) {
+  const [activeIndex, setActiveIndex] = React.useState(0);
+  const [emblaApi, setEmblaApi] = React.useState(null);
+  const [canGoPrev, setCanGoPrev] = React.useState(false);
+  const [canGoNext, setCanGoNext] = React.useState(true);
+
+  React.useEffect(() => {
+    if (!emblaApi) return undefined;
+
+    const updateState = () => {
+      setActiveIndex(emblaApi.selectedScrollSnap());
+      setCanGoPrev(emblaApi.canScrollPrev());
+      setCanGoNext(emblaApi.canScrollNext());
+    };
+
+    updateState();
+    emblaApi.on('select', updateState);
+    emblaApi.on('reInit', updateState);
+
+    return () => {
+      emblaApi.off('select', updateState);
+      emblaApi.off('reInit', updateState);
+    };
+  }, [emblaApi]);
+
+  return (
+    <Box className="analysis-coverage-carousel-wrap">
+      <Group className="analysis-coverage-carousel-header" justify="space-between" wrap="nowrap">
+        <Text size="xs" fw={700} className="analysis-stage-recommendation-title">
+          {FORECAST_CHART_SLIDES[activeIndex]?.title || 'Ausblick'}
+        </Text>
+        <Group gap={6} wrap="nowrap">
+          <Badge variant="filled" size="md" className="analysis-coverage-carousel-counter">
+            {activeIndex + 1}/{FORECAST_CHART_SLIDES.length}
+          </Badge>
+          <ActionIcon variant="filled" size="md" className="analysis-coverage-carousel-nav" onClick={() => emblaApi?.scrollPrev()} disabled={!canGoPrev}>
+            <IconChevronLeft size={14} />
+          </ActionIcon>
+          <ActionIcon variant="filled" size="md" className="analysis-coverage-carousel-nav" onClick={() => emblaApi?.scrollNext()} disabled={!canGoNext}>
+            <IconChevronRight size={14} />
+          </ActionIcon>
+        </Group>
+      </Group>
+
+      <Carousel
+        withIndicators
+        withControls={false}
+        getEmblaApi={setEmblaApi}
+        className="analysis-coverage-carousel"
+        slideSize="100%"
+        slideGap={0}
+        emblaOptions={{ loop: false, align: 'start', dragFree: false }}
+      >
+        <Carousel.Slide>
+          <Box className="analysis-coverage-carousel-slide">
+            {activeIndex === 0 ? <PreviewSankeyChart previewFlow={previewFlow} accent={accent} /> : null}
+          </Box>
+        </Carousel.Slide>
+        <Carousel.Slide>
+          <Box className="analysis-coverage-carousel-slide">
+            {activeIndex === 1 ? <DemographyAgeChart demographyData={demographyData} accent={accent} /> : null}
+          </Box>
+        </Carousel.Slide>
+      </Carousel>
+    </Box>
   );
 }
 
@@ -1706,7 +1836,8 @@ function VisuView() {
   );
   const activeAnalysisSubPage = useSelector((state) => state.ui.analysisSubPage || STORY_STEPS[0].id);
   const [activeStep, setActiveStep] = React.useState(() => {
-    const idx = STORY_STEPS.findIndex((step) => step.id === activeAnalysisSubPage);
+    const normalizedSubPage = ANALYSIS_SUBPAGE_ALIASES[activeAnalysisSubPage] || activeAnalysisSubPage;
+    const idx = STORY_STEPS.findIndex((step) => step.id === normalizedSubPage);
     return idx >= 0 ? idx : 0;
   });
   const [emblaApi, setEmblaApi] = React.useState(null);
@@ -2850,7 +2981,21 @@ function VisuView() {
   const demographyData = React.useMemo(() => {
     const referenceDate = chartState?.referenceDate || todayIso;
     const formatter = new Intl.DateTimeFormat('de-DE', { month: 'short', year: '2-digit' });
-    const ageBands = ['0-2', '3', '4', '5', '6+'];
+    const cohortStarts = Array.from(
+      { length: Math.floor(AGE_HISTOGRAM_MAX_MONTHS / AGE_COHORT_SIZE_MONTHS) + 1 },
+      (_, idx) => idx * AGE_COHORT_SIZE_MONTHS
+    );
+    const cohortLabels = cohortStarts.map((start) => {
+      const fromYears = (start / 12).toLocaleString('de-DE', {
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 2,
+      });
+      const toYears = ((start + AGE_COHORT_SIZE_MONTHS) / 12).toLocaleString('de-DE', {
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 2,
+      });
+      return `${fromYears}-${toYears}`;
+    });
 
     const hasGroupFilter = Array.isArray(selectedGroups) && selectedGroups.length > 0;
     const groupFilterSet = new Set((selectedGroups || []).map((value) => String(value)));
@@ -2874,36 +3019,29 @@ function VisuView() {
         .map((item) => getAgeInMonthsAtDate(item.dateofbirth, monthIso))
         .filter((age) => Number.isFinite(age));
 
-      const counts = {
-        '0-2': 0,
-        '3': 0,
-        '4': 0,
-        '5': 0,
-        '6+': 0,
-      };
-
+      const cohortCounts = cohortStarts.map(() => 0);
       ageValues.forEach((ageMonths) => {
-        const ageYears = ageMonths / 12;
-        if (ageYears < 3) counts['0-2'] += 1;
-        else if (ageYears < 4) counts['3'] += 1;
-        else if (ageYears < 5) counts['4'] += 1;
-        else if (ageYears < 6) counts['5'] += 1;
-        else counts['6+'] += 1;
+        const boundedAge = Math.max(0, Math.min(AGE_HISTOGRAM_MAX_MONTHS, Number(ageMonths || 0)));
+        const cohortIndex = Math.min(cohortCounts.length - 1, Math.floor(boundedAge / AGE_COHORT_SIZE_MONTHS));
+        cohortCounts[cohortIndex] += 1;
       });
 
       const total = ageValues.length;
-      const peakEntry = Object.entries(counts).sort((a, b) => b[1] - a[1])[0] || ['0-2', 0];
+      const peakIndex = cohortCounts.reduce((bestIdx, value, idx, arr) => (value > arr[bestIdx] ? idx : bestIdx), 0);
+      const peakBand = cohortLabels[peakIndex] || '-';
+      const peakValue = Number(cohortCounts[peakIndex] || 0);
+      const under3Count = ageValues.filter((ageMonths) => Number(ageMonths || 0) < 36).length;
 
       return {
         label: formatter.format(monthDate),
         monthIso,
-        categories: ageBands,
-        counts: ageBands.map((band) => counts[band]),
+        cohortLabels,
+        cohortCounts,
         total,
         medianAgeMonths: getMedian(ageValues),
-        u3SharePct: total > 0 ? (counts['0-2'] / total) * 100 : 0,
-        peakBand: peakEntry[0],
-        peakSharePct: total > 0 ? (Number(peakEntry[1] || 0) / total) * 100 : 0,
+        u3SharePct: total > 0 ? (under3Count / total) * 100 : 0,
+        peakBand,
+        peakSharePct: total > 0 ? (peakValue / total) * 100 : 0,
       };
     });
 
@@ -2925,7 +3063,7 @@ function VisuView() {
       }, 0);
 
     return {
-      categories: ageBands,
+      cohortLabels,
       snapshots,
       kpis: {
         medianAgeYears: (currentSnapshot?.medianAgeMonths || 0) / 12,
@@ -3071,27 +3209,11 @@ function VisuView() {
       : activeStory.id === 'compare'
         ? [
             {
-              key: 'kpi-net-occupancy',
-              title: 'Netto-Belegung je Gruppe',
-              value: previewFlow?.kpis?.minNetEntry && previewFlow?.kpis?.maxNetEntry
-                ? `Min ${previewFlow.kpis.minNetEntry.net > 0 ? '+' : ''}${previewFlow.kpis.minNetEntry.net} (${previewFlow.kpis.minNetEntry.name}) / Max ${previewFlow.kpis.maxNetEntry.net > 0 ? '+' : ''}${previewFlow.kpis.maxNetEntry.net} (${previewFlow.kpis.maxNetEntry.name})`
-                : 'Keine Verschiebung',
-              text: '3-Monatsvorschau: Nettoveränderung pro Gruppe.',
-              tone: 'good',
-            },
-            {
               key: 'kpi-external-entry-ratio',
               title: 'Externe Zugangsquote',
               value: `${(previewFlow?.kpis?.externalEntryRatioPct || 0).toFixed(1)}%`,
               text: 'Anteil externer Zugänge am gesamten Gruppenzufluss.',
               tone: 'good',
-            },
-            {
-              key: 'kpi-exit-ratio',
-              title: 'Abgangsquote',
-              value: `${(previewFlow?.kpis?.exitRatioPct || 0).toFixed(1)}%`,
-              text: 'Anteil externer Abgänge an aktuell aktiven Kindern.',
-              tone: (previewFlow?.kpis?.exitRatioPct || 0) > 12 ? 'warn' : 'good',
             },
             {
               key: 'kpi-flow-concentration',
@@ -3100,9 +3222,6 @@ function VisuView() {
               text: 'Anteil der drei größten Flüsse am Gesamtvolumen.',
               tone: (previewFlow?.kpis?.concentrationPct || 0) > 70 ? 'warn' : 'good',
             },
-          ]
-      : activeStory.id === 'demography'
-        ? [
             {
               key: 'kpi-demography-median',
               title: 'Medianalter',
@@ -3111,25 +3230,11 @@ function VisuView() {
               tone: 'good',
             },
             {
-              key: 'kpi-demography-u3',
-              title: 'U3-Anteil',
-              value: `${(demographyData?.kpis?.u3SharePct || 0).toFixed(1)}%`,
-              text: 'Anteil 0-2 Jahre in der aktuellen Belegung.',
-              tone: (demographyData?.kpis?.u3SharePct || 0) > 45 ? 'warn' : 'good',
-            },
-            {
               key: 'kpi-demography-school',
               title: 'Schulstarter (12M)',
               value: `${demographyData?.kpis?.schoolStarters12M || 0}`,
               text: 'Kinder, die binnen 12 Monaten 6 Jahre erreichen.',
               tone: 'warn',
-            },
-            {
-              key: 'kpi-demography-peak',
-              title: 'Größtes Alterscluster',
-              value: `${demographyData?.kpis?.peakBand || '-'} (${(demographyData?.kpis?.peakBandSharePct || 0).toFixed(1)}%)`,
-              text: 'Dominantes Altersband im aktuellen Monat.',
-              tone: 'good',
             },
           ]
       : STAGE_RECOMMENDATIONS_BY_STORY[activeStory.id] || STAGE_RECOMMENDATIONS_BY_STORY.quality;
@@ -3211,12 +3316,16 @@ function VisuView() {
   ));
 
   React.useEffect(() => {
-    const stepIndex = STORY_STEPS.findIndex((step) => step.id === activeAnalysisSubPage);
+    const normalizedSubPage = ANALYSIS_SUBPAGE_ALIASES[activeAnalysisSubPage] || activeAnalysisSubPage;
+    if (normalizedSubPage !== activeAnalysisSubPage) {
+      dispatch(setAnalysisSubPage(normalizedSubPage));
+    }
+    const stepIndex = STORY_STEPS.findIndex((step) => step.id === normalizedSubPage);
     if (stepIndex >= 0 && stepIndex !== activeStep) {
       setActiveStep(stepIndex);
       emblaApi?.scrollTo(stepIndex);
     }
-  }, [activeAnalysisSubPage, activeStep, emblaApi]);
+  }, [activeAnalysisSubPage, activeStep, dispatch, emblaApi]);
 
   return (
     <Box
@@ -3350,9 +3459,11 @@ function VisuView() {
           ) : activeStory.id === 'cohort' ? (
             <FinanceTrendChart financeTrend={coverageData?.financeTrend || null} accent={activeStory.accent} />
           ) : activeStory.id === 'compare' ? (
-            <PreviewSankeyChart previewFlow={previewFlow} accent={activeStory.accent} />
-          ) : activeStory.id === 'demography' ? (
-            <DemographyAgeChart demographyData={demographyData} accent={activeStory.accent} />
+            <ForecastStageCarousel
+              previewFlow={previewFlow}
+              demographyData={demographyData}
+              accent={activeStory.accent}
+            />
           ) : (
             <DiagramPlaceholder story={activeStory} />
           )}

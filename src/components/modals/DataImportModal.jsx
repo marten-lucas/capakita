@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Modal, Button, Checkbox, Stack, Text, Group, FileButton, SegmentedControl, MultiSelect, Paper, Radio, List, ThemeIcon, Divider, PasswordInput } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { IconUpload, IconCheck, IconAlertCircle } from '@tabler/icons-react';
@@ -8,6 +8,7 @@ import { setActivePage } from '../../store/uiSlice';
 
 function DataImportModal({ opened, onClose, title = 'Datenimport-Wizard', requirePasswordConfirmation = false }) {
   const isMobile = useMediaQuery('(max-width: 48em)');
+  const wizardFormRef = useRef(null);
   const [step, setStep] = useState(1);
   const [file, setFile] = useState(null);
   const [isAnonymized, setIsAnonymized] = useState(true);
@@ -69,7 +70,7 @@ function DataImportModal({ opened, onClose, title = 'Datenimport-Wizard', requir
     setPreview(nextPreview);
   }, [preparedImport, mergeMode, recordScope, selectedRecordKeys, conflictPolicy, getImportPreview]);
 
-  const handlePrepareImport = async () => {
+  const handlePrepareImport = useCallback(async () => {
     if (!file) return;
     setIsPreparing(true);
     try {
@@ -93,9 +94,20 @@ function DataImportModal({ opened, onClose, title = 'Datenimport-Wizard', requir
     } finally {
       setIsPreparing(false);
     }
-  };
+  }, [
+    file,
+    isAnonymized,
+    importMode,
+    importPassword,
+    prepareImport,
+    getImportPreview,
+    mergeMode,
+    recordScope,
+    selectedRecordKeys,
+    conflictPolicy,
+  ]);
 
-  const handleApplyImport = async () => {
+  const handleApplyImport = useCallback(async () => {
     if (!preparedImport || !preview?.supported) return;
     setIsApplying(true);
     try {
@@ -115,7 +127,17 @@ function DataImportModal({ opened, onClose, title = 'Datenimport-Wizard', requir
     } finally {
       setIsApplying(false);
     }
-  };
+  }, [
+    preparedImport,
+    preview,
+    applyImport,
+    mergeMode,
+    recordScope,
+    selectedRecordKeys,
+    conflictPolicy,
+    onClose,
+    dispatch,
+  ]);
 
   const conflictPolicyDisabled = mergeMode === 'replace' || (preview?.counts?.conflicts || 0) === 0;
 
@@ -138,7 +160,7 @@ function DataImportModal({ opened, onClose, title = 'Datenimport-Wizard', requir
       paddingRight: 4,
     };
 
-  const handlePrimaryStepAction = () => {
+  const handlePrimaryStepAction = useCallback(() => {
     if (step === 1 && canAnalyzeFile) {
       handlePrepareImport();
       return;
@@ -152,11 +174,27 @@ function DataImportModal({ opened, onClose, title = 'Datenimport-Wizard', requir
     if (step === 3 && canImport && !isApplying) {
       handleApplyImport();
     }
-  };
+  }, [step, canAnalyzeFile, canContinueToStep3, canImport, isApplying, handlePrepareImport, handleApplyImport]);
 
   const handleWizardSubmit = (event) => {
     event.preventDefault();
     handlePrimaryStepAction();
+  };
+
+  const isTextLikeElement = (element) => {
+    if (!(element instanceof HTMLElement)) return false;
+    const tagName = element.tagName.toLowerCase();
+    if (tagName === 'textarea') return true;
+    if (tagName !== 'input') return false;
+
+    const inputType = String(element.getAttribute('type') || '').toLowerCase();
+    return inputType === 'text'
+      || inputType === 'search'
+      || inputType === 'email'
+      || inputType === 'password'
+      || inputType === 'number'
+      || inputType === 'tel'
+      || inputType === 'url';
   };
 
   const handleWizardKeyDownCapture = (event) => {
@@ -166,17 +204,7 @@ function DataImportModal({ opened, onClose, title = 'Datenimport-Wizard', requir
 
     const target = event.target;
     const tagName = target instanceof HTMLElement ? target.tagName.toLowerCase() : '';
-    if (tagName === 'textarea') return;
-
-    const inputType = target instanceof HTMLInputElement ? String(target.type || '').toLowerCase() : '';
-    const isTextLikeInput = inputType === 'text'
-      || inputType === 'search'
-      || inputType === 'email'
-      || inputType === 'password'
-      || inputType === 'number'
-      || inputType === 'tel'
-      || inputType === 'url';
-    if (isTextLikeInput) return;
+    if (isTextLikeElement(target)) return;
 
     if (step === 2 || step === 3) {
       event.preventDefault();
@@ -190,6 +218,37 @@ function DataImportModal({ opened, onClose, title = 'Datenimport-Wizard', requir
     handlePrimaryStepAction();
   };
 
+  useEffect(() => {
+    if (!opened) return undefined;
+
+    const handleWindowKeyDownCapture = (event) => {
+      if (event.key !== 'Enter' && event.key !== 'NumpadEnter') return;
+      if (event.defaultPrevented) return;
+      if (event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) return;
+
+      const target = event.target instanceof HTMLElement ? event.target : null;
+      const formContainsTarget = wizardFormRef.current && target ? wizardFormRef.current.contains(target) : false;
+      if (formContainsTarget) return;
+
+      const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      const withinModal = Boolean(
+        (target && target.closest('[data-import-wizard-modal="true"]'))
+        || (activeElement && activeElement.closest('[data-import-wizard-modal="true"]'))
+      );
+      if (!withinModal) return;
+
+      if (isTextLikeElement(target) || isTextLikeElement(activeElement)) return;
+
+      event.preventDefault();
+      handlePrimaryStepAction();
+    };
+
+    window.addEventListener('keydown', handleWindowKeyDownCapture, true);
+    return () => {
+      window.removeEventListener('keydown', handleWindowKeyDownCapture, true);
+    };
+  }, [opened, handlePrimaryStepAction]);
+
   return (
     <Modal
       opened={opened}
@@ -198,8 +257,9 @@ function DataImportModal({ opened, onClose, title = 'Datenimport-Wizard', requir
       centered
       fullScreen={isMobile}
       size={isMobile ? '100%' : 'lg'}
+      data-import-wizard-modal="true"
     >
-      <Stack component="form" onSubmit={handleWizardSubmit} onKeyDownCapture={handleWizardKeyDownCapture}>
+      <Stack ref={wizardFormRef} component="form" onSubmit={handleWizardSubmit} onKeyDownCapture={handleWizardKeyDownCapture}>
         <SegmentedControl
           value={String(step)}
           onChange={(value) => setStep(Number(value))}

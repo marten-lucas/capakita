@@ -3,7 +3,7 @@ import { Alert, Button, Text, Menu, ActionIcon, Select, Box, Switch, Modal, Stac
 import { useSelector, useDispatch, useStore } from 'react-redux';
 import { isSaveAllowed, setSaveDialogOpen, setLoadDialogOpen, setSelectedScenarioId } from '../store/simScenarioSlice';
 import { setActivePage, setAnalysisSubPage, setBrowserAutoSaveEnabled, setSettingsSubPage } from '../store/uiSlice';
-import { IconDatabase, IconChartBar, IconSettings, IconDotsVertical, IconUpload, IconDeviceFloppy, IconFolderOpen, IconCalendarEvent, IconInfoCircle, IconRefresh, IconTrash, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconLayersIntersect, IconUsers, IconCertificate, IconTools, IconAlertTriangle, IconRoute, IconClockHour4, IconArrowsSplit, IconUser } from '@tabler/icons-react';
+import { IconDatabase, IconChartBar, IconSettings, IconDotsVertical, IconUpload, IconDeviceFloppy, IconFolderOpen, IconCalendarEvent, IconInfoCircle, IconRefresh, IconTrash, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconLayersIntersect, IconUsers, IconCertificate, IconTools, IconAlertTriangle, IconRoute, IconClockHour4, IconArrowsSplit } from '@tabler/icons-react';
 import { refreshEventsForScenario, clearEventOverridesForScenario } from '../store/eventSlice';
 import { updateDatesOfInterest } from '../store/datesOfInterestSlice';
 import { loadBookingsByScenario } from '../store/simBookingSlice';
@@ -25,8 +25,7 @@ const NAV_ITEMS = [
       { value: 'status', label: 'Bedarfsdeckung', icon: IconChartBar },
       { value: 'transitions', label: 'Resilienz', icon: IconRoute },
       { value: 'cohort', label: 'Finanzen', icon: IconClockHour4 },
-      { value: 'compare', label: 'Vorschau', icon: IconArrowsSplit },
-      { value: 'demography', label: 'Demografie', icon: IconUser },
+      { value: 'compare', label: 'Ausblick', icon: IconArrowsSplit },
       { value: 'options', label: 'Optionen-Check', icon: IconTools },
       { value: 'trends', label: 'Trend-Radar', icon: IconChartBar },
     ],
@@ -132,6 +131,7 @@ function TopNav({ variant = 'sidebar', sidebarCollapsed = false, onToggleSidebar
   const activePage = useSelector((state) => state.ui.activePage);
   const activeSettingsSubPage = useSelector((state) => state.ui.settingsSubPage || 'groups');
   const activeAnalysisSubPage = useSelector((state) => state.ui.analysisSubPage || 'quality');
+  const normalizedAnalysisSubPage = activeAnalysisSubPage === 'demography' ? 'compare' : activeAnalysisSubPage;
   const browserAutoSaveEnabled = useSelector((state) => state.ui.browserAutoSaveEnabled);
   const store = useStore();
   const [importModalOpen, setImportModalOpen] = React.useState(false);
@@ -139,6 +139,11 @@ function TopNav({ variant = 'sidebar', sidebarCollapsed = false, onToggleSidebar
   const [cleanupModalOpen, setCleanupModalOpen] = React.useState(false);
   const [resetEventOverrides, setResetEventOverrides] = React.useState(true);
   const showScenarioSelector = (scenarios?.length || 0) > 1;
+
+  React.useEffect(() => {
+    if (activeAnalysisSubPage === normalizedAnalysisSubPage) return;
+    dispatch(setAnalysisSubPage(normalizedAnalysisSubPage));
+  }, [activeAnalysisSubPage, dispatch, normalizedAnalysisSubPage]);
 
   const scenarioOptions = React.useMemo(
     () =>
@@ -253,7 +258,7 @@ function TopNav({ variant = 'sidebar', sidebarCollapsed = false, onToggleSidebar
               {item.subItems.map((subItem) => (
                 <UnstyledButton
                   key={subItem.value}
-                  className={`app-nav-subitem ${(item.value === 'settings' ? activeSettingsSubPage : activeAnalysisSubPage) === subItem.value ? 'is-active' : ''}`}
+                  className={`app-nav-subitem ${(item.value === 'settings' ? activeSettingsSubPage : normalizedAnalysisSubPage) === subItem.value ? 'is-active' : ''}`}
                   onClick={() => {
                     dispatch(setActivePage(item.value));
                     if (item.value === 'settings') {
@@ -267,7 +272,7 @@ function TopNav({ variant = 'sidebar', sidebarCollapsed = false, onToggleSidebar
                   <subItem.icon size={14} stroke={1.8} />
                   <Text
                     size="xs"
-                    fw={(item.value === 'settings' ? activeSettingsSubPage : activeAnalysisSubPage) === subItem.value ? 700 : 600}
+                    fw={(item.value === 'settings' ? activeSettingsSubPage : normalizedAnalysisSubPage) === subItem.value ? 700 : 600}
                   >
                     {subItem.label}
                   </Text>
@@ -472,11 +477,12 @@ export function MobileBottomNav() {
   const activePage = useSelector((state) => state.ui.activePage);
   const activeSettingsSubPage = useSelector((state) => state.ui.settingsSubPage || 'groups');
   const activeAnalysisSubPage = useSelector((state) => state.ui.analysisSubPage || 'quality');
+  const normalizedAnalysisSubPage = activeAnalysisSubPage === 'demography' ? 'compare' : activeAnalysisSubPage;
 
   const mobileItems = React.useMemo(
     () => NAV_ITEMS.map((item) => {
       if (item.value === 'visu') {
-        const activeSub = item.subItems?.find((entry) => entry.value === activeAnalysisSubPage);
+        const activeSub = item.subItems?.find((entry) => entry.value === normalizedAnalysisSubPage);
         return {
           ...item,
           label: activeSub ? `Analyse: ${activeSub.label}` : item.label,
@@ -489,7 +495,7 @@ export function MobileBottomNav() {
         label: activeSub ? `Optionen: ${activeSub.label}` : item.label,
       };
     }),
-    [activeAnalysisSubPage, activeSettingsSubPage]
+    [activeSettingsSubPage, normalizedAnalysisSubPage]
   );
 
   return (

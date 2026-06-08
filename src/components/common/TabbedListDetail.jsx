@@ -90,7 +90,6 @@ function TabbedListDetail({
           minHeight: isMobile ? 360 : 0,
           display: 'flex',
           flexDirection: 'column',
-          minWidth: 0,
           overflow: 'hidden',
         }}
       >
