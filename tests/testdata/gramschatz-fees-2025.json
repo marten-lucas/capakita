@@ -142,49 +142,49 @@
               "id": "f1",
               "minHours": 3,
               "maxHours": 4,
-              "monthlyAmount": 165,
+              "monthlyAmount": 170,
               "validFrom": "2025-01-01"
             },
             {
               "id": "f2",
               "minHours": 4.01,
               "maxHours": 5,
-              "monthlyAmount": 195,
+              "monthlyAmount": 200,
               "validFrom": "2025-01-01"
             },
             {
               "id": "f3",
               "minHours": 5.01,
               "maxHours": 6,
-              "monthlyAmount": 225,
+              "monthlyAmount": 230,
               "validFrom": "2025-01-01"
             },
             {
               "id": "f4",
               "minHours": 6.01,
               "maxHours": 7,
-              "monthlyAmount": 255,
+              "monthlyAmount": 260,
               "validFrom": "2025-01-01"
             },
             {
               "id": "f5",
               "minHours": 7.01,
               "maxHours": 8,
-              "monthlyAmount": 285,
+              "monthlyAmount": 290,
               "validFrom": "2025-01-01"
             },
             {
               "id": "f6",
               "minHours": 8.01,
               "maxHours": 9,
-              "monthlyAmount": 315,
+              "monthlyAmount": 320,
               "validFrom": "2025-01-01"
             },
             {
               "id": "f7",
               "minHours": 9.01,
               "maxHours": 10,
-              "monthlyAmount": 345,
+              "monthlyAmount": 350,
               "validFrom": "2025-01-01"
             }
           ]
@@ -199,49 +199,49 @@
               "id": "f8",
               "minHours": 3,
               "maxHours": 4,
-              "monthlyAmount": 145,
+              "monthlyAmount": 150,
               "validFrom": "2025-01-01"
             },
             {
               "id": "f9",
               "minHours": 4.01,
               "maxHours": 5,
-              "monthlyAmount": 165,
+              "monthlyAmount": 170,
               "validFrom": "2025-01-01"
             },
             {
               "id": "f10",
               "minHours": 5.01,
               "maxHours": 6,
-              "monthlyAmount": 185,
+              "monthlyAmount": 190,
               "validFrom": "2025-01-01"
             },
             {
               "id": "f11",
               "minHours": 6.01,
               "maxHours": 7,
-              "monthlyAmount": 205,
+              "monthlyAmount": 210,
               "validFrom": "2025-01-01"
             },
             {
               "id": "f12",
               "minHours": 7.01,
               "maxHours": 8,
-              "monthlyAmount": 225,
+              "monthlyAmount": 230,
               "validFrom": "2025-01-01"
             },
             {
               "id": "f13",
               "minHours": 8.01,
               "maxHours": 9,
-              "monthlyAmount": 245,
+              "monthlyAmount": 250,
               "validFrom": "2025-01-01"
             },
             {
               "id": "f14",
               "minHours": 9.01,
               "maxHours": 10,
-              "monthlyAmount": 265,
+              "monthlyAmount": 270,
               "validFrom": "2025-01-01"
             }
           ]
@@ -256,21 +256,21 @@
               "id": "f15",
               "minHours": 1,
               "maxHours": 2,
-              "monthlyAmount": 105,
+              "monthlyAmount": 110,
               "validFrom": "2025-01-01"
             },
             {
               "id": "f16",
               "minHours": 2.01,
               "maxHours": 3,
-              "monthlyAmount": 125,
+              "monthlyAmount": 130,
               "validFrom": "2025-01-01"
             },
             {
               "id": "f17",
               "minHours": 3.01,
               "maxHours": 4,
-              "monthlyAmount": 145,
+              "monthlyAmount": 150,
               "validFrom": "2025-01-01"
             }
           ]
@@ -301,10 +301,10 @@
             "hasNonGermanSpeakingParents": false
           },
           "weeklyHours": 5,
-          "expectedGroupFeeAmount": 195,
+          "expectedGroupFeeAmount": 200,
           "expectedWeight": 2.0,
           "expectedBayKiBiGAmount": 240,
-          "expectedTotalMonthly": 435
+          "expectedTotalMonthly": 440
         },
         {
           "id": "child-3to5-weight1",
@@ -321,10 +321,10 @@
             "hasNonGermanSpeakingParents": false
           },
           "weeklyHours": 6,
-          "expectedGroupFeeAmount": 205,
+          "expectedGroupFeeAmount": 210,
           "expectedWeight": 1.0,
           "expectedBayKiBiGAmount": 120,
-          "expectedTotalMonthly": 325
+          "expectedTotalMonthly": 330
         },
         {
           "id": "child-schoolage-weight12",
@@ -341,10 +341,10 @@
             "hasNonGermanSpeakingParents": false
           },
           "weeklyHours": 2,
-          "expectedGroupFeeAmount": 105,
+          "expectedGroupFeeAmount": 110,
           "expectedWeight": 1.2,
           "expectedBayKiBiGAmount": 144,
-          "expectedTotalMonthly": 249
+          "expectedTotalMonthly": 254
         },
         {
           "id": "child-disability-weight45",
@@ -361,10 +361,10 @@
             "hasNonGermanSpeakingParents": false
           },
           "weeklyHours": 5,
-          "expectedGroupFeeAmount": 195,
+          "expectedGroupFeeAmount": 200,
           "expectedWeight": 4.5,
           "expectedBayKiBiGAmount": 540,
-          "expectedTotalMonthly": 735
+          "expectedTotalMonthly": 740
         },
         {
           "id": "child-tempDisability-weight45",
@@ -381,10 +381,10 @@
             "hasNonGermanSpeakingParents": false
           },
           "weeklyHours": 6,
-          "expectedGroupFeeAmount": 205,
+          "expectedGroupFeeAmount": 210,
           "expectedWeight": 4.5,
           "expectedBayKiBiGAmount": 540,
-          "expectedTotalMonthly": 745,
+          "expectedTotalMonthly": 750,
           "validForReferenceDate": "2025-05-01",
           "note": "Weight expires after 180 days from temporaryDisabilityDate"
         },
@@ -403,10 +403,10 @@
             "hasNonGermanSpeakingParents": false
           },
           "weeklyHours": 4,
-          "expectedGroupFeeAmount": 195,
+          "expectedGroupFeeAmount": 200,
           "expectedWeight": 1.3,
           "expectedBayKiBiGAmount": 156,
-          "expectedTotalMonthly": 351
+          "expectedTotalMonthly": 356
         },
         {
           "id": "child-nonGermanParents-weight13",
@@ -423,10 +423,10 @@
             "hasNonGermanSpeakingParents": true
           },
           "weeklyHours": 7,
-          "expectedGroupFeeAmount": 225,
+          "expectedGroupFeeAmount": 230,
           "expectedWeight": 1.3,
           "expectedBayKiBiGAmount": 156,
-          "expectedTotalMonthly": 381
+          "expectedTotalMonthly": 386
         },
         {
           "id": "child-disability-wins-precedence",
@@ -443,10 +443,10 @@
             "hasNonGermanSpeakingParents": false
           },
           "weeklyHours": 5,
-          "expectedGroupFeeAmount": 195,
+          "expectedGroupFeeAmount": 200,
           "expectedWeight": 4.5,
           "expectedBayKiBiGAmount": 540,
-          "expectedTotalMonthly": 735,
+          "expectedTotalMonthly": 740,
           "note": "Disability weight (4.5) takes precedence over day-care weight (1.3)"
         }
       ]

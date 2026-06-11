@@ -2,8 +2,8 @@ import React from 'react';
 import { Alert, Button, Text, Menu, ActionIcon, Select, Box, Switch, Modal, Stack, Checkbox, Group, UnstyledButton } from '@mantine/core';
 import { useSelector, useDispatch, useStore } from 'react-redux';
 import { isSaveAllowed, setSaveDialogOpen, setLoadDialogOpen, setSelectedScenarioId } from '../store/simScenarioSlice';
-import { setActivePage, setAnalysisSubPage, setBrowserAutoSaveEnabled, setSettingsSubPage } from '../store/uiSlice';
-import { IconDatabase, IconChartBar, IconSettings, IconDotsVertical, IconUpload, IconDeviceFloppy, IconFolderOpen, IconCalendarEvent, IconInfoCircle, IconRefresh, IconTrash, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconLayersIntersect, IconUsers, IconCertificate, IconTools, IconAlertTriangle, IconRoute, IconClockHour4, IconArrowsSplit } from '@tabler/icons-react';
+import { setActivePage, setAnalysisSubPage, setBrowserAutoSaveEnabled, setSettingsSubPage, setDataSubmenu } from '../store/uiSlice';
+import { IconDatabase, IconChartBar, IconSettings, IconDotsVertical, IconUpload, IconDeviceFloppy, IconFolderOpen, IconCalendarEvent, IconInfoCircle, IconRefresh, IconTrash, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconLayersIntersect, IconUsers, IconCertificate, IconTools, IconAlertTriangle, IconRoute, IconClockHour4, IconArrowsSplit, IconUser, IconBabyCarriage } from '@tabler/icons-react';
 import { refreshEventsForScenario, clearEventOverridesForScenario } from '../store/eventSlice';
 import { updateDatesOfInterest } from '../store/datesOfInterestSlice';
 import { loadBookingsByScenario } from '../store/simBookingSlice';
@@ -15,7 +15,15 @@ import { buildScenarioCleanupResult } from '../utils/scenarioCleanup';
 import DataImportModal from './modals/DataImportModal';
 
 const NAV_ITEMS = [
-  { value: 'data', label: 'Daten', icon: IconDatabase },
+  {
+    value: 'data',
+    label: 'Daten',
+    icon: IconDatabase,
+    subItems: [
+      { value: 'capacity', label: 'Mitarbeiter', icon: IconUser },
+      { value: 'demand', label: 'Kinder', icon: IconBabyCarriage },
+    ],
+  },
   {
     value: 'visu',
     label: 'Analyse',
@@ -39,7 +47,9 @@ const NAV_ITEMS = [
       { value: 'groups', label: 'Gruppen', icon: IconUsers },
       { value: 'qualifications', label: 'Qualifikationen', icon: IconCertificate },
       { value: 'events', label: 'Ereignisse', icon: IconCalendarEvent },
-      { value: 'finance', label: 'Finanzen', icon: IconTools },
+      { value: 'finance-funding', label: 'Förderung', icon: IconTools },
+      { value: 'finance-absence', label: 'Bezahlte Abwesenheit', icon: IconTools },
+      { value: 'finance-fees', label: 'Beiträge', icon: IconTools },
     ],
   },
   { value: 'events', label: 'Ereignisse', icon: IconCalendarEvent },
@@ -129,7 +139,9 @@ function TopNav({ variant = 'sidebar', sidebarCollapsed = false, onToggleSidebar
   const scenarios = useSelector((state) => state.simScenario.scenarios);
   const selectedScenarioId = useSelector((state) => state.simScenario.selectedScenarioId);
   const activePage = useSelector((state) => state.ui.activePage);
+  const dataSubmenu = useSelector((state) => state.ui.dataSubmenu || 'capacity');
   const activeSettingsSubPage = useSelector((state) => state.ui.settingsSubPage || 'groups');
+  const normalizedSettingsSubPage = activeSettingsSubPage === 'finance' ? 'finance-funding' : activeSettingsSubPage;
   const activeAnalysisSubPage = useSelector((state) => state.ui.analysisSubPage || 'quality');
   const normalizedAnalysisSubPage = activeAnalysisSubPage === 'demography' ? 'compare' : activeAnalysisSubPage;
   const browserAutoSaveEnabled = useSelector((state) => state.ui.browserAutoSaveEnabled);
@@ -144,6 +156,11 @@ function TopNav({ variant = 'sidebar', sidebarCollapsed = false, onToggleSidebar
     if (activeAnalysisSubPage === normalizedAnalysisSubPage) return;
     dispatch(setAnalysisSubPage(normalizedAnalysisSubPage));
   }, [activeAnalysisSubPage, dispatch, normalizedAnalysisSubPage]);
+
+  React.useEffect(() => {
+    if (activeSettingsSubPage === normalizedSettingsSubPage) return;
+    dispatch(setSettingsSubPage(normalizedSettingsSubPage));
+  }, [activeSettingsSubPage, normalizedSettingsSubPage, dispatch]);
 
   const scenarioOptions = React.useMemo(
     () =>
@@ -258,11 +275,20 @@ function TopNav({ variant = 'sidebar', sidebarCollapsed = false, onToggleSidebar
               {item.subItems.map((subItem) => (
                 <UnstyledButton
                   key={subItem.value}
-                  className={`app-nav-subitem ${(item.value === 'settings' ? activeSettingsSubPage : normalizedAnalysisSubPage) === subItem.value ? 'is-active' : ''}`}
+                  className={`app-nav-subitem ${(
+                    item.value === 'settings'
+                      ? normalizedSettingsSubPage
+                      : item.value === 'data'
+                        ? dataSubmenu
+                        : normalizedAnalysisSubPage
+                  ) === subItem.value ? 'is-active' : ''}`}
                   onClick={() => {
                     dispatch(setActivePage(item.value));
                     if (item.value === 'settings') {
                       dispatch(setSettingsSubPage(subItem.value));
+                    }
+                    if (item.value === 'data') {
+                      dispatch(setDataSubmenu(subItem.value));
                     }
                     if (item.value === 'visu') {
                       dispatch(setAnalysisSubPage(subItem.value));
@@ -272,7 +298,13 @@ function TopNav({ variant = 'sidebar', sidebarCollapsed = false, onToggleSidebar
                   <subItem.icon size={14} stroke={1.8} />
                   <Text
                     size="xs"
-                    fw={(item.value === 'settings' ? activeSettingsSubPage : normalizedAnalysisSubPage) === subItem.value ? 700 : 600}
+                    fw={(
+                      item.value === 'settings'
+                        ? normalizedSettingsSubPage
+                        : item.value === 'data'
+                          ? dataSubmenu
+                          : normalizedAnalysisSubPage
+                    ) === subItem.value ? 700 : 600}
                   >
                     {subItem.label}
                   </Text>
@@ -475,12 +507,21 @@ function TopNav({ variant = 'sidebar', sidebarCollapsed = false, onToggleSidebar
 export function MobileBottomNav() {
   const dispatch = useDispatch();
   const activePage = useSelector((state) => state.ui.activePage);
+  const dataSubmenu = useSelector((state) => state.ui.dataSubmenu || 'capacity');
   const activeSettingsSubPage = useSelector((state) => state.ui.settingsSubPage || 'groups');
+  const normalizedSettingsSubPage = activeSettingsSubPage === 'finance' ? 'finance-funding' : activeSettingsSubPage;
   const activeAnalysisSubPage = useSelector((state) => state.ui.analysisSubPage || 'quality');
   const normalizedAnalysisSubPage = activeAnalysisSubPage === 'demography' ? 'compare' : activeAnalysisSubPage;
 
   const mobileItems = React.useMemo(
     () => NAV_ITEMS.map((item) => {
+      if (item.value === 'data') {
+        const activeSub = item.subItems?.find((entry) => entry.value === dataSubmenu);
+        return {
+          ...item,
+          label: activeSub ? `Daten: ${activeSub.label}` : item.label,
+        };
+      }
       if (item.value === 'visu') {
         const activeSub = item.subItems?.find((entry) => entry.value === normalizedAnalysisSubPage);
         return {
@@ -489,13 +530,13 @@ export function MobileBottomNav() {
         };
       }
       if (item.value !== 'settings') return item;
-      const activeSub = item.subItems?.find((entry) => entry.value === activeSettingsSubPage);
+      const activeSub = item.subItems?.find((entry) => entry.value === normalizedSettingsSubPage);
       return {
         ...item,
         label: activeSub ? `Optionen: ${activeSub.label}` : item.label,
       };
     }),
-    [activeSettingsSubPage, normalizedAnalysisSubPage]
+    [dataSubmenu, normalizedSettingsSubPage, normalizedAnalysisSubPage]
   );
 
   return (

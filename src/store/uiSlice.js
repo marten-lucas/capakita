@@ -2,11 +2,12 @@ import { createSlice } from '@reduxjs/toolkit';
 
 export const initialUiState = {
   activePage: 'welcome', // 'welcome' | 'data' | 'visu' | 'settings' | 'legal'
-  settingsSubPage: 'groups', // 'scenarios' | 'groups' | 'qualifications' | 'events' | 'finance'
+  settingsSubPage: 'groups', // 'scenarios' | 'groups' | 'qualifications' | 'events' | 'finance-funding' | 'finance-absence' | 'finance-fees'
   analysisSubPage: 'quality', // 'quality' | 'status' | 'transitions' | 'cohort' | 'compare' | 'options' | 'trends'
   browserAutoSaveEnabled: false,
   dataListFilter: 'all',
   dataCaptureQueueMode: false,
+  dataSubmenu: 'capacity',
 };
 
 const uiSlice = createSlice({
@@ -31,6 +32,9 @@ const uiSlice = createSlice({
     setDataCaptureQueueMode: (state, action) => {
       state.dataCaptureQueueMode = Boolean(action.payload);
     },
+    setDataSubmenu: (state, action) => {
+      state.dataSubmenu = action.payload === 'demand' ? 'demand' : 'capacity';
+    },
   },
 });
 
@@ -41,5 +45,6 @@ export const {
   setBrowserAutoSaveEnabled,
   setDataListFilter,
   setDataCaptureQueueMode,
+  setDataSubmenu,
 } = uiSlice.actions;
 export default uiSlice.reducer;

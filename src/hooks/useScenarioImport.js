@@ -156,6 +156,7 @@ function buildPreparedImportFromCapakitaData({
   const groupsByItem = payload?.groupsByScenario?.[scenarioId] || {};
   const qualificationAssignmentsByItem = payload?.qualificationAssignmentsByScenario?.[scenarioId] || {};
   const itemFinancesByItem = payload?.financeByScenario?.[scenarioId]?.itemFinances || {};
+  const scenarioFinance = cloneObject(payload?.financeByScenario?.[scenarioId], null);
 
   const simDataList = Object.values(itemsById || {});
   const groupDefs = payload?.groupDefsByScenario?.[scenarioId] || [];
@@ -207,6 +208,7 @@ function buildPreparedImportFromCapakitaData({
     groupAssignmentsByExternalKey,
     qualificationAssignmentsByExternalKey,
     itemFinancesByExternalKey,
+    scenarioFinance,
   };
 }
 
@@ -527,12 +529,42 @@ export function useScenarioImport() {
       }
     }
 
+    const defaultScenarioFinance = {
+      settings: { partialAbsenceThresholdDays: 42, partialAbsenceEmployerSharePercent: 0 },
+      bayKiBiGRules: [],
+      groupFeeCatalogs: {},
+    };
+
+    const existingScenarioFinance = {
+      ...defaultScenarioFinance,
+      ...(nextFinanceByScenario[targetScenarioId] || {}),
+    };
+
+    const incomingScenarioFinance = preparedImport?.scenarioFinance && typeof preparedImport.scenarioFinance === 'object'
+      ? cloneObject(preparedImport.scenarioFinance, {})
+      : null;
+
+    const hasExistingScenarioFinanceData = Boolean(
+      (existingScenarioFinance?.bayKiBiGRules || []).length > 0
+      || Object.keys(existingScenarioFinance?.groupFeeCatalogs || {}).length > 0
+    );
+
+    let mergedScenarioFinance = existingScenarioFinance;
+    if (incomingScenarioFinance) {
+      const shouldTakeIncomingFinance = mergeMode === 'replace'
+        || conflictPolicy === 'overwrite'
+        || !hasExistingScenarioFinanceData;
+
+      if (shouldTakeIncomingFinance) {
+        mergedScenarioFinance = {
+          ...defaultScenarioFinance,
+          ...incomingScenarioFinance,
+        };
+      }
+    }
+
     nextFinanceByScenario[targetScenarioId] = {
-      ...(nextFinanceByScenario[targetScenarioId] || {
-        settings: { partialAbsenceThresholdDays: 42, partialAbsenceEmployerSharePercent: 0 },
-        bayKiBiGRules: [],
-        groupFeeCatalogs: {},
-      }),
+      ...mergedScenarioFinance,
       itemFinances: nextItemFinances,
     };
 

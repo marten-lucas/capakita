@@ -2,6 +2,8 @@ import { generateExpertRatioTimeDimension, generateCareRatioTimeDimension } from
 import { sumBookingHours } from '../bookingUtils';
 import { getPeriodBoundsForCategory, rangesOverlap, resolveGroupIdAtDate, splitBookingByGroupAtDate } from '../financeUtils';
 import { shouldIncludeDataItemInAnalysis } from '../dataVisibility';
+import { segmentMatchesMode } from '../bookingUtils';
+import { timeToMinutes } from '../timeUtils';
 
 function normalizeDateValue(value) {
     if (value === null || value === undefined) return '';
@@ -68,6 +70,33 @@ function getBookingEnd(booking) {
         || booking?.valid_until
         || ''
     );
+}
+
+function getSegmentShareFactor(segment) {
+    const allocation = Number(segment?.allocationSharePercent);
+    if (!Number.isFinite(allocation)) return 1;
+    return Math.max(0, allocation) / 100;
+}
+
+function sumWeightedBookingHours(booking, options = {}) {
+    if (!Array.isArray(booking?.times)) return 0;
+    const mode = options.mode || 'all';
+    let totalMinutes = 0;
+
+    booking.times.forEach((day) => {
+        if (!Array.isArray(day?.segments)) return;
+        day.segments.forEach((segment) => {
+            if (!segmentMatchesMode(segment, mode)) return;
+
+            const startMinutes = timeToMinutes(segment?.booking_start);
+            const endMinutes = timeToMinutes(segment?.booking_end);
+            if (startMinutes === null || endMinutes === null || endMinutes <= startMinutes) return;
+
+            totalMinutes += (endMinutes - startMinutes) * getSegmentShareFactor(segment);
+        });
+    });
+
+    return totalMinutes / 60;
 }
 
 /**
@@ -290,7 +319,7 @@ export function calculateChartDataMidterm(
 
             itemBookings.forEach((booking) => {
                 if (!rangesOverlap(getBookingStart(booking), getBookingEnd(booking), chartRange.start, chartRange.end)
-                    || sumBookingHours(booking, { mode: 'pedagogical' }) <= 0) {
+                    || sumWeightedBookingHours(booking, { mode: 'pedagogical' }) <= 0) {
                     return;
                 }
 
@@ -303,7 +332,7 @@ export function calculateChartDataMidterm(
 
                 splitBookings.forEach((splitBooking) => {
                     if (!groupMatchesSelection(splitBooking.groupId)) return;
-                    if (sumBookingHours(splitBooking, { mode: 'pedagogical' }) <= 0) return;
+                    if (sumWeightedBookingHours(splitBooking, { mode: 'pedagogical' }) <= 0) return;
 
                     filteredCapacityBookings.push({
                         ...splitBooking,
@@ -337,7 +366,7 @@ export function calculateChartDataMidterm(
                     : ((!booking.itemStart || booking.itemStart <= cat) && (!booking.itemEnd || booking.itemEnd >= cat));
 
                 if (bookingOverlaps && itemOverlaps) {
-                    totalHours += sumBookingHours(booking, { mode });
+                    totalHours += sumWeightedBookingHours(booking, { mode });
                 }
             });
             series[idx] = totalHours;

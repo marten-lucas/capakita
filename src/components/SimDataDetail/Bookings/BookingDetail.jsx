@@ -77,9 +77,15 @@ function BookingDetail({ index, booking }) {
   const dispatch = useDispatch();
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(state => state.simScenario.selectedItems?.[selectedScenarioId]);
-  const { baseScenario, getEffectiveDataItem, getEffectiveBookings } = useOverlayData();
+  const { baseScenario, getEffectiveDataItem, getEffectiveBookings, getEffectiveGroupDefs } = useOverlayData();
   const selectedItem = getEffectiveDataItem(selectedItemId);
   const allowCategorySelection = selectedItem?.type === 'capacity';
+  const allowGroupSelection = selectedItem?.type === 'capacity';
+  const groupDefs = getEffectiveGroupDefs();
+  const groupOptions = React.useMemo(
+    () => (groupDefs || []).map((group) => ({ value: String(group.id), label: group.name || String(group.id) })),
+    [groupDefs]
+  );
 
   const baseScenarioId = baseScenario?.id;
   const baseBookingsObj = baseScenarioId ? getEffectiveBookings(selectedItemId) : {};
@@ -139,7 +145,8 @@ function BookingDetail({ index, booking }) {
           id: `${parentItemId}-${index}-${dayAbbr}-${Date.now()}`,
           booking_start: suggestedRange.start,
           booking_end: suggestedRange.end,
-          category: 'pedagogical'
+          category: 'pedagogical',
+          groupAllocations: []
         }]
       });
     } else if (!isEnabled && dayIndex !== -1) {
@@ -168,7 +175,8 @@ function BookingDetail({ index, booking }) {
             id: `${parentItemId}-${index}-${dayAbbr}-${Date.now()}`,
             booking_start: suggestedRange.start,
             booking_end: suggestedRange.end,
-            category: 'pedagogical'
+            category: 'pedagogical',
+            groupAllocations: []
           }
         ]
       };
@@ -241,6 +249,32 @@ function BookingDetail({ index, booking }) {
       ));
 
       return { ...t, segments: newSegments };
+    });
+
+    handleUpdateBooking({ ...booking, times: newTimes });
+  };
+
+  const handleSegmentAllocationsChange = (dayAbbr, segIdx, allocationsInput) => {
+    const allocations = (allocationsInput || [])
+      .map((entry) => ({
+        groupId: String(entry.groupId || ''),
+        share: Number(entry.share) || 0,
+      }))
+      .filter((entry) => entry.groupId);
+
+    const newTimes = cloneBookingTimes(booking.times).map((time) => {
+      if (time.day_name !== dayAbbr) return time;
+
+      const newSegments = time.segments.map((segment, index) => {
+        if (index !== segIdx) return segment;
+        return {
+          ...segment,
+          groupId: allocations.length === 1 ? allocations[0].groupId : '',
+          groupAllocations: allocations,
+        };
+      });
+
+      return { ...time, segments: newSegments };
     });
 
     handleUpdateBooking({ ...booking, times: newTimes });
@@ -335,6 +369,9 @@ function BookingDetail({ index, booking }) {
               onTimeChange={(sIdx, vals) => handleTimeChange(day.abbr, sIdx, vals)}
               onCategoryChange={(sIdx, category) => handleCategoryChange(day.abbr, sIdx, category)}
               allowCategorySelection={allowCategorySelection}
+              allowGroupSelection={allowGroupSelection}
+              groupOptions={groupOptions}
+              onSegmentAllocationsChange={(sIdx, allocations) => handleSegmentAllocationsChange(day.abbr, sIdx, allocations)}
             />
           );
         })}

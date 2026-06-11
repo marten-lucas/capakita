@@ -206,4 +206,131 @@ describe('calculateChartDataMidterm', () => {
     expect(group1Result.capacity_pedagogical[0]).toBe(5);
     expect(group2Result.capacity_pedagogical[0]).toBe(5);
   });
+
+  it('weights capacity hours by segment groupAllocations when filtering by group', () => {
+    const scenarioId = 'scenario-4';
+    const basePayload = {
+      bookingsByScenario: {
+        [scenarioId]: {
+          'capacity-1': {
+            'booking-1': {
+              id: 'booking-1',
+              startdate: '2026-01-01',
+              enddate: '',
+              times: [
+                {
+                  day_name: 'Mo',
+                  segments: [
+                    {
+                      booking_start: '08:00',
+                      booking_end: '10:00',
+                      category: 'pedagogical',
+                      groupAllocations: [
+                        { groupId: 'g1', share: 40 },
+                        { groupId: 'g2', share: 60 },
+                      ],
+                    },
+                  ],
+                },
+                {
+                  day_name: 'Di',
+                  segments: [
+                    {
+                      booking_start: '08:00',
+                      booking_end: '10:00',
+                      category: 'pedagogical',
+                      groupAllocations: [
+                        { groupId: 'g1', share: 40 },
+                        { groupId: 'g2', share: 60 },
+                      ],
+                    },
+                  ],
+                },
+                {
+                  day_name: 'Mi',
+                  segments: [
+                    {
+                      booking_start: '08:00',
+                      booking_end: '10:00',
+                      category: 'pedagogical',
+                      groupAllocations: [
+                        { groupId: 'g1', share: 40 },
+                        { groupId: 'g2', share: 60 },
+                      ],
+                    },
+                  ],
+                },
+                {
+                  day_name: 'Do',
+                  segments: [
+                    {
+                      booking_start: '08:00',
+                      booking_end: '10:00',
+                      category: 'pedagogical',
+                      groupAllocations: [
+                        { groupId: 'g1', share: 40 },
+                        { groupId: 'g2', share: 60 },
+                      ],
+                    },
+                  ],
+                },
+                {
+                  day_name: 'Fr',
+                  segments: [
+                    {
+                      booking_start: '08:00',
+                      booking_end: '10:00',
+                      category: 'pedagogical',
+                      groupAllocations: [
+                        { groupId: 'g1', share: 40 },
+                        { groupId: 'g2', share: 60 },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+      },
+      dataByScenario: {
+        [scenarioId]: {
+          'capacity-1': {
+            id: 'capacity-1',
+            type: 'capacity',
+            startdate: '2026-01-01',
+            enddate: '',
+          },
+        },
+      },
+      groupDefs: [
+        { id: 'g1', name: 'Fuchsgruppe' },
+        { id: 'g2', name: 'Bärchengruppe' },
+      ],
+      qualificationDefs: [],
+      groupsByScenario: { [scenarioId]: {} },
+      qualificationAssignmentsByScenario: { [scenarioId]: {} },
+      scenarioId,
+      timedimension: 'month',
+    };
+
+    const group1Result = calculateChartDataMidterm(
+      ['2026-08'],
+      '2026-08-15',
+      ['g1'],
+      [],
+      basePayload
+    );
+
+    const group2Result = calculateChartDataMidterm(
+      ['2026-08'],
+      '2026-08-15',
+      ['g2'],
+      [],
+      basePayload
+    );
+
+    expect(group1Result.capacity_pedagogical[0]).toBe(4);
+    expect(group2Result.capacity_pedagogical[0]).toBe(6);
+  });
 });

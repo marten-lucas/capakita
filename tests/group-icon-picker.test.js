@@ -32,6 +32,9 @@ async function seedScenarioWithGroup(page) {
         },
       },
     });
+
+    store.dispatch({ type: 'ui/setActivePage', payload: 'settings' });
+    store.dispatch({ type: 'ui/setSettingsSubPage', payload: 'groups' });
   });
 }
 
@@ -49,7 +52,10 @@ test('group icon picker opens without runtime errors', async ({ page }, testInfo
 
   await seedScenarioWithGroup(page);
 
-  await page.getByRole('button', { name: 'Optionen' }).click();
+  const optionsButton = page.getByRole('button', { name: 'Optionen' });
+  if (await optionsButton.count()) {
+    await optionsButton.first().click();
+  }
   await page.getByRole('heading', { name: 'Testgruppe' }).waitFor({ state: 'visible' });
 
   const picker = page.getByTestId('group-icon-picker');

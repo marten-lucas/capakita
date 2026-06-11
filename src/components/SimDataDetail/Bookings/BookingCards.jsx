@@ -1,11 +1,23 @@
 import React from 'react';
 import { Text, Group, Box, Avatar, Stack, Badge } from '@mantine/core';
+import { IconUsers } from '@tabler/icons-react';
 import { consolidateBookingSummary } from '../../../utils/bookingUtils';
 import { calculateSegmentMinutes, formatDurationHours, timeToMinutes } from '../../../utils/timeUtils';
+import { useOverlayData } from '../../../hooks/useOverlayData';
 
 const TIMELINE_START_MINUTES = 6 * 60;
 const TIMELINE_END_MINUTES = 19 * 60;
 const TIMELINE_TOTAL_MINUTES = TIMELINE_END_MINUTES - TIMELINE_START_MINUTES;
+
+function getSegmentGroupIds(segment) {
+  if (Array.isArray(segment?.groupAllocations) && segment.groupAllocations.length > 0) {
+    return segment.groupAllocations
+      .map((allocation) => String(allocation.groupId || ''))
+      .filter(Boolean);
+  }
+  if (segment?.groupId) return [String(segment.groupId)];
+  return [];
+}
 
 // Helper to calculate total hours from booking segments
 function getBookingHours(times) {
@@ -36,7 +48,7 @@ function BookingWeeklyOverview({ bookingTimes }) {
     <Box
       style={{
         position: 'relative',
-        height: 54,
+        height: 72,
         borderRadius: 12,
         overflow: 'hidden',
         border: '1px solid var(--mantine-color-gray-3)',
@@ -78,7 +90,7 @@ function BookingWeeklyOverview({ bookingTimes }) {
               width: `${dayWidths}%`,
               bottom: 0,
               borderLeft: index === 0 ? 'none' : '1px solid rgba(8,55,67,0.08)',
-              padding: 6,
+              padding: 8,
             }}
           >
             <Group justify="space-between" align="center" gap={4} mb={4}>
@@ -106,7 +118,7 @@ function BookingWeeklyOverview({ bookingTimes }) {
             <Box
               style={{
                 position: 'relative',
-                height: 18,
+                height: 24,
                 borderRadius: 999,
                 overflow: 'hidden',
                 background: 'rgba(255,255,255,0.75)',
@@ -128,9 +140,9 @@ function BookingWeeklyOverview({ bookingTimes }) {
                     style={{
                       position: 'absolute',
                       left: `${((clippedStart - TIMELINE_START_MINUTES) / TIMELINE_TOTAL_MINUTES) * 100}%`,
-                      top: 3,
+                      top: 4,
                       width: `${Math.max(((clippedEnd - clippedStart) / TIMELINE_TOTAL_MINUTES) * 100, 2)}%`,
-                      height: 10,
+                      height: 14,
                       borderRadius: 999,
                       background: segment.category === 'administrative'
                         ? 'linear-gradient(135deg, rgba(145,65,172,0.65), rgba(145,65,172,0.35))'
@@ -156,6 +168,12 @@ function formatGermanDate(isoDate) {
 
 function BookingCards({ item, index }) {
   const booking = item;
+  const { getEffectiveGroupDefs } = useOverlayData();
+  const groupDefs = getEffectiveGroupDefs();
+  const groupLabelById = React.useMemo(
+    () => Object.fromEntries((groupDefs || []).map((group) => [String(group.id), group.name || String(group.id)])),
+    [groupDefs]
+  );
   const start = formatGermanDate(booking.startdate);
   const end = formatGermanDate(booking.enddate);
   let dateRangeText = '';
@@ -168,24 +186,44 @@ function BookingCards({ item, index }) {
   }
   
   const hoursText = getBookingHours(booking.times);
+  const bookingGroupIds = React.useMemo(() => {
+    const ids = new Set();
+    (booking.times || []).forEach((dayTime) => {
+      (dayTime?.segments || []).forEach((segment) => {
+        getSegmentGroupIds(segment).forEach((groupId) => ids.add(groupId));
+      });
+    });
+    return Array.from(ids);
+  }, [booking.times]);
+  const groupSummaryText = React.useMemo(() => {
+    if (bookingGroupIds.length === 0) return 'ohne Gruppe';
+    const labels = bookingGroupIds.map((groupId) => groupLabelById[groupId] || groupId);
+    if (labels.length <= 2) return labels.join(', ');
+    return `${labels[0]}, ${labels[1]} +${labels.length - 2}`;
+  }, [bookingGroupIds, groupLabelById]);
 
   return (
     <Stack gap={6} w="100%">
       <Group wrap="wrap" gap="sm" align="flex-start">
-        <Avatar color="blue" radius="xl" size="sm">
+        <Avatar color="blue" radius="xl" size="md">
           {index + 1}
         </Avatar>
         <Box style={{ flex: 1, minWidth: 0 }}>
-          <Text size="sm" fw={500}>
-            {hoursText} {dateRangeText}
-          </Text>
-          <Text size="xs" c="dimmed">
+          <Group gap="xs" wrap="wrap" align="center">
+            <Text size="md" fw={600}>
+              {hoursText} {dateRangeText}
+            </Text>
+            <Badge size="sm" variant="light" color="teal" leftSection={<IconUsers size={12} />}>
+              {groupSummaryText}
+            </Badge>
+          </Group>
+          <Text size="sm" c="dimmed">
             {consolidateBookingSummary(booking.times)}
           </Text>
         </Box>
       </Group>
       <Box>
-        <Box h={18} />
+        <Box h={24} />
         <BookingWeeklyOverview bookingTimes={booking.times} />
       </Box>
     </Stack>

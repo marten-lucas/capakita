@@ -210,6 +210,60 @@ function getValidTimeSegments(assignment) {
     .sort((left, right) => left.startMinutes - right.startMinutes);
 }
 
+function normalizeAllocationShare(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 0;
+  return Math.max(0, numeric);
+}
+
+function distributeEvenAllocation(groupIds) {
+  const normalized = [...new Set((groupIds || []).map((groupId) => String(groupId)).filter(Boolean))];
+  if (normalized.length === 0) return [];
+  const base = Math.floor(100 / normalized.length);
+  const rest = 100 - (base * normalized.length);
+  return normalized.map((groupId, index) => ({
+    groupId,
+    share: base + (index < rest ? 1 : 0),
+  }));
+}
+
+function getSegmentAllocations(segment) {
+  if (!segment) return [];
+
+  if (Array.isArray(segment.groupAllocations) && segment.groupAllocations.length > 0) {
+    const prepared = segment.groupAllocations
+      .map((entry) => ({
+        groupId: String(entry?.groupId || ''),
+        share: normalizeAllocationShare(entry?.share),
+      }))
+      .filter((entry) => entry.groupId);
+
+    if (prepared.length === 0) return [];
+
+    const sum = prepared.reduce((total, entry) => total + entry.share, 0);
+    if (sum <= 0) {
+      return distributeEvenAllocation(prepared.map((entry) => entry.groupId));
+    }
+
+    return prepared.map((entry) => ({
+      groupId: entry.groupId,
+      share: (entry.share / sum) * 100,
+    }));
+  }
+
+  if (segment.groupId) {
+    return [{ groupId: String(segment.groupId), share: 100 }];
+  }
+
+  return [];
+}
+
+function hasBookingSegmentAllocations(booking) {
+  return Array.isArray(booking?.times)
+    && booking.times.some((dayEntry) => Array.isArray(dayEntry?.segments)
+      && dayEntry.segments.some((segment) => getSegmentAllocations(segment).length > 0));
+}
+
 export function resolveGroupIdsAtDate(groupAssignments, date, fallbackGroupId = null) {
   const activeAssignment = pickActiveAssignment(groupAssignments, date);
   if (!activeAssignment) {
@@ -276,18 +330,11 @@ export function splitBookingByGroupAtDate(booking, groupAssignments, date, fallb
   const activeAssignment = pickActiveAssignment(groupAssignments, date);
   const baseGroupId = activeAssignment?.groupId || fallbackGroupId || null;
 
-  if (!activeAssignment || activeAssignment.assignmentMode !== 'multiple') {
-    return [{ ...booking, groupId: baseGroupId ? String(baseGroupId) : null }];
-  }
-
-  const timeSegments = getValidTimeSegments(activeAssignment);
-  if (timeSegments.length === 0) {
-    return [{ ...booking, groupId: baseGroupId ? String(baseGroupId) : null }];
-  }
+  const bookingDefinesAllocations = hasBookingSegmentAllocations(booking);
 
   const groupedTimes = new Map();
 
-  const appendSegment = (groupId, day, dayName, sourceSegment, startMinutes, endMinutes) => {
+  const appendSegment = (groupId, day, dayName, sourceSegment, startMinutes, endMinutes, allocationSharePercent = 100) => {
     if (endMinutes <= startMinutes) return;
 
     const key = groupId || '__NO_GROUP__';
@@ -303,35 +350,75 @@ export function splitBookingByGroupAtDate(booking, groupAssignments, date, fallb
       id: `${sourceSegment?.id || 'segment'}-${key}-${dayName}-${startMinutes}-${endMinutes}`,
       booking_start: minutesToTime(startMinutes),
       booking_end: minutesToTime(endMinutes),
+      allocationSharePercent: Math.max(0, Number(allocationSharePercent) || 0),
     });
   };
 
-  (booking?.times || []).forEach((dayEntry) => {
-    const day = dayEntry?.day;
-    const dayName = dayEntry?.day_name;
-    if (!dayName || !Array.isArray(dayEntry?.segments)) return;
+  if (bookingDefinesAllocations) {
+    (booking?.times || []).forEach((dayEntry) => {
+      const day = dayEntry?.day;
+      const dayName = dayEntry?.day_name;
+      if (!dayName || !Array.isArray(dayEntry?.segments)) return;
 
-    dayEntry.segments.forEach((segment) => {
-      const start = timeToMinutes(segment?.booking_start);
-      const end = timeToMinutes(segment?.booking_end);
-      if (start === null || end === null || end <= start) return;
+      dayEntry.segments.forEach((segment) => {
+        const start = timeToMinutes(segment?.booking_start);
+        const end = timeToMinutes(segment?.booking_end);
+        if (start === null || end === null || end <= start) return;
 
-      let uncovered = [{ start, end }];
-      timeSegments.forEach((groupSegment) => {
-        const overlapStart = Math.max(start, groupSegment.startMinutes);
-        const overlapEnd = Math.min(end, groupSegment.endMinutes);
-        if (overlapEnd <= overlapStart) return;
+        const allocations = getSegmentAllocations(segment);
+        if (allocations.length === 0) {
+          appendSegment(null, day, dayName, segment, start, end, 100);
+          return;
+        }
 
-        appendSegment(groupSegment.groupId, day, dayName, segment, overlapStart, overlapEnd);
+        let assignedShare = 0;
+        allocations.forEach((allocation) => {
+          assignedShare += allocation.share;
+          appendSegment(allocation.groupId, day, dayName, segment, start, end, allocation.share);
+        });
 
-        uncovered = uncovered.flatMap((interval) => subtractInterval(interval, overlapStart, overlapEnd));
-      });
-
-      uncovered.forEach((interval) => {
-        appendSegment(null, day, dayName, segment, interval.start, interval.end);
+        if (assignedShare < 99.999) {
+          appendSegment(null, day, dayName, segment, start, end, 100 - assignedShare);
+        }
       });
     });
-  });
+  } else {
+    if (!activeAssignment || activeAssignment.assignmentMode !== 'multiple') {
+      return [{ ...booking, groupId: baseGroupId ? String(baseGroupId) : null }];
+    }
+
+    const timeSegments = getValidTimeSegments(activeAssignment);
+    if (timeSegments.length === 0) {
+      return [{ ...booking, groupId: baseGroupId ? String(baseGroupId) : null }];
+    }
+
+    (booking?.times || []).forEach((dayEntry) => {
+      const day = dayEntry?.day;
+      const dayName = dayEntry?.day_name;
+      if (!dayName || !Array.isArray(dayEntry?.segments)) return;
+
+      dayEntry.segments.forEach((segment) => {
+        const start = timeToMinutes(segment?.booking_start);
+        const end = timeToMinutes(segment?.booking_end);
+        if (start === null || end === null || end <= start) return;
+
+        let uncovered = [{ start, end }];
+        timeSegments.forEach((groupSegment) => {
+          const overlapStart = Math.max(start, groupSegment.startMinutes);
+          const overlapEnd = Math.min(end, groupSegment.endMinutes);
+          if (overlapEnd <= overlapStart) return;
+
+          appendSegment(groupSegment.groupId, day, dayName, segment, overlapStart, overlapEnd, 100);
+
+          uncovered = uncovered.flatMap((interval) => subtractInterval(interval, overlapStart, overlapEnd));
+        });
+
+        uncovered.forEach((interval) => {
+          appendSegment(null, day, dayName, segment, interval.start, interval.end, 100);
+        });
+      });
+    });
+  }
 
   const splitBookings = [];
   groupedTimes.forEach((byDay, groupId) => {

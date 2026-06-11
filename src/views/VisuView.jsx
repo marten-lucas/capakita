@@ -603,7 +603,7 @@ function QualityStageCarousel({ qualityDonutData, qualityStaffScheduleData, acce
   );
 }
 
-function CoverageHeatmap({ categories, groups, heatValues, accent, mode }) {
+function CoverageHeatmap({ categories, groups, heatValues, accent, mode, onHoverChange }) {
   const slotsPerDay = React.useMemo(() => Math.max(Math.floor(categories.length / 5), 0), [categories.length]);
   const majorTickPositions = React.useMemo(() => {
     if (slotsPerDay === 0) return [];
@@ -629,7 +629,10 @@ function CoverageHeatmap({ categories, groups, heatValues, accent, mode }) {
   }, [slotsPerDay]);
 
   const metricRange = React.useMemo(() => {
-    const values = heatValues.map(([, , value]) => Number(value || 0));
+    const values = heatValues.map((entry) => {
+      if (Array.isArray(entry)) return Number(entry[2] || 0);
+      return Number(entry?.value || 0);
+    });
     const min = values.length ? Math.min(...values) : 0;
     const max = values.length ? Math.max(...values) : 1;
     if (min === max) {
@@ -755,6 +758,22 @@ function CoverageHeatmap({ categories, groups, heatValues, accent, mode }) {
           borderColor: 'rgba(255,255,255,0.6)',
           data: heatValues,
           nullColor: 'rgba(226,232,240,0.5)',
+          point: {
+            events: {
+              mouseOver() {
+                if (!onHoverChange) return;
+                const options = this.options || {};
+                onHoverChange({
+                  label: options.kpiLabel || `${groups[this.y]?.name || 'Gruppe'} · ${categories[this.x] || '-'}`,
+                  demand: Number(options.demand || 0),
+                  capacityPedagogical: Number(options.capacityPedagogical || 0),
+                  capacityAdministrative: Number(options.capacityAdministrative || 0),
+                  careRatio: Number(options.careRatio || 0),
+                  expertRatio: Number(options.expertRatio || 0),
+                });
+              },
+            },
+          },
           states: {
             hover: {
               borderColor: accent,
@@ -764,7 +783,7 @@ function CoverageHeatmap({ categories, groups, heatValues, accent, mode }) {
         },
       ],
     }),
-    [accent, categories, colorStops, dayBands, daySeparatorLines, groups, heatValues, majorTickPositions, metricLabel, metricRange.max, metricRange.min]
+    [accent, categories, colorStops, dayBands, daySeparatorLines, groups, heatValues, majorTickPositions, metricLabel, metricRange.max, metricRange.min, onHoverChange]
   );
 
   const legendEntries = React.useMemo(() => {
@@ -930,6 +949,7 @@ function CoverageStageCarousel({ weeklyData, categories, groups, heatValues, acc
                 heatValues={heatValues}
                 accent={accent}
                 mode={heatmapMode}
+                onHoverChange={onHoverChange}
               />
             ) : null}
           </Box>
@@ -1391,6 +1411,7 @@ function PreviewSankeyChart({ previewFlow, accent }) {
   const options = React.useMemo(
     () => {
       const links = previewFlow?.links || [];
+      const nodes = previewFlow?.nodes || [];
       return {
         chart: {
           backgroundColor: 'transparent',
@@ -1399,7 +1420,10 @@ function PreviewSankeyChart({ previewFlow, accent }) {
         title: { text: null },
         credits: { enabled: false },
         tooltip: {
-          pointFormat: '<b>{point.fromNode.name}</b> -> <b>{point.toNode.name}</b>: <b>{point.weight}</b>',
+          pointFormatter() {
+            const stepLabel = this.options?.stepLabel ? `<br/>Zeitpunkt: <b>${this.options.stepLabel}</b>` : '';
+            return `<b>${this.fromNode?.name || ''}</b> -> <b>${this.toNode?.name || ''}</b>: <b>${Number(this.weight || 0)}</b>${stepLabel}`;
+          },
         },
         plotOptions: {
           series: {
@@ -1419,8 +1443,9 @@ function PreviewSankeyChart({ previewFlow, accent }) {
         series: [
           {
             type: 'sankey',
-            name: 'Absehbare Verschiebungen',
+            name: 'Gruppenubergange',
             data: links,
+            nodes,
             colorByPoint: false,
             colors: [accent],
             dataLabels: {
@@ -1445,10 +1470,10 @@ function PreviewSankeyChart({ previewFlow, accent }) {
             Sankey-Chart
           </Badge>
           <Title order={3} className="analysis-diagram-placeholder-title">
-            Vorschau Gruppenverschiebungen
+            Keine gruppenbezogenen Ubergange
           </Title>
           <Text size="sm" c="dimmed" ta="center" className="analysis-diagram-placeholder-text">
-            Für den gewählten Zeitraum sind keine absehbaren Verschiebungen vorhanden.
+            Ab dem Stichtag wurden in den bekannten Ereignissen keine Gruppenwechsel aktiver Kinder gefunden.
           </Text>
         </Stack>
       </Paper>
@@ -1490,11 +1515,12 @@ function DemographyAgeChart({ demographyData, accent }) {
 
       const indexForMonths = (months) => Math.floor(months / AGE_COHORT_SIZE_MONTHS);
       const krippeEndIndex = indexForMonths(35);
-      const corridorStartIndex = indexForMonths(33);
-      const corridorEndIndex = indexForMonths(41);
+      // Bayerischer Einschulungskorridor: Kinder, die zwischen 1. Juli und 30. September 6 Jahre alt werden.
+      const corridorStartIndex = indexForMonths(72);
+      const corridorEndIndex = indexForMonths(74);
       const regelStartIndex = indexForMonths(36);
-      const regelEndIndex = indexForMonths(71);
-      const schoolStartIndex = indexForMonths(72);
+      const regelEndIndex = Math.max(regelStartIndex, corridorStartIndex - 1);
+      const schoolStartIndex = corridorEndIndex + 1;
 
       const seriesData = counts.map((value, index) => {
         let color = '#16a34a';
@@ -1541,7 +1567,7 @@ function DemographyAgeChart({ demographyData, accent }) {
               color: 'rgba(245, 158, 11, 0.20)',
               borderColor: 'rgba(245, 158, 11, 0.55)',
               borderWidth: 1,
-              label: { text: 'Korridorkinder', style: { color: '#92400e', fontSize: '10px' } },
+              label: { text: 'Einschulungskorridor', style: { color: '#92400e', fontSize: '10px' } },
             },
             {
               from: schoolStartIndex - 0.5,
@@ -1821,6 +1847,7 @@ function VisuView() {
   const bookingsByScenario = useSelector((state) => state.simBooking?.bookingsByScenario || {});
   const groupsByScenario = useSelector((state) => state.simGroup?.groupsByScenario || {});
   const groupDefsByScenario = useSelector((state) => state.simGroup?.groupDefsByScenario || {});
+  const eventsByScenario = useSelector((state) => state.events?.eventsByScenario || {});
   const qualificationAssignmentsByScenario = useSelector(
     (state) => state.simQualification?.qualificationAssignmentsByScenario || {}
   );
@@ -2007,15 +2034,19 @@ function VisuView() {
         let groupMinutes = 0;
 
         categories.forEach((_, slotIndex) => {
-          const delta = Number(groupCapacitySeries[slotIndex] || 0) - Number(groupDemandSeries[slotIndex] || 0);
-          if (delta < 0) groupMinutes += Math.abs(delta) * 30;
-
           const demandValue = Number(groupDemandSeries[slotIndex] || 0);
+          const capacityValue = Number(groupCapacitySeries[slotIndex] || 0);
           const pedagogicalValue = Number(groupPedCapacitySeries[slotIndex] || 0);
+          const administrativeValue = Math.max(0, capacityValue - pedagogicalValue);
+          const careRatioValue = Number(groupCareRatioSeries[slotIndex] || 0);
+          const expertRatioValue = Number(weeklyData?.expert_ratio?.[slotIndex] || 0);
+
+          const delta = capacityValue - demandValue;
+          if (delta < 0) groupMinutes += Math.abs(delta) * 30;
 
           let heatValue;
           if (heatmapMode === HEATMAP_MODES.CARE_KEY) {
-            heatValue = Number(groupCareRatioSeries[slotIndex] || 0);
+            heatValue = careRatioValue;
           } else if (heatmapMode === HEATMAP_MODES.PRESENT_STAFF) {
             heatValue = pedagogicalValue;
           } else {
@@ -2023,7 +2054,18 @@ function VisuView() {
             heatValue = pedagogicalValue > 0 ? demandValue / pedagogicalValue : (demandValue > 0 ? demandValue : 0);
           }
 
-          heatValues.push([slotIndex, groupIndex, heatValue]);
+          const slotLabel = categories[slotIndex] || '-';
+          heatValues.push({
+            x: slotIndex,
+            y: groupIndex,
+            value: heatValue,
+            kpiLabel: `${group.name} · ${slotLabel}`,
+            demand: demandValue,
+            capacityPedagogical: pedagogicalValue,
+            capacityAdministrative: administrativeValue,
+            careRatio: careRatioValue,
+            expertRatio: expertRatioValue,
+          });
         });
 
         groupUndercoverageMinutes.push({
@@ -2872,111 +2914,190 @@ function VisuView() {
 
   const previewFlow = React.useMemo(() => {
     const referenceDate = chartState?.referenceDate || todayIso;
-    const horizonDateObj = new Date(referenceDate);
-    horizonDateObj.setUTCMonth(horizonDateObj.getUTCMonth() + 3);
-    const horizonDate = horizonDateObj.toISOString().slice(0, 10);
-
-    const externalIn = 'Zugang extern';
-    const externalOut = 'Abgang extern';
     const noGroup = 'Ohne Gruppe';
+    const dateLabelFormatter = new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
 
     const groupsById = new Map((groupDefs || []).map((group) => [String(group.id), group.name || 'Gruppe']));
-    const flowCounter = new Map();
+    const hasGroupFilter = Array.isArray(selectedGroups) && selectedGroups.length > 0;
+    const selectedGroupSet = new Set((selectedGroups || []).map((value) => String(value)));
 
-    const addFlow = (from, to, weight = 1) => {
-      if (!from || !to || from === to || weight <= 0) return;
-      const key = `${from}__${to}`;
-      flowCounter.set(key, (flowCounter.get(key) || 0) + weight);
+    const scenarioEvents = (eventsByScenario?.[selectedScenarioId] || []).filter((event) => {
+      if (!event || event.enabled === false) return false;
+      if (event.entityType !== 'demand') return false;
+      if (!event.effectiveDate || event.effectiveDate < referenceDate) return false;
+      return event.type === 'group_assignment_start'
+        || event.type === 'group_assignment_end'
+        || event.type === 'auto_group_transition';
+    });
+
+    const eventDates = Array.from(new Set(scenarioEvents.map((event) => String(event.effectiveDate)))).sort();
+
+    const flowCounter = new Map();
+    const nodesById = new Map();
+
+    const makeNodeId = (dateIso, groupId) => `${dateIso}__${groupId || '__NO_GROUP__'}`;
+
+    const ensureNode = (dateIso, groupId, groupLabel) => {
+      const id = makeNodeId(dateIso, groupId);
+      if (!nodesById.has(id)) {
+        const dateLabel = dateIso === referenceDate ? 'Stichtag' : dateLabelFormatter.format(parseIsoDateSafe(dateIso) || new Date(`${dateIso}T00:00:00Z`));
+        nodesById.set(id, {
+          id,
+          name: `${groupLabel} (${dateLabel})`,
+          dateIso,
+          groupId: groupId || '__NO_GROUP__',
+          groupLabel,
+        });
+      }
+      return id;
+    };
+
+    const addFlow = (fromNodeId, toNodeId, stepLabel, weight = 1) => {
+      if (!fromNodeId || !toNodeId || weight <= 0) return;
+      const key = `${fromNodeId}__${toNodeId}`;
+      const current = flowCounter.get(key);
+      if (current) {
+        current.weight += weight;
+      } else {
+        flowCounter.set(key, {
+          from: fromNodeId,
+          to: toNodeId,
+          weight,
+          stepLabel,
+        });
+      }
     };
 
     const demandItems = Object.values(effectiveDataItems || {}).filter(
       (item) => item && item.type === 'demand' && !item.archived
     );
 
-    let activeNowCount = 0;
-
-    demandItems.forEach((item) => {
+    const activeNowChildren = demandItems.filter((item) => {
+      if (!isRecordActiveOnDate(item, referenceDate)) return false;
       const itemId = String(item.id);
       const assignments = getEffectiveGroupAssignments(itemId);
       const currentGroupId = resolveGroupIdAtDate(assignments, referenceDate, item.groupId || null);
-      const futureGroupId = resolveGroupIdAtDate(assignments, horizonDate, item.groupId || null);
-      const currentLabel = currentGroupId ? (groupsById.get(String(currentGroupId)) || noGroup) : noGroup;
-      const futureLabel = futureGroupId ? (groupsById.get(String(futureGroupId)) || noGroup) : noGroup;
+      if (!hasGroupFilter) return true;
+      if (!currentGroupId) return selectedGroupSet.has('__NO_GROUP__');
+      return selectedGroupSet.has(String(currentGroupId));
+    });
 
-      const isActiveNow = isRecordActiveOnDate(item, referenceDate);
-      const isActiveFuture = isRecordActiveOnDate(item, horizonDate);
-      if (isActiveNow) activeNowCount += 1;
+    const resolveGroupAtDate = (item, dateIso) => {
+      const assignments = getEffectiveGroupAssignments(String(item.id));
+      const groupIdRaw = resolveGroupIdAtDate(assignments, dateIso, item.groupId || null);
+      const groupId = groupIdRaw ? String(groupIdRaw) : '__NO_GROUP__';
+      const groupLabel = groupIdRaw ? (groupsById.get(groupId) || noGroup) : noGroup;
+      return { groupId, groupLabel };
+    };
 
-      if (!isActiveNow && isActiveFuture) {
-        addFlow(externalIn, futureLabel, 1);
-        return;
-      }
+    const stepSummaries = [];
+    let previousDate = referenceDate;
 
-      if (isActiveNow && !isActiveFuture) {
-        addFlow(currentLabel, externalOut, 1);
-        return;
-      }
+    eventDates.forEach((eventDate) => {
+      const stepLabel = dateLabelFormatter.format(parseIsoDateSafe(eventDate) || new Date(`${eventDate}T00:00:00Z`));
+      let changedInStep = 0;
+      let linkedInStep = 0;
+      const stepFlowCounter = new Map();
 
-      if (isActiveNow && isActiveFuture && currentLabel !== futureLabel) {
-        addFlow(currentLabel, futureLabel, 1);
+      const addStepFlow = (fromNodeId, toNodeId, weight = 1) => {
+        if (!fromNodeId || !toNodeId || weight <= 0) return;
+        const key = `${fromNodeId}__${toNodeId}`;
+        const current = stepFlowCounter.get(key);
+        if (current) {
+          current.weight += weight;
+        } else {
+          stepFlowCounter.set(key, { from: fromNodeId, to: toNodeId, weight });
+        }
+      };
+
+      activeNowChildren.forEach((item) => {
+        if (!isRecordActiveOnDate(item, previousDate) || !isRecordActiveOnDate(item, eventDate)) return;
+
+        const fromState = resolveGroupAtDate(item, previousDate);
+        const toState = resolveGroupAtDate(item, eventDate);
+        const fromNodeId = ensureNode(previousDate, fromState.groupId, fromState.groupLabel);
+        const toNodeId = ensureNode(eventDate, toState.groupId, toState.groupLabel);
+
+        addStepFlow(fromNodeId, toNodeId, 1);
+        linkedInStep += 1;
+        if (fromState.groupId !== toState.groupId) {
+          changedInStep += 1;
+        }
+      });
+
+      if (linkedInStep > 0 && changedInStep > 0) {
+        stepFlowCounter.forEach((entry) => {
+          addFlow(entry.from, entry.to, stepLabel, Number(entry.weight || 0));
+        });
+        stepSummaries.push({
+          dateIso: eventDate,
+          label: stepLabel,
+          changed: changedInStep,
+          linked: linkedInStep,
+        });
+        previousDate = eventDate;
       }
     });
 
-    const links = Array.from(flowCounter.entries()).map(([key, value]) => {
-      const [from, to] = key.split('__');
-      return [from, to, value];
+    const links = Array.from(flowCounter.values())
+      .map((entry) => ({
+        from: entry.from,
+        to: entry.to,
+        weight: Number(entry.weight || 0),
+        stepLabel: entry.stepLabel,
+      }))
+      .filter((entry) => entry.weight > 0);
+
+    const nodes = Array.from(nodesById.values()).map((node) => ({ id: node.id, name: node.name }));
+
+    const changedLinks = links.filter((entry) => {
+      const fromNode = nodesById.get(entry.from);
+      const toNode = nodesById.get(entry.to);
+      return fromNode && toNode && fromNode.groupId !== toNode.groupId;
     });
 
-    const isExternalNode = (value) => value === externalIn || value === externalOut;
-    const isGroupNode = (value) => !isExternalNode(value);
+    const changedVolumes = changedLinks.map((entry) => Number(entry.weight || 0));
+    const totalTransitions = changedVolumes.reduce((sum, value) => sum + value, 0);
+    const top3Transitions = [...changedVolumes].sort((a, b) => b - a).slice(0, 3).reduce((sum, value) => sum + value, 0);
+    const concentrationPct = totalTransitions > 0 ? (top3Transitions / totalTransitions) * 100 : 0;
 
-    const externalEntries = links
-      .filter(([from, to]) => from === externalIn && isGroupNode(to))
-      .reduce((sum, [, , value]) => sum + Number(value || 0), 0);
-    const internalShifts = links
-      .filter(([from, to]) => isGroupNode(from) && isGroupNode(to) && from !== to)
-      .reduce((sum, [, , value]) => sum + Number(value || 0), 0);
-    const externalExits = links
-      .filter(([, to]) => to === externalOut)
-      .reduce((sum, [, , value]) => sum + Number(value || 0), 0);
-
-    const inflowTotal = externalEntries + internalShifts;
-    const externalEntryRatioPct = inflowTotal > 0 ? (externalEntries / inflowTotal) * 100 : 0;
-    const exitRatioPct = activeNowCount > 0 ? (externalExits / activeNowCount) * 100 : 0;
-
-    const linkVolumes = links.map(([, , value]) => Number(value || 0));
-    const totalVolume = linkVolumes.reduce((sum, value) => sum + value, 0);
-    const top3Volume = [...linkVolumes].sort((a, b) => b - a).slice(0, 3).reduce((sum, value) => sum + value, 0);
-    const concentrationPct = totalVolume > 0 ? (top3Volume / totalVolume) * 100 : 0;
-
-    const groupNet = new Map();
-    links.forEach(([from, to, value]) => {
-      const numeric = Number(value || 0);
-      if (isGroupNode(from)) groupNet.set(from, (groupNet.get(from) || 0) - numeric);
-      if (isGroupNode(to)) groupNet.set(to, (groupNet.get(to) || 0) + numeric);
-    });
-
-    const groupNetEntries = Array.from(groupNet.entries()).map(([name, net]) => ({ name, net }));
-    const minNetEntry = groupNetEntries.length
-      ? groupNetEntries.reduce((min, current) => (current.net < min.net ? current : min), groupNetEntries[0])
-      : null;
-    const maxNetEntry = groupNetEntries.length
-      ? groupNetEntries.reduce((max, current) => (current.net > max.net ? current : max), groupNetEntries[0])
-      : null;
+    const topTransition = changedLinks.reduce((best, current) => {
+      const currentWeight = Number(current.weight || 0);
+      if (!best || currentWeight > best.weight) {
+        const fromNode = nodesById.get(current.from);
+        const toNode = nodesById.get(current.to);
+        return {
+          from: fromNode?.name || '-',
+          to: toNode?.name || '-',
+          weight: currentWeight,
+        };
+      }
+      return best;
+    }, null);
 
     return {
       referenceDate,
-      horizonDate,
+      eventDates: stepSummaries,
+      nodes,
       links,
       kpis: {
-        externalEntryRatioPct,
-        exitRatioPct,
+        activeNowCount: activeNowChildren.length,
+        eventStepsCount: stepSummaries.length,
+        transitionCount: totalTransitions,
         concentrationPct,
-        minNetEntry,
-        maxNetEntry,
+        topTransition,
       },
     };
-  }, [chartState?.referenceDate, effectiveDataItems, getEffectiveGroupAssignments, groupDefs, todayIso]);
+  }, [
+    chartState?.referenceDate,
+    effectiveDataItems,
+    eventsByScenario,
+    getEffectiveGroupAssignments,
+    groupDefs,
+    selectedGroups,
+    selectedScenarioId,
+    todayIso,
+  ]);
 
   const demographyData = React.useMemo(() => {
     const referenceDate = chartState?.referenceDate || todayIso;
@@ -3000,9 +3121,71 @@ function VisuView() {
     const hasGroupFilter = Array.isArray(selectedGroups) && selectedGroups.length > 0;
     const groupFilterSet = new Set((selectedGroups || []).map((value) => String(value)));
 
+    const scenarioEvents = (eventsByScenario?.[selectedScenarioId] || []).filter((event) => (
+      event
+      && event.enabled !== false
+      && event.type === 'auto_group_transition'
+      && event.entityType === 'demand'
+      && event.effectiveDate
+      && event.metadata?.targetStage
+    ));
+
+    const autoTransitionsByItem = new Map();
+    scenarioEvents.forEach((event) => {
+      const itemId = String(event.entityId || '');
+      if (!itemId) return;
+      const next = autoTransitionsByItem.get(itemId) || [];
+      next.push(event);
+      autoTransitionsByItem.set(itemId, next);
+    });
+    autoTransitionsByItem.forEach((events, itemId) => {
+      autoTransitionsByItem.set(
+        itemId,
+        [...events].sort((left, right) => {
+          const dateDiff = String(left.effectiveDate).localeCompare(String(right.effectiveDate));
+          if (dateDiff !== 0) return dateDiff;
+          return String(left.id || '').localeCompare(String(right.id || ''));
+        })
+      );
+    });
+
+    const groupIdByStage = {
+      kita: String(
+        (groupDefs || []).find((group) => {
+          const type = String(group?.type || '').toLowerCase();
+          const name = String(group?.name || '').toLowerCase();
+          return type.includes('regel') || type.includes('kita') || name.includes('regel') || name.includes('kita');
+        })?.id || ''
+      ),
+      school: String(
+        (groupDefs || []).find((group) => {
+          const type = String(group?.type || '').toLowerCase();
+          const name = String(group?.name || '').toLowerCase();
+          return type.includes('schul') || name.includes('schul');
+        })?.id || ''
+      ),
+    };
+
+    const resolveProjectedGroupIdAtDate = (item, dateIso) => {
+      const itemId = String(item?.id || '');
+      if (!itemId) return null;
+
+      const baseGroupId = resolveGroupIdAtDate(getEffectiveGroupAssignments(itemId), dateIso, item.groupId || null);
+      const transitions = autoTransitionsByItem.get(itemId) || [];
+      if (!transitions.length) return baseGroupId;
+
+      const applicable = transitions.filter((event) => String(event.effectiveDate) <= String(dateIso));
+      if (!applicable.length) return baseGroupId;
+
+      const lastTransition = applicable[applicable.length - 1];
+      const targetStage = String(lastTransition?.metadata?.targetStage || '').toLowerCase();
+      const projectedGroupId = groupIdByStage[targetStage];
+      return projectedGroupId || baseGroupId;
+    };
+
     const isGroupSelected = (item, dateIso) => {
       if (!hasGroupFilter) return true;
-      const groupId = resolveGroupIdAtDate(getEffectiveGroupAssignments(String(item.id)), dateIso, item.groupId || null);
+      const groupId = resolveProjectedGroupIdAtDate(item, dateIso);
       if (!groupId) return groupFilterSet.has('__NO_GROUP__');
       return groupFilterSet.has(String(groupId));
     };
@@ -3073,7 +3256,16 @@ function VisuView() {
         peakBandSharePct: currentSnapshot?.peakSharePct || 0,
       },
     };
-  }, [chartState?.referenceDate, effectiveDataItems, getEffectiveGroupAssignments, selectedGroups, todayIso]);
+  }, [
+    chartState?.referenceDate,
+    effectiveDataItems,
+    eventsByScenario,
+    getEffectiveGroupAssignments,
+    groupDefs,
+    selectedGroups,
+    selectedScenarioId,
+    todayIso,
+  ]);
 
   const stageRecommendations =
     activeStory.id === 'quality'
@@ -3209,17 +3401,26 @@ function VisuView() {
       : activeStory.id === 'compare'
         ? [
             {
-              key: 'kpi-external-entry-ratio',
-              title: 'Externe Zugangsquote',
-              value: `${(previewFlow?.kpis?.externalEntryRatioPct || 0).toFixed(1)}%`,
-              text: 'Anteil externer Zugänge am gesamten Gruppenzufluss.',
+              key: 'kpi-active-now',
+              title: 'Aktive Kinder (Stichtag)',
+              value: `${previewFlow?.kpis?.activeNowCount || 0}`,
+              text: 'Kohorte fur den Verlauf ohne externe Zugange.',
               tone: 'good',
+            },
+            {
+              key: 'kpi-transition-steps',
+              title: 'Ereignisschritte mit Wechseln',
+              value: `${previewFlow?.kpis?.eventStepsCount || 0}`,
+              text: `${previewFlow?.kpis?.transitionCount || 0} Gruppenwechsel uber alle bekannten Ereigniszeitpunkte.`,
+              tone: (previewFlow?.kpis?.eventStepsCount || 0) > 0 ? 'good' : 'warn',
             },
             {
               key: 'kpi-flow-concentration',
               title: 'Konzentrationsindex (Top-3)',
               value: `${(previewFlow?.kpis?.concentrationPct || 0).toFixed(1)}%`,
-              text: 'Anteil der drei größten Flüsse am Gesamtvolumen.',
+              text: previewFlow?.kpis?.topTransition
+                ? `Großter Einzelubergang: ${previewFlow.kpis.topTransition.from} -> ${previewFlow.kpis.topTransition.to} (${previewFlow.kpis.topTransition.weight}).`
+                : 'Keine gruppenbezogenen Ubergange im Zeitraum.',
               tone: (previewFlow?.kpis?.concentrationPct || 0) > 70 ? 'warn' : 'good',
             },
             {

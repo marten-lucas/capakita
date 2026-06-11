@@ -461,5 +461,52 @@ describe('financeUtils', () => {
       expect(byGroup.__NO_GROUP__.times[0].segments[0].booking_start).toBe('10:00');
       expect(byGroup.__NO_GROUP__.times[0].segments[0].booking_end).toBe('11:00');
     });
+
+    it('splits a booking by segment groupAllocations shares', () => {
+      const split = splitBookingByGroupAtDate(
+        {
+          id: 'b2',
+          startdate: '2026-01-01',
+          enddate: '',
+          times: [
+            {
+              day: 1,
+              day_name: 'Mo',
+              segments: [
+                {
+                  id: 'seg-2',
+                  booking_start: '08:00',
+                  booking_end: '10:00',
+                  category: 'pedagogical',
+                  groupAllocations: [
+                    { groupId: 'g1', share: 40 },
+                    { groupId: 'g2', share: 60 },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+        {
+          a1: {
+            id: 'a1',
+            assignmentMode: 'single',
+            start: '2026-01-01',
+            end: '',
+            groupId: 'legacy-group',
+          },
+        },
+        '2026-06-01',
+        null
+      );
+
+      const byGroup = Object.fromEntries(split.map((entry) => [entry.groupId || '__NO_GROUP__', entry]));
+
+      expect(Object.keys(byGroup).sort()).toEqual(['g1', 'g2']);
+      expect(byGroup.g1.times[0].segments[0].booking_start).toBe('08:00');
+      expect(byGroup.g1.times[0].segments[0].booking_end).toBe('10:00');
+      expect(byGroup.g1.times[0].segments[0].allocationSharePercent).toBe(40);
+      expect(byGroup.g2.times[0].segments[0].allocationSharePercent).toBe(60);
+    });
   });
 });

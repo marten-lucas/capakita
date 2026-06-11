@@ -1,4 +1,4 @@
-import { sumBookingHours } from '../bookingUtils';
+import { segmentMatchesMode } from '../bookingUtils';
 import { timeToMinutes } from '../timeUtils';
 import { shouldIncludeDataItemInAnalysis } from '../dataVisibility';
 import { resolveGroupIdAtDate, splitBookingByGroupAtDate } from '../financeUtils';
@@ -22,6 +22,51 @@ function getCategoryMinutes(category) {
   if (typeof category !== 'string') return null;
   const [, time] = category.split(' ');
   return timeToMinutes(time || '');
+}
+
+function getSegmentShareFactor(segment) {
+  const allocation = Number(segment?.allocationSharePercent);
+  if (!Number.isFinite(allocation)) return 1;
+  return Math.max(0, allocation) / 100;
+}
+
+function sumWeightedBookingHours(booking, options = {}) {
+  if (!Array.isArray(booking?.times)) return 0;
+  const mode = options.mode || 'all';
+  let totalMinutes = 0;
+
+  booking.times.forEach((day) => {
+    if (!Array.isArray(day?.segments)) return;
+    day.segments.forEach((segment) => {
+      if (!segmentMatchesMode(segment, mode)) return;
+
+      const startMinutes = timeToMinutes(segment?.booking_start);
+      const endMinutes = timeToMinutes(segment?.booking_end);
+      if (startMinutes === null || endMinutes === null || endMinutes <= startMinutes) return;
+
+      totalMinutes += (endMinutes - startMinutes) * getSegmentShareFactor(segment);
+    });
+  });
+
+  return totalMinutes / 60;
+}
+
+function getBookingContributionAtCategory(booking, dayName, categoryMinutes) {
+  if (!Array.isArray(booking?.times)) return 0;
+
+  return booking.times.reduce((total, dayObj) => {
+    if (dayObj?.day_name !== dayName || !Array.isArray(dayObj?.segments)) return total;
+
+    const segmentContribution = dayObj.segments.reduce((segmentTotal, segment) => {
+      const startMinutes = timeToMinutes(segment?.booking_start);
+      const endMinutes = timeToMinutes(segment?.booking_end);
+      if (startMinutes === null || endMinutes === null) return segmentTotal;
+      if (!(startMinutes <= categoryMinutes && endMinutes > categoryMinutes)) return segmentTotal;
+      return segmentTotal + getSegmentShareFactor(segment);
+    }, 0);
+
+    return total + segmentContribution;
+  }, 0);
 }
 
 // REMOVE any getScenarioChain or scenario traversal here!
@@ -52,21 +97,13 @@ export function generateExpertRatioSeries(categories, filteredCapacityBookings, 
     filteredCapacityBookings.forEach(booking => {
       // booking.times: [{ day_name, segments }]
       if (!Array.isArray(booking.times)) return;
-      const covers = booking.times.some(dayObj => {
-        if (dayObj.day_name !== day) return false;
-        if (!Array.isArray(dayObj.segments)) return false;
-        return dayObj.segments.some(seg => {
-          const startMinutes = timeToMinutes(seg.booking_start);
-          const endMinutes = timeToMinutes(seg.booking_end);
-          return startMinutes !== null && endMinutes !== null && startMinutes <= categoryMinutes && endMinutes > categoryMinutes;
-        });
-      });
-      if (covers) {
-        total += 1;
+      const contribution = getBookingContributionAtCategory(booking, day, categoryMinutes);
+      if (contribution > 0) {
+        total += contribution;
         // booking.qualifications: array of keys
         const qualiArr = Array.isArray(booking.qualifications) ? booking.qualifications : [];
         if (qualiArr.some(q => expertQualiKeys.has(q))) {
-          expert += 1;
+          expert += contribution;
         }
       }
     });
@@ -94,21 +131,13 @@ export function generateCareRatioSeries(categories, filteredDemandBookings, filt
     let weightedDemand = 0;
     filteredDemandBookings.forEach(booking => {
       if (!Array.isArray(booking.times)) return;
-      const covers = booking.times.some(dayObj => {
-        if (dayObj.day_name !== day) return false;
-        if (!Array.isArray(dayObj.segments)) return false;
-        return dayObj.segments.some(seg => {
-          const startMinutes = timeToMinutes(seg.booking_start);
-          const endMinutes = timeToMinutes(seg.booking_end);
-          return startMinutes !== null && endMinutes !== null && startMinutes <= categoryMinutes && endMinutes > categoryMinutes;
-        });
-      });
-      if (covers) {
+      const contribution = getBookingContributionAtCategory(booking, day, categoryMinutes);
+      if (contribution > 0) {
         // Hole das Kind-Objekt und GroupDef
         const child = dataByScenario?.[booking.itemId];
         const groupDef = getGroupDefById(booking.groupId);
         const weight = getBayKiBiGWeightForChild(child, groupDef);
-        weightedDemand += weight;
+        weightedDemand += contribution * weight;
       }
     });
 
@@ -116,18 +145,7 @@ export function generateCareRatioSeries(categories, filteredDemandBookings, filt
     let capacityCount = 0;
     filteredCapacityBookings.forEach(booking => {
       if (!Array.isArray(booking.times)) return;
-      const covers = booking.times.some(dayObj => {
-        if (dayObj.day_name !== day) return false;
-        if (!Array.isArray(dayObj.segments)) return false;
-        return dayObj.segments.some(seg => {
-          const startMinutes = timeToMinutes(seg.booking_start);
-          const endMinutes = timeToMinutes(seg.booking_end);
-          return startMinutes !== null && endMinutes !== null && startMinutes <= categoryMinutes && endMinutes > categoryMinutes;
-        });
-      });
-      if (covers) {
-        capacityCount += 1;
-      }
+      capacityCount += getBookingContributionAtCategory(booking, day, categoryMinutes);
     });
 
     // Berechnung des Schlüssels
@@ -238,7 +256,7 @@ export function filterBookings({
     // For demand: only group filter
     if (type === 'demand' && groupMatch) {
       itemBookings.forEach(booking => {
-        if (isActiveAt(booking, referenceDate) && sumBookingHours(booking) > 0) {
+        if (isActiveAt(booking, referenceDate) && sumWeightedBookingHours(booking) > 0) {
           demand.push({ ...booking, itemId, groupId });
         }
       });
@@ -260,7 +278,7 @@ export function filterBookings({
 
       if (qualiMatch) {
         itemBookings.forEach(booking => {
-          if (!isActiveAt(booking, referenceDate) || sumBookingHours(booking, { mode: 'pedagogical' }) <= 0) {
+          if (!isActiveAt(booking, referenceDate) || sumWeightedBookingHours(booking, { mode: 'pedagogical' }) <= 0) {
             return;
           }
 
@@ -273,7 +291,7 @@ export function filterBookings({
 
           splitBookings.forEach((splitBooking) => {
             if (!groupMatchesSelection(splitBooking.groupId)) return;
-            if (sumBookingHours(splitBooking, { mode: 'pedagogical' }) <= 0) return;
+            if (sumWeightedBookingHours(splitBooking, { mode: 'pedagogical' }) <= 0) return;
 
             capacity.push({
               ...splitBooking,
@@ -310,27 +328,12 @@ export function generateBookingDataSeries(referenceDate, filteredBookings, categ
     return { day, time };
   }
 
-  // Helper: check if a booking covers a category (supports nested segments)
-  function bookingCoversCategory(booking, catDay, catTime) {
-    if (!Array.isArray(booking.times)) return false;
-    // booking.times: [{ day_name: 'Mo', segments: [{ booking_start, booking_end }] }, ...]
-    return booking.times.some(dayObj => {
-      if (dayObj.day_name !== catDay) return false;
-      if (!Array.isArray(dayObj.segments)) return false;
-      return dayObj.segments.some(seg =>
-        seg.booking_start <= catTime && seg.booking_end > catTime // exclusive end
-      );
-    });
-  }
-
   // For each category, count bookings that cover it
   categories.forEach((cat, idx) => {
     const { day, time } = parseCategory(cat);
     let count = 0;
     filteredBookings.forEach(booking => {
-      if (bookingCoversCategory(booking, day, time)) {
-        count++;
-      }
+      count += getBookingContributionAtCategory(booking, day, getCategoryMinutes(cat));
     });
     series[idx] = count;
   });
@@ -387,7 +390,7 @@ export function generateExpertRatioTimeDimension(categories, timedimension, filt
     filteredCapacityBookings.forEach(booking => {
       // Check if booking is active during this time period
       if (isBookingActiveInTimePeriod(booking, cat, timedimension)) {
-        const bookingHours = sumBookingHours(booking, { mode: 'pedagogical' });
+        const bookingHours = sumWeightedBookingHours(booking, { mode: 'pedagogical' });
         totalHours += bookingHours;
 
         // Check if this booking has expert qualifications
@@ -427,7 +430,7 @@ export function generateCareRatioTimeDimension(categories, timedimension, filter
     // Calculate weighted demand hours for this time period
     filteredDemandBookings.forEach(booking => {
       if (isBookingActiveInTimePeriod(booking, cat, timedimension)) {
-        const bookingHours = sumBookingHours(booking);
+        const bookingHours = sumWeightedBookingHours(booking);
         
         // Get the child object and GroupDef for BayKiBiG weighting
         const child = dataByScenario?.[booking.itemId];
@@ -441,7 +444,7 @@ export function generateCareRatioTimeDimension(categories, timedimension, filter
     // Calculate capacity hours for this time period
     filteredCapacityBookings.forEach(booking => {
       if (isBookingActiveInTimePeriod(booking, cat, timedimension)) {
-        capacityHours += sumBookingHours(booking, { mode: 'pedagogical' });
+        capacityHours += sumWeightedBookingHours(booking, { mode: 'pedagogical' });
       }
     });
 

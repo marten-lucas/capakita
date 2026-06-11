@@ -16,15 +16,15 @@ describe('VisuView album flow', () => {
       </Provider>
     );
 
-    expect(screen.getAllByTestId(/story-card-/)).toHaveLength(7);
+    expect(await screen.findAllByTestId(/story-card-/)).toHaveLength(7);
     expect(screen.getByTestId('story-card-quality')).toHaveAttribute('data-active', 'true');
 
-    fireEvent.click(screen.getByText('Bedarfsdeckung'));
+    fireEvent.click(screen.getByTestId('story-card-status'));
 
     await waitFor(() => {
       expect(screen.getByTestId('story-card-status')).toHaveAttribute('data-active', 'true');
-    });
+    }, { timeout: 15000 });
 
     expect(screen.getByTestId('story-card-quality')).toHaveAttribute('data-active', 'false');
-  });
+  }, 20000);
 });

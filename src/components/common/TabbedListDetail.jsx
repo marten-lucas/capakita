@@ -102,7 +102,7 @@ function TabbedListDetail({
               {actions && actions(selectedItem)}
             </Group>
 
-            <Box p="md" style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+            <Box p="md" style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
               {typeof detailContent === 'function' ? detailContent(selectedItem) : detailContent}
             </Box>
           </Box>

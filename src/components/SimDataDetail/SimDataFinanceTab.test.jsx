@@ -186,7 +186,7 @@ describe('SimDataFinanceTab', () => {
     expect(screen.getByText('Durchschnittliche Wochenstunden')).toBeTruthy();
     expect(screen.getByText('20.0 h')).toBeTruthy();
     expect(screen.getByText('Elternbeitrag')).toBeTruthy();
-    expect(screen.getByText('BayKiBiG-Foerderung')).toBeTruthy();
+    expect(screen.getByText('BayKiBiG-Förderung')).toBeTruthy();
     expect(screen.getByText('Gesamteinnahmen')).toBeTruthy();
   });
 

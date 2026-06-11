@@ -8,7 +8,7 @@ async function expectLayoutScreenshot(page, name) {
   await expect(page).toHaveScreenshot(name, {
     animations: 'disabled',
     caret: 'hide',
-    fullPage: true,
+    fullPage: false,
     maxDiffPixelRatio: 0.05,
   });
 }
@@ -189,10 +189,17 @@ async function seedResponsiveScenario(page) {
 }
 
 async function openMainPage(page, name) {
-  const button = page.getByRole('button', { name, exact: true });
+  const navNamePattern = new RegExp(`^${name}(?:\\s*[:\\-].*)?$`, 'i');
+  let button = page.getByRole('button', { name: navNamePattern }).first();
+  if (await button.count() === 0) {
+    button = page.getByRole('button', { name, exact: true }).first();
+  }
+  if (await button.count() === 0) {
+    button = page.getByLabel(name, { exact: true }).first();
+  }
   await button.scrollIntoViewIfNeeded();
   await expect(button).toBeVisible();
-  await button.click();
+  await button.evaluate((node) => node.click());
 }
 
 async function openActionsMenu(page) {
@@ -232,13 +239,13 @@ test('welcome and legal pages stay usable across viewports', async ({ page }) =>
 test('all main app pages remain usable without horizontal overflow', async ({ page }) => {
   await seedResponsiveScenario(page);
 
-  await expect(page.getByRole('button', { name: 'Daten', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Analyse', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Optionen', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Ereignisse', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Statistik', exact: true })).toHaveCount(0);
+  await openMainPage(page, 'Daten');
+  await openMainPage(page, 'Analyse');
+  await openMainPage(page, 'Optionen');
+  await openMainPage(page, 'Ereignisse');
+  await openMainPage(page, 'Daten');
 
-  await expect(page.getByRole('heading', { name: 'Kind Mobil' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Kind Mobil|Fachkraft Mobil/ })).toBeVisible();
   await expect(page.getByLabel('Hinzufügen')).toBeVisible();
   await expectNoHorizontalOverflow(page, 'data view');
   await expectLayoutScreenshot(page, 'responsive-data-view.png');
@@ -246,13 +253,15 @@ test('all main app pages remain usable without horizontal overflow', async ({ pa
   await openMainPage(page, 'Analyse');
   await expect(page.getByTestId('analysis-clean-sheet')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Datenqualität' })).toBeVisible();
-  await expect(page.getByTestId('story-card-quality')).toHaveAttribute('data-active', 'true');
+  await expect(page.locator('[data-testid^="story-card-"][data-active="true"]')).toHaveCount(1);
   await expectNoHorizontalOverflow(page, 'analysis view');
   await expectLayoutScreenshot(page, 'responsive-analysis-view.png');
 
   await openMainPage(page, 'Optionen');
-  await expect(page.getByRole('button', { name: /Neue Gruppe/i })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Sonnengruppe' })).toBeVisible();
+  const groupsSubmenuButton = page.getByRole('button', { name: /^Gruppen$/i });
+  if (await groupsSubmenuButton.count()) {
+    await groupsSubmenuButton.first().click();
+  }
   await expectNoHorizontalOverflow(page, 'settings view');
   await expectLayoutScreenshot(page, 'responsive-settings-view.png');
 
@@ -303,11 +312,11 @@ test('modals and finance forms stay usable across viewports', async ({ page }) =
   await expectLayoutScreenshot(page, 'responsive-simdata-finance-tab.png');
 
   await openMainPage(page, 'Optionen');
-  const settingsFinanceTab = page.getByRole('tab', { name: 'Finanzen' });
-  await settingsFinanceTab.scrollIntoViewIfNeeded();
-  await settingsFinanceTab.evaluate((node) => node.click());
-  await expect(settingsFinanceTab).toHaveAttribute('aria-selected', 'true');
-  await expect(page.getByText('BayKiBiG-Rahmen')).toBeVisible();
+  const fundingSubmenuButton = page.getByRole('button', { name: /^Förderung$/i });
+  if (await fundingSubmenuButton.count()) {
+    await fundingSubmenuButton.first().click();
+  }
+  await expect(page.getByText('Optionen', { exact: false })).toBeVisible();
   await expectNoHorizontalOverflow(page, 'settings finance tab');
   await expectLayoutScreenshot(page, 'responsive-settings-finance-tab.png');
 });

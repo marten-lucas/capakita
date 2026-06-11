@@ -226,7 +226,7 @@ function SimDataFinanceTab() {
               <Text fw={600}>{formatCurrency(childFinance.parentFeeAmount)}</Text>
             </Group>
             <Group justify="space-between" wrap="wrap">
-              <Text>BayKiBiG-Foerderung</Text>
+              <Text>BayKiBiG-Förderung</Text>
               <Text fw={600}>{formatCurrency(childFinance.bayKiBiGAmount)}</Text>
             </Group>
             <Group justify="space-between" wrap="wrap">

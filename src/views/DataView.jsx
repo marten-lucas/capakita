@@ -14,6 +14,7 @@ function DataPage() {
   const dispatch = useDispatch();
   const selectedScenarioId = useSelector(state => state.simScenario.selectedScenarioId);
   const scenarios = useSelector(state => state.simScenario.scenarios);
+  const dataSubmenu = useSelector((state) => state.ui.dataSubmenu || 'capacity');
 
   const handleAddCapacity = () => {
     dispatch(addDataItemAndSelect({ scenarioId: selectedScenarioId, item: { type: "capacity", source: "manual entry" } }));
@@ -77,12 +78,15 @@ function DataPage() {
 
         <Menu.Dropdown>
           <Menu.Label>Hinzufügen</Menu.Label>
-          <Menu.Item leftSection={<IconUser size={16} />} onClick={handleAddCapacity}>
-            Kapazität
-          </Menu.Item>
-          <Menu.Item leftSection={<IconBabyCarriage size={16} />} onClick={handleAddDemand}>
-            Bedarf
-          </Menu.Item>
+          {dataSubmenu === 'capacity' ? (
+            <Menu.Item leftSection={<IconUser size={16} />} onClick={handleAddCapacity}>
+              Mitarbeiter
+            </Menu.Item>
+          ) : (
+            <Menu.Item leftSection={<IconBabyCarriage size={16} />} onClick={handleAddDemand}>
+              Kind
+            </Menu.Item>
+          )}
           <Menu.Item leftSection={<IconLayersIntersect size={16} />} onClick={handleAddScenario}>
             Szenario
           </Menu.Item>

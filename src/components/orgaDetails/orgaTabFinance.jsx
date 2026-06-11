@@ -2,10 +2,13 @@ import React from 'react';
 import dayjs from 'dayjs';
 import {
   Accordion,
+  Alert,
+  Modal,
   Button,
   Group,
   NumberInput,
   Paper,
+  Select,
   SimpleGrid,
   Stack,
   Text,
@@ -35,7 +38,9 @@ import {
 } from '../../utils/financeImport';
 import {
   buildFeeCatalogExportPayload,
-  parseFeeCatalogImportPayload,
+  extractFeeCatalogImportData,
+  proposeFeeCatalogMappings,
+  applyFeeCatalogMappings,
 } from '../../utils/feeCatalogTransfer';
 
 const STMAS_BAYKIBIG_URL = 'https://www.stmas.bayern.de/imperia/md/content/stmas/stmas_inet/kinderbetreuung/3.7.2.2_kfa-131118.xls';
@@ -344,7 +349,7 @@ function FeeEntryDetail({ item, groupId, scenarioId, dispatch }) {
   );
 }
 
-function OrgaTabFinance() {
+function OrgaTabFinance({ section = 'all' }) {
   const dispatch = useDispatch();
   const isMobile = useMediaQuery('(max-width: 48em)');
   const selectedScenarioId = useSelector((state) => state.simScenario.selectedScenarioId);
@@ -356,6 +361,11 @@ function OrgaTabFinance() {
   const [excelFile, setExcelFile] = React.useState(null);
   const [excelUrl, setExcelUrl] = React.useState(STMAS_BAYKIBIG_URL);
   const [feeCatalogFile, setFeeCatalogFile] = React.useState(null);
+  const [feeCatalogImportOpen, setFeeCatalogImportOpen] = React.useState(false);
+  const [feeCatalogSourceByKey, setFeeCatalogSourceByKey] = React.useState({});
+  const [feeCatalogSources, setFeeCatalogSources] = React.useState([]);
+  const [feeCatalogMappingByGroup, setFeeCatalogMappingByGroup] = React.useState({});
+  const [feeCatalogUnmatchedSourceKeys, setFeeCatalogUnmatchedSourceKeys] = React.useState([]);
 
   const handleImportBayKiBiG = async (file) => {
     if (file) {
@@ -406,55 +416,76 @@ function OrgaTabFinance() {
     try {
       const content = await file.text();
       const parsed = JSON.parse(content);
-      const catalogs = parseFeeCatalogImportPayload(parsed);
+      const extracted = extractFeeCatalogImportData(parsed, { preferNonMember: true });
 
-      // Try to map parsed catalog keys to existing group IDs/names in this scenario
-      const finalCatalogs = {};
-      const parsedKeys = Object.keys(catalogs || {});
-      const usedKeys = new Set();
-
-      if (Array.isArray(groupDefs) && groupDefs.length > 0) {
-        groupDefs.forEach((group) => {
-          const gid = String(group.id);
-          const gname = (group.name || '').toLowerCase();
-
-          // heuristics to find matching parsed key
-          let foundKey = parsedKeys.find((k) => String(k) === gid);
-          if (!foundKey && gname) foundKey = parsedKeys.find((k) => String(k).toLowerCase() === gname);
-          if (!foundKey && gname) foundKey = parsedKeys.find((k) => String(k).toLowerCase().includes(gname));
-          if (!foundKey && gname) foundKey = parsedKeys.find((k) => gname.includes(String(k).toLowerCase()));
-          if (!foundKey) {
-            // try stripping common prefixes like 'group-'
-            foundKey = parsedKeys.find((k) => String(k).replace(/^group-/, '') === gid || String(k).replace(/^group-/, '') === gname);
-          }
-
-          if (foundKey) {
-            finalCatalogs[gid] = catalogs[foundKey];
-            usedKeys.add(foundKey);
-          }
-        });
-
-        // Add any leftover parsed catalogs under their original keys
-        parsedKeys.forEach((k) => {
-          if (!usedKeys.has(k)) finalCatalogs[k] = catalogs[k];
-        });
-      } else {
-        Object.assign(finalCatalogs, catalogs);
+      if (!Array.isArray(groupDefs) || groupDefs.length === 0) {
+        dispatch(setGroupFeeCatalogs({
+          scenarioId: selectedScenarioId,
+          catalogs: extracted.catalogsByKey,
+        }));
+        setFeeCatalogFile(null);
+        return;
       }
 
-      dispatch(setGroupFeeCatalogs({
-        scenarioId: selectedScenarioId,
-        catalogs: finalCatalogs,
-      }));
-      setFeeCatalogFile(null);
+      const proposal = proposeFeeCatalogMappings({
+        groupDefs,
+        catalogDescriptors: extracted.catalogDescriptors,
+      });
+
+      const nextMapping = {};
+      groupDefs.forEach((group) => {
+        nextMapping[String(group.id)] = proposal.mappingsByGroupId?.[String(group.id)]?.sourceKey || null;
+      });
+
+      setFeeCatalogSourceByKey(extracted.catalogsByKey || {});
+      setFeeCatalogSources(extracted.catalogDescriptors || []);
+      setFeeCatalogMappingByGroup(nextMapping);
+      setFeeCatalogUnmatchedSourceKeys(proposal.unmatchedSourceKeys || []);
+      setFeeCatalogImportOpen(true);
     } catch (error) {
       console.error('Error importing fee catalogs:', error);
       alert('Fehler beim Katalog-Import: ' + error.message);
     }
   };
 
+  const handleApplyFeeCatalogImport = () => {
+    const finalCatalogs = applyFeeCatalogMappings({
+      mappingsByGroupId: Object.fromEntries(
+        Object.entries(feeCatalogMappingByGroup || {}).map(([groupId, sourceKey]) => [
+          String(groupId),
+          { sourceKey: sourceKey || null },
+        ])
+      ),
+      catalogsByKey: feeCatalogSourceByKey,
+    });
+
+    dispatch(setGroupFeeCatalogs({
+      scenarioId: selectedScenarioId,
+      catalogs: finalCatalogs,
+    }));
+
+    setFeeCatalogImportOpen(false);
+    setFeeCatalogFile(null);
+  };
+
+  const hasUnmappedGroups = Array.isArray(groupDefs)
+    && groupDefs.some((group) => !feeCatalogMappingByGroup?.[String(group.id)]);
+
+  const feeCatalogSourceOptions = (feeCatalogSources || []).map((source) => {
+    const sourceName = source.groupName || source.key;
+    return {
+      value: String(source.key),
+      label: `${sourceName} (${source.entries?.length || 0} Staffeln)`,
+    };
+  });
+
+  const showFunding = section === 'all' || section === 'funding';
+  const showAbsence = section === 'all' || section === 'absence';
+  const showFees = section === 'all' || section === 'fees';
+
   return (
     <Stack gap="md">
+      {showFunding && (
       <Paper withBorder p="md" radius="md">
         <Stack gap="md">
           <div>
@@ -516,7 +547,9 @@ function OrgaTabFinance() {
           </SimpleGrid>
         </Stack>
       </Paper>
+      )}
 
+      {showAbsence && (
       <Paper withBorder p="md" radius="md">
         <Stack gap="sm">
           <div>
@@ -550,7 +583,9 @@ function OrgaTabFinance() {
           </SimpleGrid>
         </Stack>
       </Paper>
+      )}
 
+      {showFees && (
       <Paper withBorder p="md" radius="md">
         <Stack gap="md">
           <div>
@@ -637,6 +672,56 @@ function OrgaTabFinance() {
           )}
         </Stack>
       </Paper>
+      )}
+
+      {showFees && (
+      <Modal
+        opened={feeCatalogImportOpen}
+        onClose={() => setFeeCatalogImportOpen(false)}
+        title="Import-Wizard: Beitragskataloge zuordnen"
+        size="lg"
+      >
+        <Stack gap="md">
+          <Text size="sm" c="dimmed">
+            Ordne jede Zielgruppe einer importierten Quelle zu. So bleiben die Beiträge auch dann korrekt,
+            wenn Gruppen-IDs zwischen Datei und Szenario nicht identisch sind.
+          </Text>
+
+          {feeCatalogUnmatchedSourceKeys.length > 0 ? (
+            <Alert color="yellow" title="Nicht automatisch zugeordnete Quellen">
+              {feeCatalogUnmatchedSourceKeys.join(', ')}
+            </Alert>
+          ) : null}
+
+          <Stack gap="sm">
+            {(groupDefs || []).map((group) => (
+              <Select
+                key={group.id}
+                label={group.name || `Gruppe ${group.id}`}
+                placeholder="Import-Quelle waehlen"
+                data={feeCatalogSourceOptions}
+                value={feeCatalogMappingByGroup?.[String(group.id)] || null}
+                onChange={(value) => setFeeCatalogMappingByGroup((current) => ({
+                  ...current,
+                  [String(group.id)]: value || null,
+                }))}
+                clearable
+                searchable
+              />
+            ))}
+          </Stack>
+
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setFeeCatalogImportOpen(false)}>
+              Abbrechen
+            </Button>
+            <Button onClick={handleApplyFeeCatalogImport} disabled={hasUnmappedGroups}>
+              Import anwenden
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+      )}
     </Stack>
   );
 }

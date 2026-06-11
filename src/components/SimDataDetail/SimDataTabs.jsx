@@ -20,6 +20,7 @@ function SimDataTabs() {
   // Use overlay hook to get effective data
   const { getEffectiveDataItem } = useOverlayData();
   const item = getEffectiveDataItem(selectedItemId);
+  const isEmployee = item?.type === 'capacity';
 
   useEffect(() => {
     setActiveTab('general');
@@ -50,27 +51,31 @@ function SimDataTabs() {
             Allgemein
           </Tabs.Tab>
           <Tabs.Tab value="bookings" leftSection={<IconClock size={16} />}>
-            Zeiten
+            {isEmployee ? 'Zeiten & Gruppen' : 'Zeiten'}
           </Tabs.Tab>
-          <Tabs.Tab value="groups" leftSection={<IconUsers size={16} />}>
-            Gruppen
-          </Tabs.Tab>
+          {!isEmployee && (
+            <Tabs.Tab value="groups" leftSection={<IconUsers size={16} />}>
+              Gruppen
+            </Tabs.Tab>
+          )}
           <Tabs.Tab value="finance" leftSection={<IconTools size={16} />}>
             Finanzen
           </Tabs.Tab>
         </Tabs.List>
 
-        <Box pt="md" style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
-          <Tabs.Panel value="general" style={{ height: '100%' }}>
+        <Box pt="md" style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+          <Tabs.Panel value="general" style={{ minHeight: '100%' }}>
             <SimDataGeneralTab />
           </Tabs.Panel>
-          <Tabs.Panel value="bookings" style={{ height: '100%' }}>
+          <Tabs.Panel value="bookings" style={{ minHeight: '100%' }}>
             <SimDataBookingTab />
           </Tabs.Panel>
-          <Tabs.Panel value="groups" style={{ height: '100%' }}>
-            <SimDataGroupsTab />
-          </Tabs.Panel>
-          <Tabs.Panel value="finance" style={{ height: '100%' }}>
+          {!isEmployee && (
+            <Tabs.Panel value="groups" style={{ minHeight: '100%' }}>
+              <SimDataGroupsTab />
+            </Tabs.Panel>
+          )}
+          <Tabs.Panel value="finance" style={{ minHeight: '100%' }}>
             <SimDataFinanceTab />
           </Tabs.Panel>
         </Box>

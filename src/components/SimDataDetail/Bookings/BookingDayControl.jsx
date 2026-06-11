@@ -1,6 +1,6 @@
 import React from 'react';
-import { ActionIcon, Box, Button, Group, Paper, SegmentedControl, Stack, Switch, Text, TextInput, Tooltip } from '@mantine/core';
-import { IconBriefcase, IconChevronDown, IconPlus, IconUser, IconTrash } from '@tabler/icons-react';
+import { ActionIcon, Box, Button, Checkbox, Divider, Group, Menu, NumberInput, Paper, SegmentedControl, Stack, Switch, Text, TextInput, Tooltip } from '@mantine/core';
+import { IconBriefcase, IconChevronDown, IconPlus, IconUser, IconUsers, IconTrash } from '@tabler/icons-react';
 import { minutesToTime, normalizeTimeInput, timeToMinutes } from '../../../utils/timeUtils';
 
 const TIMELINE_START_MINUTES = 6 * 60;
@@ -38,12 +38,45 @@ function formatInputValue(value) {
   return normalizeTimeInput(value) || value || '';
 }
 
+function getSegmentGroupIds(segment) {
+  if (Array.isArray(segment?.groupAllocations) && segment.groupAllocations.length > 0) {
+    return segment.groupAllocations
+      .map((allocation) => String(allocation.groupId || ''))
+      .filter(Boolean);
+  }
+  if (segment?.groupId) return [String(segment.groupId)];
+  return [];
+}
+
+function getSegmentAllocations(segment) {
+  if (Array.isArray(segment?.groupAllocations) && segment.groupAllocations.length > 0) {
+    return segment.groupAllocations
+      .map((entry) => ({ groupId: String(entry.groupId || ''), share: Number(entry.share) || 0 }))
+      .filter((entry) => entry.groupId);
+  }
+  if (segment?.groupId) {
+    return [{ groupId: String(segment.groupId), share: 100 }];
+  }
+  return [];
+}
+
+function distributeEvenly(groupIds) {
+  const normalized = Array.from(new Set((groupIds || []).map((id) => String(id)).filter(Boolean)));
+  if (normalized.length === 0) return [];
+  const base = Math.floor(100 / normalized.length);
+  const rest = 100 - (base * normalized.length);
+  return normalized.map((groupId, index) => ({
+    groupId,
+    share: base + (index < rest ? 1 : 0),
+  }));
+}
+
 function clampMinutes(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
 const HEADER_CHEVRON_WIDTH = 28;
-const HEADER_ROW_HEIGHT = 44;
+const HEADER_ROW_HEIGHT = 54;
 
 function DayHeader({ dayLabel, isActive, onToggle, detailsOpen, onToggleDetails }) {
   return (
@@ -96,7 +129,20 @@ function DayHeader({ dayLabel, isActive, onToggle, detailsOpen, onToggleDetails 
   );
 }
 
-function DayControl({ dayLabel, dayData, onToggle, onTimeChange, onAddSegment, onAddSegmentAt, onRemoveSegment, onCategoryChange, allowCategorySelection = false }) {
+function DayControl({
+  dayLabel,
+  dayData,
+  onToggle,
+  onTimeChange,
+  onAddSegment,
+  onAddSegmentAt,
+  onRemoveSegment,
+  onCategoryChange,
+  allowCategorySelection = false,
+  allowGroupSelection = false,
+  groupOptions = [],
+  onSegmentAllocationsChange,
+}) {
   const isActive = !!dayData;
   const [detailsOpen, setDetailsOpen] = React.useState(false);
   const segments = React.useMemo(
@@ -110,6 +156,11 @@ function DayControl({ dayLabel, dayData, onToggle, onTimeChange, onAddSegment, o
   const onTimeChangeRef = React.useRef(onTimeChange);
   const [draftValues, setDraftValues] = React.useState({});
   const [hoveredBlockIndex, setHoveredBlockIndex] = React.useState(null);
+  const groupLabelById = React.useMemo(
+    () => Object.fromEntries((groupOptions || []).map((option) => [String(option.value), option.label])),
+    [groupOptions]
+  );
+  const [openGroupMenuIndex, setOpenGroupMenuIndex] = React.useState(null);
 
   React.useEffect(() => {
     segmentsRef.current = segments;
@@ -334,9 +385,43 @@ function DayControl({ dayLabel, dayData, onToggle, onTimeChange, onAddSegment, o
     setDetailsOpen((previous) => !previous);
   }, []);
 
+  const updateSegmentAllocations = React.useCallback((segmentIndex, allocations) => {
+    const normalized = (allocations || [])
+      .map((entry) => ({ groupId: String(entry.groupId || ''), share: Number(entry.share) || 0 }))
+      .filter((entry) => entry.groupId);
+    onSegmentAllocationsChange?.(segmentIndex, normalized);
+  }, [onSegmentAllocationsChange]);
+
+  const toggleSegmentGroup = React.useCallback((segmentIndex, groupId, checked) => {
+    const segment = segments[segmentIndex];
+    if (!segment) return;
+    const currentAllocations = getSegmentAllocations(segment);
+    const selectedIds = new Set(currentAllocations.map((entry) => entry.groupId));
+
+    if (checked) {
+      selectedIds.add(String(groupId));
+    } else {
+      selectedIds.delete(String(groupId));
+    }
+
+    updateSegmentAllocations(segmentIndex, distributeEvenly(Array.from(selectedIds)));
+  }, [segments, updateSegmentAllocations]);
+
+  const setSegmentShare = React.useCallback((segmentIndex, groupId, nextShare) => {
+    const segment = segments[segmentIndex];
+    if (!segment) return;
+    const currentAllocations = getSegmentAllocations(segment);
+    const updated = currentAllocations.map((entry) => (
+      entry.groupId === String(groupId)
+        ? { ...entry, share: Math.max(0, Math.min(100, Number(nextShare) || 0)) }
+        : entry
+    ));
+    updateSegmentAllocations(segmentIndex, updated);
+  }, [segments, updateSegmentAllocations]);
+
   return (
     <Box
-      py="xs"
+      py="sm"
       style={{
         borderBottom: '1px solid var(--mantine-color-gray-2)',
       }}
@@ -356,7 +441,7 @@ function DayControl({ dayLabel, dayData, onToggle, onTimeChange, onAddSegment, o
               ref={timelineRef}
               style={{
                 position: 'relative',
-                height: 42,
+                height: 68,
                 borderRadius: 12,
                 overflow: 'hidden',
                 border: '1px solid var(--mantine-color-gray-3)',
@@ -387,7 +472,16 @@ function DayControl({ dayLabel, dayData, onToggle, onTimeChange, onAddSegment, o
               {timelineBlocks.map((block) => (
                 <Tooltip
                   key={`${block.index}-${block.startLabel}-${block.endLabel}`}
-                  label={`${block.startLabel} - ${block.endLabel}`}
+                  label={(() => {
+                    const segment = segments[block.index];
+                    const segmentGroupIds = getSegmentGroupIds(segment);
+                    const label = segmentGroupIds
+                      .map((groupId) => groupLabelById[groupId] || groupId)
+                      .join(', ');
+                    return label
+                      ? `${block.startLabel} - ${block.endLabel} | ${label}`
+                      : `${block.startLabel} - ${block.endLabel}`;
+                  })()}
                   withArrow
                 >
                   <Box
@@ -397,8 +491,8 @@ function DayControl({ dayLabel, dayData, onToggle, onTimeChange, onAddSegment, o
                     style={{
                       position: 'absolute',
                       left: `${block.left}%`,
-                      top: 6,
-                      height: 30,
+                      top: 8,
+                      height: 46,
                       width: `${Math.max(block.width, 2)}%`,
                       borderRadius: 0,
                       background: block.category === 'administrative'
@@ -409,7 +503,7 @@ function DayControl({ dayLabel, dayData, onToggle, onTimeChange, onAddSegment, o
                       alignItems: 'center',
                       justifyContent: 'center',
                       color: '#fff',
-                      fontSize: 11,
+                      fontSize: 12,
                       fontWeight: 700,
                       paddingInline: 18,
                       whiteSpace: 'nowrap',
@@ -424,7 +518,7 @@ function DayControl({ dayLabel, dayData, onToggle, onTimeChange, onAddSegment, o
                   >
                     {allowCategorySelection && (
                       <ActionIcon
-                        size={16}
+                        size={20}
                         variant="filled"
                         color={block.category === 'administrative' ? 'violet' : 'blue'}
                         onPointerDown={(event) => {
@@ -444,8 +538,8 @@ function DayControl({ dayLabel, dayData, onToggle, onTimeChange, onAddSegment, o
                         aria-label={`Segment ${block.index + 1} Kategorie umschalten`}
                         style={{
                           position: 'absolute',
-                          top: -7,
-                          left: -7,
+                          top: -10,
+                          left: -10,
                           zIndex: 2,
                           cursor: 'pointer',
                         }}
@@ -454,6 +548,133 @@ function DayControl({ dayLabel, dayData, onToggle, onTimeChange, onAddSegment, o
                           ? <IconBriefcase size={11} />
                           : <IconUser size={11} />}
                       </ActionIcon>
+                    )}
+                    {allowGroupSelection && (
+                      <Menu
+                        opened={openGroupMenuIndex === block.index}
+                        onChange={(opened) => setOpenGroupMenuIndex(opened ? block.index : null)}
+                        withinPortal
+                        closeOnItemClick={false}
+                        position="bottom-start"
+                        offset={6}
+                      >
+                        <Menu.Target>
+                          <Box
+                            style={{
+                              position: 'absolute',
+                              bottom: -10,
+                              left: -10,
+                              zIndex: 2,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <ActionIcon
+                              size={22}
+                              variant="filled"
+                              color="teal"
+                              onPointerDown={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                              }}
+                              onMouseDown={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                              }}
+                              onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                              }}
+                              aria-label={`Segment ${block.index + 1} Gruppenmenü`}
+                            >
+                              <IconUsers size={13} />
+                            </ActionIcon>
+                            {(() => {
+                              const segment = segments[block.index];
+                              const groupCount = getSegmentGroupIds(segment).length;
+                              if (groupCount <= 1) return null;
+                              return (
+                                <Box
+                                  style={{
+                                    position: 'absolute',
+                                    top: -5,
+                                    right: -5,
+                                    minWidth: 14,
+                                    height: 14,
+                                    borderRadius: 999,
+                                    background: 'var(--mantine-color-dark-7)',
+                                    color: 'white',
+                                    fontSize: 9,
+                                    fontWeight: 700,
+                                    lineHeight: '14px',
+                                    textAlign: 'center',
+                                    paddingInline: 3,
+                                  }}
+                                >
+                                  {groupCount}
+                                </Box>
+                              );
+                            })()}
+                          </Box>
+                        </Menu.Target>
+
+                        <Menu.Dropdown
+                          onPointerDown={(event) => event.stopPropagation()}
+                          onMouseDown={(event) => event.stopPropagation()}
+                        >
+                          <Box px="xs" py={6}>
+                            <Text size="xs" fw={700}>Gruppen und Prozent</Text>
+                          </Box>
+                          <Divider />
+                          <Box px="xs" py="xs" style={{ minWidth: 260, maxHeight: 260, overflowY: 'auto' }}>
+                            {groupOptions.length === 0 ? (
+                              <Text size="xs" c="dimmed">Keine Gruppen vorhanden.</Text>
+                            ) : (
+                              <Stack gap={6}>
+                                {groupOptions.map((option) => {
+                                  const segment = segments[block.index];
+                                  const allocations = getSegmentAllocations(segment);
+                                  const entry = allocations.find((allocation) => allocation.groupId === String(option.value));
+                                  const checked = Boolean(entry);
+                                  return (
+                                    <Box key={`${block.index}-${option.value}`}>
+                                      <Group justify="space-between" align="center" wrap="nowrap" gap="xs">
+                                        <Checkbox
+                                          checked={checked}
+                                          label={option.label}
+                                          onChange={(event) => toggleSegmentGroup(block.index, option.value, event.currentTarget.checked)}
+                                        />
+                                        {checked && (
+                                          <NumberInput
+                                            value={entry?.share ?? 0}
+                                            onChange={(value) => setSegmentShare(block.index, option.value, value)}
+                                            min={0}
+                                            max={100}
+                                            step={5}
+                                            size="xs"
+                                            style={{ width: 90 }}
+                                            suffix=" %"
+                                          />
+                                        )}
+                                      </Group>
+                                    </Box>
+                                  );
+                                })}
+                                <Button
+                                  size="xs"
+                                  variant="light"
+                                  onClick={() => {
+                                    const segment = segments[block.index];
+                                    const allocations = getSegmentAllocations(segment);
+                                    updateSegmentAllocations(block.index, distributeEvenly(allocations.map((entry) => entry.groupId)));
+                                  }}
+                                >
+                                  Gleich verteilen
+                                </Button>
+                              </Stack>
+                            )}
+                          </Box>
+                        </Menu.Dropdown>
+                      </Menu>
                     )}
                     {segments.length > 1 && (
                       <ActionIcon
@@ -509,7 +730,15 @@ function DayControl({ dayLabel, dayData, onToggle, onTimeChange, onAddSegment, o
                     />
                     {block.width >= 12 && (
                       <Text size="inherit" style={{ pointerEvents: 'none' }}>
-                        {block.startLabel}–{block.endLabel}
+                        {(() => {
+                          const segment = segments[block.index];
+                          const segmentGroupIds = getSegmentGroupIds(segment);
+                          const firstGroup = segmentGroupIds[0];
+                          const firstLabel = firstGroup ? (groupLabelById[firstGroup] || firstGroup) : '';
+                          const suffix = segmentGroupIds.length > 1 ? ` +${segmentGroupIds.length - 1}` : '';
+                          const groupText = firstLabel ? ` · ${firstLabel}${suffix}` : '';
+                          return `${block.startLabel}–${block.endLabel}${groupText}`;
+                        })()}
                       </Text>
                     )}
                     <Box
@@ -536,7 +765,7 @@ function DayControl({ dayLabel, dayData, onToggle, onTimeChange, onAddSegment, o
             <Box
               style={{
                 position: 'relative',
-                height: 16,
+                height: 20,
                 marginInline: 2,
               }}
             >
@@ -569,36 +798,35 @@ function DayControl({ dayLabel, dayData, onToggle, onTimeChange, onAddSegment, o
               {segments.map((segment, idx) => {
                 const draft = getDraftForSegment(segment, idx);
                 const isValid = timeToMinutes(draft.start) !== null && timeToMinutes(draft.end) !== null && (timeToMinutes(draft.end) > timeToMinutes(draft.start));
-
                 return (
-                  <Paper key={segment.id || idx} withBorder radius="md" p="xs" bg="white" style={{ borderColor: 'var(--mantine-color-gray-3)' }}>
+                  <Paper key={segment.id || idx} withBorder radius="md" p="md" bg="white" style={{ borderColor: 'var(--mantine-color-gray-3)' }}>
                     <Group justify="space-between" align="center" wrap="wrap" gap="sm">
                       <Text size="sm" fw={600} c="dark.8" style={{ whiteSpace: 'nowrap', minWidth: 88, flexShrink: 0 }}>
                         Segment {idx + 1}
                       </Text>
                       <Group align="center" wrap="wrap" gap="xs" style={{ flex: 1, minWidth: 0 }}>
                         <TextInput
-                          size="xs"
+                          size="sm"
                           value={draft.start}
                           onChange={(event) => updateDraft(segment, idx, { start: event.currentTarget.value })}
                           onBlur={() => commitRange(idx, draft.start, draft.end)}
                           placeholder="08:00"
                           aria-label={`Segment ${idx + 1} Startzeit`}
                           error={!isValid && draft.start && draft.end ? 'Ungültig' : null}
-                          style={{ width: 116, flexShrink: 0 }}
+                          style={{ width: 132, flexShrink: 0 }}
                         />
                         <Text size="sm" fw={600} c="dimmed" style={{ whiteSpace: 'nowrap', lineHeight: 1, flexShrink: 0 }}>
                           -
                         </Text>
                         <TextInput
-                          size="xs"
+                          size="sm"
                           value={draft.end}
                           onChange={(event) => updateDraft(segment, idx, { end: event.currentTarget.value })}
                           onBlur={() => commitRange(idx, draft.start, draft.end)}
                           placeholder="12:00"
                           aria-label={`Segment ${idx + 1} Endzeit`}
                           error={!isValid && draft.start && draft.end ? 'Ungültig' : null}
-                          style={{ width: 116, flexShrink: 0 }}
+                          style={{ width: 132, flexShrink: 0 }}
                         />
                         {allowCategorySelection && (
                           <SegmentedControl
@@ -631,6 +859,7 @@ function DayControl({ dayLabel, dayData, onToggle, onTimeChange, onAddSegment, o
                         </ActionIcon>
                       )}
                     </Group>
+
                   </Paper>
                 );
               })}

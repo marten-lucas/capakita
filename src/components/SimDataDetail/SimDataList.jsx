@@ -2,7 +2,7 @@ import React, { useMemo, useRef, useState } from 'react';
 import { Group, Avatar, Badge, Text, ActionIcon, Stack, Tooltip, Checkbox, Button, Paper, TextInput, NumberInput, SimpleGrid, Switch, Menu } from '@mantine/core';
 import { useSelector, useDispatch } from 'react-redux';
 import { setSelectedItem, setSelectedItems, selectSelectedItemIds } from '../../store/simScenarioSlice';
-import { setDataCaptureQueueMode, setDataListFilter } from '../../store/uiSlice';
+import { setDataCaptureQueueMode, setDataListFilter, setDataSubmenu } from '../../store/uiSlice';
 import {
   deleteDataItemThunk,
   deleteDataItemsThunk,
@@ -238,6 +238,7 @@ function SimDataList() {
   const effectiveDataItems = getEffectiveDataItems();
   const groupDefs = getEffectiveGroupDefs();
   const qualificationDefs = getEffectiveQualificationDefs();
+  const dataSubmenu = useSelector((state) => state.ui.dataSubmenu || 'capacity');
   const [showArchivedItems, setShowArchivedItems] = useState(false);
   const dataListFilter = useSelector((state) => state.ui.dataListFilter || 'all');
   const dataCaptureQueueMode = useSelector((state) => state.ui.dataCaptureQueueMode || false);
@@ -305,6 +306,11 @@ function SimDataList() {
     [effectiveDataItems, showArchivedItems, dataListFilter, missingReasonByItemId]
   );
 
+  const submenuData = useMemo(
+    () => data.filter((item) => item.type === dataSubmenu),
+    [data, dataSubmenu]
+  );
+
   const incompleteIds = useMemo(
     () => data
       .filter((item) => {
@@ -365,10 +371,45 @@ function SimDataList() {
     () => data.filter((item) => selectedItemIds.includes(item.id)),
     [data, selectedItemIds]
   );
+  const selectedSubmenuItemId = selectedItemIds.find((id) => submenuData.some((item) => item.id === id)) || submenuData[0]?.id || null;
   const lastSelectedIndexRef = useRef(null);
 
   const isMultiSelected = selectedItemIds.length > 1;
   const isCapacityOnlySelection = selectedItems.length > 0 && selectedItems.every((item) => item.type === 'capacity');
+
+  React.useEffect(() => {
+    if (!selectedItemId) return;
+    const selectedItem = data.find((item) => item.id === selectedItemId);
+    if (!selectedItem?.type) return;
+    if (selectedItem.type !== dataSubmenu) {
+      dispatch(setDataSubmenu(selectedItem.type));
+    }
+  }, [selectedItemId, data, dataSubmenu, dispatch]);
+
+  React.useEffect(() => {
+    if (submenuData.length === 0) {
+      dispatch(setSelectedItems([]));
+      return;
+    }
+
+    const hasSelectedInSubmenu = selectedItemIds.some((id) => submenuData.some((item) => item.id === id));
+    if (!hasSelectedInSubmenu) {
+      const firstId = submenuData[0].id;
+      dispatch(setSelectedItems([firstId]));
+      dispatch(setSelectedItem(firstId));
+    }
+  }, [submenuData, selectedItemIds, dispatch]);
+
+  React.useEffect(() => {
+    const submenuIdSet = new Set(submenuData.map((item) => item.id));
+    const inSubmenuSelection = selectedItemIds.filter((id) => submenuIdSet.has(id));
+    if (inSubmenuSelection.length !== selectedItemIds.length) {
+      dispatch(setSelectedItems(inSubmenuSelection));
+      if (inSubmenuSelection.length > 0) {
+        dispatch(setSelectedItem(inSubmenuSelection[0]));
+      }
+    }
+  }, [dataSubmenu, submenuData, selectedItemIds, dispatch]);
 
   const toggleSelectedItem = (itemId, checked) => {
     const id = String(itemId);
@@ -638,8 +679,8 @@ function SimDataList() {
       )}
 
       <TabbedListDetail
-        data={data}
-        selectedId={selectedItemId}
+        data={submenuData}
+        selectedId={selectedSubmenuItemId}
         onSelect={(id) => dispatch(setSelectedItem(id))}
         renderItem={renderItem}
         detailTitle={(item) => (isMultiSelected ? `${selectedItemIds.length} Einträge ausgewählt` : (item?.name || 'Details'))}
