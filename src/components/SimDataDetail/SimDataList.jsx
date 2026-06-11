@@ -2,7 +2,7 @@ import React, { useMemo, useRef, useState } from 'react';
 import { Group, Avatar, Badge, Text, ActionIcon, Stack, Tooltip, Checkbox, Button, Paper, TextInput, NumberInput, SimpleGrid, Switch, Menu } from '@mantine/core';
 import { useSelector, useDispatch } from 'react-redux';
 import { setSelectedItem, setSelectedItems, selectSelectedItemIds } from '../../store/simScenarioSlice';
-import { setDataCaptureQueueMode, setDataListFilter, setDataSubmenu } from '../../store/uiSlice';
+import { setDataCaptureQueueMode, setDataListFilter } from '../../store/uiSlice';
 import {
   deleteDataItemThunk,
   deleteDataItemsThunk,
@@ -376,15 +376,6 @@ function SimDataList() {
 
   const isMultiSelected = selectedItemIds.length > 1;
   const isCapacityOnlySelection = selectedItems.length > 0 && selectedItems.every((item) => item.type === 'capacity');
-
-  React.useEffect(() => {
-    if (!selectedItemId) return;
-    const selectedItem = data.find((item) => item.id === selectedItemId);
-    if (!selectedItem?.type) return;
-    if (selectedItem.type !== dataSubmenu) {
-      dispatch(setDataSubmenu(selectedItem.type));
-    }
-  }, [selectedItemId, data, dataSubmenu, dispatch]);
 
   React.useEffect(() => {
     if (submenuData.length === 0) {
