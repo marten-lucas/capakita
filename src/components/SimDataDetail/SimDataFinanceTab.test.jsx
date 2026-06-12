@@ -140,7 +140,6 @@ function createTestStore(selectedItemId) {
                 {
                   id: 'fee-1',
                   validFrom: '2026-01-01',
-                  minHours: 0,
                   maxHours: 25,
                   monthlyAmount: 300,
                 },

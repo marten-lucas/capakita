@@ -71,8 +71,8 @@ describe('financeUtils', () => {
         bayKiBiGRules: [{ id: 'b1', validFrom: '2026-01-01', baseValue: 120 }],
         groupFeeCatalogs: {
           g1: [
-            { id: 'f1', validFrom: '2026-01-01', minHours: 0, maxHours: 20, monthlyAmount: 280 },
-            { id: 'f2', validFrom: '2026-01-01', minHours: 20.01, maxHours: 30, monthlyAmount: 320 },
+            { id: 'f1', validFrom: '2026-01-01', maxHours: 20, monthlyAmount: 280 },
+            { id: 'f2', validFrom: '2026-01-01', maxHours: 30, monthlyAmount: 320 },
           ],
         },
       },
@@ -290,8 +290,8 @@ describe('financeUtils', () => {
             { id: 'b2', validFrom: '2025-07-01', validUntil: '2025-12-31', baseValue: 200 },
           ],
           groupFeeCatalogs: {
-            g1: [{ id: 'g1f1', validFrom: '2025-01-01', minHours: 0, maxHours: 10, monthlyAmount: 165 }],
-            g2: [{ id: 'g2f1', validFrom: '2025-01-01', minHours: 0, maxHours: 10, monthlyAmount: 225 }],
+            g1: [{ id: 'g1f1', validFrom: '2025-01-01', maxHours: 10, monthlyAmount: 165 }],
+            g2: [{ id: 'g2f1', validFrom: '2025-01-01', maxHours: 10, monthlyAmount: 225 }],
           },
         },
       };
@@ -344,7 +344,7 @@ describe('financeUtils', () => {
         financeScenario: {
           bayKiBiGRules: [],
           groupFeeCatalogs: {
-            g1: [{ id: 'g1f1', validFrom: '2025-01-01', minHours: 3, maxHours: 10, monthlyAmount: 165 }],
+            g1: [{ id: 'g1f1', validFrom: '2025-01-01', maxHours: 0.5, monthlyAmount: 165 }],
           },
         },
         referenceDate: '2025-10-15',
@@ -386,7 +386,7 @@ describe('financeUtils', () => {
             { id: 'b1', validFrom: '2026-01-01', validUntil: '2026-12-31', baseValue: 100 },
           ],
           groupFeeCatalogs: {
-            g1: [{ id: 'g1f1', validFrom: '2025-01-01', minHours: 0, maxHours: 20, monthlyAmount: 100 }],
+            g1: [{ id: 'g1f1', validFrom: '2025-01-01', maxHours: 20, monthlyAmount: 100 }],
           },
         },
         referenceDate: '2025-06-15',

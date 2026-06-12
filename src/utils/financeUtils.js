@@ -695,17 +695,27 @@ export function calculateChildMonthlyRevenue({
   const groupId = resolveGroupIdAtDate(groupAssignments, referenceDate, item.groupId || null);
   const groupDef = (groupDefs || []).find((entry) => String(entry.id) === String(groupId));
   const feeCatalog = financeScenario?.groupFeeCatalogs?.[groupId] || [];
-  const feeEntry = pickApplicableValidityEntry(
-    feeCatalog,
-    referenceDate,
-    (entry) => {
-      const minHours = Number(entry.minHours);
+  const feeEntry = feeCatalog
+    .filter((entry) => isDateWithinRange(referenceDate, entry.validFrom || '', entry.validUntil || ''))
+    .sort((left, right) => {
+      const leftStart = left.validFrom || '';
+      const rightStart = right.validFrom || '';
+      if (leftStart !== rightStart) return rightStart.localeCompare(leftStart);
+
+      const leftMax = Number(left.maxHours);
+      const rightMax = Number(right.maxHours);
+      const leftFinite = Number.isFinite(leftMax);
+      const rightFinite = Number.isFinite(rightMax);
+      if (leftFinite && rightFinite) return leftMax - rightMax;
+      if (leftFinite) return -1;
+      if (rightFinite) return 1;
+
+      return String(left.id).localeCompare(String(right.id));
+    })
+    .find((entry) => {
       const maxHours = Number(entry.maxHours);
-      const minOk = !Number.isFinite(minHours) || weeklyHours >= minHours;
-      const maxOk = !Number.isFinite(maxHours) || weeklyHours <= maxHours;
-      return minOk && maxOk;
-    }
-  );
+      return !Number.isFinite(maxHours) || weeklyHours <= maxHours;
+    }) || null;
   const bayKiBiGRule = pickApplicableValidityEntry(financeScenario?.bayKiBiGRules, referenceDate)
     || pickLatestValidityEntry(financeScenario?.bayKiBiGRules);
   const bayKiBiGWeight = getBayKiBiGWeightForChild(item, groupDef, referenceDate, bayKiBiGRule?.weightFactors);

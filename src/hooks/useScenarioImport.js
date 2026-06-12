@@ -1,8 +1,9 @@
 import { useCallback } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useDispatch, useSelector, useStore } from 'react-redux';
 import CryptoJS from 'crypto-js';
 import { createId } from '../utils/idUtils';
 import { addScenario, setSelectedItems, updateScenario } from '../store/simScenarioSlice';
+import { refreshAllEvents } from '../store/eventSlice';
 import { extractAdebisData } from '../utils/adebis-reader';
 import { isRecordActiveOnDate } from '../utils/financeUtils';
 import {
@@ -255,6 +256,7 @@ function getConflictInfo(existingItem, incomingItem) {
 
 export function useScenarioImport() {
   const dispatch = useDispatch();
+  const store = useStore();
   const selectedScenarioId = useSelector((state) => state.simScenario.selectedScenarioId);
   const scenarios = useSelector((state) => state.simScenario.scenarios);
   const dataByScenario = useSelector((state) => state.simData.dataByScenario);
@@ -589,6 +591,20 @@ export function useScenarioImport() {
 
     dispatch(setSelectedItems(createdOrUpdatedIds.length > 0 ? [createdOrUpdatedIds[0]] : []));
 
+    const currentState = store.getState();
+    dispatch(refreshAllEvents({
+      simScenario: {
+        ...currentState.simScenario,
+        selectedScenarioId: targetScenarioId,
+      },
+      simData: { dataByScenario: nextDataByScenario },
+      simBooking: { bookingsByScenario: nextBookingsByScenario },
+      simGroup: {
+        groupsByScenario: nextGroupsByScenario,
+        groupDefsByScenario: nextGroupDefsByScenario,
+      },
+    }));
+
     return {
       importedCount: createdOrUpdatedIds.length,
     };
@@ -602,6 +618,7 @@ export function useScenarioImport() {
     qualificationAssignmentsByScenario,
     qualificationDefsByScenario,
     scenarios,
+    store,
     selectedScenarioId,
   ]);
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Stack, Button, Text, Group, Badge, ActionIcon, TextInput, Select } from '@mantine/core';
+import { Stack, Button, Text, Group, Badge, ActionIcon, TextInput, Select, Switch, NumberInput } from '@mantine/core';
 import { IconPlus, IconTrash } from '@tabler/icons-react';
 import { useSelector, useDispatch } from 'react-redux';
 import { addGroupDef, updateGroupDef, deleteGroupDef } from '../../store/simGroupSlice';
@@ -30,6 +30,9 @@ function OrgaTabGroupDefs() {
           name: 'Neue Gruppe',
           icon: DEFAULT_GROUP_ICON,
           type: 'Regelgruppe',
+          fillUp: false,
+          maxFacilityCount: '',
+          maxSchoolGrade: '',
         },
       })
     );
@@ -60,6 +63,11 @@ function OrgaTabGroupDefs() {
         detailTitle={(item) => item?.name || 'Gruppe'}
         detailContent={(item) => (
           <Stack gap="md">
+            {(() => {
+              const isSchoolGroup = String(item?.type || '') === 'Schulkindgruppe';
+              const fillUpEnabled = Boolean(item?.fillUp) && isSchoolGroup;
+              return (
+                <>
             <TextInput
               label="Name"
               value={item?.name || ''}
@@ -82,11 +90,71 @@ function OrgaTabGroupDefs() {
                   updateGroupDef({
                     scenarioId: selectedScenarioId,
                     groupId: item.id,
-                    updates: { type: value || 'Regelgruppe' },
+                    updates: {
+                      type: value || 'Regelgruppe',
+                      fillUp: value === 'Schulkindgruppe' ? Boolean(item?.fillUp) : false,
+                    },
                   })
                 )
               }
             />
+            {isSchoolGroup ? (
+              <Switch
+                label="Auffuellen aktivieren"
+                checked={Boolean(item?.fillUp)}
+                onChange={(event) =>
+                  dispatch(
+                    updateGroupDef({
+                      scenarioId: selectedScenarioId,
+                      groupId: item.id,
+                      updates: { fillUp: event.currentTarget.checked },
+                    })
+                  )
+                }
+              />
+            ) : null}
+            {fillUpEnabled ? (
+              <>
+                <NumberInput
+                  label="Maximal zulaessige Anzahl von Kindern in der Einrichtung"
+                  value={item?.maxFacilityCount ?? ''}
+                  onChange={(value) =>
+                    dispatch(
+                      updateGroupDef({
+                        scenarioId: selectedScenarioId,
+                        groupId: item.id,
+                        updates: { maxFacilityCount: value ?? '' },
+                      })
+                    )
+                  }
+                  min={0}
+                  allowDecimal={false}
+                  allowNegative={false}
+                  placeholder="Optional"
+                />
+                <Select
+                  label="Schulkindbetreuung endet nach dem Schuljahr"
+                  value={item?.maxSchoolGrade ? String(item.maxSchoolGrade) : ''}
+                  onChange={(value) =>
+                    dispatch(
+                      updateGroupDef({
+                        scenarioId: selectedScenarioId,
+                        groupId: item.id,
+                        updates: { maxSchoolGrade: value || '' },
+                      })
+                    )
+                  }
+                  data={[
+                    { value: '1', label: '1. Klasse' },
+                    { value: '2', label: '2. Klasse' },
+                    { value: '3', label: '3. Klasse' },
+                    { value: '4', label: '4. Klasse' },
+                  ]}
+                  placeholder="Klasse waehlen"
+                  clearable
+                />
+              </>
+            ) : null}
             <Stack gap="xs">
               <Text size="sm" fw={500}>
                 Icon
@@ -107,6 +175,9 @@ function OrgaTabGroupDefs() {
                 />
               </div>
             </Stack>
+                </>
+              );
+            })()}
           </Stack>
         )}
         actions={(item) => (

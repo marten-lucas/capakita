@@ -49,18 +49,20 @@ function formatCurrency(value) {
 }
 
 function PersonnelCostSummary({ item }) {
+  const privacyMode = useSelector((state) => state.ui?.privacyMode || false);
+
   return (
     <Stack gap={2}>
       <Text fw={500}>Personalkosten</Text>
       <Text size="sm" c="dimmed">
-        {Number(item.annualGrossSalary) || 0} EUR / {Number(item.employerOnCostPercent) || 0} % ab {item.validFrom || 'sofort'}
+        {privacyMode ? '••••• EUR' : `${Number(item.annualGrossSalary) || 0} EUR`} / {Number(item.employerOnCostPercent) || 0} % ab {item.validFrom || 'sofort'}
         {item.validUntil ? ` bis ${item.validUntil}` : ''}
       </Text>
     </Stack>
   );
 }
 
-function PersonnelCostDetail({ item, scenarioId, selectedItemId, dispatch }) {
+function PersonnelCostDetail({ item, scenarioId, selectedItemId, dispatch, privacyMode = false }) {
   const [localAnnualGrossSalary, setLocalAnnualGrossSalary] = React.useState(item.annualGrossSalary ?? '');
   const [localEmployerOnCostPercent, setLocalEmployerOnCostPercent] = React.useState(item.employerOnCostPercent ?? '');
   const [localNote, setLocalNote] = React.useState(item.note ?? '');
@@ -135,6 +137,7 @@ function PersonnelCostDetail({ item, scenarioId, selectedItemId, dispatch }) {
         value={localAnnualGrossSalary}
         onChange={(value) => setLocalAnnualGrossSalary(value ?? '')}
         onBlur={commitAnnualGrossSalary}
+        type={privacyMode ? 'password' : 'text'}
         decimalScale={2}
         min={0}
         thousandSeparator="."
@@ -166,6 +169,7 @@ function SimDataFinanceTab() {
   const isMobile = useMediaQuery('(max-width: 48em)');
   const scenarioId = useSelector((state) => state.simScenario.selectedScenarioId);
   const selectedItemId = useSelector(selectPrimarySelectedItemId);
+  const privacyMode = useSelector((state) => state.ui?.privacyMode || false);
   const referenceDate = useSelector((state) => state.chart?.[scenarioId]?.referenceDate || dayjs().format('YYYY-MM-DD'));
   const financeScenario = useSelector((state) => state.simFinance.financeByScenario[scenarioId] || {
     settings: { partialAbsenceThresholdDays: 42, partialAbsenceEmployerSharePercent: 0 },
@@ -181,7 +185,6 @@ function SimDataFinanceTab() {
   } = useOverlayData();
 
   const item = getEffectiveDataItem(selectedItemId);
-  if (!item) return null;
 
   const effectiveBookings = Object.values(getEffectiveBookings(selectedItemId) || {});
 
@@ -193,6 +196,8 @@ function SimDataFinanceTab() {
   React.useEffect(() => {
     setFinanceSubTab('overview');
   }, [selectedItemId]);
+
+  if (!item) return null;
 
   if (item.type === 'demand') {
     const childFinance = calculateChildMonthlyRevenue({
@@ -255,7 +260,7 @@ function SimDataFinanceTab() {
     <Tabs value={financeSubTab} onChange={(value) => setFinanceSubTab(value || 'overview')} variant="outline" styles={{ root: { height: '100%' } }}>
       <Tabs.List>
         <Tabs.Tab value="overview">Übersicht</Tabs.Tab>
-        <Tabs.Tab value="history">Historie</Tabs.Tab>
+        <Tabs.Tab value="history">Personalkosten</Tabs.Tab>
       </Tabs.List>
 
       <Tabs.Panel value="overview" pt="md">
@@ -272,7 +277,7 @@ function SimDataFinanceTab() {
             </Group>
             <Group justify="space-between" wrap="wrap">
               <Text>Monatliche Basiskosten</Text>
-              <Text fw={600}>{formatCurrency(staffFinance.baseMonthlyCost)}</Text>
+              <Text fw={600}>{privacyMode ? '•••••' : formatCurrency(staffFinance.baseMonthlyCost)}</Text>
             </Group>
             <Group justify="space-between" wrap="wrap">
               <Text>Anwesenheitsfaktor</Text>
@@ -280,7 +285,7 @@ function SimDataFinanceTab() {
             </Group>
             <Group justify="space-between" wrap="wrap">
               <Text fw={600}>Monatliche Personalkosten</Text>
-              <Text fw={700}>{formatCurrency(staffFinance.adjustedMonthlyCost)}</Text>
+              <Text fw={700}>{privacyMode ? '•••••' : formatCurrency(staffFinance.adjustedMonthlyCost)}</Text>
             </Group>
           </Stack>
         </Paper>
@@ -313,7 +318,7 @@ function SimDataFinanceTab() {
                 <PersonnelCostSummary item={historyItem} />
               )}
               DetailComponent={({ item: historyItem }) => (
-                <PersonnelCostDetail item={historyItem} scenarioId={scenarioId} selectedItemId={selectedItemId} dispatch={dispatch} />
+                <PersonnelCostDetail item={historyItem} scenarioId={scenarioId} selectedItemId={selectedItemId} dispatch={dispatch} privacyMode={privacyMode} />
               )}
               emptyText="Noch kein Personalkosten-Eintrag hinterlegt."
               onDelete={(_, historyItem) => dispatch(deletePersonnelCostEntry({

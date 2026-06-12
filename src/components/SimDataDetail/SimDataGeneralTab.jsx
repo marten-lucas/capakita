@@ -27,6 +27,12 @@ function SimDataGeneralTab() {
   const item = getEffectiveDataItem(selectedItemId);
   const qualificationAssignments = getEffectiveQualificationAssignments(selectedItemId);
   const currentQualificationAssignment = qualificationAssignments[0] || null;
+  const [detailSubTab, setDetailSubTab] = React.useState('base');
+
+  React.useEffect(() => {
+    if (!item) return;
+    setDetailSubTab('base');
+  }, [item?.id, item?.type]);
 
   if (!item) return null;
 
@@ -83,11 +89,6 @@ function SimDataGeneralTab() {
   const validFrom = item.validFrom ? new Date(item.validFrom) : null;
   const validUntil = item.validUntil ? new Date(item.validUntil) : null;
   const absences = Array.isArray(item.absences) ? item.absences : [];
-  const [detailSubTab, setDetailSubTab] = React.useState('base');
-
-  React.useEffect(() => {
-    setDetailSubTab('base');
-  }, [item.id, itemType]);
 
   const handleAbsenceUpdate = (absenceId, updates) => {
     const nextAbsences = absences.map((absence) => (

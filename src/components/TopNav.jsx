@@ -2,8 +2,8 @@ import React from 'react';
 import { Alert, Button, Text, Menu, ActionIcon, Select, Box, Switch, Modal, Stack, Checkbox, Group, UnstyledButton } from '@mantine/core';
 import { useSelector, useDispatch, useStore } from 'react-redux';
 import { isSaveAllowed, setSaveDialogOpen, setLoadDialogOpen, setSelectedScenarioId } from '../store/simScenarioSlice';
-import { setActivePage, setAnalysisSubPage, setBrowserAutoSaveEnabled, setSettingsSubPage, setDataSubmenu } from '../store/uiSlice';
-import { IconDatabase, IconChartBar, IconSettings, IconDotsVertical, IconUpload, IconDeviceFloppy, IconFolderOpen, IconCalendarEvent, IconInfoCircle, IconRefresh, IconTrash, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconLayersIntersect, IconUsers, IconCertificate, IconTools, IconAlertTriangle, IconRoute, IconClockHour4, IconArrowsSplit, IconUser, IconBabyCarriage } from '@tabler/icons-react';
+import { setActivePage, setAnalysisSubPage, setBrowserAutoSaveEnabled, setSettingsSubPage, setDataSubmenu, setPrivacyMode } from '../store/uiSlice';
+import { IconDatabase, IconChartBar, IconSettings, IconDotsVertical, IconUpload, IconDeviceFloppy, IconFolderOpen, IconCalendarEvent, IconInfoCircle, IconRefresh, IconTrash, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconLayersIntersect, IconUsers, IconCertificate, IconTools, IconAlertTriangle, IconRoute, IconClockHour4, IconArrowsSplit, IconUser, IconBabyCarriage, IconEye, IconEyeOff } from '@tabler/icons-react';
 import { refreshEventsForScenario, clearEventOverridesForScenario } from '../store/eventSlice';
 import { updateDatesOfInterest } from '../store/datesOfInterestSlice';
 import { loadBookingsByScenario } from '../store/simBookingSlice';
@@ -145,6 +145,7 @@ function TopNav({ variant = 'sidebar', sidebarCollapsed = false, onToggleSidebar
   const activeAnalysisSubPage = useSelector((state) => state.ui.analysisSubPage || 'quality');
   const normalizedAnalysisSubPage = activeAnalysisSubPage === 'demography' ? 'compare' : activeAnalysisSubPage;
   const browserAutoSaveEnabled = useSelector((state) => state.ui.browserAutoSaveEnabled);
+  const privacyMode = useSelector((state) => state.ui.privacyMode || false);
   const store = useStore();
   const [importModalOpen, setImportModalOpen] = React.useState(false);
   const [privacyModalOpen, setPrivacyModalOpen] = React.useState(false);
@@ -428,6 +429,34 @@ function TopNav({ variant = 'sidebar', sidebarCollapsed = false, onToggleSidebar
                   </ActionIcon>
                 </Group>
               )}
+
+              <Group justify="space-between" align="center" wrap="nowrap" className="app-sidebar-menu-row">
+                {!sidebarCollapsed ? (
+                  <Button
+                    variant={privacyMode ? 'filled' : 'light'}
+                    color={privacyMode ? 'red' : undefined}
+                    size="sm"
+                    fullWidth
+                    justify="flex-start"
+                    leftSection={privacyMode ? <IconEyeOff size={16} /> : <IconEye size={16} />}
+                    onClick={() => dispatch(setPrivacyMode(!privacyMode))}
+                    aria-pressed={privacyMode}
+                  >
+                    Persönliche Daten verstecken
+                  </Button>
+                ) : (
+                  <ActionIcon
+                    variant={privacyMode ? 'filled' : 'subtle'}
+                    color={privacyMode ? 'red' : undefined}
+                    size="sm"
+                    onClick={() => dispatch(setPrivacyMode(!privacyMode))}
+                    aria-label={privacyMode ? 'Persönliche Daten anzeigen' : 'Persönliche Daten verstecken'}
+                    title={privacyMode ? 'Persönliche Daten anzeigen' : 'Persönliche Daten verstecken'}
+                  >
+                    {privacyMode ? <IconEyeOff size={16} /> : <IconEye size={16} />}
+                  </ActionIcon>
+                )}
+              </Group>
 
               <Group justify="space-between" align="center" wrap="nowrap" className="app-sidebar-menu-row">
                 {!sidebarCollapsed && (

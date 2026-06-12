@@ -89,7 +89,6 @@ function createTestStore() {
                 {
                   id: 'fee-1',
                   validFrom: '2025-01-01',
-                  minHours: 3,
                   maxHours: 6,
                   monthlyAmount: 200,
                 },
@@ -98,7 +97,6 @@ function createTestStore() {
                 {
                   id: 'fee-2',
                   validFrom: '2025-01-01',
-                  minHours: 3,
                   maxHours: 6,
                   monthlyAmount: 150,
                 },

@@ -28,10 +28,6 @@ function parseIsoDate(dateValue) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function monthsAgo(baseDate, months) {
-  return new Date(Date.UTC(baseDate.getUTCFullYear(), baseDate.getUTCMonth() - months, baseDate.getUTCDate()));
-}
-
 function yearsAgo(baseDate, years) {
   return new Date(Date.UTC(baseDate.getUTCFullYear() - years, baseDate.getUTCMonth(), baseDate.getUTCDate()));
 }

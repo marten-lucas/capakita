@@ -126,6 +126,7 @@ describe('Adebis import regression', () => {
     const scenarioId = state.simScenario.selectedScenarioId;
     const dataByScenario = state.simData.dataByScenario[scenarioId] || {};
     const bookingsByScenario = state.simBooking.bookingsByScenario[scenarioId] || {};
+    const events = state.events.eventsByScenario[scenarioId] || [];
 
     const importedChildIds = new Set((rawdata.kidsRaw || []).map((entry) => String(entry.KINDNR)));
 
@@ -144,6 +145,8 @@ describe('Adebis import regression', () => {
 
     expect(childIdsWithTimes.size).toBeGreaterThan(0);
     expect(employeeIdsWithTimes.size).toBeGreaterThan(0);
+    expect(events.length).toBeGreaterThan(0);
+    expect(events.some((event) => event.type === 'group_assignment_start' || event.type === 'booking_start' || event.type === 'presence_start')).toBe(true);
 
     let checkedChildren = 0;
     let checkedEmployees = 0;

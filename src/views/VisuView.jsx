@@ -4,15 +4,19 @@ import {
   Anchor,
   Badge,
   Box,
+  Button,
   Group,
   Modal,
   Paper,
   RingProgress,
+  Select,
   Stack,
+  Switch,
   Text,
   Title,
 } from '@mantine/core';
 import { Carousel } from '@mantine/carousel';
+import { MonthPickerInput } from '@mantine/dates';
 import Highcharts from 'highcharts';
 import HighchartsHeatmap from 'highcharts/modules/heatmap';
 import HighchartsSankey from 'highcharts/modules/sankey';
@@ -25,10 +29,11 @@ import { setActivePage, setAnalysisSubPage } from '../store/uiSlice';
 import { setSelectedItem, setSelectedItems } from '../store/simScenarioSlice';
 import { ensureScenario } from '../store/chartSlice';
 import { selectWeeklyChartData } from '../store/chartSelectors';
+import { selectHistoricalStatistics, selectGroupTransitionStatistics } from '../store/statisticsSelectors';
 import { useOverlayData } from '../hooks/useOverlayData';
 import { calculateScenarioMonthlyFinance, isDateWithinRange, isRecordActiveOnDate, resolveGroupIdAtDate } from '../utils/financeUtils';
 import { buildOverlayAwareData } from '../utils/overlayUtils';
-import { isArchivedDataItem, shouldIncludeDataItemInAnalysis } from '../utils/dataVisibility';
+import { isArchivedDataItem, shouldIncludeDataItemInAnalysis, getActiveDemandChildrenAtDate } from '../utils/dataVisibility';
 import { filterBookings, generateCareRatioSeries } from '../utils/chartUtils/chartUtils';
 import { generateBookingDataSeries, generateTimeSegments, formatWeeklyAxisLabel } from '../utils/chartUtils/chartUtilsWeekly';
 import {
@@ -95,7 +100,12 @@ const HEATMAP_MODES = {
 
 const QUALITY_GROUP_COLOR_PALETTE = ['#2563eb', '#059669', '#d97706', '#dc2626', '#7c3aed', '#0891b2', '#be123c', '#4d7c0f'];
 const QUALITY_ADMIN_TIME_COLOR = '#8b5cf6';
-const AGE_COHORT_SIZE_MONTHS = 3;
+const FORECAST_GROUP_COLOR_PALETTE = ['#0ea5e9', '#22c55e', '#f59e0b', '#a855f7', '#ef4444', '#14b8a6', '#6366f1', '#84cc16'];
+const DEMOGRAPHY_RESOLUTION_MONTHS = {
+  quarter: 3,
+  halfyear: 6,
+  year: 12,
+};
 const AGE_HISTOGRAM_MAX_MONTHS = 96;
 
 const RESILIENCE_CASCADE_STAGES = [
@@ -1405,22 +1415,144 @@ function FinanceTrendChart({ financeTrend, accent }) {
   );
 }
 
-function PreviewSankeyChart({ previewFlow, accent }) {
-  const hasData = (previewFlow?.links || []).length > 0;
+function PreviewSankeyChart({ previewFlow, accent, privacyMode = false }) {
+  const [hoverInfo, setHoverInfo] = React.useState(null);
+  const [stageBadgePositions, setStageBadgePositions] = React.useState([]);
+  const stageBadgeSignatureRef = React.useRef('');
+
+  const filteredLinks = React.useMemo(() => {
+    return previewFlow?.links || [];
+  }, [previewFlow?.links]);
+
+  const filteredNodes = React.useMemo(() => {
+    const nodes = previewFlow?.nodes || [];
+    const links = filteredLinks || [];
+    if (!links.length) return [];
+    const usedIds = new Set();
+    links.forEach((entry) => {
+      if (entry?.from) usedIds.add(String(entry.from));
+      if (entry?.to) usedIds.add(String(entry.to));
+    });
+    return nodes.filter((node) => usedIds.has(String(node.id)));
+  }, [previewFlow?.nodes, filteredLinks]);
+
+  const hasData = filteredLinks.length > 0;
+  const stageLabels = React.useMemo(() => {
+    const byDate = new Map();
+    (filteredNodes || []).forEach((node) => {
+      const dateIso = String(node?.dateIso || '');
+      if (!dateIso) return;
+      if (!byDate.has(dateIso)) {
+        byDate.set(dateIso, String(node?.stageLabel || dateIso));
+      }
+    });
+    return Array.from(byDate.entries())
+      .sort(([left], [right]) => String(left).localeCompare(String(right)))
+      .map(([, label]) => label);
+  }, [filteredNodes]);
+
+  const linksByNodeId = React.useMemo(() => {
+    const map = new Map();
+    filteredLinks.forEach((entry) => {
+      const fromId = String(entry?.from || '');
+      const toId = String(entry?.to || '');
+      if (fromId) {
+        const fromLinks = map.get(fromId) || [];
+        fromLinks.push(entry);
+        map.set(fromId, fromLinks);
+      }
+      if (toId) {
+        const toLinks = map.get(toId) || [];
+        toLinks.push(entry);
+        map.set(toId, toLinks);
+      }
+    });
+    return map;
+  }, [filteredLinks]);
 
   const options = React.useMemo(
     () => {
-      const links = previewFlow?.links || [];
-      const nodes = previewFlow?.nodes || [];
+      const links = filteredLinks;
+      const nodes = filteredNodes;
+      const nodesById = new Map(nodes.map((node) => [String(node.id), node]));
+      const resolveNodeColor = (groupIdRaw) => {
+        const groupId = String(groupIdRaw || '__NO_GROUP__');
+        const mappedColor = previewFlow?.groupColorsById?.[groupId];
+        if (mappedColor) return mappedColor;
+        if (groupId === '__NO_GROUP__') return '#94a3b8';
+        return accent;
+      };
+
+      const linksWithColor = links.map((entry) => {
+        const toNode = nodesById.get(String(entry.to));
+        return {
+          ...entry,
+          color: resolveNodeColor(toNode?.groupId),
+        };
+      });
+
+      const nodesWithColor = [...nodes]
+        .sort((left, right) => {
+          const dateDiff = String(left?.dateIso || '').localeCompare(String(right?.dateIso || ''));
+          if (dateDiff !== 0) return dateDiff;
+          return Number(right?.rank || 0) - Number(left?.rank || 0);
+        })
+        .map((node) => ({
+          ...node,
+          color: resolveNodeColor(node.groupId),
+        }));
+
       return {
         chart: {
           backgroundColor: 'transparent',
-          spacing: [8, 8, 8, 8],
+          spacing: [40, 8, 8, 8],
+          events: {
+            render() {
+              const sankeySeries = this.series?.find((series) => series?.type === 'sankey');
+              if (!sankeySeries) return;
+
+              const byDate = new Map();
+              (sankeySeries.points || []).forEach((point) => {
+                if (!point?.isNode) return;
+                const dateIso = String(point?.options?.dateIso || '');
+                if (!dateIso) return;
+                const shape = point.shapeArgs;
+                if (!shape || !Number.isFinite(shape.x) || !Number.isFinite(shape.width)) return;
+
+                const centerX = this.plotLeft + Number(shape.x) + (Number(shape.width) / 2);
+                const current = byDate.get(dateIso) || {
+                  label: String(point?.options?.stageLabel || dateIso),
+                  sumX: 0,
+                  count: 0,
+                };
+                current.sumX += centerX;
+                current.count += 1;
+                byDate.set(dateIso, current);
+              });
+
+              const next = Array.from(byDate.entries())
+                .sort(([left], [right]) => String(left).localeCompare(String(right)))
+                .map(([dateIso, entry]) => ({
+                  dateIso,
+                  label: entry.label,
+                  leftPx: entry.count > 0 ? entry.sumX / entry.count : 0,
+                }));
+
+              const signature = JSON.stringify(next.map((item) => [item.dateIso, Math.round(item.leftPx), item.label]));
+              if (signature !== stageBadgeSignatureRef.current) {
+                stageBadgeSignatureRef.current = signature;
+                setStageBadgePositions(next);
+              }
+            },
+          },
         },
         title: { text: null },
         credits: { enabled: false },
         tooltip: {
           pointFormatter() {
+            if (this.isNode) {
+              return `<b>${this.name || ''}</b><br/>Stufe: <b>${this.options?.stageLabel || '-'}</b><br/>Kinder: <b>${Number(this.sum || 0)}</b>`;
+            }
             const stepLabel = this.options?.stepLabel ? `<br/>Zeitpunkt: <b>${this.options.stepLabel}</b>` : '';
             return `<b>${this.fromNode?.name || ''}</b> -> <b>${this.toNode?.name || ''}</b>: <b>${Number(this.weight || 0)}</b>${stepLabel}`;
           },
@@ -1433,6 +1565,42 @@ function PreviewSankeyChart({ previewFlow, accent }) {
             nodePadding: 14,
             nodeWidth: 18,
             curveFactor: 0.45,
+            minLinkWidth: 2,
+            point: {
+              events: {
+                mouseOut() {
+                  setHoverInfo(null);
+                },
+                mouseOver() {
+                  if (this.isNode) {
+                    const nodeId = String(this.id || this.options?.id || '');
+                    const relatedLinks = linksByNodeId.get(nodeId) || [];
+                    const childrenMap = new Map();
+                    relatedLinks.forEach((link) => {
+                      (link.children || []).forEach((child) => {
+                        childrenMap.set(String(child.id || ''), child);
+                      });
+                    });
+                    setHoverInfo({
+                      kind: 'node',
+                      title: String(this.name || '-'),
+                      subtitle: String(this.options?.stageLabel || '-'),
+                      count: Number(this.sum || 0),
+                      children: Array.from(childrenMap.values()),
+                    });
+                    return;
+                  }
+
+                  setHoverInfo({
+                    kind: 'link',
+                    title: `${this.fromNode?.name || '-'} -> ${this.toNode?.name || '-'}`,
+                    subtitle: String(this.options?.stepLabel || '-'),
+                    count: Number(this.weight || 0),
+                    children: Array.isArray(this.options?.children) ? this.options.children : [],
+                  });
+                },
+              },
+            },
             states: {
               inactive: {
                 opacity: 0.35,
@@ -1444,8 +1612,8 @@ function PreviewSankeyChart({ previewFlow, accent }) {
           {
             type: 'sankey',
             name: 'Gruppenubergange',
-            data: links,
-            nodes,
+            data: linksWithColor,
+            nodes: nodesWithColor,
             colorByPoint: false,
             colors: [accent],
             dataLabels: {
@@ -1459,7 +1627,7 @@ function PreviewSankeyChart({ previewFlow, accent }) {
         ],
       };
     },
-    [accent, previewFlow]
+    [accent, filteredLinks, filteredNodes, linksByNodeId, previewFlow?.groupColorsById]
   );
 
   if (!hasData) {
@@ -1482,21 +1650,513 @@ function PreviewSankeyChart({ previewFlow, accent }) {
 
   return (
     <Paper className="analysis-diagram-placeholder" withBorder p="xs">
-      <HighchartsReact highcharts={Highcharts} options={options} containerProps={{ style: { height: '100%' } }} />
+      <Group align="stretch" gap="sm" wrap="nowrap" style={{ minHeight: 0, height: '100%' }}>
+        <Box style={{ flex: 1, minWidth: 0, minHeight: 0 }}>
+          <Box style={{ position: 'relative', height: '100%' }}>
+            {(stageBadgePositions.length > 0 || stageLabels.length > 0) ? (
+              <Box style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 22, pointerEvents: 'none', zIndex: 2 }}>
+                {(stageBadgePositions.length > 0 ? stageBadgePositions : stageLabels.map((label, idx) => ({
+                  dateIso: String(idx),
+                  label,
+                  leftPx: `${((idx + 1) / (stageLabels.length + 1)) * 100}%`,
+                }))).map((entry) => (
+                  <Box
+                    key={`sankey-stage-${entry.dateIso}`}
+                    style={{
+                      position: 'absolute',
+                      left: typeof entry.leftPx === 'string' ? entry.leftPx : `${entry.leftPx}px`,
+                      transform: 'translateX(-50%)',
+                    }}
+                  >
+                    <Badge variant="outline" size="xs" color="gray">{entry.label}</Badge>
+                  </Box>
+                ))}
+              </Box>
+            ) : null}
+            <HighchartsReact highcharts={Highcharts} options={options} containerProps={{ style: { height: '100%' } }} />
+          </Box>
+        </Box>
+        <Box style={{ width: 320, minWidth: 320, maxWidth: 320, flex: '0 0 320px', borderLeft: '1px solid var(--mantine-color-gray-3)', paddingLeft: 12, overflowY: 'auto' }}>
+          {hoverInfo ? (
+            <Stack gap={6}>
+              <Badge variant="outline" size="sm" color="gray">{hoverInfo.subtitle}</Badge>
+              <Text size="sm" fw={600}>{hoverInfo.title}</Text>
+              <Badge variant="light" size="sm" color="gray">Kinder: {hoverInfo.count}</Badge>
+              <Box>
+                <Text size="xs" fw={600} mb={4}>Kinderliste</Text>
+                <Text size="xs" c="dimmed" style={{ lineHeight: 1.5 }}>
+                  {(hoverInfo.children || []).slice(0, 120).map((child, idx) => (
+                    <span key={`${String(child.id || '')}-${idx}`}>
+                      {privacyMode ? `Kind ${idx + 1}` : (child.name || `Kind ${idx + 1}`)}
+                      {idx < Math.min((hoverInfo.children || []).length, 120) - 1 ? ', ' : ''}
+                    </span>
+                  ))}
+                </Text>
+              </Box>
+            </Stack>
+          ) : (
+            <Text size="xs" c="dimmed">Sankey-Link oder Knoten berühren, um Werte anzuzeigen.</Text>
+          )}
+        </Box>
+      </Group>
     </Paper>
   );
 }
 
-function DemographyAgeChart({ demographyData, accent }) {
-  const snapshots = demographyData?.snapshots || [];
+function ForecastGroupTimelineChart({ previewFlow, accent, privacyMode = false }) {
+  const sharedChartMargins = {
+    marginLeft: 76,
+    marginRight: 12,
+  };
+
+  const groupTimeline = previewFlow?.groupTimeline || null;
+  const categories = groupTimeline?.labels || [];
+  const timelineDateIsos = groupTimeline?.dates || [];
+  const seriesByGroup = groupTimeline?.seriesByGroup || [];
+  const timelinePoints = groupTimeline?.timelinePoints || EMPTY_LIST;
+  const rangeStartIso = groupTimeline?.rangeStartIso || null;
+  const rangeEndIso = groupTimeline?.rangeEndIso || null;
+  const [hoveredTimestamp, setHoveredTimestamp] = React.useState(null);
+  const rangeStartMs = rangeStartIso ? new Date(`${rangeStartIso}T00:00:00Z`).getTime() : undefined;
+  const rangeEndMs = rangeEndIso ? new Date(`${rangeEndIso}T00:00:00Z`).getTime() : undefined;
+  const timelineDateMs = timelineDateIsos.map((dateIso) => new Date(`${dateIso}T00:00:00Z`).getTime());
+
+  const hoverIndex = React.useMemo(() => {
+    if (!timelineDateMs.length || hoveredTimestamp == null) return -1;
+    let bestIndex = 0;
+    let bestDistance = Math.abs(Number(timelineDateMs[0]) - Number(hoveredTimestamp));
+    for (let idx = 1; idx < timelineDateMs.length; idx += 1) {
+      const distance = Math.abs(Number(timelineDateMs[idx]) - Number(hoveredTimestamp));
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestIndex = idx;
+      }
+    }
+    return bestIndex;
+  }, [hoveredTimestamp, timelineDateMs]);
+
+  const hoverTimestamp = hoverIndex >= 0 ? Number(timelineDateMs[hoverIndex]) : null;
+
+  const eventCountByTimestamp = React.useMemo(() => {
+    const map = new Map();
+    (timelinePoints || []).forEach((point) => {
+      const key = Number(point?.x || 0);
+      if (!Number.isFinite(key)) return;
+      map.set(key, Number(point?.count || 0));
+    });
+    return map;
+  }, [timelinePoints]);
+
+  const hoverEventCount = hoverTimestamp == null ? 0 : Number(eventCountByTimestamp.get(hoverTimestamp) || 0);
+
+  if (!categories.length || !seriesByGroup.length) {
+    return (
+      <Paper className="analysis-diagram-placeholder" withBorder p="lg">
+        <Stack gap={6} align="center" justify="center" className="analysis-diagram-placeholder-inner">
+          <Badge variant="light" size="lg" className="analysis-diagram-placeholder-badge">
+            Gruppenverlauf
+          </Badge>
+          <Title order={3} className="analysis-diagram-placeholder-title">
+            Keine Gruppendaten
+          </Title>
+          <Text size="sm" c="dimmed" ta="center" className="analysis-diagram-placeholder-text">
+            Für den gewählten Zeitraum konnten keine Gruppenverläufe ermittelt werden.
+          </Text>
+        </Stack>
+      </Paper>
+    );
+  }
+
+  const buildLineOptions = (groupSeries, showXAxis) => ({
+    chart: {
+      type: 'line',
+      backgroundColor: 'transparent',
+      spacing: [4, 8, 4, 8],
+      ...sharedChartMargins,
+    },
+    title: { text: null },
+    credits: { enabled: false },
+    legend: { enabled: false },
+    xAxis: {
+      type: 'datetime',
+      min: rangeStartMs,
+      max: rangeEndMs,
+      plotLines: hoverTimestamp == null
+        ? []
+        : [{ value: hoverTimestamp, color: '#334155', width: 1, zIndex: 7, dashStyle: 'ShortDot' }],
+      labels: {
+        enabled: showXAxis,
+        format: '{value:%d.%m.%Y}',
+        rotation: showXAxis ? -25 : 0,
+      },
+      tickLength: showXAxis ? 4 : 0,
+      lineWidth: showXAxis ? 1 : 0,
+    },
+    yAxis: {
+      min: 0,
+      allowDecimals: false,
+      title: { text: groupSeries?.name || 'Gruppe' },
+    },
+    tooltip: {
+      shared: false,
+      positioner(labelWidth, labelHeight, point) {
+        const chart = this.chart;
+        let x = point.plotX + chart.plotLeft - labelWidth / 2;
+        let y = point.plotY + chart.plotTop - labelHeight - 12;
+        x = Math.max(chart.plotLeft, Math.min(x, chart.plotLeft + chart.plotWidth - labelWidth));
+        y = Math.max(chart.plotTop, y);
+        return { x, y };
+      },
+      pointFormatter() {
+        const dateLabel = Highcharts.dateFormat('%d.%m.%Y', Number(this.x || 0));
+        return `<b>${this.series.name}</b><br/>${dateLabel}: <b>${Number(this.y || 0)}</b> Kinder`;
+      },
+    },
+    plotOptions: {
+      series: {
+        animation: false,
+        marker: { enabled: false },
+        point: {
+          events: {
+            mouseOver() {
+              setHoveredTimestamp(Number(this.x));
+            },
+          },
+        },
+      },
+    },
+    series: [
+      {
+        type: 'line',
+        name: groupSeries?.name || 'Gruppe',
+        data: timelineDateMs.map((x, idx) => [x, Number(groupSeries?.data?.[idx] || 0)]),
+        color: groupSeries?.color || accent,
+        lineWidth: 2,
+      },
+    ],
+  });
+
+  const timelineOptions = {
+    chart: {
+      type: 'timeline',
+      backgroundColor: 'transparent',
+      spacing: [4, 8, 8, 8],
+      ...sharedChartMargins,
+    },
+    title: { text: null },
+    credits: { enabled: false },
+    legend: { enabled: false },
+    xAxis: {
+      type: 'datetime',
+      min: rangeStartMs,
+      max: rangeEndMs,
+      plotLines: hoverTimestamp == null
+        ? []
+        : [{ value: hoverTimestamp, color: '#334155', width: 1, zIndex: 7, dashStyle: 'ShortDot' }],
+      labels: {
+        format: '{value:%d.%m.%Y}',
+      },
+      title: { text: 'Event-Timeline' },
+    },
+    yAxis: {
+      visible: false,
+      title: { text: null },
+    },
+    tooltip: {
+      useHTML: true,
+      positioner(labelWidth, labelHeight, point) {
+        const chart = this.chart;
+        let x = point.plotX + chart.plotLeft - labelWidth / 2;
+        let y = point.plotY + chart.plotTop - labelHeight - 12;
+        x = Math.max(chart.plotLeft, Math.min(x, chart.plotLeft + chart.plotWidth - labelWidth));
+        y = Math.max(chart.plotTop, y);
+        return { x, y };
+      },
+      pointFormatter() {
+        const dateText = this.options.dateLabel || this.key || '';
+        const total = Number(this.options.count || 0);
+        const autoCount = Number(this.options.autoCount || 0);
+        const eventList = this.options.eventList || [];
+        const eventRows = eventList.slice(0, 8).map((ev) => {
+          const typeLabel = ev.targetStage
+            ? `\u2192 ${ev.targetStage}`
+            : String(ev.type || '').replace(/_/g, ' ');
+          return `<li>${ev.entityName || '-'} (${typeLabel})</li>`;
+        }).join('');
+        const moreHint = eventList.length > 8 ? `<li style="color:#94a3b8">+${eventList.length - 8} weitere</li>` : '';
+        return `<strong>${dateText}</strong><br /><span>${total} Events (${autoCount} Auto)</span><ul style="margin:4px 0 0 0;padding-left:16px;font-size:11px">${eventRows}${moreHint}</ul>`;
+      },
+    },
+    plotOptions: {
+      series: {
+        animation: false,
+        point: {
+          events: {
+            mouseOver() {
+              setHoveredTimestamp(Number(this.x));
+            },
+          },
+        },
+      },
+      timeline: {
+        marker: {
+          symbol: 'circle',
+        },
+        dataLabels: {
+          enabled: false,
+        },
+      },
+    },
+    series: [
+      {
+        type: 'timeline',
+        name: 'Events',
+        data: timelinePoints,
+        color: '#64748b',
+        showInLegend: false,
+      },
+    ],
+  };
+
+  return (
+    <Paper className="analysis-diagram-placeholder" withBorder p="xs" onMouseLeave={() => setHoveredTimestamp(null)}>
+      <Group align="stretch" gap="sm" wrap="nowrap" style={{ minHeight: 0, height: '100%' }}>
+        <Box style={{ flex: 1, minWidth: 0 }}>
+          <Stack gap={6} h="100%" style={{ overflowY: 'auto', minHeight: 0 }}>
+            {seriesByGroup.map((groupSeries, idx) => (
+              <Box key={`forecast-group-series-${groupSeries.groupId || idx}`} style={{ minHeight: 130, height: 130, flex: '0 0 auto' }}>
+                <HighchartsReact
+                  highcharts={Highcharts}
+                  options={buildLineOptions(groupSeries, false)}
+                  containerProps={{ style: { height: '100%' } }}
+                />
+              </Box>
+            ))}
+            <Box style={{ minHeight: 170, height: 170, flex: '0 0 auto' }}>
+              <HighchartsReact
+                highcharts={Highcharts}
+                options={timelineOptions}
+                containerProps={{ style: { height: '100%' } }}
+              />
+            </Box>
+          </Stack>
+        </Box>
+
+        <Box style={{ width: 320, minWidth: 320, maxWidth: 320, flex: '0 0 320px', borderLeft: '1px solid var(--mantine-color-gray-3)', paddingLeft: 12, overflowY: 'auto' }}>
+          {hoverIndex >= 0 ? (
+            <Stack gap={6}>
+              <Group gap={8} wrap="wrap">
+                <Badge variant="outline" color="gray" size="sm">
+                  {categories[hoverIndex] || '-'}
+                </Badge>
+                {seriesByGroup.map((groupSeries) => (
+                  <Badge key={`hover-value-${groupSeries.groupId}`} variant="light" size="sm" style={{ backgroundColor: `${groupSeries.color || accent}1A`, color: groupSeries.color || accent }}>
+                    {groupSeries.name}: {Number(groupSeries?.data?.[hoverIndex] || 0)}
+                  </Badge>
+                ))}
+                <Badge variant="light" color="gray" size="sm">
+                  Events: {hoverEventCount}
+                </Badge>
+              </Group>
+
+              {seriesByGroup.map((groupSeries) => {
+                const children = groupSeries.childrenByIndex?.[hoverIndex] || [];
+                if (!children.length) return null;
+                return (
+                  <Box key={`child-list-${groupSeries.groupId}`}>
+                    <Text size="xs" fw={600} style={{ color: groupSeries.color || accent }}>
+                      {groupSeries.name}:
+                    </Text>
+                    <Text size="xs" c="dimmed" style={{ lineHeight: 1.5 }}>
+                      {children.map((child, idx) => (
+                        <span key={child.id}>
+                          {privacyMode ? `Kind ${idx + 1}` : child.name}
+                          {idx < children.length - 1 ? ', ' : ''}
+                        </span>
+                      ))}
+                    </Text>
+                  </Box>
+                );
+              })}
+            </Stack>
+          ) : (
+            <Text size="xs" c="dimmed">Diagramm berühren, um Werte anzuzeigen.</Text>
+          )}
+        </Box>
+      </Group>
+    </Paper>
+  );
+}
+
+function ForecastHoursTimelineChart({ previewFlow, accent, privacyMode = false }) {
+  const sharedChartMargins = { marginLeft: 76, marginRight: 12 };
+  const groupTimeline = previewFlow?.groupTimeline || null;
+  const timelineDateIsos = groupTimeline?.dates || [];
+  const seriesByGroup = groupTimeline?.seriesByGroup || [];
+  const rangeStartIso = groupTimeline?.rangeStartIso || null;
+  const rangeEndIso = groupTimeline?.rangeEndIso || null;
+  const [hoveredTimestamp, setHoveredTimestamp] = React.useState(null);
+  const rangeStartMs = rangeStartIso ? new Date(`${rangeStartIso}T00:00:00Z`).getTime() : undefined;
+  const rangeEndMs = rangeEndIso ? new Date(`${rangeEndIso}T00:00:00Z`).getTime() : undefined;
+  const timelineDateMs = timelineDateIsos.map((d) => new Date(`${d}T00:00:00Z`).getTime());
+
+  const hoverIndex = React.useMemo(() => {
+    if (!timelineDateMs.length || hoveredTimestamp == null) return -1;
+    let best = 0;
+    let bestDist = Math.abs(Number(timelineDateMs[0]) - Number(hoveredTimestamp));
+    for (let i = 1; i < timelineDateMs.length; i += 1) {
+      const d = Math.abs(Number(timelineDateMs[i]) - Number(hoveredTimestamp));
+      if (d < bestDist) { bestDist = d; best = i; }
+    }
+    return best;
+  }, [hoveredTimestamp, timelineDateMs]);
+
+  const hoverTimestamp = hoverIndex >= 0 ? Number(timelineDateMs[hoverIndex]) : null;
+
+  if (!seriesByGroup.length) {
+    return (
+      <Paper className="analysis-diagram-placeholder" withBorder p="lg">
+        <Stack gap={6} align="center" justify="center" className="analysis-diagram-placeholder-inner">
+          <Badge variant="light" size="lg">Buchungsstunden</Badge>
+          <Title order={3} className="analysis-diagram-placeholder-title">Keine Buchungsdaten</Title>
+          <Text size="sm" c="dimmed" ta="center">Für den gewählten Zeitraum konnten keine Buchungsstunden ermittelt werden.</Text>
+        </Stack>
+      </Paper>
+    );
+  }
+
+  const buildHoursOptions = (groupSeries) => ({
+    chart: { type: 'line', backgroundColor: 'transparent', spacing: [4, 8, 4, 8], ...sharedChartMargins },
+    title: { text: null },
+    credits: { enabled: false },
+    legend: { enabled: false },
+    xAxis: {
+      type: 'datetime',
+      min: rangeStartMs,
+      max: rangeEndMs,
+      plotLines: hoverTimestamp == null ? [] : [{ value: hoverTimestamp, color: '#334155', width: 1, zIndex: 7, dashStyle: 'ShortDot' }],
+      labels: { enabled: false },
+      tickLength: 0,
+      lineWidth: 0,
+    },
+    yAxis: {
+      min: 0,
+      allowDecimals: true,
+      title: { text: `${groupSeries?.name || 'Gruppe'} (h/Wo)` },
+    },
+    tooltip: {
+      shared: false,
+      positioner(labelWidth, labelHeight, point) {
+        const chart = this.chart;
+        let x = point.plotX + chart.plotLeft - labelWidth / 2;
+        let y = point.plotY + chart.plotTop - labelHeight - 12;
+        x = Math.max(chart.plotLeft, Math.min(x, chart.plotLeft + chart.plotWidth - labelWidth));
+        y = Math.max(chart.plotTop, y);
+        return { x, y };
+      },
+      pointFormatter() {
+        return `<b>${this.series.name}</b><br/>${Highcharts.dateFormat('%d.%m.%Y', Number(this.x || 0))}: <b>${Number(this.y || 0).toFixed(1)} h/Wo</b>`;
+      },
+    },
+    plotOptions: {
+      series: {
+        animation: false,
+        marker: { enabled: false },
+        point: { events: { mouseOver() { setHoveredTimestamp(Number(this.x)); } } },
+      },
+    },
+    series: [{
+      type: 'line',
+      name: groupSeries?.name || 'Gruppe',
+      data: timelineDateMs.map((x, idx) => [x, Number(groupSeries?.hoursData?.[idx] || 0)]),
+      color: groupSeries?.color || accent,
+      lineWidth: 2,
+    }],
+  });
+
+  return (
+    <Paper className="analysis-diagram-placeholder" withBorder p="xs" onMouseLeave={() => setHoveredTimestamp(null)}>
+      <Group align="stretch" gap="sm" wrap="nowrap" style={{ minHeight: 0, height: '100%' }}>
+        <Box style={{ flex: 1, minWidth: 0 }}>
+          <Stack gap={6} h="100%" style={{ overflowY: 'auto', minHeight: 0 }}>
+            {seriesByGroup.map((groupSeries, idx) => (
+              <Box key={`forecast-hours-${groupSeries.groupId || idx}`} style={{ minHeight: 130, height: 130, flex: '0 0 auto' }}>
+                <HighchartsReact highcharts={Highcharts} options={buildHoursOptions(groupSeries)} containerProps={{ style: { height: '100%' } }} />
+              </Box>
+            ))}
+          </Stack>
+        </Box>
+        <Box style={{ width: 280, minWidth: 280, maxWidth: 280, flex: '0 0 280px', borderLeft: '1px solid var(--mantine-color-gray-3)', paddingLeft: 12, overflowY: 'auto' }}>
+          {hoverIndex >= 0 ? (
+            <Stack gap={6}>
+              <Badge variant="outline" color="gray" size="sm">{timelineDateIsos[hoverIndex] || '-'}</Badge>
+              {seriesByGroup.map((groupSeries) => (
+                <Badge key={`hours-hover-${groupSeries.groupId}`} variant="light" size="sm" style={{ backgroundColor: `${groupSeries.color || accent}1A`, color: groupSeries.color || accent }}>
+                  {groupSeries.name}: {Number(groupSeries?.hoursData?.[hoverIndex] || 0).toFixed(1)} h/Wo
+                </Badge>
+              ))}
+              {!privacyMode ? (
+                <Box>
+                  <Text size="xs" fw={600} mb={4} c="dimmed">Kinder mit Buchungen:</Text>
+                  {seriesByGroup.map((groupSeries) => {
+                    const children = groupSeries.childrenByIndex?.[hoverIndex] || [];
+                    if (!children.length) return null;
+                    return (
+                      <Box key={`hours-child-list-${groupSeries.groupId}`} mb={4}>
+                        <Text size="xs" fw={600} style={{ color: groupSeries.color || accent }}>{groupSeries.name}:</Text>
+                        <Text size="xs" c="dimmed" style={{ lineHeight: 1.5 }}>
+                          {children.map((child, i) => (
+                            <span key={child.id}>{child.name}{i < children.length - 1 ? ', ' : ''}</span>
+                          ))}
+                        </Text>
+                      </Box>
+                    );
+                  })}
+                </Box>
+              ) : null}
+            </Stack>
+          ) : (
+            <Text size="xs" c="dimmed">Diagramm berühren, um Stunden anzuzeigen.</Text>
+          )}
+        </Box>
+      </Group>
+    </Paper>
+  );
+}
+
+function DemographyAgeChart({ demographyData, accent, selectedResolution = 'quarter', onResolutionChange = () => {} }) {
+  const snapshots = React.useMemo(() => demographyData?.snapshots || [], [demographyData]);
   const [frameIndex, setFrameIndex] = React.useState(0);
   const [isPlaying, setIsPlaying] = React.useState(false);
+  const [selectedMonth, setSelectedMonth] = React.useState(null);
+  const [selectedCategory, setSelectedCategory] = React.useState('all');
   const hasData = snapshots.length > 0;
+
+  const snapshotIndexByMonth = React.useMemo(() => {
+    const index = new Map();
+    snapshots.forEach((snapshot, idx) => {
+      const key = String(snapshot?.monthIso || '').slice(0, 7);
+      if (key) index.set(key, idx);
+    });
+    return index;
+  }, [snapshots]);
 
   React.useEffect(() => {
     setFrameIndex(0);
     setIsPlaying(false);
-  }, [demographyData]);
+    const initialMonthIso = snapshots[0]?.monthIso;
+    setSelectedMonth(initialMonthIso ? new Date(`${initialMonthIso.slice(0, 7)}-01T00:00:00.000Z`) : null);
+  }, [demographyData, snapshots]);
+
+  React.useEffect(() => {
+    if (!selectedMonth) return;
+    const monthKey = selectedMonth.toISOString().slice(0, 7);
+    const idx = snapshotIndexByMonth.get(monthKey);
+    if (Number.isInteger(idx)) {
+      setFrameIndex(idx);
+      setIsPlaying(false);
+    }
+  }, [selectedMonth, snapshotIndexByMonth]);
 
   React.useEffect(() => {
     if (!isPlaying || snapshots.length <= 1) return undefined;
@@ -1512,8 +2172,9 @@ function DemographyAgeChart({ demographyData, accent }) {
     () => {
       const categories = activeSnapshot?.cohortLabels || demographyData?.cohortLabels || [];
       const counts = activeSnapshot?.cohortCounts || categories.map(() => 0);
+      const cohortSizeMonths = Number(activeSnapshot?.cohortSizeMonths || demographyData?.cohortSizeMonths || DEMOGRAPHY_RESOLUTION_MONTHS.quarter);
 
-      const indexForMonths = (months) => Math.floor(months / AGE_COHORT_SIZE_MONTHS);
+      const indexForMonths = (months) => Math.floor(months / cohortSizeMonths);
       const krippeEndIndex = indexForMonths(35);
       // Bayerischer Einschulungskorridor: Kinder, die zwischen 1. Juli und 30. September 6 Jahre alt werden.
       const corridorStartIndex = indexForMonths(72);
@@ -1522,33 +2183,34 @@ function DemographyAgeChart({ demographyData, accent }) {
       const regelEndIndex = Math.max(regelStartIndex, corridorStartIndex - 1);
       const schoolStartIndex = corridorEndIndex + 1;
 
-      const seriesData = counts.map((value, index) => {
+      const rangeByCategory = {
+        all: { start: 0, end: categories.length - 1 },
+        krippe: { start: 0, end: krippeEndIndex },
+        regel: { start: regelStartIndex, end: regelEndIndex },
+        schule: { start: schoolStartIndex, end: categories.length - 1 },
+      };
+      const selectedRange = rangeByCategory[selectedCategory] || rangeByCategory.all;
+      const startIndex = Math.max(0, Math.min(categories.length - 1, selectedRange.start));
+      const endIndex = Math.max(startIndex, Math.min(categories.length - 1, selectedRange.end));
+
+      const visibleCategories = selectedCategory === 'all'
+        ? categories
+        : categories.slice(startIndex, endIndex + 1);
+      const visibleCounts = selectedCategory === 'all'
+        ? counts
+        : counts.slice(startIndex, endIndex + 1);
+
+      const seriesData = visibleCounts.map((value, index) => {
         let color = '#16a34a';
-        if (index <= krippeEndIndex) color = '#3b82f6';
-        if (index >= corridorStartIndex && index <= corridorEndIndex) color = '#f59e0b';
-        if (index >= schoolStartIndex) color = '#64748b';
+        const absoluteIndex = selectedCategory === 'all' ? index : startIndex + index;
+        if (absoluteIndex <= krippeEndIndex) color = '#3b82f6';
+        if (absoluteIndex >= corridorStartIndex && absoluteIndex <= corridorEndIndex) color = '#f59e0b';
+        if (absoluteIndex >= schoolStartIndex) color = '#64748b';
         return { y: Number(value || 0), color };
       });
 
-      return {
-        chart: {
-          type: 'column',
-          backgroundColor: 'transparent',
-          spacing: [8, 8, 8, 8],
-        },
-        title: { text: null },
-        credits: { enabled: false },
-        xAxis: {
-          categories,
-          title: { text: 'Alter in Jahren (3-Monats-Cohorten)' },
-          labels: {
-            style: { fontSize: '10px' },
-            formatter() {
-              if (this.pos % 4 !== 0) return '';
-              return categories[this.pos] || '';
-            },
-          },
-          plotBands: [
+      const plotBands = selectedCategory === 'all'
+        ? [
             {
               from: -0.5,
               to: krippeEndIndex + 0.5,
@@ -1575,7 +2237,28 @@ function DemographyAgeChart({ demographyData, accent }) {
               color: 'rgba(100, 116, 139, 0.12)',
               label: { text: 'Schulkinder', style: { color: '#334155', fontSize: '10px' } },
             },
-          ],
+          ]
+        : [];
+
+      return {
+        chart: {
+          type: 'column',
+          backgroundColor: 'transparent',
+          spacing: [8, 8, 8, 8],
+        },
+        title: { text: null },
+        credits: { enabled: false },
+        xAxis: {
+          categories: visibleCategories,
+          title: { text: `Alter in Jahren (${cohortSizeMonths}-Monats-Cohorten)` },
+          labels: {
+            style: { fontSize: '10px' },
+            formatter() {
+              if (this.pos % 4 !== 0) return '';
+              return visibleCategories[this.pos] || '';
+            },
+          },
+          plotBands,
         },
         yAxis: {
           min: 0,
@@ -1584,7 +2267,7 @@ function DemographyAgeChart({ demographyData, accent }) {
         },
         tooltip: {
           formatter() {
-            const cohort = categories[this.point.index] || '';
+            const cohort = visibleCategories[this.point.index] || '';
             return `<b>${cohort} Jahre</b><br/><b>${Number(this.point.y || 0)}</b> Kinder`;
           },
         },
@@ -1605,7 +2288,7 @@ function DemographyAgeChart({ demographyData, accent }) {
         ],
       };
     },
-    [accent, activeSnapshot?.cohortCounts, activeSnapshot?.cohortLabels, demographyData]
+    [accent, activeSnapshot?.cohortCounts, activeSnapshot?.cohortLabels, activeSnapshot?.cohortSizeMonths, demographyData, selectedCategory]
   );
 
   if (!hasData) {
@@ -1662,9 +2345,46 @@ function DemographyAgeChart({ demographyData, accent }) {
           </ActionIcon>
         </Group>
 
-        <Badge variant="light" size="sm">
-          {activeSnapshot?.label || '-'}
-        </Badge>
+        <Group gap={6} wrap="wrap" justify="flex-end">
+          <Select
+            value={selectedCategory}
+            onChange={(value) => setSelectedCategory(value || 'all')}
+            data={[
+              { value: 'all', label: 'Alle Altersgruppen' },
+              { value: 'krippe', label: 'Krippe' },
+              { value: 'regel', label: 'Regelgruppe' },
+              { value: 'schule', label: 'Schule' },
+            ]}
+            size="xs"
+            w={170}
+            allowDeselect={false}
+            data-testid="forecast-demography-category-filter"
+          />
+          <Select
+            value={selectedResolution}
+            onChange={(value) => onResolutionChange(value || 'quarter')}
+            data={[
+              { value: 'quarter', label: 'Quartale' },
+              { value: 'halfyear', label: 'Halbjahre' },
+              { value: 'year', label: 'Jahre' },
+            ]}
+            size="xs"
+            w={140}
+            allowDeselect={false}
+            data-testid="forecast-demography-resolution-filter"
+          />
+          <MonthPickerInput
+            value={selectedMonth}
+            onChange={setSelectedMonth}
+            valueFormat="MM/YYYY"
+            placeholder="Monat wählen"
+            size="xs"
+            w={170}
+            data-testid="forecast-demography-monthpicker"
+            minDate={snapshots[0]?.monthIso ? new Date(`${String(snapshots[0].monthIso).slice(0, 7)}-01T00:00:00.000Z`) : undefined}
+            maxDate={snapshots[snapshots.length - 1]?.monthIso ? new Date(`${String(snapshots[snapshots.length - 1].monthIso).slice(0, 7)}-01T00:00:00.000Z`) : undefined}
+          />
+        </Group>
       </Group>
 
       <Box h="calc(100% - 2rem)">
@@ -1674,12 +2394,260 @@ function DemographyAgeChart({ demographyData, accent }) {
   );
 }
 
+function TrendHistoryChart({ trendData, accent, page = 'counts' }) {
+  const options = React.useMemo(() => {
+    const defaultCategories = trendData?.categories || [];
+    const yearCategories = trendData?.trendYearCategories || [];
+    const categories = (page === 'entries' || page === 'entryAge' || page === 'corridor' || page === 'regelAge')
+      ? yearCategories
+      : defaultCategories;
+    const childrenSeries = trendData?.children || [];
+    const employeeSeries = trendData?.employees || [];
+    const bookingSeries = trendData?.bookingHours || [];
+    const workingSeries = trendData?.workingHours || [];
+    const entrySeries = trendData?.entries || [];
+    const entryAgeSeries = trendData?.entryAgeYears || [];
+    const corridorSeries = trendData?.corridorRemainPct || [];
+    const regelAgeSeries = trendData?.regelEntryAgeYears || [];
+    const groupChildrenSeries = trendData?.groupChildrenSeries || [];
+
+    const isCountsPage = page === 'counts';
+    const isHoursPage = page === 'hours';
+    const isEntriesPage = page === 'entries';
+
+    let series = [
+      { name: 'Kinder', data: childrenSeries, color: accent },
+      { name: 'Mitarbeiter', data: employeeSeries, color: '#4f46e5' },
+    ];
+    if (isHoursPage) {
+      series = [
+        { name: 'Buchungsstunden', data: bookingSeries, color: '#0f766e' },
+        { name: 'Arbeitsstunden', data: workingSeries, color: '#ea580c' },
+      ];
+    }
+    if (isEntriesPage) {
+      series = [
+        { name: 'Eintritte', data: entrySeries, color: '#0284c7' },
+      ];
+    }
+    if (page === 'entryAge') {
+      series = [
+        { name: 'Eintrittsalter', data: entryAgeSeries, color: '#b45309' },
+      ];
+    }
+    if (page === 'corridor') {
+      series = [
+        { name: 'Korridor-Verbleib', data: corridorSeries, color: '#7c3aed' },
+      ];
+    }
+    if (page === 'regelAge') {
+      series = [
+        { name: 'Ø Alter bei Wechsel in Regelgruppe', data: regelAgeSeries, color: '#0f766e' },
+      ];
+    }
+    if (page === 'groupChildren') {
+      series = groupChildrenSeries;
+    }
+
+    const yAxisTitle = page === 'groupChildren'
+      ? 'Kinderanzahl'
+      : isCountsPage
+      ? 'Anzahl'
+      : isHoursPage
+        ? 'Stunden/Woche'
+        : isEntriesPage
+          ? 'Anzahl Eintritte'
+          : page === 'corridor'
+            ? 'Anteil in %'
+            : page === 'regelAge'
+              ? 'Jahre'
+          : 'Jahre';
+
+    return {
+      chart: {
+        type: 'line',
+        backgroundColor: 'transparent',
+        spacing: [8, 8, 8, 8],
+      },
+      title: { text: null },
+      credits: { enabled: false },
+      xAxis: {
+        categories,
+      },
+      yAxis: {
+        min: 0,
+        allowDecimals: !isCountsPage && !isEntriesPage && page !== 'groupChildren',
+        title: { text: yAxisTitle },
+      },
+      tooltip: {
+        shared: true,
+      },
+      plotOptions: {
+        series: {
+          animation: false,
+          marker: {
+            enabled: false,
+          },
+        },
+      },
+      series,
+    };
+  }, [accent, page, trendData]);
+
+  const hasData = React.useMemo(() => {
+    const categories = (page === 'entries' || page === 'entryAge' || page === 'corridor' || page === 'regelAge')
+      ? (trendData?.trendYearCategories || [])
+      : (trendData?.categories || []);
+    if (!Array.isArray(categories) || categories.length === 0) return false;
+    if (page === 'groupChildren') {
+      return Array.isArray(trendData?.groupChildrenSeries) && trendData.groupChildrenSeries.length > 0;
+    }
+    return true;
+  }, [page, trendData]);
+
+  if (!hasData) {
+    return (
+      <Paper className="analysis-diagram-placeholder" withBorder p="lg">
+        <Stack gap={6} align="center" justify="center" className="analysis-diagram-placeholder-inner">
+          <Badge variant="light" size="lg" className="analysis-diagram-placeholder-badge">
+            Trend-Chart
+          </Badge>
+          <Title order={3} className="analysis-diagram-placeholder-title">
+            Keine historischen Werte
+          </Title>
+          <Text size="sm" c="dimmed" ta="center" className="analysis-diagram-placeholder-text">
+            Für den gewählten Kontext konnten keine historischen Monatswerte aggregiert werden.
+          </Text>
+        </Stack>
+      </Paper>
+    );
+  }
+
+  return (
+    <Paper className="analysis-diagram-placeholder" withBorder p="xs">
+      <HighchartsReact highcharts={Highcharts} options={options} containerProps={{ style: { height: '100%' } }} />
+    </Paper>
+  );
+}
+
+const TREND_CHART_SLIDES = [
+  { id: 'counts', title: 'Anzahl Kinder & Mitarbeiter' },
+  { id: 'groupChildren', title: 'Kinderanzahl nach Gruppen (historisch)' },
+  { id: 'hours', title: 'Buchungsstunden & Arbeitsstunden' },
+  { id: 'entries', title: 'Neu-Anmeldungen (Jahresachse)' },
+  { id: 'entryAge', title: 'Eintrittsalter (Jahresachse)' },
+  { id: 'corridor', title: 'Korridor-Verbleib (Jahresachse)' },
+  { id: 'regelAge', title: 'Ø Alter beim Wechsel in Regelgruppe' },
+];
+
+function TrendHistoryCarousel({ trendData, accent }) {
+  const [activeIndex, setActiveIndex] = React.useState(0);
+  const [emblaApi, setEmblaApi] = React.useState(null);
+  const [canGoPrev, setCanGoPrev] = React.useState(false);
+  const [canGoNext, setCanGoNext] = React.useState(true);
+
+  React.useEffect(() => {
+    if (!emblaApi) return undefined;
+
+    const updateState = () => {
+      setActiveIndex(emblaApi.selectedScrollSnap());
+      setCanGoPrev(emblaApi.canScrollPrev());
+      setCanGoNext(emblaApi.canScrollNext());
+    };
+
+    updateState();
+    emblaApi.on('select', updateState);
+    emblaApi.on('reInit', updateState);
+
+    return () => {
+      emblaApi.off('select', updateState);
+      emblaApi.off('reInit', updateState);
+    };
+  }, [emblaApi]);
+
+  return (
+    <Box className="analysis-coverage-carousel-wrap">
+      <Group className="analysis-coverage-carousel-header" justify="space-between" wrap="nowrap">
+        <Text size="xs" fw={700} className="analysis-stage-recommendation-title">
+          {TREND_CHART_SLIDES[activeIndex]?.title || 'Trend'}
+        </Text>
+        <Group gap={6} wrap="nowrap">
+          <Badge variant="filled" size="md" className="analysis-coverage-carousel-counter">
+            {activeIndex + 1}/{TREND_CHART_SLIDES.length}
+          </Badge>
+          <ActionIcon variant="filled" size="md" className="analysis-coverage-carousel-nav" onClick={() => emblaApi?.scrollPrev()} disabled={!canGoPrev}>
+            <IconChevronLeft size={14} />
+          </ActionIcon>
+          <ActionIcon variant="filled" size="md" className="analysis-coverage-carousel-nav" onClick={() => emblaApi?.scrollNext()} disabled={!canGoNext}>
+            <IconChevronRight size={14} />
+          </ActionIcon>
+        </Group>
+      </Group>
+
+      <Carousel
+        withIndicators
+        withControls={false}
+        getEmblaApi={setEmblaApi}
+        className="analysis-coverage-carousel"
+        slideSize="100%"
+        slideGap={0}
+        emblaOptions={{ loop: false, align: 'start', dragFree: false }}
+      >
+        <Carousel.Slide>
+          <Box className="analysis-coverage-carousel-slide">
+            {activeIndex === 0 ? <TrendHistoryChart trendData={trendData} accent={accent} page="counts" /> : null}
+          </Box>
+        </Carousel.Slide>
+        <Carousel.Slide>
+          <Box className="analysis-coverage-carousel-slide">
+            {activeIndex === 1 ? <TrendHistoryChart trendData={trendData} accent={accent} page="groupChildren" /> : null}
+          </Box>
+        </Carousel.Slide>
+        <Carousel.Slide>
+          <Box className="analysis-coverage-carousel-slide">
+            {activeIndex === 2 ? <TrendHistoryChart trendData={trendData} accent={accent} page="hours" /> : null}
+          </Box>
+        </Carousel.Slide>
+        <Carousel.Slide>
+          <Box className="analysis-coverage-carousel-slide">
+            {activeIndex === 3 ? <TrendHistoryChart trendData={trendData} accent={accent} page="entries" /> : null}
+          </Box>
+        </Carousel.Slide>
+        <Carousel.Slide>
+          <Box className="analysis-coverage-carousel-slide">
+            {activeIndex === 4 ? <TrendHistoryChart trendData={trendData} accent={accent} page="entryAge" /> : null}
+          </Box>
+        </Carousel.Slide>
+        <Carousel.Slide>
+          <Box className="analysis-coverage-carousel-slide">
+            {activeIndex === 5 ? <TrendHistoryChart trendData={trendData} accent={accent} page="corridor" /> : null}
+          </Box>
+        </Carousel.Slide>
+        <Carousel.Slide>
+          <Box className="analysis-coverage-carousel-slide">
+            {activeIndex === 6 ? <TrendHistoryChart trendData={trendData} accent={accent} page="regelAge" /> : null}
+          </Box>
+        </Carousel.Slide>
+      </Carousel>
+    </Box>
+  );
+}
+
 const FORECAST_CHART_SLIDES = [
+  { id: 'groups-timeline', title: 'Gruppenverlauf & Event-Timeline' },
+  { id: 'booking-hours', title: 'Buchungsstunden-Verlauf' },
   { id: 'preview', title: 'Ausblick (Sankey)' },
   { id: 'demography', title: 'Demografie-Prognose' },
 ];
 
-function ForecastStageCarousel({ previewFlow, demographyData, accent }) {
+function ForecastStageCarousel({
+  previewFlow,
+  demographyData,
+  accent,
+  privacyMode = false,
+  demographyResolution = 'quarter',
+  onDemographyResolutionChange = () => {},
+}) {
   const [activeIndex, setActiveIndex] = React.useState(0);
   const [emblaApi, setEmblaApi] = React.useState(null);
   const [canGoPrev, setCanGoPrev] = React.useState(false);
@@ -1734,12 +2702,35 @@ function ForecastStageCarousel({ previewFlow, demographyData, accent }) {
       >
         <Carousel.Slide>
           <Box className="analysis-coverage-carousel-slide">
-            {activeIndex === 0 ? <PreviewSankeyChart previewFlow={previewFlow} accent={accent} /> : null}
+            {activeIndex === 0 ? <ForecastGroupTimelineChart previewFlow={previewFlow} accent={accent} privacyMode={privacyMode} /> : null}
           </Box>
         </Carousel.Slide>
         <Carousel.Slide>
           <Box className="analysis-coverage-carousel-slide">
-            {activeIndex === 1 ? <DemographyAgeChart demographyData={demographyData} accent={accent} /> : null}
+            {activeIndex === 1 ? <ForecastHoursTimelineChart previewFlow={previewFlow} accent={accent} privacyMode={privacyMode} /> : null}
+          </Box>
+        </Carousel.Slide>
+        <Carousel.Slide>
+          <Box className="analysis-coverage-carousel-slide">
+            {activeIndex === 2 ? (
+              <PreviewSankeyChart
+                previewFlow={previewFlow}
+                accent={accent}
+                privacyMode={privacyMode}
+              />
+            ) : null}
+          </Box>
+        </Carousel.Slide>
+        <Carousel.Slide>
+          <Box className="analysis-coverage-carousel-slide">
+            {activeIndex === 3 ? (
+              <DemographyAgeChart
+                demographyData={demographyData}
+                accent={accent}
+                selectedResolution={demographyResolution}
+                onResolutionChange={onDemographyResolutionChange}
+              />
+            ) : null}
           </Box>
         </Carousel.Slide>
       </Carousel>
@@ -1867,9 +2858,18 @@ function VisuView() {
     const idx = STORY_STEPS.findIndex((step) => step.id === normalizedSubPage);
     return idx >= 0 ? idx : 0;
   });
+  const [settledStep, setSettledStep] = React.useState(() => {
+    const normalizedSubPage = ANALYSIS_SUBPAGE_ALIASES[activeAnalysisSubPage] || activeAnalysisSubPage;
+    const idx = STORY_STEPS.findIndex((step) => step.id === normalizedSubPage);
+    return idx >= 0 ? idx : 0;
+  });
+  const activeStepRef = React.useRef(activeStep);
+  const privacyMode = useSelector((state) => state.ui.privacyMode || false);
   const [emblaApi, setEmblaApi] = React.useState(null);
   const [canScrollPrev, setCanScrollPrev] = React.useState(false);
   const [canScrollNext, setCanScrollNext] = React.useState(false);
+  const [demographyResolution, setDemographyResolution] = React.useState('quarter');
+  const [simulateInflow, setSimulateInflow] = React.useState(false);
   const [monteCarloConfig, setMonteCarloConfig] = React.useState({
     runs: 1200,
     baseAbsenceProbabilityPct: 14,
@@ -1878,6 +2878,7 @@ function VisuView() {
     minExpertRatioPct: LEGAL_EXPERT_RATIO_MIN_PCT,
     maxCareRatio: 8,
     minGroupHeadcount: 1,
+    minGroupHeadcountByGroup: {},
     maxUndercoverageSlots: 4,
     maxOvertimeHoursPerEmployeePerWeek: 2,
     maxTimeReductionHoursPerWeek: 3,
@@ -1890,13 +2891,27 @@ function VisuView() {
     childCompensationRatePct: 6,
   });
   const [monteCarloRunId, setMonteCarloRunId] = React.useState(0);
+
+  // Debounce step changes by 500ms so heavy analysis only starts after user settles
+  React.useEffect(() => {
+    activeStepRef.current = activeStep;
+    const timer = setTimeout(() => setSettledStep(activeStep), 500);
+    return () => clearTimeout(timer);
+  }, [activeStep]);
   const todayIso = React.useMemo(() => new Date().toISOString().slice(0, 10), []);
   const qualityReferenceDate = React.useMemo(() => chartState?.referenceDate || todayIso, [chartState?.referenceDate, todayIso]);
-  const { getEffectiveDataItems, getEffectiveBookings, getEffectiveGroupAssignments, getEffectiveGroupDefs } = useOverlayData();
   const activeStory = STORY_STEPS[activeStep] || STORY_STEPS[0];
+  const settledStory = STORY_STEPS[settledStep] || STORY_STEPS[0];
+  const trendStatistics = useSelector((state) =>
+    selectHistoricalStatistics(state, {
+      aggregation: 'month',
+      asOfDate: qualityReferenceDate,
+    })
+  );
+  const { getEffectiveDataItems, getEffectiveBookings, getEffectiveGroupAssignments, getEffectiveGroupDefs } = useOverlayData();
   const activeLoadingStages = React.useMemo(
-    () => ANALYSIS_LOADING_STAGES_BY_STORY[activeStory.id] || [ANALYSIS_LOADING_STAGES[0]],
-    [activeStory.id]
+    () => ANALYSIS_LOADING_STAGES_BY_STORY[settledStory.id] || [ANALYSIS_LOADING_STAGES[0]],
+    [settledStory.id]
   );
   const effectiveDataItems = React.useMemo(() => getEffectiveDataItems(), [getEffectiveDataItems]);
   const groupDefs = React.useMemo(() => getEffectiveGroupDefs(), [getEffectiveGroupDefs]);
@@ -1917,7 +2932,7 @@ function VisuView() {
   const computeCoverageData = React.useCallback(() => {
     if (!selectedScenarioId) return null;
 
-    const storyId = activeStory.id;
+    const storyId = settledStory.id;
     const needsCoverage = storyId === 'status' || storyId === 'transitions';
     const needsResilience = storyId === 'transitions';
     const needsFinance = storyId === 'cohort';
@@ -2013,6 +3028,7 @@ function VisuView() {
 
       const heatValues = [];
       const groupUndercoverageMinutes = [];
+      const groupCapacitySeriesByGroup = {};
 
       groupsForHeatmap.forEach((group, groupIndex) => {
         const groupFilter = group.id === '__NO_GROUP__' ? ['__NO_GROUP__'] : [group.id];
@@ -2023,6 +3039,7 @@ function VisuView() {
 
         const groupDemandSeries = generateBookingDataSeries(referenceDate, groupDemand, categories);
         const groupCapacitySeries = generateBookingDataSeries(referenceDate, groupCapacity, categories, 'all');
+        groupCapacitySeriesByGroup[String(group.id)] = groupCapacitySeries.map((value) => Number(value || 0));
         const groupPedCapacitySeries = generateBookingDataSeries(referenceDate, groupCapacity, categories, 'pedagogical');
         const groupCareRatioSeries = generateCareRatioSeries(
           categories,
@@ -2086,6 +3103,7 @@ function VisuView() {
         totalCapacity: capacitySeries.reduce((sum, value) => sum + Number(value || 0), 0),
         heatValues,
         groupUndercoverageMinutes,
+        groupCapacitySeriesByGroup,
       };
     };
 
@@ -2113,6 +3131,9 @@ function VisuView() {
       const minExpertRatioPct = Math.max(0, Math.min(100, Number(monteCarloConfig?.minExpertRatioPct || LEGAL_EXPERT_RATIO_MIN_PCT)));
       const maxCareRatioAllowed = Math.max(1, Math.min(30, Number(monteCarloConfig?.maxCareRatio || 8)));
       const minGroupHeadcount = Math.max(0, Math.min(10, Number(monteCarloConfig?.minGroupHeadcount || 1)));
+      const minGroupHeadcountByGroup = (monteCarloConfig?.minGroupHeadcountByGroup && typeof monteCarloConfig.minGroupHeadcountByGroup === 'object')
+        ? monteCarloConfig.minGroupHeadcountByGroup
+        : {};
       const maxUndercoverageSlots = Math.max(0, Math.min(200, Number(monteCarloConfig?.maxUndercoverageSlots || 4)));
       const maxOvertimeHoursPerEmployeePerWeek = Math.max(0, Math.min(20, Number(monteCarloConfig?.maxOvertimeHoursPerEmployeePerWeek || 2)));
       const maxTimeReductionHoursPerWeek = Math.max(0, Math.min(20, Number(monteCarloConfig?.maxTimeReductionHoursPerWeek || 3)));
@@ -2127,6 +3148,8 @@ function VisuView() {
       const slotsPerDay = Math.max(1, Math.floor(categories.length / 5));
       const dayLabels = ['Mo', 'Di', 'Mi', 'Do', 'Fr'];
       const groupCount = Math.max(1, groupsForHeatmap.length);
+      const groupIdsForMonteCarlo = groupsForHeatmap.map((group) => String(group.id));
+      const baselineGroupCapacitySeries = baselineSnapshot?.groupCapacitySeriesByGroup || {};
       const expertSeriesBase = (weeklyData?.expert_ratio || []).map((value) => Number(value || 0));
       const demandSeriesBase = (weeklyData?.demand || []).map((value) => Number(value || 0));
       const pedSeriesBase = (weeklyData?.capacity_pedagogical || []).map((value) => Number(value || 0));
@@ -2221,13 +3244,35 @@ function VisuView() {
             }
 
             let totalStaff = effectivePed + adminBase;
-            const minimumStaffRequired = minGroupHeadcount * groupCount;
+            const minimumStaffRequired = groupIdsForMonteCarlo.reduce((sum, groupId) => {
+              const rawMin = Number(minGroupHeadcountByGroup[groupId]);
+              const required = Number.isFinite(rawMin) ? rawMin : minGroupHeadcount;
+              return sum + Math.max(0, required);
+            }, 0);
+            const baselineGroupCapacityAtSlot = groupIdsForMonteCarlo.reduce((sum, groupId) => {
+              const series = baselineGroupCapacitySeries[groupId] || [];
+              return sum + Number(series[slotIndex] || 0);
+            }, 0);
+            const groupCapacityScalingFactor = baselineGroupCapacityAtSlot > 0
+              ? (totalStaff / baselineGroupCapacityAtSlot)
+              : 0;
+            const hasGroupMinViolation = groupIdsForMonteCarlo.some((groupId) => {
+              const rawMin = Number(minGroupHeadcountByGroup[groupId]);
+              const groupMinRequired = Number.isFinite(rawMin) ? rawMin : minGroupHeadcount;
+              const series = baselineGroupCapacitySeries[groupId] || [];
+              const baselineGroupCapacity = Number(series[slotIndex] || 0);
+              const effectiveGroupCapacity = baselineGroupCapacityAtSlot > 0
+                ? (baselineGroupCapacity * groupCapacityScalingFactor)
+                : (totalStaff / Math.max(1, groupCount));
+              return effectiveGroupCapacity + 1e-9 < Math.max(0, groupMinRequired);
+            });
             let currentCareRatio = totalStaff > 0 ? effectiveDemand / totalStaff : Number.POSITIVE_INFINITY;
             let currentExpertRatio = expertBase;
 
             let stage = 0;
             let isCompliant = (
               totalStaff >= minimumStaffRequired
+              && !hasGroupMinViolation
               && currentCareRatio <= maxCareRatioAllowed
               && currentExpertRatio >= minExpertRatioPct
             );
@@ -2242,6 +3287,7 @@ function VisuView() {
                 currentCareRatio = totalStaff > 0 ? effectiveDemand / totalStaff : Number.POSITIVE_INFINITY;
                 isCompliant = (
                   totalStaff >= minimumStaffRequired
+                  && !hasGroupMinViolation
                   && currentCareRatio <= maxCareRatioAllowed
                   && currentExpertRatio >= minExpertRatioPct
                 );
@@ -2256,6 +3302,7 @@ function VisuView() {
               currentCareRatio = totalStaff > 0 ? effectiveDemand / totalStaff : Number.POSITIVE_INFINITY;
               isCompliant = (
                 totalStaff >= minimumStaffRequired
+                && !hasGroupMinViolation
                 && currentCareRatio <= maxCareRatioAllowed
                 && currentExpertRatio >= minExpertRatioPct
               );
@@ -2267,6 +3314,7 @@ function VisuView() {
               currentCareRatio = totalStaff > 0 ? effectiveDemand / totalStaff : Number.POSITIVE_INFINITY;
               isCompliant = (
                 totalStaff >= minimumStaffRequired
+                && !hasGroupMinViolation
                 && currentCareRatio <= maxCareRatioAllowed
                 && currentExpertRatio >= minExpertRatioPct
               );
@@ -2281,16 +3329,18 @@ function VisuView() {
               periodRiskAccumulator[weekIndex][dayIndex] += 1;
 
               const isHeadcountIssue = totalStaff < minimumStaffRequired;
+              const isGroupMinIssue = hasGroupMinViolation;
               const isCareRatioIssue = currentCareRatio > maxCareRatioAllowed;
               const isExpertIssue = currentExpertRatio < minExpertRatioPct;
               const absenceBucket = absentPed >= 3 ? '3+' : String(absentPed);
               const factorLabels = [];
               if (isHeadcountIssue) factorLabels.push('Unterbesetzung');
+              if (isGroupMinIssue) factorLabels.push('Gruppen-Minimum');
               if (isCareRatioIssue) factorLabels.push('Schlüsselgrenze');
               if (isExpertIssue) factorLabels.push('Fachkraftquote');
               if (factorLabels.length === 0) factorLabels.push('Sonstige Restriktion');
 
-              const combinationKey = `A${absenceBucket}|H${isHeadcountIssue ? 1 : 0}|C${isCareRatioIssue ? 1 : 0}|E${isExpertIssue ? 1 : 0}`;
+              const combinationKey = `A${absenceBucket}|H${isHeadcountIssue ? 1 : 0}|G${isGroupMinIssue ? 1 : 0}|C${isCareRatioIssue ? 1 : 0}|E${isExpertIssue ? 1 : 0}`;
               const combinationLabel = `Ausfälle ${absenceBucket} · ${factorLabels.join(' + ')}`;
               dayClosureCombinationKeys[dayIndex][slotInDay] = combinationKey;
               closureCombinationLabels.set(combinationKey, combinationLabel);
@@ -2563,7 +3613,6 @@ function VisuView() {
       financeTrend,
     };
   }, [
-    activeStory.id,
     bookingsByScenario,
     chartState,
     dataByScenario,
@@ -2579,6 +3628,7 @@ function VisuView() {
     selectedGroups,
     selectedQualifications,
     selectedScenarioId,
+    settledStory.id,
     weeklyChartData,
     heatmapMode,
   ]);
@@ -2914,23 +3964,140 @@ function VisuView() {
 
   const previewFlow = React.useMemo(() => {
     const referenceDate = chartState?.referenceDate || todayIso;
+    const inflowActive = Boolean(simulateInflow);
     const noGroup = 'Ohne Gruppe';
+    const syntheticGroupIds = {
+      kita: '__AUTO_STAGE_KITA__',
+      school: '__AUTO_STAGE_SCHOOL__',
+      exit: '__AUTO_STAGE_EXIT__',
+    };
     const dateLabelFormatter = new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
 
     const groupsById = new Map((groupDefs || []).map((group) => [String(group.id), group.name || 'Gruppe']));
+    const groupMetaById = new Map((groupDefs || []).map((group) => [String(group.id), {
+      name: String(group?.name || ''),
+      type: String(group?.type || ''),
+    }]));
+    groupsById.set(syntheticGroupIds.kita, 'Kita');
+    groupsById.set(syntheticGroupIds.school, 'Schule');
+    groupsById.set(syntheticGroupIds.exit, 'Aus Einrichtung');
+    groupMetaById.set(syntheticGroupIds.kita, { name: 'Kita', type: 'Regelgruppe' });
+    groupMetaById.set(syntheticGroupIds.school, { name: 'Schule', type: 'Schulkindgruppe' });
+    groupMetaById.set(syntheticGroupIds.exit, { name: 'Aus Einrichtung', type: 'Exit' });
+
+    const fillUpGroupIds = new Set(
+      (groupDefs || [])
+        .filter((group) => String(group?.type || '') === 'Schulkindgruppe' && Boolean(group?.fillUp))
+        .map((group) => String(group.id))
+    );
+
+    // Build a map of group-id -> maxSchoolGrade for school groups with fill-up
+    const maxSchoolGradeByGroup = new Map();
+    (groupDefs || []).forEach((group) => {
+      const gid = String(group.id);
+      const raw = Number(group?.maxSchoolGrade);
+      if (Number.isFinite(raw) && raw > 0 && fillUpGroupIds.has(gid)) {
+        maxSchoolGradeByGroup.set(gid, raw);
+      }
+    });
+
+    // For each school child, pre-compute a simulated exit date based on maxSchoolGrade.
+    // School entry is Sep 1 of the child's enrollment year (Bavaria rule).
+    // After `maxSchoolGrade` years of school, the child exits on Sep 1 of the following year.
+    const computeSchoolGradeExitDate = (item, schoolGroupId) => {
+      const maxGrade = maxSchoolGradeByGroup.get(String(schoolGroupId || ''));
+      if (!maxGrade) return null;
+      const dob = item?.dateofbirth;
+      if (!dob) return null;
+      // Simplified: birth -> 6th birthday -> next Sep 1 = school start year
+      const birthDate = parseIsoDateSafe(dob);
+      if (!birthDate) return null;
+      const sixthBirthYear = birthDate.getUTCFullYear() + 6;
+      const sixthBirthMonth = birthDate.getUTCMonth() + 1;
+      // Bavaria: enrolled Sep of 6th-birthday year if birthday before Oct 1
+      const schoolStartYear = sixthBirthMonth <= 9 ? sixthBirthYear : sixthBirthYear + 1;
+      // After maxGrade years, the exit is at Sep 1 (start of year after last grade)
+      const exitYear = schoolStartYear + maxGrade;
+      return `${String(exitYear).padStart(4, '0')}-09-01`;
+    };
+
+    // Override isRecordActiveOnDate for school-group children honoring maxSchoolGrade
+    const isActiveForForecast = (item, dateIso, { schoolGroupId = null } = {}) => {
+      if (!isRecordActiveOnDate(item, dateIso)) return false;
+      if (!schoolGroupId || !maxSchoolGradeByGroup.has(String(schoolGroupId))) return true;
+      const exitDate = computeSchoolGradeExitDate(item, schoolGroupId);
+      if (!exitDate) return true;
+      return String(dateIso) < exitDate;
+    };
+
+    const groupColorsById = (() => {
+      const map = {};
+      (groupDefs || []).forEach((group, idx) => {
+        map[String(group.id)] = FORECAST_GROUP_COLOR_PALETTE[idx % FORECAST_GROUP_COLOR_PALETTE.length];
+      });
+      map[String(syntheticGroupIds.kita)] = '#0ea5e9';
+      map[String(syntheticGroupIds.school)] = '#6366f1';
+      map[String(syntheticGroupIds.exit)] = '#475569';
+      map.__NO_GROUP__ = '#94a3b8';
+      return map;
+    })();
+
+    const groupIdByStage = {
+      kita: String(
+        (groupDefs || []).find((group) => {
+          const type = String(group?.type || '').toLowerCase();
+          const name = String(group?.name || '').toLowerCase();
+          return type.includes('regel') || type.includes('kita') || name.includes('regel') || name.includes('kita');
+        })?.id || syntheticGroupIds.kita
+      ),
+      school: String(
+        (groupDefs || []).find((group) => {
+          const type = String(group?.type || '').toLowerCase();
+          const name = String(group?.name || '').toLowerCase();
+          return type.includes('schul') || name.includes('schul');
+        })?.id || syntheticGroupIds.school
+      ),
+      exit: String(syntheticGroupIds.exit),
+    };
+
+    const formatGroupLabel = (groupIdRaw) => {
+      if (!groupIdRaw) return noGroup;
+      const groupId = String(groupIdRaw);
+      const baseName = groupsById.get(groupId) || noGroup;
+      if (fillUpGroupIds.has(groupId)) {
+        return `${baseName} (Auffuellen)`;
+      }
+      return baseName;
+    };
+
+    const getAgeBucketRank = (groupId) => {
+      const id = String(groupId || '');
+      const meta = groupMetaById.get(id) || { name: id, type: '' };
+      const haystack = `${String(meta.name || '')} ${String(meta.type || '')}`.toLowerCase();
+
+      // Render order top -> bottom: Schule, Regelgruppe, Krippe.
+      if (id === String(syntheticGroupIds.exit) || haystack.includes('exit') || haystack.includes('aus einrichtung')) return 4;
+      if (haystack.includes('schul') || haystack.includes('vorschul') || haystack.includes('hort')) return 3;
+      if (haystack.includes('regel') || haystack.includes('kita') || haystack.includes('kindergarten')) return 2;
+      if (haystack.includes('kripp') || haystack.includes('u3')) return 1;
+      if (id === '__NO_GROUP__') return 0;
+      return 2;
+    };
+
     const hasGroupFilter = Array.isArray(selectedGroups) && selectedGroups.length > 0;
     const selectedGroupSet = new Set((selectedGroups || []).map((value) => String(value)));
 
-    const scenarioEvents = (eventsByScenario?.[selectedScenarioId] || []).filter((event) => {
+    const allScenarioEvents = (eventsByScenario?.[selectedScenarioId] || []).filter((event) => {
       if (!event || event.enabled === false) return false;
       if (event.entityType !== 'demand') return false;
-      if (!event.effectiveDate || event.effectiveDate < referenceDate) return false;
+      const eventDateIso = String(event?.simulatedDate || event?.effectiveDate || '');
+      if (!eventDateIso || eventDateIso < referenceDate) return false;
       return event.type === 'group_assignment_start'
         || event.type === 'group_assignment_end'
         || event.type === 'auto_group_transition';
     });
 
-    const eventDates = Array.from(new Set(scenarioEvents.map((event) => String(event.effectiveDate)))).sort();
+    const getEventDateIso = (event) => String(event?.simulatedDate || event?.effectiveDate || '');
 
     const flowCounter = new Map();
     const nodesById = new Map();
@@ -2940,40 +4107,40 @@ function VisuView() {
     const ensureNode = (dateIso, groupId, groupLabel) => {
       const id = makeNodeId(dateIso, groupId);
       if (!nodesById.has(id)) {
-        const dateLabel = dateIso === referenceDate ? 'Stichtag' : dateLabelFormatter.format(parseIsoDateSafe(dateIso) || new Date(`${dateIso}T00:00:00Z`));
         nodesById.set(id, {
           id,
-          name: `${groupLabel} (${dateLabel})`,
+          name: groupLabel,
           dateIso,
           groupId: groupId || '__NO_GROUP__',
           groupLabel,
+          count: 0,
         });
       }
       return id;
     };
 
-    const addFlow = (fromNodeId, toNodeId, stepLabel, weight = 1) => {
+    const addFlow = (fromNodeId, toNodeId, stepLabel, stepDateIso, weight = 1, children = []) => {
       if (!fromNodeId || !toNodeId || weight <= 0) return;
-      const key = `${fromNodeId}__${toNodeId}`;
+      const key = `${fromNodeId}__${toNodeId}__${stepDateIso || ''}`;
       const current = flowCounter.get(key);
       if (current) {
         current.weight += weight;
+        current.children = [...(current.children || []), ...children];
       } else {
         flowCounter.set(key, {
           from: fromNodeId,
           to: toNodeId,
           weight,
           stepLabel,
+          stepDateIso,
+          children: [...children],
         });
       }
     };
 
-    const demandItems = Object.values(effectiveDataItems || {}).filter(
-      (item) => item && item.type === 'demand' && !item.archived
-    );
+    const demandItems = getActiveDemandChildrenAtDate(effectiveDataItems || {}, referenceDate);
 
     const activeNowChildren = demandItems.filter((item) => {
-      if (!isRecordActiveOnDate(item, referenceDate)) return false;
       const itemId = String(item.id);
       const assignments = getEffectiveGroupAssignments(itemId);
       const currentGroupId = resolveGroupIdAtDate(assignments, referenceDate, item.groupId || null);
@@ -2982,52 +4149,182 @@ function VisuView() {
       return selectedGroupSet.has(String(currentGroupId));
     });
 
-    const resolveGroupAtDate = (item, dateIso) => {
+    const activeNowChildIds = new Set(activeNowChildren.map((item) => String(item.id || '')));
+    const scenarioEvents = allScenarioEvents.filter((event) => activeNowChildIds.has(String(event?.entityId || '')));
+
+    // Simulated inflow: synthetic "phantom" children entering each Sept 1 in forecast window
+    // Compute avg entries directly from dataByScenario historical startdates.
+    const simulatedInflowChildren = [];
+    if (inflowActive) {
+      const scenarioItemsForInflow = selectedScenarioId ? (dataByScenario?.[selectedScenarioId] || {}) : {};
+      const entryYearCounts = new Map();
+      Object.values(scenarioItemsForInflow).forEach((item) => {
+        if (!item || item.archived || item.type !== 'demand') return;
+        if (!shouldIncludeDataItemInAnalysis(item)) return;
+        const startIso = String(item.startdate || '');
+        if (!startIso) return;
+        const yearKey = startIso.slice(0, 4);
+        entryYearCounts.set(yearKey, Number(entryYearCounts.get(yearKey) || 0) + 1);
+      });
+      const entriesTotalVals = Array.from(entryYearCounts.values());
+      const avgAnnualEntries = entriesTotalVals.length > 0
+        ? entriesTotalVals.reduce((sum, v) => sum + v, 0) / entriesTotalVals.length
+        : 0;
+      if (avgAnnualEntries > 0) {
+        const refYear = Number(String(referenceDate).slice(0, 4));
+        const maxYears = 6;
+        for (let yearOffset = 1; yearOffset <= maxYears; yearOffset += 1) {
+          const entryYear = refYear + yearOffset;
+          const entryDate = `${entryYear}-09-01`;
+          const exitDate = `${entryYear + 3}-09-01`; // assume Krippe 3 years
+          const count = Math.round(avgAnnualEntries);
+          for (let i = 0; i < count; i += 1) {
+            simulatedInflowChildren.push({
+              _synthetic: true,
+              id: `__inflow__${entryYear}__${i}`,
+              name: `Zulauf ${entryYear} #${i + 1}`,
+              startdate: entryDate,
+              enddate: exitDate,
+              type: 'demand',
+              groupId: groupIdByStage.kita || null,
+            });
+          }
+        }
+      }
+    }
+
+    const assignmentDates = activeNowChildren.flatMap((item) => {
       const assignments = getEffectiveGroupAssignments(String(item.id));
-      const groupIdRaw = resolveGroupIdAtDate(assignments, dateIso, item.groupId || null);
+      if (!Array.isArray(assignments)) return [];
+      return assignments
+        .map((assignment) => String(assignment?.start || ''))
+        .filter((dateIso) => dateIso && dateIso >= referenceDate);
+    });
+
+    const autoTransitionsByItem = new Map();
+    scenarioEvents
+      .filter((event) => event?.type === 'auto_group_transition' && event?.metadata?.targetStage)
+      .forEach((event) => {
+        const itemId = String(event.entityId || '');
+        if (!itemId) return;
+        const next = autoTransitionsByItem.get(itemId) || [];
+        next.push(event);
+        autoTransitionsByItem.set(itemId, next);
+      });
+    autoTransitionsByItem.forEach((events, itemId) => {
+      autoTransitionsByItem.set(
+        itemId,
+        [...events].sort((left, right) => {
+          const dateDiff = getEventDateIso(left).localeCompare(getEventDateIso(right));
+          if (dateDiff !== 0) return dateDiff;
+          return String(left.id || '').localeCompare(String(right.id || ''));
+        })
+      );
+    });
+
+    const eventDates = Array.from(
+      new Set([
+        ...scenarioEvents.map((event) => getEventDateIso(event)).filter((dateIso) => Boolean(dateIso)),
+        ...assignmentDates,
+      ])
+    ).sort();
+
+    const resolveGroupAtDate = (item, dateIso, { includeExit = true } = {}) => {
+      if (!isRecordActiveOnDate(item, dateIso)) {
+        if (includeExit) {
+          return {
+            groupId: String(syntheticGroupIds.exit),
+            groupLabel: formatGroupLabel(syntheticGroupIds.exit),
+          };
+        }
+        return {
+          groupId: '__NO_GROUP__',
+          groupLabel: noGroup,
+        };
+      }
+
+      const itemId = String(item.id || '');
+      const assignments = getEffectiveGroupAssignments(itemId);
+      const baseGroupIdRaw = resolveGroupIdAtDate(assignments, dateIso, item.groupId || null);
+
+      const transitions = autoTransitionsByItem.get(itemId) || [];
+      const applicable = transitions.filter((event) => getEventDateIso(event) <= String(dateIso));
+      const lastTransition = applicable.length ? applicable[applicable.length - 1] : null;
+      const targetStage = String(lastTransition?.metadata?.targetStage || '').toLowerCase();
+      const projectedGroupId = Object.prototype.hasOwnProperty.call(groupIdByStage, targetStage)
+        ? groupIdByStage[targetStage]
+        : null;
+
+      const groupIdRaw = projectedGroupId || baseGroupIdRaw;
       const groupId = groupIdRaw ? String(groupIdRaw) : '__NO_GROUP__';
-      const groupLabel = groupIdRaw ? (groupsById.get(groupId) || noGroup) : noGroup;
+
+      // Apply maxSchoolGrade exit: if this child should have left already, mark as exit
+      if (includeExit && !isActiveForForecast(item, dateIso, { schoolGroupId: groupId })) {
+        return {
+          groupId: String(syntheticGroupIds.exit),
+          groupLabel: formatGroupLabel(syntheticGroupIds.exit),
+        };
+      }
+
+      const groupLabel = groupIdRaw ? formatGroupLabel(groupId) : noGroup;
       return { groupId, groupLabel };
     };
 
-    const stepSummaries = [];
-    let previousDate = referenceDate;
+    const timelineTailDates = activeNowChildren.flatMap((item) => {
+      const dates = [];
+      const enddateRaw = String(item?.enddate || '');
+      if (enddateRaw && enddateRaw >= referenceDate) dates.push(enddateRaw);
+      // Add grade-exit dates for school children
+      if (maxSchoolGradeByGroup.size > 0) {
+        [groupIdByStage.school, ...(groupDefs || []).filter((g) => maxSchoolGradeByGroup.has(String(g.id))).map((g) => String(g.id))].forEach((gid) => {
+          const exitDate = computeSchoolGradeExitDate(item, gid);
+          if (exitDate && exitDate >= referenceDate) dates.push(exitDate);
+        });
+      }
+      return dates;
+    });
 
-    eventDates.forEach((eventDate) => {
+    const timelineDates = Array.from(new Set([referenceDate, ...eventDates, ...timelineTailDates])).sort();
+
+    const stepSummaries = [];
+    let previousDate = timelineDates[0] || referenceDate;
+
+    timelineDates.slice(1).forEach((eventDate) => {
       const stepLabel = dateLabelFormatter.format(parseIsoDateSafe(eventDate) || new Date(`${eventDate}T00:00:00Z`));
       let changedInStep = 0;
       let linkedInStep = 0;
       const stepFlowCounter = new Map();
 
-      const addStepFlow = (fromNodeId, toNodeId, weight = 1) => {
+      const addStepFlow = (fromNodeId, toNodeId, child, weight = 1) => {
         if (!fromNodeId || !toNodeId || weight <= 0) return;
         const key = `${fromNodeId}__${toNodeId}`;
         const current = stepFlowCounter.get(key);
         if (current) {
           current.weight += weight;
+          current.children.push(child);
         } else {
-          stepFlowCounter.set(key, { from: fromNodeId, to: toNodeId, weight });
+          stepFlowCounter.set(key, { from: fromNodeId, to: toNodeId, weight, children: [child] });
         }
       };
 
       activeNowChildren.forEach((item) => {
-        if (!isRecordActiveOnDate(item, previousDate) || !isRecordActiveOnDate(item, eventDate)) return;
+        if (!isRecordActiveOnDate(item, previousDate)) return;
 
-        const fromState = resolveGroupAtDate(item, previousDate);
+        const fromState = resolveGroupAtDate(item, previousDate, { includeExit: false });
         const toState = resolveGroupAtDate(item, eventDate);
         const fromNodeId = ensureNode(previousDate, fromState.groupId, fromState.groupLabel);
         const toNodeId = ensureNode(eventDate, toState.groupId, toState.groupLabel);
 
-        addStepFlow(fromNodeId, toNodeId, 1);
+        addStepFlow(fromNodeId, toNodeId, { id: String(item.id || ''), name: String(item.name || 'Kind') }, 1);
         linkedInStep += 1;
         if (fromState.groupId !== toState.groupId) {
           changedInStep += 1;
         }
       });
 
-      if (linkedInStep > 0 && changedInStep > 0) {
+      if (linkedInStep > 0) {
         stepFlowCounter.forEach((entry) => {
-          addFlow(entry.from, entry.to, stepLabel, Number(entry.weight || 0));
+          addFlow(entry.from, entry.to, stepLabel, eventDate, Number(entry.weight || 0), entry.children || []);
         });
         stepSummaries.push({
           dateIso: eventDate,
@@ -3045,10 +4342,131 @@ function VisuView() {
         to: entry.to,
         weight: Number(entry.weight || 0),
         stepLabel: entry.stepLabel,
+        stepDateIso: entry.stepDateIso,
+        children: Array.from(
+          new Map((entry.children || []).map((child) => [String(child.id || ''), child])).values()
+        ),
       }))
       .filter((entry) => entry.weight > 0);
 
-    const nodes = Array.from(nodesById.values()).map((node) => ({ id: node.id, name: node.name }));
+    const nodeCountById = new Map();
+    timelineDates.forEach((dateIso) => {
+      activeNowChildren.forEach((item) => {
+        const state = resolveGroupAtDate(item, dateIso);
+        const nodeId = ensureNode(dateIso, state.groupId, state.groupLabel);
+        nodeCountById.set(nodeId, Number(nodeCountById.get(nodeId) || 0) + 1);
+      });
+    });
+
+    const nodes = Array.from(nodesById.values()).map((node) => ({
+      id: node.id,
+      name: `${node.name}: ${Number(nodeCountById.get(node.id) || 0)} Kinder`,
+      groupId: node.groupId,
+      dateIso: node.dateIso,
+      rank: getAgeBucketRank(node.groupId),
+      stageLabel: node.dateIso === referenceDate
+        ? 'Stichtag'
+        : dateLabelFormatter.format(parseIsoDateSafe(node.dateIso) || new Date(`${node.dateIso}T00:00:00Z`)),
+    }));
+    const timelineLabels = timelineDates.map((dateIso) => dateLabelFormatter.format(parseIsoDateSafe(dateIso) || new Date(`${dateIso}T00:00:00Z`)));
+    const groupTimelineCounter = new Map();
+
+    timelineDates.forEach((dateIso, dateIndex) => {
+      const allForecastChildren = inflowActive
+        ? [...activeNowChildren, ...simulatedInflowChildren]
+        : activeNowChildren;
+
+      allForecastChildren.forEach((item) => {
+        if (!isRecordActiveOnDate(item, dateIso)) return;
+        const isSynthetic = Boolean(item._synthetic);
+        const state = isSynthetic
+          ? { groupId: String(item.groupId || groupIdByStage.kita || '__NO_GROUP__'), groupLabel: groupsById.get(String(item.groupId || '')) || 'Krippe (Zulauf)' }
+          : resolveGroupAtDate(item, dateIso);
+        const groupId = String(state.groupId || '__NO_GROUP__');
+        if (!groupTimelineCounter.has(groupId)) {
+          groupTimelineCounter.set(groupId, {
+            groupId,
+            name: state.groupLabel,
+            color: groupColorsById[groupId] || '#64748b',
+            data: timelineDates.map(() => 0),
+            hoursData: timelineDates.map(() => 0),
+            childrenByIndex: timelineDates.map(() => []),
+          });
+        }
+        const groupSeries = groupTimelineCounter.get(groupId);
+        groupSeries.data[dateIndex] = Number(groupSeries.data[dateIndex] || 0) + 1;
+
+        if (!isSynthetic) {
+          // Accumulate weekly booking hours for this child at this date
+          const itemId = String(item.id || '');
+          const bookingsForItem = Object.values(getEffectiveBookings(itemId) || {});
+          const activeBookings = bookingsForItem.filter((b) => isRecordActiveOnDate(b, dateIso));
+          const childWeeklyHours = activeBookings.reduce((sum, booking) => {
+            let totalMins = 0;
+            (booking.times || []).forEach((day) => {
+              (day.segments || []).forEach((seg) => {
+                if (!seg.booking_start || !seg.booking_end) return;
+                const [sh, sm] = String(seg.booking_start).split(':').map(Number);
+                const [eh, em] = String(seg.booking_end).split(':').map(Number);
+                const mins = ((eh * 60 + em) - (sh * 60 + sm));
+                if (mins > 0) totalMins += mins;
+              });
+            });
+            return sum + (totalMins / 60);
+          }, 0);
+          groupSeries.hoursData[dateIndex] = Number(groupSeries.hoursData[dateIndex] || 0) + childWeeklyHours;
+          groupSeries.childrenByIndex[dateIndex].push({
+            id: itemId,
+            name: String(item.name || 'Kind'),
+          });
+        }
+      });
+    });
+
+    const seriesByGroup = Array.from(groupTimelineCounter.values())
+      .sort((left, right) => {
+        const leftRank = getAgeBucketRank(left.groupId);
+        const rightRank = getAgeBucketRank(right.groupId);
+        if (leftRank !== rightRank) return rightRank - leftRank;
+
+        const leftMax = Math.max(...left.data, 0);
+        const rightMax = Math.max(...right.data, 0);
+        if (leftMax !== rightMax) return rightMax - leftMax;
+        return String(left.name).localeCompare(String(right.name), 'de', { sensitivity: 'base' });
+      });
+
+    const eventByDate = scenarioEvents.reduce((accumulator, event) => {
+      const key = getEventDateIso(event);
+      if (!key) return accumulator;
+      if (!accumulator[key]) {
+        accumulator[key] = { total: 0, auto: 0, eventList: [] };
+      }
+      accumulator[key].total += 1;
+      if (event?.type === 'auto_group_transition') {
+        accumulator[key].auto += 1;
+      }
+      accumulator[key].eventList.push({
+        id: String(event?.id || ''),
+        type: String(event?.type || ''),
+        entityName: String(event?.entityName || ''),
+        description: String(event?.description || ''),
+        targetStage: String(event?.metadata?.targetStage || ''),
+      });
+      return accumulator;
+    }, {});
+
+    const timelinePoints = Object.entries(eventByDate)
+      .sort(([leftDate], [rightDate]) => String(leftDate).localeCompare(String(rightDate)))
+      .map(([dateIso, counts]) => ({
+        x: new Date(`${dateIso}T00:00:00Z`).getTime(),
+        name: `${Number(counts.total || 0)} Events`,
+        label: `${dateLabelFormatter.format(parseIsoDateSafe(dateIso) || new Date(`${dateIso}T00:00:00Z`))} · ${Number(counts.total || 0)}`,
+        description: `${Number(counts.auto || 0)} Auto-Events`,
+        count: Number(counts.total || 0),
+        autoCount: Number(counts.auto || 0),
+        dateLabel: dateLabelFormatter.format(parseIsoDateSafe(dateIso) || new Date(`${dateIso}T00:00:00Z`)),
+        eventList: counts.eventList || [],
+      }));
 
     const changedLinks = links.filter((entry) => {
       const fromNode = nodesById.get(entry.from);
@@ -3080,6 +4498,15 @@ function VisuView() {
       eventDates: stepSummaries,
       nodes,
       links,
+      groupColorsById,
+      groupTimeline: {
+        dates: timelineDates,
+        labels: timelineLabels,
+        seriesByGroup,
+        timelinePoints,
+        rangeStartIso: timelineDates[0] || referenceDate,
+        rangeEndIso: timelineDates[timelineDates.length - 1] || referenceDate,
+      },
       kpis: {
         activeNowCount: activeNowChildren.length,
         eventStepsCount: stepSummaries.length,
@@ -3090,28 +4517,32 @@ function VisuView() {
     };
   }, [
     chartState?.referenceDate,
+    dataByScenario,
     effectiveDataItems,
     eventsByScenario,
+    getEffectiveBookings,
     getEffectiveGroupAssignments,
     groupDefs,
     selectedGroups,
     selectedScenarioId,
+    simulateInflow,
     todayIso,
   ]);
 
   const demographyData = React.useMemo(() => {
     const referenceDate = chartState?.referenceDate || todayIso;
+    const cohortSizeMonths = Number(DEMOGRAPHY_RESOLUTION_MONTHS[demographyResolution] || DEMOGRAPHY_RESOLUTION_MONTHS.quarter);
     const formatter = new Intl.DateTimeFormat('de-DE', { month: 'short', year: '2-digit' });
     const cohortStarts = Array.from(
-      { length: Math.floor(AGE_HISTOGRAM_MAX_MONTHS / AGE_COHORT_SIZE_MONTHS) + 1 },
-      (_, idx) => idx * AGE_COHORT_SIZE_MONTHS
+      { length: Math.floor(AGE_HISTOGRAM_MAX_MONTHS / cohortSizeMonths) + 1 },
+      (_, idx) => idx * cohortSizeMonths
     );
     const cohortLabels = cohortStarts.map((start) => {
       const fromYears = (start / 12).toLocaleString('de-DE', {
         minimumFractionDigits: 1,
         maximumFractionDigits: 2,
       });
-      const toYears = ((start + AGE_COHORT_SIZE_MONTHS) / 12).toLocaleString('de-DE', {
+      const toYears = ((start + cohortSizeMonths) / 12).toLocaleString('de-DE', {
         minimumFractionDigits: 1,
         maximumFractionDigits: 2,
       });
@@ -3196,8 +4627,7 @@ function VisuView() {
       monthDate.setUTCMonth(monthDate.getUTCMonth() + idx);
       const monthIso = monthDate.toISOString().slice(0, 10);
 
-      const ageValues = Object.values(effectiveDataItems || {})
-        .filter((item) => item && item.type === 'demand' && !item.archived && isRecordActiveOnDate(item, monthIso))
+      const ageValues = getActiveDemandChildrenAtDate(effectiveDataItems || {}, monthIso)
         .filter((item) => isGroupSelected(item, monthIso))
         .map((item) => getAgeInMonthsAtDate(item.dateofbirth, monthIso))
         .filter((age) => Number.isFinite(age));
@@ -3205,7 +4635,7 @@ function VisuView() {
       const cohortCounts = cohortStarts.map(() => 0);
       ageValues.forEach((ageMonths) => {
         const boundedAge = Math.max(0, Math.min(AGE_HISTOGRAM_MAX_MONTHS, Number(ageMonths || 0)));
-        const cohortIndex = Math.min(cohortCounts.length - 1, Math.floor(boundedAge / AGE_COHORT_SIZE_MONTHS));
+        const cohortIndex = Math.min(cohortCounts.length - 1, Math.floor(boundedAge / cohortSizeMonths));
         cohortCounts[cohortIndex] += 1;
       });
 
@@ -3218,6 +4648,7 @@ function VisuView() {
       return {
         label: formatter.format(monthDate),
         monthIso,
+        cohortSizeMonths,
         cohortLabels,
         cohortCounts,
         total,
@@ -3233,9 +4664,7 @@ function VisuView() {
     horizonDate.setUTCMonth(horizonDate.getUTCMonth() + 12);
     const horizonIso = horizonDate.toISOString().slice(0, 10);
 
-    const schoolStarters12M = Object.values(effectiveDataItems || {})
-      .filter((item) => item && item.type === 'demand' && !item.archived)
-      .filter((item) => isRecordActiveOnDate(item, referenceDate))
+    const schoolStarters12M = getActiveDemandChildrenAtDate(effectiveDataItems || {}, referenceDate)
       .filter((item) => isGroupSelected(item, referenceDate))
       .reduce((sum, item) => {
         const ageNow = getAgeInMonthsAtDate(item.dateofbirth, referenceDate);
@@ -3247,6 +4676,7 @@ function VisuView() {
 
     return {
       cohortLabels,
+      cohortSizeMonths,
       snapshots,
       kpis: {
         medianAgeYears: (currentSnapshot?.medianAgeMonths || 0) / 12,
@@ -3264,8 +4694,226 @@ function VisuView() {
     groupDefs,
     selectedGroups,
     selectedScenarioId,
+    demographyResolution,
     todayIso,
   ]);
+
+  const trendHistoryData = React.useMemo(() => {
+    const bucketsAll = Array.isArray(trendStatistics?.buckets) ? trendStatistics.buckets : [];
+    const reference = parseIsoDateSafe(qualityReferenceDate);
+    const cutoffDate = reference ? new Date(reference.getTime()) : null;
+    if (cutoffDate) cutoffDate.setUTCFullYear(cutoffDate.getUTCFullYear() - 10);
+    const cutoffIso = cutoffDate ? cutoffDate.toISOString().slice(0, 10) : null;
+    const buckets = cutoffIso
+      ? bucketsAll.filter((bucket) => String(bucket.evaluationDate || bucket.end || '') >= cutoffIso)
+      : bucketsAll;
+    const scenarioItems = selectedScenarioId ? (dataByScenario?.[selectedScenarioId] || {}) : {};
+    const trendYearCategories = (
+      Number.isInteger(cutoffDate?.getUTCFullYear()) && Number.isInteger(reference?.getUTCFullYear())
+        ? Array.from({ length: reference.getUTCFullYear() - cutoffDate.getUTCFullYear() + 1 }, (_, idx) => String(cutoffDate.getUTCFullYear() + idx))
+        : []
+    );
+
+    const categories = buckets.map((bucket) => String(bucket.label || ''));
+    const children = buckets.map((bucket) => Number(bucket.childrenCount || 0));
+    const bookingHours = buckets.map((bucket) => Number(bucket.bookingHours || 0));
+    const workingHours = buckets.map((bucket) => Number(bucket.careHours || 0));
+    const groupNamesById = new Map((groupDefs || []).map((group) => [String(group.id), String(group.name || 'Gruppe')]));
+    const childrenByGroupSeries = new Map();
+
+    buckets.forEach((bucket, bucketIndex) => {
+      const evalDate = String(bucket.evaluationDate || bucket.end || '');
+      if (!evalDate) return;
+
+      Object.values(scenarioItems).forEach((item) => {
+        if (!item || item.archived || item.type !== 'demand') return;
+        if (!shouldIncludeDataItemInAnalysis(item)) return;
+        if (!isRecordActiveOnDate(item, evalDate)) return;
+
+        const itemId = String(item.id || '');
+        const groupIdRaw = resolveGroupIdAtDate(getEffectiveGroupAssignments(itemId), evalDate, item.groupId || null);
+        const groupId = groupIdRaw ? String(groupIdRaw) : '__NO_GROUP__';
+        const groupName = groupIdRaw ? (groupNamesById.get(groupId) || 'Gruppe') : 'Ohne Gruppe';
+
+        if (!childrenByGroupSeries.has(groupId)) {
+          childrenByGroupSeries.set(groupId, {
+            name: groupName,
+            data: buckets.map(() => 0),
+          });
+        }
+        const series = childrenByGroupSeries.get(groupId);
+        series.data[bucketIndex] = Number(series.data[bucketIndex] || 0) + 1;
+      });
+    });
+
+    const groupChildrenSeries = Array.from(childrenByGroupSeries.values())
+      .map((series, idx) => {
+        const palette = ['#0ea5e9', '#14b8a6', '#22c55e', '#f97316', '#eab308', '#a855f7', '#ef4444', '#64748b'];
+        return {
+          type: 'line',
+          name: series.name,
+          data: series.data,
+          color: palette[idx % palette.length],
+        };
+      })
+      .sort((left, right) => String(left.name).localeCompare(String(right.name), 'de', { sensitivity: 'base' }));
+
+    const entryYearStart = cutoffDate ? cutoffDate.getUTCFullYear() : null;
+    const entryYearEnd = reference ? reference.getUTCFullYear() : null;
+    const entryYearCategories = (
+      Number.isInteger(entryYearStart) && Number.isInteger(entryYearEnd) && entryYearStart <= entryYearEnd
+    )
+      ? Array.from({ length: entryYearEnd - entryYearStart + 1 }, (_, idx) => String(entryYearStart + idx))
+      : [];
+
+    const entriesByYear = new Map(entryYearCategories.map((year) => [year, 0]));
+    const entryAgeSumByYear = new Map(entryYearCategories.map((year) => [year, 0]));
+    const entryAgeCountByYear = new Map(entryYearCategories.map((year) => [year, 0]));
+
+    Object.values(scenarioItems).forEach((item) => {
+      if (!item || item.archived || item.type !== 'demand') return;
+      if (!shouldIncludeDataItemInAnalysis(item)) return;
+
+      const startIso = String(item.startdate || '');
+      if (!startIso) return;
+      if (cutoffIso && startIso < cutoffIso) return;
+      if (String(startIso) > String(qualityReferenceDate)) return;
+
+      const yearKey = String(startIso).slice(0, 4);
+      if (!entriesByYear.has(yearKey)) return;
+
+      entriesByYear.set(yearKey, Number(entriesByYear.get(yearKey) || 0) + 1);
+
+      const dob = parseIsoDateSafe(item.dateofbirth);
+      const startDate = parseIsoDateSafe(startIso);
+      if (!dob || !startDate) return;
+
+      let years = startDate.getUTCFullYear() - dob.getUTCFullYear();
+      const monthDelta = startDate.getUTCMonth() - dob.getUTCMonth();
+      if (monthDelta < 0 || (monthDelta === 0 && startDate.getUTCDate() < dob.getUTCDate())) {
+        years -= 1;
+      }
+
+      const beforeBirthday = (
+        startDate.getUTCMonth() < dob.getUTCMonth()
+        || (startDate.getUTCMonth() === dob.getUTCMonth() && startDate.getUTCDate() < dob.getUTCDate())
+      );
+      const birthdayThisYear = new Date(Date.UTC(
+        startDate.getUTCFullYear(),
+        dob.getUTCMonth(),
+        dob.getUTCDate()
+      ));
+      const lastBirthday = beforeBirthday
+        ? new Date(Date.UTC(startDate.getUTCFullYear() - 1, dob.getUTCMonth(), dob.getUTCDate()))
+        : birthdayThisYear;
+      const dayMs = 24 * 60 * 60 * 1000;
+      const daysSinceBirthday = Math.max(0, Math.round((startDate.getTime() - lastBirthday.getTime()) / dayMs));
+      const ageYears = years + (daysSinceBirthday / 365.25);
+      if (!Number.isFinite(ageYears) || ageYears < 0) return;
+
+      entryAgeSumByYear.set(yearKey, Number(entryAgeSumByYear.get(yearKey) || 0) + ageYears);
+      entryAgeCountByYear.set(yearKey, Number(entryAgeCountByYear.get(yearKey) || 0) + 1);
+    });
+
+    const entries = entryYearCategories.map((year) => Number(entriesByYear.get(year) || 0));
+    const entryAgeYears = entryYearCategories.map((year) => {
+      const count = Number(entryAgeCountByYear.get(year) || 0);
+      if (count <= 0) return null;
+      const sum = Number(entryAgeSumByYear.get(year) || 0);
+      return Number((sum / count).toFixed(2));
+    });
+
+    const employees = buckets.map((bucket) => {
+      const evalDate = String(bucket.evaluationDate || bucket.end || '');
+      if (!evalDate) return 0;
+
+      return Object.values(scenarioItems).reduce((sum, item) => {
+        if (!item || item.archived || item.type !== 'capacity') return sum;
+        if (!shouldIncludeDataItemInAnalysis(item)) return sum;
+        if (!isRecordActiveOnDate(item, evalDate)) return sum;
+        return sum + 1;
+      }, 0);
+    });
+
+    const latestIndex = categories.length - 1;
+    const firstIndex = 0;
+    const avgChildren = children.length > 0 ? (children.reduce((sum, value) => sum + Number(value || 0), 0) / children.length) : 0;
+    const avgEmployees = employees.length > 0 ? (employees.reduce((sum, value) => sum + Number(value || 0), 0) / employees.length) : 0;
+    const avgEntries = entries.length > 0 ? (entries.reduce((sum, value) => sum + Number(value || 0), 0) / entries.length) : 0;
+    const entryAgeValid = entryAgeYears.filter((value) => Number.isFinite(value));
+    const avgEntryAgeYears = entryAgeValid.length > 0
+      ? (entryAgeValid.reduce((sum, value) => sum + Number(value || 0), 0) / entryAgeValid.length)
+      : 0;
+
+    const annualTransitionState = {
+      simScenario: { selectedScenarioId },
+      simData: { dataByScenario },
+      simBooking: { bookingsByScenario },
+      simGroup: { groupsByScenario, groupDefsByScenario },
+    };
+
+    const annualTransitionStats = trendYearCategories.map((year) => {
+      const asOfDate = `${year}-12-31`;
+      return selectGroupTransitionStatistics(annualTransitionState, {
+        asOfDate,
+        windowDays: 90,
+      });
+    });
+
+    const corridorRemainPct = annualTransitionStats.map((result) => Number(((result?.corridor?.remainProbability || 0) * 100).toFixed(1)));
+    const regelEntryAgeYears = annualTransitionStats.map((result, index) => {
+      const year = trendYearCategories[index];
+      const yearTransitions = Array.isArray(result?.transitions)
+        ? result.transitions.filter((transition) => transition.toGroupId === 'regelgruppe' && String(transition.date || '').startsWith(`${year}-`))
+        : [];
+      const ages = yearTransitions
+        .map((transition) => Number(transition.ageMonths))
+        .filter((value) => Number.isFinite(value));
+      if (ages.length === 0) return null;
+      return Number((ages.reduce((sum, value) => sum + value, 0) / ages.length / 12).toFixed(2));
+    });
+
+    const avgChildrenByGroup = groupChildrenSeries
+      .map((series) => {
+        const seriesAvg = series.data.length > 0
+          ? (series.data.reduce((sum, value) => sum + Number(value || 0), 0) / series.data.length)
+          : 0;
+        return { name: series.name, average: seriesAvg };
+      })
+      .sort((left, right) => right.average - left.average);
+
+    const avgChildrenByGroupSubtitle = avgChildrenByGroup.length > 0
+      ? avgChildrenByGroup.map((entry) => `${entry.name}: ${entry.average.toFixed(1)}`).join(' · ')
+      : 'Keine Gruppendaten verfügbar.';
+
+    return {
+      categories,
+      entryYearCategories,
+      children,
+      employees,
+      bookingHours,
+      workingHours,
+      entries,
+      entryAgeYears,
+      trendYearCategories,
+      corridorRemainPct,
+      regelEntryAgeYears,
+      groupChildrenSeries,
+      kpis: {
+        latestChildren: latestIndex >= 0 ? Number(children[latestIndex] || 0) : 0,
+        latestEmployees: latestIndex >= 0 ? Number(employees[latestIndex] || 0) : 0,
+        latestBookingHours: latestIndex >= 0 ? Number(bookingHours[latestIndex] || 0) : 0,
+        latestWorkingHours: latestIndex >= 0 ? Number(workingHours[latestIndex] || 0) : 0,
+        avgEntries,
+        avgEntryAgeYears,
+        avgChildren,
+        avgEmployees,
+        avgChildrenByGroupSubtitle,
+        childrenDelta: latestIndex > firstIndex ? Number(children[latestIndex] || 0) - Number(children[firstIndex] || 0) : 0,
+        bookingDelta: latestIndex > firstIndex ? Number(bookingHours[latestIndex] || 0) - Number(bookingHours[firstIndex] || 0) : 0,
+      },
+    };
+  }, [bookingsByScenario, dataByScenario, getEffectiveGroupAssignments, groupDefs, groupDefsByScenario, groupsByScenario, qualityReferenceDate, selectedScenarioId, trendStatistics]);
 
   const stageRecommendations =
     activeStory.id === 'quality'
@@ -3438,6 +5086,37 @@ function VisuView() {
               tone: 'warn',
             },
           ]
+      : activeStory.id === 'trends'
+        ? [
+            {
+              key: 'kpi-trend-inflow',
+              title: 'Durchschnittlicher Zulauf',
+              value: `${(trendHistoryData?.kpis?.avgEntries || 0).toFixed(1)}`,
+              text: 'Ø Neu-Anmeldungen pro Jahr über 10 Jahre.',
+              tone: 'good',
+            },
+            {
+              key: 'kpi-trend-entry-age',
+              title: 'Durchschnittliches Eintrittsalter',
+              value: `${(trendHistoryData?.kpis?.avgEntryAgeYears || 0).toFixed(2)} Jahre`,
+              text: 'Gemittelt über die jährlichen Eintrittsalter.',
+              tone: 'good',
+            },
+            {
+              key: 'kpi-trend-children-average',
+              title: 'Durchschnittliche Kinderanzahl',
+              value: `${(trendHistoryData?.kpis?.avgChildren || 0).toFixed(1)}`,
+              text: trendHistoryData?.kpis?.avgChildrenByGroupSubtitle || 'Keine Gruppendaten verfügbar.',
+              tone: 'good',
+            },
+            {
+              key: 'kpi-trend-employees-average',
+              title: 'Durchschnittliche MitarbeiterZahl',
+              value: `${(trendHistoryData?.kpis?.avgEmployees || 0).toFixed(1)}`,
+              text: 'Ø aktive Kapazität über die historischen Buckets.',
+              tone: 'good',
+            },
+          ]
       : STAGE_RECOMMENDATIONS_BY_STORY[activeStory.id] || STAGE_RECOMMENDATIONS_BY_STORY.quality;
 
   const qualityDonutData = React.useMemo(
@@ -3491,6 +5170,12 @@ function VisuView() {
       emblaApi.off('select', updateScrollState);
       emblaApi.off('reInit', updateScrollState);
     };
+  }, [emblaApi]);
+
+  // Fix: when emblaApi first initializes scroll to current active step (sidebar nav sync)
+  React.useEffect(() => {
+    if (!emblaApi) return;
+    emblaApi.scrollTo(activeStepRef.current);
   }, [emblaApi]);
 
   const handleStepChange = React.useCallback((index) => {
@@ -3635,7 +5320,11 @@ function VisuView() {
         </Group>
 
         <Box className="analysis-stage-content" data-testid="analysis-stage-content">
-          {activeStory.id === 'quality' ? (
+          {settledStep !== activeStep ? (
+            <Box className="analysis-diagram-placeholder" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Text size="sm" c="dimmed">Wird berechnet…</Text>
+            </Box>
+          ) : activeStory.id === 'quality' ? (
             <QualityStageCarousel
               qualityDonutData={qualityDonutData}
               qualityStaffScheduleData={qualityStaffScheduleData}
@@ -3664,13 +5353,29 @@ function VisuView() {
               previewFlow={previewFlow}
               demographyData={demographyData}
               accent={activeStory.accent}
+              privacyMode={privacyMode}
+              demographyResolution={demographyResolution}
+              onDemographyResolutionChange={setDemographyResolution}
             />
+          ) : activeStory.id === 'trends' ? (
+            <TrendHistoryCarousel trendData={trendHistoryData} accent={activeStory.accent} />
           ) : (
             <DiagramPlaceholder story={activeStory} />
           )}
         </Box>
 
         <Box className="analysis-stage-filterbar" data-testid="analysis-stage-filterbar">
+          {activeStory.id === 'compare' ? (
+            <Group gap="sm" mb={4} wrap="nowrap" align="center" style={{ paddingLeft: 8 }}>
+              <Switch
+                size="sm"
+                label="Zulauf simulieren"
+                checked={simulateInflow}
+                onChange={(e) => setSimulateInflow(e.currentTarget.checked)}
+                title="Simuliert neue Kinder basierend auf historischen Eintrittsdaten"
+              />
+            </Group>
+          ) : null}
           <ChartFilterForm
             showStichtag
             scenarioId={selectedScenarioId}

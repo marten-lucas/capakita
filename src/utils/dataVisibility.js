@@ -20,6 +20,15 @@ export function shouldIncludeDataItemInAnalysis(item) {
   return hasAllowedChildStatus(item);
 }
 
+export function getActiveDemandChildrenAtDate(itemsById, referenceDate) {
+  return Object.values(itemsById || {}).filter((item) => (
+    item
+    && item.type === 'demand'
+    && shouldIncludeDataItemInAnalysis(item)
+    && isRecordActiveOnDate(item, referenceDate)
+  ));
+}
+
 export function shouldShowDataItemInEditor(item, referenceDate) {
   if (!item) return false;
   if (!hasAllowedChildStatus(item)) return false;

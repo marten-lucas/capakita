@@ -68,6 +68,9 @@ function SettingsView() {
               name: 'Neue Gruppe',
               icon: DEFAULT_GROUP_ICON,
               type: 'Regelgruppe',
+              fillUp: false,
+              maxFacilityCount: '',
+              maxSchoolGrade: '',
             },
           })),
         },
@@ -144,7 +147,7 @@ function SettingsView() {
         onClick: () => dispatch(addGroupFeeEntry({
           scenarioId: selectedScenarioId,
           groupId: group.id,
-          entry: { validFrom: '', validUntil: '', minHours: '', maxHours: '', monthlyAmount: '' },
+          entry: { validFrom: '', validUntil: '', maxHours: '', monthlyAmount: '' },
         })),
       }));
     }

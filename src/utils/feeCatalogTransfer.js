@@ -34,8 +34,7 @@ function normalizeImportedFeeBand(entry = {}, { preferNonMember = true } = {}) {
   return {
     id: entry.id,
     label: entry.label || '',
-    minHours: entry.minHours ?? entry.hoursFrom ?? '',
-    maxHours: entry.maxHours ?? entry.hoursTo ?? '',
+    maxHours: entry.maxHours ?? entry.hoursTo ?? entry.minHours ?? entry.hoursFrom ?? '',
     monthlyAmount: amount,
     validFrom: entry.validFrom || '',
     validUntil: entry.validUntil || '',

@@ -157,6 +157,40 @@ describe('eventSlice automatic transitions', () => {
     expect(findDate('auto_transition_school_octChild')).toBe('2027-09-01');
   });
 
+  it('creates a predicted exit transition when the child has an end date', () => {
+    const state = eventReducer(
+      undefined,
+      refreshAllEvents({
+        simScenario: {
+          scenarios: [{ id: scenarioId }],
+        },
+        simData: {
+          dataByScenario: {
+            [scenarioId]: {
+              child1: {
+                id: 'child1',
+                name: 'Mia',
+                type: 'demand',
+                dateofbirth: '2020-01-15',
+                startdate: '2021-01-01',
+                enddate: '2026-06-30',
+              },
+            },
+          },
+        },
+        simBooking: { bookingsByScenario: { [scenarioId]: {} } },
+        simGroup: { groupsByScenario: { [scenarioId]: {} } },
+      })
+    );
+
+    const events = state.eventsByScenario[scenarioId] || [];
+    const exitTransition = events.find((event) => event.id === 'auto_transition_exit_child1');
+
+    expect(exitTransition?.effectiveDate).toBe('2026-06-30');
+    expect(exitTransition?.metadata?.targetStage).toBe('exit');
+    expect(exitTransition?.metadata?.bookingDeltaHours).toBe(0);
+  });
+
   it('suppresses the automatic kita transition when a real group assignment already exists on that date', () => {
     const state = eventReducer(
       undefined,

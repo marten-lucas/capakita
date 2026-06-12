@@ -288,16 +288,53 @@ function ChartFilterForm({
                 value={monteCarloParams.minGroupHeadcount}
                 min={0}
                 max={10}
-                step={1}
+                step={0.5}
+                decimalScale={1}
                 onChange={(value) => {
                   const nextValue = Number(value);
                   if (!Number.isFinite(nextValue)) return;
                   onMonteCarloParamsChange?.({
                     ...monteCarloParams,
-                    minGroupHeadcount: Math.max(0, Math.min(10, Math.round(nextValue))),
+                    minGroupHeadcount: Math.max(0, Math.min(10, nextValue)),
                   });
                 }}
               />
+              {groupDefs.length > 0 && (
+                <Stack gap={6}>
+                  <Text size="xs" c="dimmed">
+                    Individuelle Mindestbesetzung je Gruppe (überschreibt den globalen Wert)
+                  </Text>
+                  {groupDefs.map((group) => {
+                    const groupId = String(group.id);
+                    const configuredValue = Number(monteCarloParams?.minGroupHeadcountByGroup?.[groupId]);
+                    const fallbackValue = Number(monteCarloParams?.minGroupHeadcount || 0);
+                    const currentValue = Number.isFinite(configuredValue) ? configuredValue : fallbackValue;
+
+                    return (
+                      <NumberInput
+                        key={`mc-min-headcount-${groupId}`}
+                        label={`Min. Köpfe: ${group.name || groupId}`}
+                        value={currentValue}
+                        min={0}
+                        max={10}
+                        step={0.5}
+                        decimalScale={1}
+                        onChange={(value) => {
+                          const nextValue = Number(value);
+                          if (!Number.isFinite(nextValue)) return;
+                          onMonteCarloParamsChange?.({
+                            ...monteCarloParams,
+                            minGroupHeadcountByGroup: {
+                              ...(monteCarloParams?.minGroupHeadcountByGroup || {}),
+                              [groupId]: Math.max(0, Math.min(10, nextValue)),
+                            },
+                          });
+                        }}
+                      />
+                    );
+                  })}
+                </Stack>
+              )}
               <NumberInput
                 label="Max. tolerierte Unterdeckung (Slots/Woche)"
                 value={monteCarloParams.maxUndercoverageSlots}

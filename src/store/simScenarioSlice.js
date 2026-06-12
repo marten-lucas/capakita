@@ -1,5 +1,6 @@
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import { isRecordActiveOnDate } from '../utils/financeUtils';
+import { refreshAllEvents } from './eventSlice';
 
 const initialState = {
   scenarios: [],
@@ -293,6 +294,13 @@ export const importScenario = ({
     if (!firstStoreKey) {
       firstStoreKey = Object.keys(importedItems)[0];
     }
+
+    dispatch(refreshAllEvents({
+      simScenario: getState().simScenario,
+      simData: getState().simData,
+      simBooking: getState().simBooking,
+      simGroup: getState().simGroup,
+    }));
     if (firstStoreKey) {
       dispatch({ type: 'simScenario/setSelectedItem', payload: firstStoreKey });
     }

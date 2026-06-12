@@ -252,7 +252,7 @@ function BayKiBiGDetail({ item, scenarioId, dispatch }) {
 }
 
 function FeeEntrySummary({ item }) {
-  const hoursLabel = `${item.minHours || 0} - ${item.maxHours || 'offen'} h`;
+  const hoursLabel = item.maxHours ? `bis ${item.maxHours} h` : 'offene Stundenobergrenze';
   return (
     <Stack gap={2}>
       <Text fw={500}>{item.label || hoursLabel}</Text>
@@ -300,36 +300,20 @@ function FeeEntryDetail({ item, groupId, scenarioId, dispatch }) {
           clearable
         />
       </SimpleGrid>
-      <Group grow>
-        <BufferedNumberInput
-          label="Min. Wochenstunden"
-          value={item.minHours}
-          onCommit={(value) => dispatch(updateGroupFeeEntry({
-            scenarioId,
-            groupId,
-            entryId: item.id,
-            updates: { minHours: value ?? '' },
-          }))}
-          decimalScale={2}
-          min={0}
-          thousandSeparator="."
-          decimalSeparator="," 
-        />
-        <BufferedNumberInput
-          label="Max. Wochenstunden"
-          value={item.maxHours}
-          onCommit={(value) => dispatch(updateGroupFeeEntry({
-            scenarioId,
-            groupId,
-            entryId: item.id,
-            updates: { maxHours: value ?? '' },
-          }))}
-          decimalScale={2}
-          min={0}
-          thousandSeparator="."
-          decimalSeparator="," 
-        />
-      </Group>
+      <BufferedNumberInput
+        label="Max. Wochenstunden"
+        value={item.maxHours}
+        onCommit={(value) => dispatch(updateGroupFeeEntry({
+          scenarioId,
+          groupId,
+          entryId: item.id,
+          updates: { maxHours: value ?? '' },
+        }))}
+        decimalScale={2}
+        min={0}
+        thousandSeparator="."
+        decimalSeparator="," 
+      />
       <BufferedNumberInput
         label="Monatsbeitrag"
         value={item.monthlyAmount}
@@ -591,7 +575,7 @@ function OrgaTabFinance({ section = 'all' }) {
           <div>
             <Text fw={600}>Beitragskataloge pro Gruppe</Text>
             <Text size="sm" c="dimmed">
-              Jede Gruppe hat ihren eigenen Katalog mit Wochenstundenstaffeln und Gueltigkeiten.
+              Jede Gruppe hat ihren eigenen Katalog mit maximalen Wochenstunden und Gueltigkeiten.
             </Text>
           </div>
 
@@ -656,7 +640,7 @@ function OrgaTabFinance({ section = 'all' }) {
                         onAdd={() => dispatch(addGroupFeeEntry({
                           scenarioId: selectedScenarioId,
                           groupId: group.id,
-                          entry: { validFrom: '', validUntil: '', minHours: '', maxHours: '', monthlyAmount: '' },
+                          entry: { validFrom: '', validUntil: '', maxHours: '', monthlyAmount: '' },
                         }))}
                         onDelete={(_, item) => dispatch(deleteGroupFeeEntry({
                           scenarioId: selectedScenarioId,

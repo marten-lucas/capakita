@@ -8,6 +8,7 @@ export const initialUiState = {
   dataListFilter: 'all',
   dataCaptureQueueMode: false,
   dataSubmenu: 'capacity',
+  privacyMode: false,
 };
 
 const uiSlice = createSlice({
@@ -35,6 +36,9 @@ const uiSlice = createSlice({
     setDataSubmenu: (state, action) => {
       state.dataSubmenu = action.payload === 'demand' ? 'demand' : 'capacity';
     },
+    setPrivacyMode: (state, action) => {
+      state.privacyMode = Boolean(action.payload);
+    },
   },
 });
 
@@ -46,5 +50,6 @@ export const {
   setDataListFilter,
   setDataCaptureQueueMode,
   setDataSubmenu,
+  setPrivacyMode,
 } = uiSlice.actions;
 export default uiSlice.reducer;

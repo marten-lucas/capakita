@@ -38,9 +38,14 @@ function normalizeBayKiBiGRule(rule = {}) {
 }
 
 function normalizeFeeBand(entry = {}) {
-  return normalizeValidityEntry(entry, {
-    minHours: entry.minHours ?? '',
-    maxHours: entry.maxHours ?? '',
+  const {
+    minHours: _legacyMinHours,
+    hoursFrom: _legacyHoursFrom,
+    ...rest
+  } = entry;
+
+  return normalizeValidityEntry(rest, {
+    maxHours: entry.maxHours ?? entry.hoursTo ?? entry.minHours ?? entry.hoursFrom ?? '',
     monthlyAmount: entry.monthlyAmount ?? '',
     label: entry.label || '',
   });

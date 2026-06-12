@@ -330,7 +330,7 @@ export function generateBookingDataSeries(referenceDate, filteredBookings, categ
 
   // For each category, count bookings that cover it
   categories.forEach((cat, idx) => {
-    const { day, time } = parseCategory(cat);
+    const { day } = parseCategory(cat);
     let count = 0;
     filteredBookings.forEach(booking => {
       count += getBookingContributionAtCategory(booking, day, getCategoryMinutes(cat));

@@ -278,6 +278,7 @@ export default function WeeklyChart({
     if (!syncGroupKey) return undefined;
 
     const listeners = ensureSyncChannel(syncGroupKey);
+    const instanceId = instanceIdRef.current;
 
     const applyExternalExtremes = ({ min, max }) => {
       externalSyncInProgress.current = true;
@@ -306,7 +307,7 @@ export default function WeeklyChart({
       externalSyncInProgress.current = false;
     };
 
-    listeners.set(instanceIdRef.current, {
+    listeners.set(instanceId, {
       onExtremes: applyExternalExtremes,
       onHover: applyExternalHover,
       onClear: applyExternalClear,
@@ -314,7 +315,7 @@ export default function WeeklyChart({
 
     return () => {
       const channel = weeklySyncChannels.get(syncGroupKey);
-      channel?.delete(instanceIdRef.current);
+      channel?.delete(instanceId);
       if (channel && channel.size === 0) {
         weeklySyncChannels.delete(syncGroupKey);
       }

@@ -1,4 +1,4 @@
-import { shouldIncludeDataItemInAnalysis } from '../dataVisibility';
+import { getActiveDemandChildrenAtDate } from '../dataVisibility';
 
 function monthsBetween(dateOfBirth, referenceDate) {
   const birth = new Date(dateOfBirth);
@@ -32,16 +32,10 @@ function buildAgeBins(maxMonths) {
 }
 
 export function calculateChartDataAgeHistogram(referenceDate, selectedGroups, { dataByScenario, groupsByScenario, scenarioId }) {
-  const dataItems = Object.values(dataByScenario?.[scenarioId] || {}).filter(
-    (item) => item?.type === 'demand' && shouldIncludeDataItemInAnalysis(item)
-  );
+  const dataItems = getActiveDemandChildrenAtDate(dataByScenario?.[scenarioId] || {}, referenceDate);
   const groupAssignments = groupsByScenario?.[scenarioId] || {};
 
   const visibleChildren = dataItems.filter((item) => {
-    const startOk = !item.startdate || item.startdate <= referenceDate;
-    const endOk = !item.enddate || item.enddate >= referenceDate;
-    if (!startOk || !endOk) return false;
-
     const assignments = Object.values(groupAssignments[item.id] || {});
     const activeAssignment = assignments.find((assignment) => {
       const assignStartOk = !assignment.start || assignment.start <= referenceDate;

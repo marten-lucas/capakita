@@ -151,6 +151,16 @@ function buildAutomaticTransitionEvents({ dataItems, existingEvents = [], scenar
             }
         ];
 
+        if (item?.enddate) {
+            transitions.push({
+                id: `auto_transition_exit_${itemKey}`,
+                effectiveDate: item.enddate,
+                description: 'Automatisches Ausscheiden: Prognostizierter Austritt aus der Einrichtung',
+                targetStage: 'exit',
+                bookingDeltaHours: 0,
+            });
+        }
+
         transitions.forEach((transition) => {
             if (!transition.effectiveDate) return;
             if (!isWithinAttendanceRange(item, transition.effectiveDate)) return;
@@ -410,6 +420,46 @@ function extractEventsForScenario(state, scenarioId, disabledIds = {}) {
     });
 
     events.push(...buildAutomaticTransitionEvents({ dataItems, existingEvents: events, scenarioId, disabledIds, autoEventSettings }));
+
+    // Post-process: add simulatedDate field.
+    // Rule (Option A): for each entity, if there are events on day T and day T+1, the T-events get simulatedDate = T+1.
+    // All others: simulatedDate = effectiveDate (same as actualDate).
+    const eventsByEntityAndDate = new Map();
+    events.forEach((event) => {
+        const key = String(event.entityId || '');
+        if (!key) return;
+        if (!eventsByEntityAndDate.has(key)) eventsByEntityAndDate.set(key, new Set());
+        eventsByEntityAndDate.get(key).add(String(event.effectiveDate || ''));
+    });
+
+    events.forEach((event) => {
+        const entityId = String(event.entityId || '');
+        const effectiveDate = String(event.effectiveDate || '');
+        // actualDate is the unmodified effectiveDate
+        event.actualDate = effectiveDate;
+
+        if (!entityId || !effectiveDate) {
+            event.simulatedDate = effectiveDate;
+            return;
+        }
+
+        const dateObj = parseIsoDateUtc(effectiveDate);
+        if (!dateObj) {
+            event.simulatedDate = effectiveDate;
+            return;
+        }
+
+        const nextDayObj = new Date(dateObj.getTime());
+        nextDayObj.setUTCDate(nextDayObj.getUTCDate() + 1);
+        const nextDayIso = toIsoDateUtc(nextDayObj);
+
+        const entityDates = eventsByEntityAndDate.get(entityId);
+        if (entityDates && entityDates.has(nextDayIso)) {
+            event.simulatedDate = nextDayIso;
+        } else {
+            event.simulatedDate = effectiveDate;
+        }
+    });
 
     return events;
 }

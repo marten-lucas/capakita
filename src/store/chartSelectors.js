@@ -4,13 +4,12 @@ import { calculateChartDataWeekly } from '../utils/chartUtils/chartUtilsWeekly';
 import { calculateChartDataMidterm, generateMidtermCategories, formatDateToCategory } from '../utils/chartUtils/chartUtilsMidterm';
 import { calculateChartDataHistogram } from '../utils/chartUtils/chartUtilsHistogram';
 import { calculateChartDataAgeHistogram } from '../utils/chartUtils/chartUtilsAgeHistogram';
-import { isArchivedDataItem } from '../utils/dataVisibility';
+import { getActiveDemandChildrenAtDate, isArchivedDataItem } from '../utils/dataVisibility';
 import {
   calculateScenarioMonthlyFinance,
   convertMonthlyAmountToPeriod,
   getPeriodBoundsForCategory,
   hasAnyBookingInWeek,
-  isRecordActiveOnDate,
   resolveGroupIdsForBounds,
 } from '../utils/financeUtils';
 import { minutesToTime, timeToMinutes } from '../utils/timeUtils';
@@ -663,12 +662,11 @@ export const selectMidtermChartData = createSelector(
       financeScenario,
     });
 
-    const activeChildrenWithBookings = Object.entries(effectiveDataItems || {}).filter(([itemId, item]) => {
-      if (item?.type !== 'demand') return false;
-      if (isArchivedDataItem(item)) return false;
-      if (!isRecordActiveOnDate(item, referenceDate)) return false;
-      return hasAnyBookingInWeek(Object.values(effectiveBookingsByItem?.[itemId] || {}), referenceDate);
-    }).length;
+    const activeChildrenWithBookings = getActiveDemandChildrenAtDate(effectiveDataItems || {}, referenceDate)
+      .filter((item) => {
+        const itemId = String(item?.id || '');
+        return hasAnyBookingInWeek(Object.values(effectiveBookingsByItem?.[itemId] || {}), referenceDate);
+      }).length;
 
     const careRatioValues = (weeklyChartData?.care_ratio || []).filter((value) => Number(value) > 0);
     const averageCareRatioWeek = careRatioValues.length > 0
