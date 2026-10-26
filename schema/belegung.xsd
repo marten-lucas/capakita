@@ -37,6 +37,18 @@
               <xs:element type="xs:string" name="PLSPLITT"/>
               <xs:element type="xs:string" name="VORKURS"/>
               <xs:element type="xs:string" name="BEMERK"/>
+              <!-- Reverse-Engineering: volle DBF-Struktur (belegung, 45 Felder) -->
+              <xs:element type="xs:string" name="GEWKAT" minOccurs="0"/>
+              <xs:element type="xs:decimal" name="PANTEIL" minOccurs="0"/>
+              <xs:element type="xs:decimal" name="BETRSTD" minOccurs="0"/>
+              <xs:element type="xs:decimal" name="BETRTAGE" minOccurs="0"/>
+              <xs:element type="xs:string" name="FERIEN" minOccurs="0"/>
+              <xs:element type="xs:string" name="ZKMANU" minOccurs="0"/>
+              <xs:element type="xs:string" name="FIXUNTER3" minOccurs="0"/>
+              <xs:element type="xs:string" name="FOERDJA" minOccurs="0"/>
+              <xs:element type="xs:string" name="FOERDNEIN" minOccurs="0"/>
+              <xs:element type="xs:string" name="KEINUNTER3" minOccurs="0"/>
+              <xs:element type="xs:string" name="BULAGE" minOccurs="0"/>
             </xs:choice>
           </xs:complexType>
         </xs:element>

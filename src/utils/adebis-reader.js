@@ -25,7 +25,10 @@ export async function extractAdebisData(file, isAnonymized, options = {}) {
         kidsRaw = extractObjectListFromXml(
             kindXmlString,
             'KIND',
-            ['KINDNR', 'AUFNDAT', 'AUSTRDAT', 'GRUNR', 'GEBDATUM', 'FNAME', 'STATUS'],
+            [
+                'KINDNR', 'AUFNDAT', 'AUSTRDAT', 'GRUNR', 'GEBDATUM', 'FNAME', 'STATUS',
+                'SUBSTATUS', 'SCHULART', 'SPRACHE', 'GESCHLECHT'
+            ],
             k => {
                 if (!isSnapshotMode) return true;
                 return isFutureOrEmptyDate(k.AUSTRDAT) && k.STATUS === '+';
@@ -49,9 +52,13 @@ export async function extractAdebisData(file, isAnonymized, options = {}) {
                 'BEGINNDAT',
                 'ENDDAT',
                 'ARBZEIT',
+                'ARBZEITB',
                 'URLAUB',
                 'QUALIFIK',
                 'VERTRAGART',
+                'ERSATZKR',
+                'PERSBONUS',
+                'STATUS',
                 'ZEITEN'
             ],
             a => (isSnapshotMode ? isFutureOrEmptyDate(a.ENDDAT) : true)
@@ -81,7 +88,7 @@ export async function extractAdebisData(file, isAnonymized, options = {}) {
         grukiRaw = extractObjectListFromXml(
             grukiXmlString,
             'GRUPPENZUORDNUNG',
-            ['KINDNR', 'GRUNR', 'GKVON', 'GKBIS'],
+            ['KINDNR', 'GRUNR', 'GKVON', 'GKBIS', 'TYP'],
             g => (isSnapshotMode ? isFutureOrEmptyDate(g.GKBIS) : true)
         );
     } else {
@@ -95,7 +102,12 @@ export async function extractAdebisData(file, isAnonymized, options = {}) {
         belegungRaw = extractObjectListFromXml(
             belegungXmlString,
             'BELEGUNGSBUCHUNG',
-            ['IDNR', 'KINDNR', 'BELVON', 'BELBIS', 'ZEITEN'],
+            [
+                'IDNR', 'KINDNR', 'BELVON', 'BELBIS', 'ZEITEN',
+                'ART', 'ZEITKAT', 'BUZEITKAT', 'GEWKAT', 'PANTEIL',
+                'BETRSTD', 'BETRTAGE', 'FERIEN', 'SCHULKIND', 'KRIPPENK',
+                'VORKURS', 'BEHINDERT', 'MIGRATION'
+            ],
             b => (isSnapshotMode ? isFutureOrEmptyDate(b.BELBIS) : true)
         );
     } else {

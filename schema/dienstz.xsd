@@ -1,22 +1,40 @@
 <xs:schema attributeFormDefault="unqualified" elementFormDefault="qualified" xmlns:xs="http://www.w3.org/2001/XMLSchema">
-  <xs:element name="BEITRAGSARTEN">
+  <!--
+    Reverse-Engineering-Korrektur (adebisKITA 7.5.5):
+    Die frühere Version dieser Datei beschrieb fälschlich BEITRAGSARTEN
+    (BARTNR/BEZ/KOSTENST/... - identisch mit beitrart.xsd).
+
+    Die echte Tabelle DIENSTZ.DBF ist eine interne Hash-Tabelle
+    (dznr, d1..d10, dhash) für Dienstzeit-Kombinationen und ist KEINE
+    Export-Quelle.
+
+    Die relevanten Arbeitszeiten der Mitarbeitenden stehen in ANSTELL.DBF
+    (ZEITEN-Memo, Wochenraster) und werden über anstell.xml importiert
+    (siehe anstell.xsd).
+  -->
+  <xs:element name="DIENSTZ">
     <xs:complexType>
       <xs:sequence>
-        <xs:element name="BEITRAGSART" maxOccurs="unbounded" minOccurs="0">
+        <xs:element name="DIENSTZSATZ" maxOccurs="unbounded" minOccurs="0">
           <xs:complexType>
             <xs:choice maxOccurs="unbounded" minOccurs="0">
-              <xs:element type="xs:byte" name="BARTNR"/>
-              <xs:element type="xs:string" name="BEZ"/>
-              <xs:element type="xs:string" name="TEXT"/>
-              <xs:element type="xs:byte" name="KOSTENST"/>
-              <xs:element type="xs:string" name="MULTIPLE"/>
-              <xs:element type="xs:string" name="STATUS"/>
-              <xs:element type="xs:string" name="VARIABEL"/>
+              <xs:element type="xs:int" name="DZNR"/>
+              <xs:element type="xs:string" name="D1" minOccurs="0"/>
+              <xs:element type="xs:string" name="D2" minOccurs="0"/>
+              <xs:element type="xs:string" name="D3" minOccurs="0"/>
+              <xs:element type="xs:string" name="D4" minOccurs="0"/>
+              <xs:element type="xs:string" name="D5" minOccurs="0"/>
+              <xs:element type="xs:string" name="D6" minOccurs="0"/>
+              <xs:element type="xs:string" name="D7" minOccurs="0"/>
+              <xs:element type="xs:string" name="D8" minOccurs="0"/>
+              <xs:element type="xs:string" name="D9" minOccurs="0"/>
+              <xs:element type="xs:string" name="D10" minOccurs="0"/>
+              <xs:element type="xs:string" name="DHASH"/>
               <xs:element type="xs:byte" name="MNR"/>
-              <xs:element type="xs:string" name="ANLDAT"/>
-              <xs:element type="xs:string" name="AENDAT"/>
-              <xs:element type="xs:byte" name="ANLUSER"/>
-              <xs:element type="xs:byte" name="AENUSER"/>
+              <xs:element type="xs:string" name="ANLDAT" minOccurs="0"/>
+              <xs:element type="xs:string" name="AENDAT" minOccurs="0"/>
+              <xs:element type="xs:byte" name="ANLUSER" minOccurs="0"/>
+              <xs:element type="xs:byte" name="AENUSER" minOccurs="0"/>
             </xs:choice>
           </xs:complexType>
         </xs:element>

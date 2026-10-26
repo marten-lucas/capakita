@@ -1,6 +1,7 @@
 import { convertDDMMYYYYtoYYYYMMDD } from './dateUtils';
 import { createId } from './idUtils';
 import { DEFAULT_GROUP_ICON } from './groupIcons';
+import { decodeBuchungsart, qualifikationInfo } from './adebisConstants';
 
 // Helper to assign unique IDs to all segments in all bookings
 function assignSegmentIdsToBookings(bookings) {
@@ -98,11 +99,15 @@ function belegung2Booking(belegungRaw) {
     const parsedTimes = Zeiten2Booking(b.ZEITEN, bookingId);
     if (!hasParsedSegments(parsedTimes)) return;
 
+    // Buchungsart gemäß adebisKITA-Decoder (ART: 0=Regel, A/B=Alternativ, F/G/H=Ferien, K=Kurzzeit)
+    const buchungsart = decodeBuchungsart(b.ART);
+
     const booking = {
       id: bookingId,
       startdate: convertDDMMYYYYtoYYYYMMDD(b.BELVON) || '',
       enddate: convertDDMMYYYYtoYYYYMMDD(b.BELBIS) || '',
       times: parsedTimes,
+      buchungsart,
       rawdata: { ...b },
       adebisId: { id: String(b.IDNR), source: "belegung" }
     };
@@ -130,6 +135,8 @@ function anstell2Booking(employeesRaw) {
       startdate: convertDDMMYYYYtoYYYYMMDD(e.BEGINNDAT) || '',
       enddate: convertDDMMYYYYtoYYYYMMDD(e.ENDDAT) || '',
       times: parsedTimes,
+      // Anstellungen haben keine Buchungsart – implizit regel-basiert (basis=true)
+      buchungsart: { code: '', label: 'R', name: 'Anstellung', gruppe: 'regel', basis: true },
       rawdata: { ...e },
       adebisId: { id: String(e.IDNR), source: "anstell" }
     });
@@ -224,19 +231,28 @@ export function adebis2GroupDefs(groupsRaw) {
 
 /**
  * Converts Adebis employeesRaw to qualification definitions, with rawdata.
+ * Namen und Fachkraft-Klassifikation stammen aus dem adebisKITA-Qualifikationskatalog
+ * (system/qualifik.dbf): E/S/H/P = Fachkraft, K/B/N = Ergänzungskraft, 1-4 = Fehlzeit.
  * @param {Array} employeesRaw - Array of employee objects with at least QUALIFIK.
- * @returns {Array} qualidefs - Array of { key, name, rawdata }
+ * @returns {Array} qualidefs - Array of { key, name, IsExpert, rawdata }
  */
 export function adebis2QualiDefs(employeesRaw) {
   const unique = Array.from(
     new Set((employeesRaw || []).map(e => e.QUALIFIK).filter(Boolean))
   );
   return unique.map(key => {
-    let name = key;
-    if (key === 'E') name = 'Erzieher';
-    else if (key === 'K') name = 'Kinderpfleger';
-    else if (key === 'W') name = 'Weiterbildung';
-    let qualiDef = { key, name, rawdata: { key, name } };
+    const info = qualifikationInfo(key);
+    const name = info ? info.name : key;
+    // IsExpert steuert die Fachkraftquote (generateExpertRatioSeries).
+    // Unbekannte Codes bleiben Fachkraft (Rückwärtskompatibilität für eigene Kürzel),
+    // bekannte Ergänzungs-/Fehlzeitcodes werden korrekt ausgeschlossen.
+    const IsExpert = info ? info.isExpert : true;
+    const qualiDef = {
+      key,
+      name,
+      IsExpert,
+      rawdata: { key, name, typ: info ? info.typ : null, IsExpert }
+    };
     return addOriginalData(qualiDef);
   });
 }
@@ -256,6 +272,8 @@ export function adebis2GroupAssignments(grukiRaw) {
       groupId: String(g.GRUNR),
       start: convertDDMMYYYYtoYYYYMMDD(g.GKVON) || '',
       end: convertDDMMYYYYtoYYYYMMDD(g.GKBIS) || '',
+      // TYP aus gruki: '1' = primäre Zuordnung (adebis-SQL filtert gk.typ == '1')
+      typ: g.TYP || '',
       rawdata: { ...g }
     };
     groupAssignments.push(addOriginalData(assignment));

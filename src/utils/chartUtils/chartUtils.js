@@ -2,17 +2,61 @@ import { segmentMatchesMode } from '../bookingUtils';
 import { timeToMinutes } from '../timeUtils';
 import { shouldIncludeDataItemInAnalysis } from '../dataVisibility';
 import { resolveGroupIdAtDate, splitBookingByGroupAtDate } from '../financeUtils';
+import { getGewkatFactor } from '../adebisConstants';
 
-function getBayKiBiGWeightForChild(child, groupDef) {
-  if (!child) return 1;
+/**
+ * Adebis-Logikflag (VFP-Export als ".T."/".F.") robust auswerten.
+ */
+export function isAdebisTrue(value) {
+  if (value === true) return true;
+  if (typeof value !== 'string') return false;
+  const v = value.trim().toUpperCase();
+  return v === '.T.' || v === 'T' || v === 'TRUE' || v === '1';
+}
 
-  if (groupDef?.type === 'Schulkindgruppe') {
-    return 1.2;
+/**
+ * BayKiBiG-Gewichtungsfaktor eines Kindes.
+ *
+ * Reverse-Engineering-Quelle: gewkat-Katalog (system/gewkat.dbf) und
+ * § 21 Abs. 4 BayKiBiG: 1,0 Regelfall (3 bis Schuleintritt), 2,0 unter 3,
+ * 1,2 ab Schuleintritt, 1,3 beide Eltern nichtdeutschsprachig, 4,5 Behinderung.
+ *
+ * Priorität (gemäß gewkat-Varianten DB/KB/SB=4.5, D/DA=2.0, KA/SA=1.3, K/S=1.2):
+ *   1. GEWKAT der Buchung (autoritativ, falls im Export enthalten)
+ *   2. BEHINDERT → 4,5
+ *   3. unter 3 Jahre (KRIPPENK oder Alter) → 2,0
+ *   4. MIGRATION → 1,3 (übersteuert Schulkind, KA/SA = 1,3 > K/S = 1,2)
+ *   5. Schulkind (SCHULKIND-Flag oder Schulkindgruppe) → 1,2
+ *   6. Regelfall → 1,0
+ */
+function getBayKiBiGWeightForChild(child, groupDef, booking) {
+  const bookingRaw = booking?.rawdata || {};
+
+  const gewkatFactor = getGewkatFactor(bookingRaw.GEWKAT || bookingRaw.gewkat);
+  if (gewkatFactor != null) {
+    return gewkatFactor;
   }
 
-  const age = Number(child.age || child.rawdata?.ALTER || 3);
-  if (Number.isFinite(age) && age < 3) {
+  if (isAdebisTrue(bookingRaw.BEHINDERT)) {
+    return 4.5;
+  }
+
+  const age = Number(child?.age || child?.rawdata?.ALTER || 3);
+  const isUnter3 =
+    isAdebisTrue(bookingRaw.KRIPPENK) || (Number.isFinite(age) && age < 3);
+  if (isUnter3) {
     return 2;
+  }
+
+  const isMigration = isAdebisTrue(bookingRaw.MIGRATION);
+  if (isMigration) {
+    return 1.3;
+  }
+
+  const isSchulkind =
+    groupDef?.type === 'Schulkindgruppe' || isAdebisTrue(bookingRaw.SCHULKIND);
+  if (isSchulkind) {
+    return 1.2;
   }
 
   return 1;
@@ -115,11 +159,29 @@ export function generateExpertRatioSeries(categories, filteredCapacityBookings, 
 /**
  * Berechnet den BayKiBiG-Anstellungsschlüssel für jedes Zeitsegment.
  * Gibt ein Array mit dem Schlüssel (z.B. 11.0) für jedes Segment zurück.
+ *
+ * Reverse-Engineering-Korrekturen (adebisKITA 7.5):
+ * - Nur Basisbuchungen zählen in den Bedarf: ART 0 (Regel) und K (Kurzzeit);
+ *   Alternativbuchungen (A/B) und Ferienbuchungen (F/G/H) dürfen die
+ *   Regelbelegung nicht doppelt zählen (adebis-FRX/Handbuch: Buchungsarten).
+ *   Legacy-Imports ohne ART-Metadaten werden wie Regel behandelt.
+ * - Gewichtung über GEWKAT/BEHINDERT/MIGRATION/SCHULKIND (s. getBayKiBiGWeightForChild).
+ * @param {Object} [options]
+ * @param {boolean} [options.includeNonBasisBookings=false] Ferien-/Alternativbuchungen einrechnen
  */
-export function generateCareRatioSeries(categories, filteredDemandBookings, filteredCapacityBookings, dataByScenario, groupDefs) {
+export function generateCareRatioSeries(categories, filteredDemandBookings, filteredCapacityBookings, dataByScenario, groupDefs, options = {}) {
+  const includeNonBasis = options.includeNonBasisBookings === true;
+
   // Hilfsfunktion: Hole GroupDef nach groupId
   function getGroupDefById(groupId) {
     return groupDefs.find(g => String(g.id) === String(groupId));
+  }
+
+  function isDemandRelevant(booking) {
+    if (includeNonBasis) return true;
+    const art = booking?.buchungsart;
+    // Legacy-Buchungen ohne Metadaten wie Basis behandeln
+    return art ? art.basis === true : true;
   }
 
   return categories.map(cat => {
@@ -131,12 +193,13 @@ export function generateCareRatioSeries(categories, filteredDemandBookings, filt
     let weightedDemand = 0;
     filteredDemandBookings.forEach(booking => {
       if (!Array.isArray(booking.times)) return;
+      if (!isDemandRelevant(booking)) return;
       const contribution = getBookingContributionAtCategory(booking, day, categoryMinutes);
       if (contribution > 0) {
         // Hole das Kind-Objekt und GroupDef
         const child = dataByScenario?.[booking.itemId];
         const groupDef = getGroupDefById(booking.groupId);
-        const weight = getBayKiBiGWeightForChild(child, groupDef);
+        const weight = getBayKiBiGWeightForChild(child, groupDef, booking);
         weightedDemand += contribution * weight;
       }
     });
