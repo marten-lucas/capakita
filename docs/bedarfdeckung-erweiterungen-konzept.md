@@ -1,7 +1,20 @@
 # Konzept: Bedarfsdeckung – Histogramme, Förder-Simulation, Betroffenheitsanalyse
 
-Status: **Konzept (v1, 26.10.2026)** · Basis: Code-Ist-Analyse + Reverse-Engineering adebisKITA 7.5.5
-(`adebis-re/docs/`) · Umsetzung noch offen
+Status: **UMGESETZT (v2, 26.10.2026)** · Basis: Code-Ist-Analyse + Reverse-Engineering adebisKITA 7.5.5
+(`adebis-re/docs/`)
+
+## Umsetzung (26.10.2026)
+
+| Phase | Umsetzung | Tests |
+|---|---|---|
+| A1 Buchungsstunden-Histogramm | Neuer Slide `hours-hist` im Bedarfsdeckung-Karussell; `BookingHistogram` prop-gesteuert (Store-Selector bleibt Fallback); Gruppen-Select im Slide | VisuView-Regression |
+| A2 Buchungskategorien-Histogramm | `chartUtilsZeitkat.calculateZeitkatDistribution` (children/bookings-Modi, nur Basisbuchungen, „ohne Kategorie"-Bucket) + Slide `kategorie-hist` mit Zeitfaktor-Tooltip | `chartUtilsZeitkat.test.js` (4) |
+| B Förderformel-Korrektur | `financeUtils.resolveZeitkatFactorForChild` + `applyZeitkatFactor`-Parameter in `calculateChildMonthlyRevenue` — **bewusst default OFF** (Decision: KPI-Sprung „später machen"); Simulation rechnet immer mit Faktor | `adebisFoerder.test.js` (10) |
+| C Simulation + Betroffenheit | `foerderSimulation.simulateZeitkatUpgrade` (nextZone/targetZone/minHours, globaler Nutzungsgrad-Slider, Δ×12 Jahresbetrachtung) + `FundingSimulationPanel` im Story-Step 06 „Optionen-Check" (KPIs, Kinder-/Familien-Ranking, Klick-Sprung ins Kind-Detail) | `foerderSimulation.test.js` (12), `FundingSimulationPanel.test.jsx` (2) |
+| Beitragssatz-Import | Reader liest `beitrart.xml`/`bartbetr.xml`; `adebisFeeCatalog.adebis2FeeCatalogs` mappt BETRAGZn → ZEITKAT-Zonen-Bänder (historische Zone '03' übersprungen, einrichtungsweite Staffel → alle Gruppen, `__DEFAULT__` ohne Gruppen); automatische Übernahme via `preparedImport.scenarioFinance` (greift bei Erstimport, überschreibt keine manuellen Kataloge) | `adebisFeeCatalog.test.js` (6), Reader-Regression |
+
+Entscheidungen des Users (26.10.2026): Zielzonen = alle 3 Modi (Default nextZone) · Δ×12 genügt ·
+Nutzungsgrad globaler Slider · Finanz-KPI-Sprung später (deshalb gated) · nur Wochenstunden-Histogramm.
 
 ---
 

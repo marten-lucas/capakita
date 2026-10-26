@@ -1,5 +1,6 @@
 import { sumBookingHours } from './bookingUtils';
 import { minutesToTime, timeToMinutes } from './timeUtils';
+import { decodeBuchungsart, getZeitkatFactor } from './adebisConstants';
 
 function parseIsoDate(value) {
   if (!value || typeof value !== 'string') return null;
@@ -164,7 +165,7 @@ export function pickApplicableValidityEntry(entries, date, predicate = () => tru
   return applicable[0] || null;
 }
 
-function pickLatestValidityEntry(entries, predicate = () => true) {
+export function pickLatestValidityEntry(entries, predicate = () => true) {
   if (!Array.isArray(entries)) return null;
 
   const applicable = entries
@@ -670,32 +671,12 @@ export function calculateMonthlyStaffCost({
   };
 }
 
-export function calculateChildMonthlyRevenue({
-  item,
-  bookings,
-  groupAssignments,
-  groupDefs,
-  financeScenario,
-  referenceDate,
-}) {
-  if (!item || item.type !== 'demand' || !isRecordActiveOnDate(item, referenceDate)) {
-    return {
-      weeklyHours: 0,
-      parentFeeAmount: 0,
-      bayKiBiGAmount: 0,
-      totalAmount: 0,
-      groupId: null,
-      feeEntry: null,
-      bayKiBiGRule: null,
-      bayKiBiGWeight: 0,
-    };
-  }
-
-  const weeklyHours = calculateAverageWeeklyHoursForDate(bookings, referenceDate);
-  const groupId = resolveGroupIdAtDate(groupAssignments, referenceDate, item.groupId || null);
-  const groupDef = (groupDefs || []).find((entry) => String(entry.id) === String(groupId));
-  const feeCatalog = financeScenario?.groupFeeCatalogs?.[groupId] || [];
-  const feeEntry = feeCatalog
+/**
+ * Wählt den passenden Beitragssatz-Band für Wochenstunden aus einem Gruppenkatalog
+ * (Gültigkeit am Stichtag, engstes maxHours-Band).
+ */
+export function findFeeEntryForHours(feeCatalog, weeklyHours, referenceDate) {
+  return (feeCatalog || [])
     .filter((entry) => isDateWithinRange(referenceDate, entry.validFrom || '', entry.validUntil || ''))
     .sort((left, right) => {
       const leftStart = left.validFrom || '';
@@ -716,11 +697,75 @@ export function calculateChildMonthlyRevenue({
       const maxHours = Number(entry.maxHours);
       return !Number.isFinite(maxHours) || weeklyHours <= maxHours;
     }) || null;
+}
+
+/**
+ * Buchungszeitfaktor eines Kindes am Stichtag (RE adebisKITA 7.5:
+ * Förderbetrag = Basiswert × Buchungszeitfaktor × Gewichtungsfaktor).
+ *
+ * Quelle: ZEITKAT der aktiven Basisbuchung (art 0/K bzw. buchungsart.basis);
+ * Alternativ-/Ferienbuchungen tragen keinen eigenen Förderanspruch.
+ * Mehrere aktive Basisbuchungen: die mit dem neuesten Startdatum gilt.
+ * Rückgabe: Faktor (number) oder null, wenn keine verwertbare Zone vorliegt.
+ */
+export function resolveZeitkatFactorForChild(bookings, referenceDate) {
+  const activeBasis = (bookings || [])
+    .filter((booking) => {
+      const art = booking?.buchungsart || decodeBuchungsart(booking?.rawdata?.ART);
+      if (art && art.basis === false) return false;
+      const start = booking?.startdate || '';
+      const end = booking?.enddate || '';
+      return (!start || start <= referenceDate) && (!end || end >= referenceDate);
+    })
+    .sort((left, right) => String(right?.startdate || '').localeCompare(String(left?.startdate || '')));
+
+  for (const booking of activeBasis) {
+    const factor = getZeitkatFactor(booking?.rawdata?.ZEITKAT);
+    if (factor != null) return factor;
+  }
+  return null;
+}
+
+export function calculateChildMonthlyRevenue({
+  item,
+  bookings,
+  groupAssignments,
+  groupDefs,
+  financeScenario,
+  referenceDate,
+  applyZeitkatFactor = false,
+}) {
+  if (!item || item.type !== 'demand' || !isRecordActiveOnDate(item, referenceDate)) {
+    return {
+      weeklyHours: 0,
+      parentFeeAmount: 0,
+      bayKiBiGAmount: 0,
+      totalAmount: 0,
+      groupId: null,
+      feeEntry: null,
+      bayKiBiGRule: null,
+      bayKiBiGWeight: 0,
+    };
+  }
+
+  const weeklyHours = calculateAverageWeeklyHoursForDate(bookings, referenceDate);
+  const groupId = resolveGroupIdAtDate(groupAssignments, referenceDate, item.groupId || null);
+  const groupDef = (groupDefs || []).find((entry) => String(entry.id) === String(groupId));
+  const feeCatalog = financeScenario?.groupFeeCatalogs?.[groupId] || [];
+  const feeEntry = findFeeEntryForHours(feeCatalog, weeklyHours, referenceDate);
   const bayKiBiGRule = pickApplicableValidityEntry(financeScenario?.bayKiBiGRules, referenceDate)
     || pickLatestValidityEntry(financeScenario?.bayKiBiGRules);
   const bayKiBiGWeight = getBayKiBiGWeightForChild(item, groupDef, referenceDate, bayKiBiGRule?.weightFactors);
   const parentFeeAmount = Number(feeEntry?.monthlyAmount) || 0;
-  const bayKiBiGAmount = (Number(bayKiBiGRule?.baseValue) || 0) * bayKiBiGWeight;
+
+  // RE-Korrektur (adebisKITA 7.5): Förderbetrag = Basiswert × Buchungszeitfaktor ×
+  // Gewichtungsfaktor. Der Faktor ist gated (applyZeitkatFactor, Default off), damit
+  // bestehende Finanz-KPIs erst bei Aktivierung springen (Decision 26.10.2026:
+  // "springen aber später machen"); die Förder-Simulation rechnet immer mit Faktor.
+  const zeitkatFactor = applyZeitkatFactor
+    ? (resolveZeitkatFactorForChild(bookings, referenceDate) ?? 1)
+    : 1;
+  const bayKiBiGAmount = (Number(bayKiBiGRule?.baseValue) || 0) * bayKiBiGWeight * zeitkatFactor;
 
   return {
     weeklyHours,
@@ -731,6 +776,7 @@ export function calculateChildMonthlyRevenue({
     feeEntry,
     bayKiBiGRule,
     bayKiBiGWeight,
+    zeitkatFactor,
   };
 }
 

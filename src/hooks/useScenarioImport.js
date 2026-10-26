@@ -6,6 +6,7 @@ import { addScenario, setSelectedItems, updateScenario } from '../store/simScena
 import { refreshAllEvents } from '../store/eventSlice';
 import { extractAdebisData } from '../utils/adebis-reader';
 import { buildFamilyRelations, attachFamilyInfo } from '../utils/adebisFamily';
+import { adebis2FeeCatalogs } from '../utils/adebisFeeCatalog';
 import { isRecordActiveOnDate } from '../utils/financeUtils';
 import {
   adebis2simData,
@@ -77,6 +78,17 @@ function buildPreparedImport({
   const qualiDefs = adebis2QualiDefs(activeEmployeeRawdata);
   const { groupAssignments } = adebis2GroupAssignments(rawdata.grukiRaw);
 
+  // Beitragssätze automatisch übernehmen, wenn der Export beitrart/bartbetr enthält
+  // (Staffel Beitragsart × Zeitkategorie → groupFeeCatalogs-Bänder).
+  const feeCatalogResult = adebis2FeeCatalogs({
+    beitrartRaw: rawdata.beitrartRaw,
+    bartbetrRaw: rawdata.bartbetrRaw,
+    groupsRaw: rawdata.groupsRaw,
+  });
+  const scenarioFinance = Object.keys(feeCatalogResult.catalogs || {}).length > 0
+    ? { groupFeeCatalogs: feeCatalogResult.catalogs }
+    : undefined;
+
   const itemsByExternalKey = new Map();
   const recordOptions = [];
 
@@ -138,6 +150,8 @@ function buildPreparedImport({
     isAnonymized,
     simDataList,
     familySource: familyRelations.source,
+    scenarioFinance,
+    groupFeeSources: feeCatalogResult.sources,
     groupDefs,
     qualiDefs,
     recordOptions,

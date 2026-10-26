@@ -56,6 +56,36 @@ export function calculateHistogramSeries(filteredBookings, bins, binSize = 4, mo
 }
 
 /**
+ * Baut die Histogramm-Datenstruktur aus bereits gefilterten Buchungen
+ * (Wiederverwendung für gruppengefilterte Analysis-Slides ohne Re-Filterung).
+ */
+export function buildHistogramDataFromBookings(filteredDemandBookings, filteredCapacityBookings) {
+  // Calculate max hours to determine bin range
+  const maxHours = Math.max(
+    ...filteredDemandBookings.map((booking) => demandBookingHours(booking)),
+    ...filteredCapacityBookings.map((booking) => sumBookingHours(booking, { mode: 'pedagogical' })),
+    ...filteredCapacityBookings.map((booking) => sumBookingHours(booking, { mode: 'administrative' })),
+    12 // Minimum range of 12 hours (so at least 0, 1-4, 5-8, 9-12)
+  );
+  const binSize = 4;
+  const categories = generateHistogramBins(maxHours, binSize);
+  const demandSeries = calculateHistogramSeries(filteredDemandBookings, categories, binSize, 'all');
+  const capacityPedagogicalSeries = calculateHistogramSeries(filteredCapacityBookings, categories, binSize, 'pedagogical');
+  const capacityAdministrativeSeries = calculateHistogramSeries(filteredCapacityBookings, categories, binSize, 'administrative');
+  const capacitySeries = capacityPedagogicalSeries.map((value, index) => value + (capacityAdministrativeSeries[index] || 0));
+
+  return {
+    categories: [...categories],
+    demand: [...demandSeries],
+    maxdemand: Math.max(...demandSeries, 0),
+    capacity: [...capacitySeries],
+    capacity_pedagogical: [...capacityPedagogicalSeries],
+    capacity_administrative: [...capacityAdministrativeSeries],
+    maxcapacity: Math.max(...capacitySeries, 0),
+  };
+}
+
+/**
  * Calculate chart data for booking histogram
  */
 export function calculateChartDataHistogram(
@@ -83,29 +113,7 @@ export function calculateChartDataHistogram(
     groupsByScenario
   });
 
-  // Calculate max hours to determine bin range
-  const maxHours = Math.max(
-    ...filteredDemandBookings.map((booking) => demandBookingHours(booking)),
-    ...filteredCapacityBookings.map((booking) => sumBookingHours(booking, { mode: 'pedagogical' })),
-    ...filteredCapacityBookings.map((booking) => sumBookingHours(booking, { mode: 'administrative' })),
-    12 // Minimum range of 12 hours (so at least 0, 1-4, 5-8, 9-12)
-  );
-  const binSize = 4;
-  const categories = generateHistogramBins(maxHours, binSize);
-  const demandSeries = calculateHistogramSeries(filteredDemandBookings, categories, binSize, 'all');
-  const capacityPedagogicalSeries = calculateHistogramSeries(filteredCapacityBookings, categories, binSize, 'pedagogical');
-  const capacityAdministrativeSeries = calculateHistogramSeries(filteredCapacityBookings, categories, binSize, 'administrative');
-  const capacitySeries = capacityPedagogicalSeries.map((value, index) => value + (capacityAdministrativeSeries[index] || 0));
-
-  return {
-    categories: [...categories],
-    demand: [...demandSeries],
-    maxdemand: Math.max(...demandSeries, 0),
-    capacity: [...capacitySeries],
-    capacity_pedagogical: [...capacityPedagogicalSeries],
-    capacity_administrative: [...capacityAdministrativeSeries],
-    maxcapacity: Math.max(...capacitySeries, 0),
-  };
+  return buildHistogramDataFromBookings(filteredDemandBookings, filteredCapacityBookings);
 }
 
 /**

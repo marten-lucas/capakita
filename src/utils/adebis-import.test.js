@@ -16,6 +16,7 @@ import { isRecordActiveOnDate } from './financeUtils';
 import JSZip from 'jszip';
 import { extractAdebisData } from './adebis-reader';
 import { buildFamilyRelations, attachFamilyInfo } from './adebisFamily';
+import { adebis2FeeCatalogs } from './adebisFeeCatalog';
 import {
   adebis2simData,
   adebis2bookings,
@@ -593,5 +594,33 @@ describe('Adebis import regression', () => {
 
     const relations = buildFamilyRelations(rawdata);
     expect(relations.families).toEqual([]);
+  });
+
+  it('liest beitrart.xml/bartbetr.xml für den automatischen Beitragssatz-Import', async () => {
+    const zip = new JSZip();
+    zip.file('beitrart.xml', [
+      '<BEITRAGSARTEN><BEITRAGSART>',
+      '<BARTNR>1</BARTNR><BEZ>Elternbeitrag Regelgruppe</BEZ>',
+      '</BEITRAGSART></BEITRAGSARTEN>',
+    ].join(''));
+    zip.file('bartbetr.xml', [
+      '<BARTBETRAEGE><BEITRAGSSATZ>',
+      '<BARTNR>1</BARTNR><GUELTIGVON>01.01.2026</GUELTIGVON>',
+      '<BETRAGZ1>80</BETRAGZ1><BETRAGZ2>90,50</BETRAGZ2><BETRAGZ5>120</BETRAGZ5>',
+      '</BEITRAGSSATZ></BARTBETRAEGE>',
+    ].join(''));
+
+    const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
+    const { rawdata } = await extractAdebisData(zipBuffer, false);
+
+    expect(rawdata.beitrartRaw).toHaveLength(1);
+    expect(rawdata.beitrartRaw[0].BEZ).toBe('Elternbeitrag Regelgruppe');
+    expect(rawdata.bartbetrRaw).toHaveLength(1);
+    expect(rawdata.bartbetrRaw[0].BETRAGZ2).toBe('90,50');
+
+    const { catalogs } = adebis2FeeCatalogs(rawdata);
+    const bands = catalogs.__DEFAULT__;
+    expect(bands).toHaveLength(3);
+    expect(bands.find((band) => band.maxHours === 3).monthlyAmount).toBe(90.5);
   });
 });

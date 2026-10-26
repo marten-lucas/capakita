@@ -1,4 +1,11 @@
 <xs:schema attributeFormDefault="unqualified" elementFormDefault="qualified" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <!--
+    Export-Vertrag beitrart.xml (adebisKITA 7.5, BEITRART.DBF aus ct240-Schema-Dump).
+    Beitragsarten mit Klassifikation (typ/barttyp/bbereich), Abrechnungsart und der
+    Berechnungsformel (berformel, VFP/List&Label-Ausdruck). Capakita liest bartnr/bez
+    für Labels des automatischen Beitragssatz-Imports (adebisFeeCatalog.js);
+    berformel wird nur dokumentiert, NICHT ausgewertet (keine Engine-Reimplementierung).
+  -->
   <xs:element name="BEITRAGSARTEN">
     <xs:complexType>
       <xs:sequence>
@@ -7,16 +14,28 @@
             <xs:choice maxOccurs="unbounded" minOccurs="0">
               <xs:element type="xs:byte" name="BARTNR"/>
               <xs:element type="xs:string" name="BEZ"/>
+              <xs:element type="xs:string" name="KURZBEZ"/>
+              <xs:element type="xs:string" name="ID"/>
+              <xs:element type="xs:string" name="KOSTENST"/>
               <xs:element type="xs:string" name="TEXT"/>
-              <xs:element type="xs:byte" name="KOSTENST"/>
+              <xs:element type="xs:string" name="STEUERREL"/>
               <xs:element type="xs:string" name="MULTIPLE"/>
-              <xs:element type="xs:string" name="STATUS"/>
+              <xs:element type="xs:string" name="MULTIMODE"/>
               <xs:element type="xs:string" name="VARIABEL"/>
+              <xs:element type="xs:string" name="ABRART"/>
+              <xs:element type="xs:string" name="STATUS"/>
+              <xs:element type="xs:string" name="TYP"/>
+              <xs:element type="xs:string" name="BBEREICH"/>
+              <xs:element type="xs:string" name="BARTTYP"/>
+              <xs:element type="xs:short" name="FAELLIGTAG"/>
+              <xs:element type="xs:int" name="REFBARTNR"/>
+              <xs:element type="xs:string" name="BEDINGUNG"/>
+              <xs:element type="xs:string" name="BERFORMEL"/>
               <xs:element type="xs:byte" name="MNR"/>
               <xs:element type="xs:string" name="ANLDAT"/>
               <xs:element type="xs:string" name="AENDAT"/>
-              <xs:element type="xs:byte" name="ANLUSER"/>
-              <xs:element type="xs:byte" name="AENUSER"/>
+              <xs:element type="xs:byte" name="ANLUSER" minOccurs="0"/>
+              <xs:element type="xs:byte" name="AENUSER" minOccurs="0"/>
             </xs:choice>
           </xs:complexType>
         </xs:element>

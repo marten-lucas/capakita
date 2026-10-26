@@ -19,6 +19,9 @@ export async function extractAdebisData(file, isAnonymized, options = {}) {
     // Optional: Familien-/Geschwisterlogik (adebis-Datenmodell: erzber = Stern über Adressen)
     const erzberXml = findFileBySuffix(zip, 'erzber.xml');
     const adressenXml = findFileBySuffix(zip, 'adressen.xml');
+    // Optional: Beitragssätze (Staffeltabelle Beitragsart × Zeitkategorie)
+    const beitrartXml = findFileBySuffix(zip, 'beitrart.xml');
+    const bartbetrXml = findFileBySuffix(zip, 'bartbetr.xml');
 
 
     // Kids
@@ -161,6 +164,39 @@ export async function extractAdebisData(file, isAnonymized, options = {}) {
         );
     }
 
+    // Beitragsarten + Beitragssätze (Staffel je Zeitkategorie) für den automatischen
+    // Gruppen-Beitragskatalog (RE: bartbetr.BETRAGZ1..13 = Satz je Stundenzonen)
+    let beitrartRaw = [];
+    if (beitrartXml) {
+        const beitrartXmlString = await decodeXml(zip, beitrartXml);
+        beitrartRaw = extractObjectListFromXml(
+            beitrartXmlString,
+            detectXmlRecordTag(parseXml(beitrartXmlString)) || 'BEITRAGSART',
+            [
+                'BARTNR', 'BEZ', 'KURZBEZ', 'KOSTENST', 'TEXT', 'STEUERREL', 'MULTIPLE',
+                'MULTIMODE', 'VARIABEL', 'ABRART', 'STATUS', 'TYP', 'BBEREICH', 'ID',
+                'BARTTYP', 'FAELLIGTAG', 'REFBARTNR', 'BEDINGUNG', 'BERFORMEL'
+            ],
+            () => true
+        );
+    }
+
+    let bartbetrRaw = [];
+    if (bartbetrXml) {
+        const bartbetrXmlString = await decodeXml(zip, bartbetrXml);
+        bartbetrRaw = extractObjectListFromXml(
+            bartbetrXmlString,
+            detectXmlRecordTag(parseXml(bartbetrXmlString)) || 'BEITRAGSSATZ',
+            [
+                'IDNR', 'BARTNR', 'BBPARENT', 'SUBTYP', 'GUELTIGVON', 'GUELTIGBIS',
+                'BETRAG', 'BETRAGZ1', 'BETRAGZ2', 'BETRAGZ3', 'BETRAGZ4', 'BETRAGZ5',
+                'BETRAGZ6', 'BETRAGZ7', 'BETRAGZ8', 'BETRAGZ9', 'BETRAGZ10',
+                'BETRAGZ11', 'BETRAGZ12', 'BETRAGZ13'
+            ],
+            () => true
+        );
+    }
+
     return {
         importMeta: {
             mode,
@@ -175,7 +211,9 @@ export async function extractAdebisData(file, isAnonymized, options = {}) {
             grukiRaw,
             belegungRaw,
             erzberRaw,
-            adressenRaw
+            adressenRaw,
+            beitrartRaw,
+            bartbetrRaw
         }
     };
 }

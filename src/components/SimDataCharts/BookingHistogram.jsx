@@ -7,14 +7,17 @@ import { generateHistogramTooltip } from '../../utils/chartUtils/chartUtilsHisto
 import { createColoredYAxis } from '../../utils/highchartsAxis';
 import { selectHistogramChartData } from '../../store/chartSelectors';
 
-export default function BookingHistogram({ compact = false }) {
+export default function BookingHistogram({ compact = false, chartData: chartDataProp }) {
   const theme = useMantineTheme();
 
   const demandColor = theme.colors.blue[6];
   const capacityPedagogicalColor = theme.colors.green[6];
   const capacityAdministrativeColor = theme.colors.violet[6];
 
-  const chartData = useSelector(selectHistogramChartData);
+  // Prop-gesteuerte Daten (z. B. gruppengefilterte Analysis-Slides) schlagen den
+  // Store-Selector; der Selector-Hook bleibt unbeding aufgerufen (Rules of Hooks).
+  const selectorData = useSelector(selectHistogramChartData);
+  const chartData = chartDataProp || selectorData;
 
   // Optimized: Only recalculate when chartData changes
   const histogramOptions = useMemo(() => {

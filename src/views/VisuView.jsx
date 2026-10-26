@@ -35,6 +35,11 @@ import { calculateScenarioMonthlyFinance, isDateWithinRange, isRecordActiveOnDat
 import { buildOverlayAwareData } from '../utils/overlayUtils';
 import { isArchivedDataItem, shouldIncludeDataItemInAnalysis, getActiveDemandChildrenAtDate } from '../utils/dataVisibility';
 import { filterBookings, generateCareRatioSeries } from '../utils/chartUtils/chartUtils';
+import { buildHistogramDataFromBookings } from '../utils/chartUtils/chartUtilsHistogram';
+import { calculateZeitkatDistribution } from '../utils/chartUtils/chartUtilsZeitkat';
+import HoursHistogramSlide from '../components/SimDataCharts/HoursHistogramSlide';
+import ZeitkatHistogramSlide from '../components/SimDataCharts/ZeitkatHistogramSlide';
+import FundingSimulationPanel from '../components/SimDataCharts/FundingSimulationPanel';
 import { generateBookingDataSeries, generateTimeSegments, formatWeeklyAxisLabel } from '../utils/chartUtils/chartUtilsWeekly';
 import {
   IconChevronLeft,
@@ -843,9 +848,11 @@ const STATUS_CHART_SLIDES = [
   { id: 'demand', title: 'Kapazität & Bedarf' },
   { id: 'ratio', title: 'Schlüssel' },
   { id: 'heatmap', title: 'Heatmap (alle Gruppen)' },
+  { id: 'hours-hist', title: 'Buchungsstunden' },
+  { id: 'kategorie-hist', title: 'Buchungskategorien' },
 ];
 
-function CoverageStageCarousel({ weeklyData, categories, groups, heatValues, accent, onHoverChange, heatmapMode }) {
+function CoverageStageCarousel({ weeklyData, categories, groups, heatValues, hoursHistogram, zeitkatDistribution, accent, onHoverChange, heatmapMode }) {
   const [activeIndex, setActiveIndex] = React.useState(0);
   const [emblaApi, setEmblaApi] = React.useState(null);
   const [canGoPrev, setCanGoPrev] = React.useState(false);
@@ -960,6 +967,30 @@ function CoverageStageCarousel({ weeklyData, categories, groups, heatValues, acc
                 accent={accent}
                 mode={heatmapMode}
                 onHoverChange={onHoverChange}
+              />
+            ) : null}
+          </Box>
+        </Carousel.Slide>
+
+        <Carousel.Slide>
+          <Box className="analysis-coverage-carousel-slide">
+            {activeIndex === 3 ? (
+              <HoursHistogramSlide
+                histogram={hoursHistogram || {}}
+                groups={groups}
+                accent={accent}
+              />
+            ) : null}
+          </Box>
+        </Carousel.Slide>
+
+        <Carousel.Slide>
+          <Box className="analysis-coverage-carousel-slide">
+            {activeIndex === 4 ? (
+              <ZeitkatHistogramSlide
+                distribution={zeitkatDistribution || {}}
+                groups={groups}
+                accent={accent}
               />
             ) : null}
           </Box>
@@ -3026,6 +3057,16 @@ function VisuView() {
       const deficits = demandSeries.map((demandValue, index) => Number(demandValue || 0) - Number(capacitySeries[index] || 0));
       const undercoverageMinutes = deficits.reduce((sum, value) => sum + (value > 0 ? value * 30 : 0), 0);
 
+      // Histogramm-/Kategorien-Verteilung (A1/A2): gesamt + je Gruppe
+      const hoursHistogram = {
+        all: buildHistogramDataFromBookings(demand, capacity),
+        byGroup: {},
+      };
+      const zeitkatDistribution = {
+        all: calculateZeitkatDistribution(demand),
+        byGroup: {},
+      };
+
       const heatValues = [];
       const groupUndercoverageMinutes = [];
       const groupCapacitySeriesByGroup = {};
@@ -3040,6 +3081,8 @@ function VisuView() {
         const groupDemandSeries = generateBookingDataSeries(referenceDate, groupDemand, categories);
         const groupCapacitySeries = generateBookingDataSeries(referenceDate, groupCapacity, categories, 'all');
         groupCapacitySeriesByGroup[String(group.id)] = groupCapacitySeries.map((value) => Number(value || 0));
+        hoursHistogram.byGroup[String(group.id)] = buildHistogramDataFromBookings(groupDemand, groupCapacity);
+        zeitkatDistribution.byGroup[String(group.id)] = calculateZeitkatDistribution(groupDemand);
         const groupPedCapacitySeries = generateBookingDataSeries(referenceDate, groupCapacity, categories, 'pedagogical');
         const groupCareRatioSeries = generateCareRatioSeries(
           categories,
@@ -3104,6 +3147,8 @@ function VisuView() {
         heatValues,
         groupUndercoverageMinutes,
         groupCapacitySeriesByGroup,
+        hoursHistogram,
+        zeitkatDistribution,
       };
     };
 
@@ -3120,6 +3165,8 @@ function VisuView() {
           totalCapacity: 0,
           heatValues: [],
           groupUndercoverageMinutes: [],
+          hoursHistogram: { all: null, byGroup: {} },
+          zeitkatDistribution: { all: null, byGroup: {} },
         };
 
     let monteCarloResult = null;
@@ -3596,6 +3643,8 @@ function VisuView() {
       },
       groupsForHeatmap,
       heatValues: baselineSnapshot.heatValues,
+      hoursHistogram: baselineSnapshot.hoursHistogram,
+      zeitkatDistribution: baselineSnapshot.zeitkatDistribution,
       kpis: {
         avgCareRatio,
         minCareRatio,
@@ -5336,6 +5385,8 @@ function VisuView() {
               categories={coverageData?.categories || []}
               groups={coverageData?.groupsForHeatmap || []}
               heatValues={coverageData?.heatValues || []}
+              hoursHistogram={coverageData?.hoursHistogram || { all: null, byGroup: {} }}
+              zeitkatDistribution={coverageData?.zeitkatDistribution || { all: null, byGroup: {} }}
               accent={activeStory.accent}
               onHoverChange={handleStatusHoverChange}
               heatmapMode={heatmapMode}
@@ -5359,6 +5410,8 @@ function VisuView() {
             />
           ) : activeStory.id === 'trends' ? (
             <TrendHistoryCarousel trendData={trendHistoryData} accent={activeStory.accent} />
+          ) : activeStory.id === 'options' ? (
+            <FundingSimulationPanel accent={activeStory.accent} />
           ) : (
             <DiagramPlaceholder story={activeStory} />
           )}
