@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { Group, Avatar, Badge, Text, ActionIcon, Stack, Tooltip, Checkbox, Button, Paper, TextInput, NumberInput, SimpleGrid, Switch, Menu } from '@mantine/core';
+import { Group, Avatar, Badge, Text, ActionIcon, Stack, Tooltip, Checkbox, Button, Paper, TextInput, NumberInput, SimpleGrid, Switch, Menu, SegmentedControl } from '@mantine/core';
 import { useSelector, useDispatch } from 'react-redux';
 import { setSelectedItem, setSelectedItems, selectSelectedItemIds } from '../../store/simScenarioSlice';
 import { setDataCaptureQueueMode, setDataListFilter } from '../../store/uiSlice';
@@ -585,94 +585,100 @@ function SimDataList() {
     );
   };
 
-  return (
-    <Stack gap="sm">
-      <Paper withBorder p="sm" radius="md">
-        <Stack gap="sm">
-          <Group justify="space-between" wrap="wrap">
-            <Group gap="xs" align="center">
-              <Text size="sm" c="dimmed">Datenliste</Text>
-              {dataListFilter !== 'all' && (
-                <Badge size="xs" variant="light">Filter: {activeFilterLabel}</Badge>
-              )}
-            </Group>
-            <Group gap="xs" wrap="wrap">
-              <Button
-                size="xs"
-                variant={dataCaptureQueueMode ? 'filled' : 'light'}
-                onClick={() => dispatch(setDataCaptureQueueMode(!dataCaptureQueueMode))}
-              >
-                Erfassungs-Queue
-              </Button>
-              <Button
-                size="xs"
-                variant="light"
-                onClick={selectNextIncomplete}
-                disabled={incompleteIds.length === 0}
-              >
-                Nächster unvollständig
-              </Button>
-              <Switch
-                size="sm"
-                checked={showArchivedItems}
-                onChange={(event) => setShowArchivedItems(event.currentTarget.checked)}
-                label="Archivierte anzeigen"
-              />
-              <Menu shadow="md" width={220} position="bottom-end">
-                <Menu.Target>
-                  <ActionIcon variant="subtle" aria-label="Filter öffnen">
-                    <IconDotsVertical size={16} />
-                  </ActionIcon>
-                </Menu.Target>
-                <Menu.Dropdown>
-                  <Menu.Label>Filter</Menu.Label>
-                  <Menu.Item onClick={() => dispatch(setDataListFilter('all'))}>Alle</Menu.Item>
-                  <Menu.Item onClick={() => dispatch(setDataListFilter('incomplete'))}>Unvollständig</Menu.Item>
-                  <Menu.Item onClick={() => dispatch(setDataListFilter('missing_booking'))}>Ohne Buchung</Menu.Item>
-                  <Menu.Item onClick={() => dispatch(setDataListFilter('missing_group'))}>Ohne Gruppe</Menu.Item>
-                  <Menu.Item onClick={() => dispatch(setDataListFilter('missing_birthdate'))}>Ohne Geburtsdatum</Menu.Item>
-                  <Menu.Item onClick={() => dispatch(setDataListFilter('missing_name'))}>Ohne Name</Menu.Item>
-                </Menu.Dropdown>
-              </Menu>
-            </Group>
-          </Group>
+  const listHeader = (
+    <Stack gap="xs">
+      <Group gap="xs" wrap="nowrap">
+        <Text size="sm" fw={600}>Datenliste</Text>
+        {dataListFilter !== 'all' && (
+          <Badge size="xs" variant="light">Filter: {activeFilterLabel}</Badge>
+        )}
+      </Group>
 
-          {dataCaptureQueueMode && (
-            <Text size="xs" c="dimmed">
-              Queue aktiv: {incompleteIds.length} unvollständige Einträge erkannt.
-            </Text>
-          )}
-        </Stack>
-      </Paper>
+      <Stack gap={6}>
+        <Group gap={6} wrap="wrap">
+          <Button
+            size="xs"
+            variant={dataCaptureQueueMode ? 'filled' : 'light'}
+            onClick={() => dispatch(setDataCaptureQueueMode(!dataCaptureQueueMode))}
+          >
+            Erfassungs-Queue
+          </Button>
+          <Button
+            size="xs"
+            variant="light"
+            onClick={selectNextIncomplete}
+            disabled={incompleteIds.length === 0}
+          >
+            Nächster unvollständig
+          </Button>
+        </Group>
+        <Group gap={6} wrap="nowrap" justify="space-between">
+          <Switch
+            size="sm"
+            checked={showArchivedItems}
+            onChange={(event) => setShowArchivedItems(event.currentTarget.checked)}
+            label="Archivierte anzeigen"
+          />
+          <Menu shadow="md" width={220} position="bottom-end">
+            <Menu.Target>
+              <ActionIcon variant="subtle" aria-label="Filter öffnen">
+                <IconDotsVertical size={16} />
+              </ActionIcon>
+            </Menu.Target>
+            <Menu.Dropdown>
+              <Menu.Label>Filter</Menu.Label>
+              <Menu.Item onClick={() => dispatch(setDataListFilter('all'))}>Alle</Menu.Item>
+              <Menu.Item onClick={() => dispatch(setDataListFilter('incomplete'))}>Unvollständig</Menu.Item>
+              <Menu.Item onClick={() => dispatch(setDataListFilter('missing_booking'))}>Ohne Buchung</Menu.Item>
+              <Menu.Item onClick={() => dispatch(setDataListFilter('missing_group'))}>Ohne Gruppe</Menu.Item>
+              <Menu.Item onClick={() => dispatch(setDataListFilter('missing_birthdate'))}>Ohne Geburtsdatum</Menu.Item>
+              <Menu.Item onClick={() => dispatch(setDataListFilter('missing_name'))}>Ohne Name</Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
+        </Group>
+      </Stack>
+
+      {dataCaptureQueueMode && (
+        <Text size="xs" c="dimmed">
+          Queue aktiv: {incompleteIds.length} unvollständige Einträge erkannt.
+        </Text>
+      )}
 
       {selectedItemIds.length > 0 && (
-        <Paper withBorder p="sm" radius="md">
-          <Group justify="space-between" wrap="wrap">
-            <Text size="sm" fw={500}>{selectedItemIds.length} ausgewählt</Text>
-            <Group gap="xs">
-              <Button size="xs" variant="light" leftSection={<IconArchive size={14} />} onClick={() => handleArchiveSelected(true)}>
-                Auswahl archivieren
+        <Paper withBorder p="xs" radius="md" bg="gray.0">
+          <Stack gap={6}>
+            <Text size="xs" fw={500}>{selectedItemIds.length} ausgewählt</Text>
+            <Group gap={4} wrap="wrap">
+              <Button size="xs" variant="light" leftSection={<IconArchive size={12} />} onClick={() => handleArchiveSelected(true)}>
+                Archivieren
               </Button>
-              <Button size="xs" variant="light" leftSection={<IconArchiveOff size={14} />} onClick={() => handleArchiveSelected(false)}>
-                Aus Archiv holen
+              <Button size="xs" variant="light" leftSection={<IconArchiveOff size={12} />} onClick={() => handleArchiveSelected(false)}>
+                Aus Archiv
               </Button>
               {isMultiSelected && (
-                <Button size="xs" color="red" variant="light" leftSection={<IconTrash size={14} />} onClick={handleBulkDelete}>
-                  Auswahl löschen
+                <Button size="xs" color="red" variant="light" leftSection={<IconTrash size={12} />} onClick={handleBulkDelete}>
+                  Löschen
                 </Button>
               )}
               <Button size="xs" variant="subtle" onClick={clearSelection}>
-                Auswahl aufheben
+                Aufheben
               </Button>
             </Group>
-          </Group>
+          </Stack>
         </Paper>
       )}
+    </Stack>
+  );
 
+  return (
+    <Stack gap="sm">
       <TabbedListDetail
         data={submenuData}
         selectedId={selectedSubmenuItemId}
         onSelect={(id) => dispatch(setSelectedItem(id))}
+        listPosition="right"
+        collapsible
+        listHeader={listHeader}
         renderItem={renderItem}
         detailTitle={(item) => (isMultiSelected ? `${selectedItemIds.length} Einträge ausgewählt` : (item?.name || 'Details'))}
         detailContent={() => (
@@ -685,6 +691,7 @@ function SimDataList() {
             <Tooltip label={item.archived ? 'Aus Archiv holen' : 'Archivieren'}>
               <ActionIcon
                 data-testid={`toggle-archive-${item._key}`}
+                aria-label={item.archived ? 'Aus Archiv holen' : 'Eintrag archivieren'}
                 color={item.archived ? 'blue' : 'gray'}
                 variant="subtle"
                 onClick={() => {
@@ -705,6 +712,8 @@ function SimDataList() {
               <ActionIcon
                 color="red"
                 variant="subtle"
+                aria-label="Eintrag löschen"
+                data-testid={`delete-data-item-${item._key}`}
                 onClick={() => {
                   dispatch(deleteDataItemThunk({ scenarioId: selectedScenarioId, itemId: item._key }));
                   dispatch(setSelectedItems(selectedItemIds.filter((id) => id !== item._key)));

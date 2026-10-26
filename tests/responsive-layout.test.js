@@ -18,15 +18,26 @@ async function expectNoHorizontalOverflow(page, label) {
     const doc = document.documentElement;
     const body = document.body;
 
-    return {
-      clientWidth: doc.clientWidth,
-      scrollWidth: Math.max(doc.scrollWidth, body?.scrollWidth || 0),
-    };
+    const clientWidth = doc.clientWidth;
+    const scrollWidth = Math.max(doc.scrollWidth, body?.scrollWidth || 0);
+    const overflowElements = Array.from(document.querySelectorAll('body *'))
+      .map((element) => ({
+        tag: element.tagName.toLowerCase(),
+        className: typeof element.className === 'string' ? element.className : '',
+        testId: element.getAttribute('data-testid') || '',
+        right: Math.round(element.getBoundingClientRect().right),
+        width: Math.round(element.getBoundingClientRect().width),
+      }))
+      .filter((entry) => entry.right > clientWidth + 2)
+      .sort((left, right) => right.right - left.right)
+      .slice(0, 8);
+
+    return { clientWidth, scrollWidth, overflowElements };
   });
 
   expect(
     metrics.scrollWidth,
-    `${label} should not overflow horizontally (scrollWidth=${metrics.scrollWidth}, clientWidth=${metrics.clientWidth})`
+    `${label} should not overflow horizontally (scrollWidth=${metrics.scrollWidth}, clientWidth=${metrics.clientWidth}, overflow=${JSON.stringify(metrics.overflowElements)})`
   ).toBeLessThanOrEqual(metrics.clientWidth + 1);
 }
 

@@ -1,9 +1,9 @@
 import React from 'react';
-import { Alert, Button, Text, Menu, ActionIcon, Select, Box, Switch, Modal, Stack, Checkbox, Group, UnstyledButton } from '@mantine/core';
+import { Alert, Button, Text, Menu, ActionIcon, Select, Box, Switch, Modal, Stack, Checkbox, Group, UnstyledButton, TextInput } from '@mantine/core';
 import { useSelector, useDispatch, useStore } from 'react-redux';
-import { isSaveAllowed, setSaveDialogOpen, setLoadDialogOpen, setSelectedScenarioId } from '../store/simScenarioSlice';
+import { isSaveAllowed, setSaveDialogOpen, setLoadDialogOpen, setSelectedScenarioId, updateScenario } from '../store/simScenarioSlice';
 import { setActivePage, setAnalysisSubPage, setBrowserAutoSaveEnabled, setSettingsSubPage, setDataSubmenu, setPrivacyMode } from '../store/uiSlice';
-import { IconDatabase, IconChartBar, IconSettings, IconDotsVertical, IconUpload, IconDeviceFloppy, IconFolderOpen, IconCalendarEvent, IconInfoCircle, IconRefresh, IconTrash, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconLayersIntersect, IconUsers, IconCertificate, IconTools, IconAlertTriangle, IconRoute, IconClockHour4, IconArrowsSplit, IconUser, IconBabyCarriage, IconEye, IconEyeOff } from '@tabler/icons-react';
+import { IconDatabase, IconChartBar, IconSettings, IconDotsVertical, IconUpload, IconDeviceFloppy, IconFolderOpen, IconCalendarEvent, IconInfoCircle, IconRefresh, IconTrash, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconLayersIntersect, IconUsers, IconCertificate, IconTools, IconAlertTriangle, IconRoute, IconClockHour4, IconArrowsSplit, IconUser, IconBabyCarriage, IconEye, IconEyeOff, IconPencil } from '@tabler/icons-react';
 import { refreshEventsForScenario, clearEventOverridesForScenario } from '../store/eventSlice';
 import { updateDatesOfInterest } from '../store/datesOfInterestSlice';
 import { loadBookingsByScenario } from '../store/simBookingSlice';
@@ -150,8 +150,15 @@ function TopNav({ variant = 'sidebar', sidebarCollapsed = false, onToggleSidebar
   const [importModalOpen, setImportModalOpen] = React.useState(false);
   const [privacyModalOpen, setPrivacyModalOpen] = React.useState(false);
   const [cleanupModalOpen, setCleanupModalOpen] = React.useState(false);
+  const [renameModalOpen, setRenameModalOpen] = React.useState(false);
+  const [scenarioNameDraft, setScenarioNameDraft] = React.useState('');
+  const [scenarioNameError, setScenarioNameError] = React.useState('');
   const [resetEventOverrides, setResetEventOverrides] = React.useState(true);
-  const showScenarioSelector = (scenarios?.length || 0) > 1;
+  const selectedScenario = React.useMemo(
+    () => (scenarios || []).find((scenario) => String(scenario.id) === String(selectedScenarioId)) || null,
+    [scenarios, selectedScenarioId]
+  );
+  const showScenarioSelector = (scenarios?.length || 0) > 0;
 
   React.useEffect(() => {
     if (activeAnalysisSubPage === normalizedAnalysisSubPage) return;
@@ -171,6 +178,56 @@ function TopNav({ variant = 'sidebar', sidebarCollapsed = false, onToggleSidebar
       })),
     [scenarios]
   );
+
+  const openRenameScenario = () => {
+    if (!selectedScenario) return;
+    setScenarioNameDraft(selectedScenario.name || '');
+    setScenarioNameError('');
+    setRenameModalOpen(true);
+  };
+
+  const handleRenameScenario = () => {
+    const nextName = scenarioNameDraft.trim();
+    if (!nextName) {
+      setScenarioNameError('Bitte einen Szenarionamen eingeben.');
+      return;
+    }
+    const duplicate = (scenarios || []).some((scenario) => (
+      String(scenario.id) !== String(selectedScenarioId)
+      && String(scenario.name || '').trim().toLocaleLowerCase() === nextName.toLocaleLowerCase()
+    ));
+    if (duplicate) {
+      setScenarioNameError('Dieser Szenarioname wird bereits verwendet.');
+      return;
+    }
+    dispatch(updateScenario({ scenarioId: selectedScenarioId, updates: { name: nextName } }));
+    setRenameModalOpen(false);
+  };
+
+  const scenarioPicker = showScenarioSelector ? (
+    <Group gap={4} wrap="nowrap" align="center">
+      <Select
+        aria-label="Szenario auswählen"
+        placeholder="Szenario wählen"
+        data={scenarioOptions}
+        value={selectedScenarioId ? String(selectedScenarioId) : null}
+        onChange={(value) => value && dispatch(setSelectedScenarioId(value))}
+        allowDeselect={false}
+        size={variant === 'mobile-header' ? 'xs' : 'sm'}
+        className={variant === 'mobile-header' ? 'app-mobile-scenario-select' : undefined}
+        style={{ flex: 1, minWidth: 0 }}
+      />
+      <ActionIcon
+        variant="subtle"
+        aria-label="Szenario umbenennen"
+        title="Szenario umbenennen"
+        disabled={!selectedScenario}
+        onClick={openRenameScenario}
+      >
+        <IconPencil size={16} />
+      </ActionIcon>
+    </Group>
+  ) : null;
 
   const handleAutoSaveToggle = (nextEnabled) => {
     if (nextEnabled) {
@@ -328,18 +385,7 @@ function TopNav({ variant = 'sidebar', sidebarCollapsed = false, onToggleSidebar
             </Text>
 
             <Group wrap="nowrap" gap="xs" style={{ flex: 1, minWidth: 0, justifyContent: 'flex-end' }}>
-              {showScenarioSelector && (
-                <Select
-                  aria-label="Szenario auswählen"
-                  placeholder="Szenario wählen"
-                  data={scenarioOptions}
-                  value={selectedScenarioId ? String(selectedScenarioId) : null}
-                  onChange={(value) => value && dispatch(setSelectedScenarioId(value))}
-                  allowDeselect={false}
-                  size="xs"
-                  className="app-mobile-scenario-select"
-                />
-              )}
+              {scenarioPicker}
               {openActionMenu}
             </Group>
           </Group>
@@ -369,17 +415,7 @@ function TopNav({ variant = 'sidebar', sidebarCollapsed = false, onToggleSidebar
               </ActionIcon>
             </Group>
 
-            {!sidebarCollapsed && showScenarioSelector && (
-              <Select
-                aria-label="Szenario auswählen"
-                placeholder="Szenario wählen"
-                data={scenarioOptions}
-                value={selectedScenarioId ? String(selectedScenarioId) : null}
-                onChange={(value) => value && dispatch(setSelectedScenarioId(value))}
-                allowDeselect={false}
-                size="sm"
-              />
-            )}
+            {!sidebarCollapsed && scenarioPicker}
 
             {navigation}
 
@@ -472,6 +508,39 @@ function TopNav({ variant = 'sidebar', sidebarCollapsed = false, onToggleSidebar
       )}
 
       <DataImportModal opened={importModalOpen} onClose={() => setImportModalOpen(false)} />
+
+      <Modal
+        opened={renameModalOpen}
+        onClose={() => setRenameModalOpen(false)}
+        title="Szenario umbenennen"
+        centered
+      >
+        <Stack gap="md">
+          <TextInput
+            label="Szenarioname"
+            value={scenarioNameDraft}
+            onChange={(event) => {
+              setScenarioNameDraft(event.currentTarget.value);
+              setScenarioNameError('');
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') handleRenameScenario();
+            }}
+            error={scenarioNameError || undefined}
+            autoFocus
+            maxLength={120}
+            data-testid="scenario-rename-input"
+          />
+          <Group justify="flex-end">
+            <Button variant="subtle" onClick={() => setRenameModalOpen(false)}>
+              Abbrechen
+            </Button>
+            <Button onClick={handleRenameScenario} data-testid="scenario-rename-save">
+              Speichern
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
 
       <Modal
         opened={cleanupModalOpen}

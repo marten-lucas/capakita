@@ -39,11 +39,13 @@ npm run test:e2e:basic:all
 npm run test:e2e:basic:all:headed
 ```
 
-### Level 4: `full-all` (Comprehensive - Default in CI)
-- **All tests** + **All 4 datasets**
-- Best for: Final validation, CI/CD pipeline
+### Level 4: `full-all` (Comprehensive)
+- **All tests** + **All 5 datasets**
+- Best for: Final validation and scheduled/manual exhaustive runs
 - Time: ~40-120 minutes
-- Tests: All tests × 4 datasets (manual + all imports, detailed validations, filters)
+- Tests: All tests × 5 datasets (manual + all imports, detailed validations, filters)
+
+Note: GitHub Pages push workflow runs unit tests + production build. The GitHub Release workflow runs `test:e2e:smoke`; it does not run `full-all`.
 
 ```bash
 npm run test:e2e:full:all
@@ -71,6 +73,7 @@ The following anonymized datasets are used:
 | Johannes-202505 | kita-anonym-71814654.zip | 34 | 12 | May 2025 snapshot |
 | Johannes-202511 | kita-anonym-29247781.zip | 43 | 11 | Nov 2025 snapshot |
 | Johannes-202602 | kita-anonym-55055120.zip | 43 | 11 | Feb 2026 snapshot |
+| Johannes-202605 | kita-anonym-53181382.zip | ? | ? | May 2026 snapshot |
 
 ## Test Structure
 
@@ -79,6 +82,8 @@ The following anonymized datasets are used:
 - ✅ Export/Import roundtrip
 - ✅ Chart presence and basic rendering
 - ✅ Data import and basic validation
+- ✅ Data-list sidepanel: right placement, collapse/expand, filters, archive toggle, capture queue, selection, bulk archive/restore/delete and bulk validity/qualification/cost edits
+- ✅ Scenario picker: rename selected scenario; reject blank and duplicate names
 
 ### Full Tests (Additional)
 - ✅ Event management (toggle events)
@@ -89,10 +94,16 @@ The following anonymized datasets are used:
 
 ## CI/CD Recommendation
 
-For CI pipelines, use `full-all` for maximum coverage:
+CI coverage is split by workflow:
+
+- `deploy-pages.yml` (every push to `main`): unit tests + production build; **no Playwright**.
+- `release.yml` (release/tag): `npm run test:e2e:smoke` (targeted Playwright smoke suite, desktop/tablet/smartphone responsive projects).
+- `full-all` is available for exhaustive manual runs; it is not currently a CI gate.
+
+For a full local run:
 
 ```bash
-TEST_LEVEL=full-all npm run test:e2e
+npm run test:e2e:full:all
 ```
 
 ## Quick Development Workflow

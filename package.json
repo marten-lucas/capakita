@@ -10,7 +10,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e:smoke": "playwright test tests/tooltip-simple.test.js tests/group-icon-picker.test.js tests/responsive-layout.test.js",
+    "test:e2e:smoke": "playwright test tests/tooltip-simple.test.js tests/group-icon-picker.test.js tests/responsive-layout.test.js tests/data-list-panel.test.js tests/scenario-rename.test.js",
     "test:e2e": "TEST_LEVEL=basic-single playwright test",
     "test:e2e:headed": "TEST_LEVEL=basic-single playwright test --headed",
     "test:e2e:basic": "TEST_LEVEL=basic-single playwright test",
