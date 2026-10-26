@@ -35,7 +35,7 @@ import { calculateScenarioMonthlyFinance, isDateWithinRange, isRecordActiveOnDat
 import { buildOverlayAwareData } from '../utils/overlayUtils';
 import { isArchivedDataItem, shouldIncludeDataItemInAnalysis, getActiveDemandChildrenAtDate } from '../utils/dataVisibility';
 import { filterBookings, generateCareRatioSeries } from '../utils/chartUtils/chartUtils';
-import { buildHistogramDataFromBookings } from '../utils/chartUtils/chartUtilsHistogram';
+import { buildHistogramDataFromBookings, generateSharedHistogramBins } from '../utils/chartUtils/chartUtilsHistogram';
 import { calculateZeitkatDistribution } from '../utils/chartUtils/chartUtilsZeitkat';
 import HoursHistogramSlide from '../components/SimDataCharts/HoursHistogramSlide';
 import ZeitkatHistogramSlide from '../components/SimDataCharts/ZeitkatHistogramSlide';
@@ -3057,9 +3057,11 @@ function VisuView() {
       const deficits = demandSeries.map((demandValue, index) => Number(demandValue || 0) - Number(capacitySeries[index] || 0));
       const undercoverageMinutes = deficits.reduce((sum, value) => sum + (value > 0 ? value * 30 : 0), 0);
 
-      // Histogramm-/Kategorien-Verteilung (A1/A2): gesamt + je Gruppe
+      // Histogramm-/Kategorien-Verteilung (A1/A2): gesamt + je Gruppe.
+      // Gemeinsame Bins für alle Gruppen (Voraussetzung für gestapelte Serien).
+      const sharedHistogramBins = generateSharedHistogramBins(demand, capacity);
       const hoursHistogram = {
-        all: buildHistogramDataFromBookings(demand, capacity),
+        all: buildHistogramDataFromBookings(demand, capacity, sharedHistogramBins),
         byGroup: {},
       };
       const zeitkatDistribution = {
@@ -3081,7 +3083,7 @@ function VisuView() {
         const groupDemandSeries = generateBookingDataSeries(referenceDate, groupDemand, categories);
         const groupCapacitySeries = generateBookingDataSeries(referenceDate, groupCapacity, categories, 'all');
         groupCapacitySeriesByGroup[String(group.id)] = groupCapacitySeries.map((value) => Number(value || 0));
-        hoursHistogram.byGroup[String(group.id)] = buildHistogramDataFromBookings(groupDemand, groupCapacity);
+        hoursHistogram.byGroup[String(group.id)] = buildHistogramDataFromBookings(groupDemand, groupCapacity, sharedHistogramBins);
         zeitkatDistribution.byGroup[String(group.id)] = calculateZeitkatDistribution(groupDemand);
         const groupPedCapacitySeries = generateBookingDataSeries(referenceDate, groupCapacity, categories, 'pedagogical');
         const groupCareRatioSeries = generateCareRatioSeries(

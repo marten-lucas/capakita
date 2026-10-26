@@ -56,19 +56,56 @@ export function calculateHistogramSeries(filteredBookings, bins, binSize = 4, mo
 }
 
 /**
- * Baut die Histogramm-Datenstruktur aus bereits gefilterten Buchungen
- * (Wiederverwendung für gruppengefilterte Analysis-Slides ohne Re-Filterung).
+ * Gemeinsame Bins für alle Gruppen (Max über Demand- UND Kapazitätsbuchungen) –
+ * Voraussetzung für gestapelte Gruppen-Serien mit identischer X-Achse.
  */
-export function buildHistogramDataFromBookings(filteredDemandBookings, filteredCapacityBookings) {
-  // Calculate max hours to determine bin range
+export function generateSharedHistogramBins(filteredDemandBookings, filteredCapacityBookings, binSize = 4) {
   const maxHours = Math.max(
     ...filteredDemandBookings.map((booking) => demandBookingHours(booking)),
     ...filteredCapacityBookings.map((booking) => sumBookingHours(booking, { mode: 'pedagogical' })),
     ...filteredCapacityBookings.map((booking) => sumBookingHours(booking, { mode: 'administrative' })),
-    12 // Minimum range of 12 hours (so at least 0, 1-4, 5-8, 9-12)
+    12
   );
+  return generateHistogramBins(maxHours, binSize);
+}
+
+/**
+ * Entfernt leere Kategorien am ENDE der X-Achse (über alle Serien), behält aber
+ * innere Nullen (sinnvolle Lücken) und mindestens eine Kategorie.
+ * @returns {{ categories: Array, series: Array, count: number }}
+ */
+export function trimTrailingEmptyCategories(categories, seriesList) {
+  const cats = Array.isArray(categories) ? categories : [];
+  const series = (seriesList || []).map((serie) => ({
+    ...serie,
+    data: (serie?.data || []).map((value) => Number(value) || 0),
+  }));
+  if (cats.length === 0) return { categories: [], series, count: 0 };
+
+  let lastNonEmpty = -1;
+  for (let index = 0; index < cats.length; index += 1) {
+    const hasData = series.some((serie) => (serie.data[index] || 0) > 0);
+    if (hasData) lastNonEmpty = index;
+  }
+  // Alles leer: nichts trimmen (leeres Chart mit voller Achse ist aussagekräftiger)
+  if (lastNonEmpty < 0) return { categories: [...cats], series, count: cats.length };
+
+  const count = lastNonEmpty + 1;
+  return {
+    categories: cats.slice(0, count),
+    series: series.map((serie) => ({ ...serie, data: serie.data.slice(0, count) })),
+    count,
+  };
+}
+
+/**
+ * Baut die Histogramm-Datenstruktur aus bereits gefilterten Buchungen
+ * (Wiederverwendung für gruppengefilterte Analysis-Slides ohne Re-Filterung).
+ * @param {Array|null} sharedCategories - optionale gemeinsame Bins (Stacking über Gruppen)
+ */
+export function buildHistogramDataFromBookings(filteredDemandBookings, filteredCapacityBookings, sharedCategories = null) {
   const binSize = 4;
-  const categories = generateHistogramBins(maxHours, binSize);
+  const categories = sharedCategories || generateSharedHistogramBins(filteredDemandBookings, filteredCapacityBookings, binSize);
   const demandSeries = calculateHistogramSeries(filteredDemandBookings, categories, binSize, 'all');
   const capacityPedagogicalSeries = calculateHistogramSeries(filteredCapacityBookings, categories, binSize, 'pedagogical');
   const capacityAdministrativeSeries = calculateHistogramSeries(filteredCapacityBookings, categories, binSize, 'administrative');
