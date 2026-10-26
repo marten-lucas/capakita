@@ -1,14 +1,17 @@
 <xs:schema attributeFormDefault="unqualified" elementFormDefault="qualified" xmlns:xs="http://www.w3.org/2001/XMLSchema">
   <!--
     Export-Vertrag erzber.xml (adebisKITA 7.5).
-    Reverse-Engineering (ERZBER.DBF, ct240-Schema-Dump): Link-Tabelle
-    Erziehungsberechtigte-Adresse ↔ Kind (Familie = Stern über adrnr).
-    Capakita leitet daraus Geschwister-Beziehungen ab (Kinder, die mindestens
-    eine adrnr teilen, Union-Find über getrennte Elternadressen).
-    Logikflags kommen als ".T."/".". Vom Adebis-Export ist die Tabelle explizit
-    in die Auswahl aufzunehmen (Standardexport enthält sie nicht).
+    Reverse-Engineering (ERZBER.DBF, ct240-Schema-Dump + Export-Registry in
+    kita.exe): Link-Tabelle Erziehungsberechtigte-Adresse ↔ Kind (Familie = Stern
+    über adrnr). Capakita leitet daraus Geschwister-Beziehungen ab (Kinder, die
+    mindestens eine adrnr teilen, Union-Find über getrennte Elternadressen).
+    Logikflags kommen als ".T."/".".
+    Die Tabelle ist Teil des festen XML-Export-Umfangs (Datei → Export/Import →
+    Daten exportieren/importieren, frmxmlbackup; Root-Element
+    ERZIEHUNGSBERECHTIGTE). Der Record-Tag variiert je Version – Capakita
+    erkennt ihn automatisch (detectXmlRecordTag, erstes Kindelement des Roots).
   -->
-  <xs:element name="ERZBER">
+  <xs:element name="ERZIEHUNGSBERECHTIGTE">
     <xs:complexType>
       <xs:sequence>
         <xs:element name="ERZBERLINK" maxOccurs="unbounded" minOccurs="0">

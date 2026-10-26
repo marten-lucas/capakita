@@ -13,6 +13,12 @@ Status: **UMGESETZT (v2, 26.10.2026)** · Basis: Code-Ist-Analyse + Reverse-Engi
 | C Simulation + Betroffenheit | `foerderSimulation.simulateZeitkatUpgrade` (nextZone/targetZone/minHours, globaler Nutzungsgrad-Slider, Δ×12 Jahresbetrachtung) + `FundingSimulationPanel` im Story-Step 06 „Optionen-Check" (KPIs, Kinder-/Familien-Ranking, Klick-Sprung ins Kind-Detail) | `foerderSimulation.test.js` (12), `FundingSimulationPanel.test.jsx` (2) |
 | Beitragssatz-Import | Reader liest `beitrart.xml`/`bartbetr.xml`; `adebisFeeCatalog.adebis2FeeCatalogs` mappt BETRAGZn → ZEITKAT-Zonen-Bänder (historische Zone '03' übersprungen, einrichtungsweite Staffel → alle Gruppen, `__DEFAULT__` ohne Gruppen); automatische Übernahme via `preparedImport.scenarioFinance` (greift bei Erstimport, überschreibt keine manuellen Kataloge) | `adebisFeeCatalog.test.js` (6), Reader-Regression |
 
+**Export-Nachtrag (26.10.2026, RE: frmxmlbackup):** Der Dialog „Sicherungsdatei erstellen“
+(Datei → Export/Import) IST der XML-Export mit fester Tabellen-Registry — erzber/
+adressen/beitrart/bartbetr sind bereits im Standardexport enthalten, keine Erweiterung
+nötig. Reader-Fixes daraus: UTF-8-Erkennung (Export-Option „in UTF-8“) und
+Record-Erkennung über direkte Root-Kinder (ERZBER-Feld/Tag-Kollision).
+
 Entscheidungen des Users (26.10.2026): Zielzonen = alle 3 Modi (Default nextZone) · Δ×12 genügt ·
 Nutzungsgrad globaler Slider · Finanz-KPI-Sprung später (deshalb gated) · nur Wochenstunden-Histogramm.
 

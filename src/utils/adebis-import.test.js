@@ -596,6 +596,50 @@ describe('Adebis import regression', () => {
     expect(relations.families).toEqual([]);
   });
 
+  it('liest erzber.xml mit dem echten Export-Root ERZIEHUNGSBERECHTIGTE (RE: Export-Registry)', async () => {
+    // frmxmlbackup schreibt Root-Namen aus der festen Export-Registry;
+    // der Record-Tag variiert und wird von Capakita auto-erkannt.
+    const zip = new JSZip();
+    zip.file('kind.xml', [
+      '<KINDER><KIND>',
+      '<KINDNR>56</KINDNR><NAME>Reuter</NAME><STATUS>+</STATUS><AUSTRDAT></AUSTRDAT>',
+      '</KIND><KIND>',
+      '<KINDNR>82</KINDNR><NAME>Reuter</NAME><STATUS>+</STATUS><AUSTRDAT></AUSTRDAT>',
+      '</KIND></KINDER>',
+    ].join(''));
+    zip.file('erzber.xml', [
+      '<ERZIEHUNGSBERECHTIGTE><ERZBER>',
+      '<IDNR>1</IDNR><ADRNR>10</ADRNR><KINDNR>56</KINDNR><ERZBER>.T.</ERZBER>',
+      '</ERZBER><ERZBER>',
+      '<IDNR>2</IDNR><ADRNR>10</ADRNR><KINDNR>82</KINDNR><ERZBER>.T.</ERZBER>',
+      '</ERZBER></ERZIEHUNGSBERECHTIGTE>',
+    ].join(''));
+
+    const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
+    const { rawdata } = await extractAdebisData(zipBuffer, false);
+
+    expect(rawdata.erzberRaw).toHaveLength(2);
+    const relations = buildFamilyRelations(rawdata);
+    expect(relations.source).toBe('erzber');
+    expect(relations.kindnrToFamilyId['56']).toBe(relations.kindnrToFamilyId['82']);
+  });
+
+  it('decodiert UTF-8-Exporte (BOM und XML-Deklaration) korrekt', async () => {
+    const withBom = `\uFEFF<ADRESSEN><ADRESSE><ADRNR>1</ADRNR><NAME>M\u00FCller</NAME></ADRESSE></ADRESSEN>`;
+    const withDeclaration = '<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>' +
+      '<BEITRAGSARTEN><BEITRAGSART><BARTNR>2</BARTNR><BEZ>Gr\u00FCn</BEZ></BEITRAGSART></BEITRAGSARTEN>';
+
+    const zip = new JSZip();
+    zip.file('adressen.xml', withBom);
+    zip.file('beitrart.xml', withDeclaration);
+
+    const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
+    const { rawdata } = await extractAdebisData(zipBuffer, false);
+
+    expect(rawdata.adressenRaw[0].NAME).toBe('Müller');
+    expect(rawdata.beitrartRaw[0].BEZ).toBe('Grün');
+  });
+
   it('liest beitrart.xml/bartbetr.xml für den automatischen Beitragssatz-Import', async () => {
     const zip = new JSZip();
     zip.file('beitrart.xml', [
