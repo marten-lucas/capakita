@@ -12,6 +12,7 @@ import {
   deleteQualificationAssignment,
 } from '../../store/simQualificationSlice';
 import QualificationPicker from './QualificationPicker';
+import SimDataFamilySection from './SimDataFamilySection';
 
 function SimDataGeneralTab() {
   const dispatch = useDispatch();
@@ -197,6 +198,8 @@ function SimDataGeneralTab() {
               />
             </Paper>
           )}
+
+          {itemType === 'demand' && <SimDataFamilySection item={item} />}
         </Stack>
       </Tabs.Panel>
 

@@ -1,0 +1,39 @@
+<xs:schema attributeFormDefault="unqualified" elementFormDefault="qualified" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <!--
+    Export-Vertrag erzber.xml (adebisKITA 7.5).
+    Reverse-Engineering (ERZBER.DBF, ct240-Schema-Dump): Link-Tabelle
+    Erziehungsberechtigte-Adresse ↔ Kind (Familie = Stern über adrnr).
+    Capakita leitet daraus Geschwister-Beziehungen ab (Kinder, die mindestens
+    eine adrnr teilen, Union-Find über getrennte Elternadressen).
+    Logikflags kommen als ".T."/".". Vom Adebis-Export ist die Tabelle explizit
+    in die Auswahl aufzunehmen (Standardexport enthält sie nicht).
+  -->
+  <xs:element name="ERZBER">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="ERZBERLINK" maxOccurs="unbounded" minOccurs="0">
+          <xs:complexType>
+            <xs:choice maxOccurs="unbounded" minOccurs="0">
+              <xs:element type="xs:int" name="IDNR"/>
+              <xs:element type="xs:int" name="LFDNR"/>
+              <xs:element type="xs:int" name="ADRNR"/>
+              <xs:element type="xs:int" name="KINDNR"/>
+              <xs:element type="xs:string" name="ERZBER"/>
+              <xs:element type="xs:string" name="ALLEINERZ"/>
+              <xs:element type="xs:string" name="ALLEINSORG"/>
+              <xs:element type="xs:string" name="BEITRZAHL"/>
+              <xs:element type="xs:string" name="BEZZUKIND"/>
+              <xs:element type="xs:string" name="ABHOLER"/>
+              <xs:element type="xs:string" name="POST"/>
+              <xs:element type="xs:string" name="ANLDAT"/>
+              <xs:element type="xs:string" name="AENDAT"/>
+              <xs:element type="xs:byte" name="ANLUSER" minOccurs="0"/>
+              <xs:element type="xs:byte" name="AENUSER" minOccurs="0"/>
+              <xs:element type="xs:byte" name="MNR"/>
+            </xs:choice>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

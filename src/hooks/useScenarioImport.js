@@ -5,6 +5,7 @@ import { createId } from '../utils/idUtils';
 import { addScenario, setSelectedItems, updateScenario } from '../store/simScenarioSlice';
 import { refreshAllEvents } from '../store/eventSlice';
 import { extractAdebisData } from '../utils/adebis-reader';
+import { buildFamilyRelations, attachFamilyInfo } from '../utils/adebisFamily';
 import { isRecordActiveOnDate } from '../utils/financeUtils';
 import {
   adebis2simData,
@@ -60,6 +61,13 @@ function buildPreparedImport({
 }) {
   const today = new Date().toISOString().slice(0, 10);
   const { simDataList } = adebis2simData(rawdata.kidsRaw, rawdata.employeesRaw, rawdata.belegungRaw);
+  // Familien-/Geschwisterlogik: erzber/adressen wenn im Export, sonst Haushalts-Fallback
+  const familyRelations = buildFamilyRelations({
+    kidsRaw: rawdata.kidsRaw,
+    erzberRaw: rawdata.erzberRaw,
+    adressenRaw: rawdata.adressenRaw,
+  });
+  attachFamilyInfo(simDataList, familyRelations);
   const { bookings, bookingReference } = adebis2bookings(rawdata.belegungRaw, rawdata.employeesRaw);
   const groupDefs = adebis2GroupDefs(rawdata.groupsRaw);
   const activeEmployeeRawdata = simDataList
@@ -129,6 +137,7 @@ function buildPreparedImport({
     importMeta,
     isAnonymized,
     simDataList,
+    familySource: familyRelations.source,
     groupDefs,
     qualiDefs,
     recordOptions,

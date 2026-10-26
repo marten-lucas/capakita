@@ -13,7 +13,9 @@ import chartReducer from '../store/chartSlice';
 import eventReducer from '../store/eventSlice';
 import datesOfInterestReducer from '../store/datesOfInterestSlice';
 import { isRecordActiveOnDate } from './financeUtils';
+import JSZip from 'jszip';
 import { extractAdebisData } from './adebis-reader';
+import { buildFamilyRelations, attachFamilyInfo } from './adebisFamily';
 import {
   adebis2simData,
   adebis2bookings,
@@ -492,5 +494,104 @@ describe('Adebis import regression', () => {
       expect(simDataList.some((item) => String(item.rawdata?.KINDNR) === kindId), `Orphaned kind ${kindId} must not exist in simDataList`).toBe(false);
       expect(Object.entries(dataByScenario).some(([, item]) => item.type === 'demand' && String(item.rawdata?.KINDNR) === kindId), `Orphaned kind ${kindId} must not exist in dataByScenario`).toBe(false);
     });
+  });
+
+  it('extrahiert Familien-/Haushaltsfelder aus kind.xml (RE: NAME/Adresse/Geschwister)', async () => {
+    const zipPath = path.resolve(process.cwd(), 'tests/testdata', 'kita-anonym-29247781.zip');
+    const zipBuffer = await readFile(zipPath);
+    const { rawdata } = await extractAdebisData(zipBuffer, false);
+
+    expect(rawdata.erzberRaw).toEqual([]);
+    expect(rawdata.adressenRaw).toEqual([]);
+
+    const kindWithAddress = rawdata.kidsRaw.find((k) => k.STRASSE && k.PLZ);
+    expect(kindWithAddress).toBeTruthy();
+    expect(kindWithAddress.NAME).toBeTruthy();
+    expect(Object.prototype.hasOwnProperty.call(kindWithAddress, 'GESCHW1VN')).toBe(true);
+    expect(Object.prototype.hasOwnProperty.call(kindWithAddress, 'ANZGESCHW')).toBe(true);
+  });
+
+  it('importiert erzber.xml/adressen.xml, wenn der Export sie enthält', async () => {
+    const zip = new JSZip();
+    zip.file('kind.xml', [
+      '<KINDER><KIND>',
+      '<KINDNR>56</KINDNR><NAME>Reuter</NAME><VORNAME>Erkan</VORNAME>',
+      '<STRASSE>Tröstgasse 85-57</STRASSE><PLZ>77515</PLZ><WOHNORT>Hofgeismar</WOHNORT>',
+      '<STATUS>+</STATUS><AUSTRDAT></AUSTRDAT>',
+      '</KIND><KIND>',
+      '<KINDNR>82</KINDNR><NAME>Reuter</NAME><VORNAME>Ingrid</VORNAME>',
+      '<STRASSE>Tröstgasse 85-57</STRASSE><PLZ>77515</PLZ><WOHNORT>Hofgeismar</WOHNORT>',
+      '<STATUS>+</STATUS><AUSTRDAT></AUSTRDAT>',
+      '</KIND></KINDER>',
+    ].join(''));
+    zip.file('erzber.xml', [
+      '<ERZBER><ERZBERLINK>',
+      '<IDNR>1</IDNR><ADRNR>10</ADRNR><KINDNR>56</KINDNR><ERZBER>.T.</ERZBER>',
+      '</ERZBERLINK><ERZBERLINK>',
+      '<IDNR>2</IDNR><ADRNR>10</ADRNR><KINDNR>82</KINDNR><ERZBER>.T.</ERZBER>',
+      '</ERZBERLINK></ERZBER>',
+    ].join(''));
+    zip.file('adressen.xml', [
+      '<ADRESSEN><ADRESSE>',
+      '<ADRNR>10</ADRNR><NAME>Reuter</NAME><VORNAME>Petra</VORNAME><ERZBER>.T.</ERZBER>',
+      '</ADRESSE></ADRESSEN>',
+    ].join(''));
+
+    const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
+    const { rawdata } = await extractAdebisData(zipBuffer, false);
+
+    expect(rawdata.erzberRaw).toHaveLength(2);
+    expect(rawdata.erzberRaw[0].ERZBER).toBe('.T.');
+    expect(rawdata.adressenRaw).toHaveLength(1);
+    expect(rawdata.adressenRaw[0].NAME).toBe('Reuter');
+
+    const relations = buildFamilyRelations(rawdata);
+    expect(relations.source).toBe('erzber');
+    expect(relations.kindnrToFamilyId['56']).toBe(relations.kindnrToFamilyId['82']);
+    expect(relations.families[0].label).toBe('Familie Reuter');
+  });
+
+  it('nutzt den Haushalts-Fallback, wenn erzber.xml fehlt (Standard-Export)', async () => {
+    // Reale Exporte: Zuordnung je Kind vorhanden (Familie der Größe 1)
+    const zipPath = path.resolve(process.cwd(), 'tests/testdata', 'kita-anonym-29247781.zip');
+    const zipBuffer = await readFile(zipPath);
+    const { rawdata } = await extractAdebisData(zipBuffer, false);
+
+    const relations = buildFamilyRelations(rawdata);
+    expect(relations.source).toBe('haushalt');
+
+    const { simDataList } = adebis2simData(rawdata.kidsRaw, rawdata.employeesRaw, rawdata.belegungRaw);
+    attachFamilyInfo(simDataList, relations);
+
+    const demandItems = simDataList.filter((item) => item.type === 'demand');
+    expect(demandItems.filter((item) => item.familyId).length).toBeGreaterThan(0);
+
+    // Geschwisterpaar über gemeinsamen Haushalt (synthetisch, da Testdaten keine Paare haben)
+    const pairZip = new JSZip();
+    pairZip.file('kind.xml', [
+      '<KINDER><KIND>',
+      '<KINDNR>56</KINDNR><NAME>Reuter</NAME><STRASSE>Tröstgasse 85-57</STRASSE><PLZ>77515</PLZ><WOHNORT>Hofgeismar</WOHNORT><STATUS>+</STATUS><AUSTRDAT></AUSTRDAT>',
+      '</KIND><KIND>',
+      '<KINDNR>82</KINDNR><NAME>Reuter</NAME><STRASSE>Tröstgasse 85-57</STRASSE><PLZ>77515</PLZ><WOHNORT>Hofgeismar</WOHNORT><STATUS>+</STATUS><AUSTRDAT></AUSTRDAT>',
+      '</KIND><KIND>',
+      '<KINDNR>94</KINDNR><NAME>Berger</NAME><STRASSE>Heinzweg 706</STRASSE><PLZ>15991</PLZ><WOHNORT>Pfaffenhofen</WOHNORT><STATUS>+</STATUS><AUSTRDAT></AUSTRDAT>',
+      '</KIND></KINDER>',
+    ].join(''));
+
+    const pairBuffer = await pairZip.generateAsync({ type: 'nodebuffer' });
+    const pairResult = await extractAdebisData(pairBuffer, false);
+    const pairRelations = buildFamilyRelations(pairResult.rawdata);
+    expect(pairRelations.source).toBe('haushalt');
+    expect(pairRelations.kindnrToFamilyId['56']).toBe(pairRelations.kindnrToFamilyId['82']);
+    expect(pairRelations.kindnrToFamilyId['94']).not.toBe(pairRelations.kindnrToFamilyId['56']);
+  });
+
+  it('anonymisierte Importe erzeugen keine Schein-Familien (leere Adressfelder)', async () => {
+    const zipPath = path.resolve(process.cwd(), 'tests/testdata', 'kita-anonym-29247781.zip');
+    const zipBuffer = await readFile(zipPath);
+    const { rawdata } = await extractAdebisData(zipBuffer, true);
+
+    const relations = buildFamilyRelations(rawdata);
+    expect(relations.families).toEqual([]);
   });
 });

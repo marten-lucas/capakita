@@ -1,5 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { sumBookingHours } from '../utils/bookingUtils';
+import { sumWeightedBookingHours } from '../utils/chartUtils/chartUtils';
 import { hasAllowedChildStatus } from '../utils/dataVisibility';
 
 const EMPTY_RESULT = {
@@ -294,7 +295,8 @@ function snapshotWeeklyHoursAtDate(bookingMap, date) {
   let total = 0;
   Object.values(bookingMap || {}).forEach((booking) => {
     if (!isActiveOn(date, booking?.startdate, booking?.enddate)) return;
-    total += sumBookingHours(booking, { mode: 'all' });
+    // BETRSTD-bewusst (belegung.BETRSTD statt Segment-Summe, RE adebisKITA 7.5)
+    total += sumWeightedBookingHours(booking);
   });
   return total;
 }
@@ -451,7 +453,7 @@ export const selectHistoricalStatistics = createSelector(
           if (!isActiveOn(evaluationDate, booking?.startdate, booking?.enddate)) return;
 
           if (item?.type === 'demand') {
-            bookingHours += sumBookingHours(booking, { mode: 'all' });
+            bookingHours += sumWeightedBookingHours(booking);
           }
 
           if (item?.type === 'capacity') {

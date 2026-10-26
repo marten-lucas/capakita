@@ -1,0 +1,36 @@
+<xs:schema attributeFormDefault="unqualified" elementFormDefault="qualified" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <!--
+    Export-Vertrag adressen.xml (adebisKITA 7.5).
+    Reverse-Engineering (ADRESSEN.DBF, ct240-Schema-Dump): zentraler Personenstamm;
+    alle Bezugspersonen (erzber-Flag), Mitarbeitende (mitarb), Ärzte, Jugendämter
+    in einer Tabelle. Capakita nutzt ADRNR+NAME für Familien-Labels im
+    Geschwister-UI; die restlichen Felder dokumentieren den Vertrag.
+    Logikflags kommen als ".T."/".". Der Standardexport enthält adressen.xml nicht.
+  -->
+  <xs:element name="ADRESSEN">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="ADRESSE" maxOccurs="unbounded" minOccurs="0">
+          <xs:complexType>
+            <xs:choice maxOccurs="unbounded" minOccurs="0">
+              <xs:element type="xs:int" name="ADRNR"/>
+              <xs:element type="xs:string" name="ANREDE"/>
+              <xs:element type="xs:string" name="TITEL"/>
+              <xs:element type="xs:string" name="NAME"/>
+              <xs:element type="xs:string" name="VORNAME"/>
+              <xs:element type="xs:string" name="STRASSE"/>
+              <xs:element type="xs:string" name="LKZ"/>
+              <xs:element type="xs:string" name="PLZ"/>
+              <xs:element type="xs:string" name="WOHNORT"/>
+              <xs:element type="xs:string" name="FAMSTAND"/>
+              <xs:element type="xs:string" name="ERZBER"/>
+              <xs:element type="xs:string" name="MITARB"/>
+              <xs:element type="xs:string" name="TELEFON"/>
+              <xs:element type="xs:string" name="EMAIL"/>
+            </xs:choice>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

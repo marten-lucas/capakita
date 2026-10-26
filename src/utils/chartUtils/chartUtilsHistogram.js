@@ -1,5 +1,11 @@
-import { filterBookings } from '../chartUtils/chartUtils';
+import { filterBookings, sumWeightedBookingHours } from '../chartUtils/chartUtils';
 import { sumBookingHours } from '../bookingUtils';
+
+// Demand-Wochenstunden BETRSTD-bewusst (adebis-Kalkulation statt Segment-Summe),
+// Kapazität weiter über Segment-Modi (anstell kennt kein BETRSTD).
+function demandBookingHours(booking) {
+  return sumWeightedBookingHours(booking);
+}
 
 /**
  * Generate histogram bins for booking hours
@@ -38,7 +44,7 @@ export function calculateHistogramSeries(filteredBookings, bins, binSize = 4, mo
   const series = new Array(bins.length).fill(0);
   
   filteredBookings.forEach(booking => {
-    const totalHours = sumBookingHours(booking, { mode });
+    const totalHours = mode === 'all' ? demandBookingHours(booking) : sumBookingHours(booking, { mode });
     if (totalHours <= 0) return;
     const binIndex = getBinIndex(totalHours, binSize);
     if (binIndex >= 0 && binIndex < series.length) {
@@ -79,7 +85,7 @@ export function calculateChartDataHistogram(
 
   // Calculate max hours to determine bin range
   const maxHours = Math.max(
-    ...filteredDemandBookings.map((booking) => sumBookingHours(booking)),
+    ...filteredDemandBookings.map((booking) => demandBookingHours(booking)),
     ...filteredCapacityBookings.map((booking) => sumBookingHours(booking, { mode: 'pedagogical' })),
     ...filteredCapacityBookings.map((booking) => sumBookingHours(booking, { mode: 'administrative' })),
     12 // Minimum range of 12 hours (so at least 0, 1-4, 5-8, 9-12)

@@ -28,6 +28,14 @@ export function findFileBySuffix(zip, suffix) {
   return null;
 }
 
+// Ermittelt das Record-Tag eines adebis-Export-XMLs (erstes Kindelement des Root-Elements).
+// Nötig, da die Export-Namen je Tabelle variieren (KINDER/KIND, BELEGUNGEN/BELEGUNGSBUCHUNG …).
+export function detectXmlRecordTag(xml) {
+  const xmlDoc = typeof xml === 'string' ? parseXml(xml) : xml;
+  const firstChild = xmlDoc?.documentElement?.children?.[0];
+  return firstChild?.tagName || null;
+}
+
 // Extracts a list of objects from an XML string or Document, given the parent tag, fields, filter, and options
 export function extractObjectListFromXml(xml, parentTag, fields, filterFn, options = {}) {
   const xmlDoc = typeof xml === 'string' ? parseXml(xml) : xml;

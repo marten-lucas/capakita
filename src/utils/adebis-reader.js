@@ -1,6 +1,6 @@
 import { loadZip } from './zipUtils';
 import { isFutureOrEmptyDate } from './dateUtils';
-import { decodeXml, findFileBySuffix, extractObjectListFromXml } from './xmlUtils';
+import { decodeXml, findFileBySuffix, extractObjectListFromXml, detectXmlRecordTag, parseXml } from './xmlUtils';
 
 // Extracts and filters the kids, employees, groups, group assignments, and bookings from an Adebis ZIP file
 export async function extractAdebisData(file, isAnonymized, options = {}) {
@@ -16,6 +16,9 @@ export async function extractAdebisData(file, isAnonymized, options = {}) {
     const gruppeXml = findFileBySuffix(zip, 'gruppe.xml');
     const grukiXml = findFileBySuffix(zip, 'gruki.xml');
     const belegungXml = findFileBySuffix(zip, 'belegung.xml');
+    // Optional: Familien-/Geschwisterlogik (adebis-Datenmodell: erzber = Stern über Adressen)
+    const erzberXml = findFileBySuffix(zip, 'erzber.xml');
+    const adressenXml = findFileBySuffix(zip, 'adressen.xml');
 
 
     // Kids
@@ -27,13 +30,23 @@ export async function extractAdebisData(file, isAnonymized, options = {}) {
             'KIND',
             [
                 'KINDNR', 'AUFNDAT', 'AUSTRDAT', 'GRUNR', 'GEBDATUM', 'FNAME', 'STATUS',
-                'SUBSTATUS', 'SCHULART', 'SPRACHE', 'GESCHLECHT'
+                'SUBSTATUS', 'SCHULART', 'SPRACHE', 'GESCHLECHT',
+                // Familien-/Geschwisterbasis: Familienname + Haushaltsadresse + adebis-Geschwisterfelder
+                'NAME', 'VORNAME', 'STRASSE', 'LKZ', 'PLZ', 'WOHNORT', 'ORTSTEIL',
+                'ANZGESCHW', 'GESCHW1VN', 'GESCHW1GD', 'GESCHW2VN', 'GESCHW2GD',
+                'GESCHW3VN', 'GESCHW3GD'
             ],
             k => {
                 if (!isSnapshotMode) return true;
                 return isFutureOrEmptyDate(k.AUSTRDAT) && k.STATUS === '+';
             },
-            { anonymizeFields: ['FNAME'], anonymize: isAnonymized }
+            {
+                anonymizeFields: [
+                    'FNAME', 'NAME', 'VORNAME', 'STRASSE', 'PLZ', 'WOHNORT', 'ORTSTEIL',
+                    'GESCHW1VN', 'GESCHW2VN', 'GESCHW3VN'
+                ],
+                anonymize: isAnonymized
+            }
         );
     } else {
         warnings.push({ code: 'MISSING_KIND_XML', message: 'kind.xml nicht gefunden.' });
@@ -114,6 +127,40 @@ export async function extractAdebisData(file, isAnonymized, options = {}) {
         warnings.push({ code: 'MISSING_BELEGUNG_XML', message: 'belegung.xml nicht gefunden.' });
     }
 
+    // Erziehungsberechtigte-Verknüpfungen (erzber: adrnr ↔ kindnr, EB-/Abholer-/Beitragszahler-Flags)
+    let erzberRaw = [];
+    if (erzberXml) {
+        const erzberXmlString = await decodeXml(zip, erzberXml);
+        erzberRaw = extractObjectListFromXml(
+            erzberXmlString,
+            detectXmlRecordTag(parseXml(erzberXmlString)) || 'ERZBER',
+            [
+                'IDNR', 'LFDNR', 'ADRNR', 'KINDNR', 'ERZBER', 'ALLEINERZ', 'ALLEINSORG',
+                'BEITRZAHL', 'BEZZUKIND', 'ABHOLER', 'POST'
+            ],
+            () => true
+        );
+    }
+
+    // Adressstamm (Personen/Institutionen) für Familien-Labels
+    let adressenRaw = [];
+    if (adressenXml) {
+        const adressenXmlString = await decodeXml(zip, adressenXml);
+        adressenRaw = extractObjectListFromXml(
+            adressenXmlString,
+            detectXmlRecordTag(parseXml(adressenXmlString)) || 'ADRESSE',
+            [
+                'ADRNR', 'ANREDE', 'TITEL', 'NAME', 'VORNAME', 'STRASSE', 'LKZ', 'PLZ',
+                'WOHNORT', 'FAMSTAND', 'ERZBER', 'MITARB'
+            ],
+            () => true,
+            {
+                anonymizeFields: ['ANREDE', 'TITEL', 'NAME', 'VORNAME', 'STRASSE', 'PLZ', 'WOHNORT'],
+                anonymize: isAnonymized
+            }
+        );
+    }
+
     return {
         importMeta: {
             mode,
@@ -126,7 +173,9 @@ export async function extractAdebisData(file, isAnonymized, options = {}) {
             employeesRaw,
             groupsRaw,
             grukiRaw,
-            belegungRaw
+            belegungRaw,
+            erzberRaw,
+            adressenRaw
         }
     };
 }

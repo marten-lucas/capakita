@@ -1,9 +1,6 @@
-import { generateExpertRatioTimeDimension, generateCareRatioTimeDimension } from '../chartUtils/chartUtils';
-import { sumBookingHours } from '../bookingUtils';
+import { generateExpertRatioTimeDimension, generateCareRatioTimeDimension, sumWeightedBookingHours } from '../chartUtils/chartUtils';
 import { getPeriodBoundsForCategory, rangesOverlap, resolveGroupIdAtDate, splitBookingByGroupAtDate } from '../financeUtils';
 import { shouldIncludeDataItemInAnalysis } from '../dataVisibility';
-import { segmentMatchesMode } from '../bookingUtils';
-import { timeToMinutes } from '../timeUtils';
 
 function normalizeDateValue(value) {
     if (value === null || value === undefined) return '';
@@ -72,32 +69,8 @@ function getBookingEnd(booking) {
     );
 }
 
-function getSegmentShareFactor(segment) {
-    const allocation = Number(segment?.allocationSharePercent);
-    if (!Number.isFinite(allocation)) return 1;
-    return Math.max(0, allocation) / 100;
-}
-
-function sumWeightedBookingHours(booking, options = {}) {
-    if (!Array.isArray(booking?.times)) return 0;
-    const mode = options.mode || 'all';
-    let totalMinutes = 0;
-
-    booking.times.forEach((day) => {
-        if (!Array.isArray(day?.segments)) return;
-        day.segments.forEach((segment) => {
-            if (!segmentMatchesMode(segment, mode)) return;
-
-            const startMinutes = timeToMinutes(segment?.booking_start);
-            const endMinutes = timeToMinutes(segment?.booking_end);
-            if (startMinutes === null || endMinutes === null || endMinutes <= startMinutes) return;
-
-            totalMinutes += (endMinutes - startMinutes) * getSegmentShareFactor(segment);
-        });
-    });
-
-    return totalMinutes / 60;
-}
+// sumWeightedBookingHours (BETRSTD-bewusst) wird aus chartUtils importiert;
+// BETRSTD (belegung.BETRSTD) ist die autoritative Wochenstundenzahl von adebis.
 
 /**
  * Generate categories for midterm chart from today until the latest event date.
@@ -285,7 +258,7 @@ export function calculateChartDataMidterm(
                 return;
             }
             itemBookings.forEach((booking) => {
-                if (rangesOverlap(getBookingStart(booking), getBookingEnd(booking), chartRange.start, chartRange.end) && sumBookingHours(booking) > 0) {
+                if (rangesOverlap(getBookingStart(booking), getBookingEnd(booking), chartRange.start, chartRange.end) && sumWeightedBookingHours(booking) > 0) {
                     filteredDemandBookings.push({
                         ...booking,
                         itemId,

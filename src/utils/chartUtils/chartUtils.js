@@ -2,16 +2,38 @@ import { segmentMatchesMode } from '../bookingUtils';
 import { timeToMinutes } from '../timeUtils';
 import { shouldIncludeDataItemInAnalysis } from '../dataVisibility';
 import { resolveGroupIdAtDate, splitBookingByGroupAtDate } from '../financeUtils';
-import { getGewkatFactor } from '../adebisConstants';
+import { getGewkatFactor, isAdebisTrue } from '../adebisConstants';
+
+// Backward-compatible re-export (zuvor hier definiert, jetzt zentral in adebisConstants)
+export { isAdebisTrue };
 
 /**
- * Adebis-Logikflag (VFP-Export als ".T."/".F.") robust auswerten.
+ * Betreuungsstunden laut adebis (belegung.BETRSTD, Wochensumme der Buchung).
+ *
+ * Reverse-Engineering: adebis berechnet BETRSTD selbst aus der Buchung (zkmanu/
+ * Rundungen inklusive) und ist damit die autoritative Wochenstunden-Angabe.
+ * Der Export liefert dezimale Strings,Komma oder Punkt.
+ * Rückgabe: Stunden (number) oder null, wenn nicht verwertbar.
  */
-export function isAdebisTrue(value) {
-  if (value === true) return true;
-  if (typeof value !== 'string') return false;
-  const v = value.trim().toUpperCase();
-  return v === '.T.' || v === 'T' || v === 'TRUE' || v === '1';
+export function getBookingBetrstdHours(booking) {
+  const raw = booking?.rawdata?.BETRSTD ?? booking?.rawdata?.betrstd;
+  if (raw === undefined || raw === null || raw === '') return null;
+  const value = Number(String(raw).trim().replace(',', '.'));
+  if (!Number.isFinite(value) || value <= 0) return null;
+  return value;
+}
+
+/**
+ * true, wenn mindestens ein Segment eine explizite Aufteilung (allocationSharePercent)
+ * besitzt – in dem Fall ist die Segmentsumme die (editierte) Wahrheit und BETRSTD
+ * darf sie nicht überschreiben.
+ */
+function hasExplicitSegmentAllocation(booking) {
+  if (!Array.isArray(booking?.times)) return false;
+  return booking.times.some((day) =>
+    Array.isArray(day?.segments)
+    && day.segments.some((segment) => segment?.allocationSharePercent != null)
+  );
 }
 
 /**
@@ -74,9 +96,25 @@ function getSegmentShareFactor(segment) {
   return Math.max(0, allocation) / 100;
 }
 
-function sumWeightedBookingHours(booking, options = {}) {
-  if (!Array.isArray(booking?.times)) return 0;
+/**
+ * Wochenstunden einer Buchung.
+ *
+ * Reverse-Engineering-Korrektur (adebisKITA 7.5):
+ * - Für Demand-Buchungen mit verwertbarem BETRSTD wird dieser Wert statt der
+ *   Segment-Summe verwendet (Autorität: adebis-Kalkulation; deckt zkmanu- und
+ *   Rundungsabweichungen ab).
+ * - Bei expliziter Segmentaufteilung (allocationSharePercent) oder im
+ *   pedagogical/administrative-Modus bleibt es bei der Segment-Summe,
+ *   da BETRSTD nur eine Gesamtwochenstundenzahl kennt.
+ */
+export function sumWeightedBookingHours(booking, options = {}) {
   const mode = options.mode || 'all';
+  if (mode === 'all' && options.preferBetrstd !== false && !hasExplicitSegmentAllocation(booking)) {
+    const betrstd = getBookingBetrstdHours(booking);
+    if (betrstd != null) return betrstd;
+  }
+
+  if (!Array.isArray(booking?.times)) return 0;
   let totalMinutes = 0;
 
   booking.times.forEach((day) => {

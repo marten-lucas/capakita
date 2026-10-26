@@ -87,6 +87,17 @@ export const BUCHUNGSART_CATALOG = {
   K: { code: 'K', label: 'K', name: 'Kurzzeitbuchung', gruppe: 'kurzzeit', basis: true },
 };
 
+/**
+ * Adebis-Logikflag (VFP-Export als ".T."/".F.") robust auswerten.
+ * Zentrale Definition (zuvor in chartUtils, dort weiterhin re-exportiert).
+ */
+export function isAdebisTrue(value) {
+  if (value === true) return true;
+  if (typeof value !== 'string') return false;
+  const v = value.trim().toUpperCase();
+  return v === '.T.' || v === 'T' || v === 'TRUE' || v === '1';
+}
+
 /** Liefert den Buchungszeitfaktor für eine Zeitkategorie-ID (null = unbekannt). */
 export function getZeitkatFactor(zeitkatId) {
   if (!zeitkatId) return null;
