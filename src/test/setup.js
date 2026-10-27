@@ -1,49 +1,51 @@
 import '@testing-library/jest-dom'
 
-if (!window.CSS) {
-	window.CSS = {};
-}
+if (typeof window !== 'undefined') {
+	if (!window.CSS) {
+		window.CSS = {};
+	}
 
-if (typeof window.CSS.supports !== 'function') {
-	window.CSS.supports = () => false;
-}
+	if (typeof window.CSS.supports !== 'function') {
+		window.CSS.supports = () => false;
+	}
 
-if (typeof window.matchMedia !== 'function') {
-	window.matchMedia = (query) => ({
-		matches: false,
-		media: query,
-		onchange: null,
-		addListener: () => {},
-		removeListener: () => {},
-		addEventListener: () => {},
-		removeEventListener: () => {},
-		dispatchEvent: () => false,
-	});
-}
+	if (typeof window.matchMedia !== 'function') {
+		window.matchMedia = (query) => ({
+			matches: false,
+			media: query,
+			onchange: null,
+			addListener: () => {},
+			removeListener: () => {},
+			addEventListener: () => {},
+			removeEventListener: () => {},
+			dispatchEvent: () => false,
+		});
+	}
 
-if (typeof window.IntersectionObserver !== 'function') {
-	class IntersectionObserverMock {
-		constructor() {}
-		disconnect() {}
-		observe() {}
-		unobserve() {}
-		takeRecords() {
-			return [];
+	if (typeof window.IntersectionObserver !== 'function') {
+		class IntersectionObserverMock {
+			constructor() {}
+			disconnect() {}
+			observe() {}
+			unobserve() {}
+			takeRecords() {
+				return [];
+			}
 		}
+
+		window.IntersectionObserver = IntersectionObserverMock;
+		globalThis.IntersectionObserver = IntersectionObserverMock;
 	}
 
-	window.IntersectionObserver = IntersectionObserverMock;
-	globalThis.IntersectionObserver = IntersectionObserverMock;
-}
+	if (typeof window.ResizeObserver !== 'function') {
+		class ResizeObserverMock {
+			constructor() {}
+			disconnect() {}
+			observe() {}
+			unobserve() {}
+		}
 
-if (typeof window.ResizeObserver !== 'function') {
-	class ResizeObserverMock {
-		constructor() {}
-		disconnect() {}
-		observe() {}
-		unobserve() {}
+		window.ResizeObserver = ResizeObserverMock;
+		globalThis.ResizeObserver = ResizeObserverMock;
 	}
-
-	window.ResizeObserver = ResizeObserverMock;
-	globalThis.ResizeObserver = ResizeObserverMock;
 }
