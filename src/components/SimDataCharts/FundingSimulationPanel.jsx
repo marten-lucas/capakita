@@ -37,7 +37,6 @@ function FundingSimulationPanel({ accent }) {
   const [utilizationPercent, setUtilizationPercent] = React.useState(100);
   const [temporaryPrices, setTemporaryPrices] = React.useState(EMPTY_TEMPORARY_PRICES);
   const [activeTab, setActiveTab] = React.useState('groups');
-  const [openFeeGroup, setOpenFeeGroup] = React.useState(null);
   const groupTableRef = React.useRef(null);
   const childTableRef = React.useRef(null);
   const familyTableRef = React.useRef(null);
@@ -67,13 +66,6 @@ function FundingSimulationPanel({ accent }) {
     return Array.from(byGroup.values());
   }, [categoryPriceRows]);
 
-  React.useEffect(() => {
-    setOpenFeeGroup((current) => (
-      current && tariffGroups.some((group) => group.id === current)
-        ? current
-        : (tariffGroups[0]?.id || null)
-    ));
-  }, [tariffGroups]);
 
   const getTemporaryPrice = (groupId, priceKey, originalAmount) => {
     const value = temporaryPrices?.[groupId]?.[priceKey];
@@ -232,8 +224,7 @@ function FundingSimulationPanel({ accent }) {
           {tariffGroups.length > 0 ? (
             <Accordion
               variant="separated"
-              value={openFeeGroup}
-              onChange={setOpenFeeGroup}
+              defaultValue={tariffGroups[0]?.id || null}
               data-testid="simulation-tariff-groups"
             >
               {tariffGroups.map((group) => (

@@ -124,6 +124,11 @@ function createTestStore() {
   });
 }
 
+function openFuchsTariffGroup() {
+  const control = screen.getByRole('button', { name: /Fuchs/ });
+  if (control.getAttribute('aria-expanded') !== 'true') fireEvent.click(control);
+}
+
 describe('FundingSimulationPanel', () => {
   it('zeigt Tarif-Ausgangswerte, Gruppenergebnisse und Gesamtwerte', () => {
     const store = createTestStore();
@@ -153,6 +158,7 @@ describe('FundingSimulationPanel', () => {
       </Provider>
     );
 
+    openFuchsTariffGroup();
     const sourceSlider = screen.getByRole('slider', { name: 'Simulationspreis Fuchs ZEITKAT 05' });
     // Setze ZEITKAT 05 auf 150 €, identisch zum geladenen ZEITKAT-06-Preis.
     for (let index = 0; index < 10; index += 1) {
@@ -190,6 +196,7 @@ describe('FundingSimulationPanel', () => {
       </Provider>
     );
 
+    openFuchsTariffGroup();
     expect(screen.getByText('Fuchs · Staffel bis 10 h')).toBeTruthy();
     expect(screen.getByText(/ZEITKAT-Sätze fehlen; die JSON-importierten Wochenstunden-Bänder werden direkt verwendet/)).toBeTruthy();
     expect(screen.getByRole('slider', { name: 'Simulationspreis Fuchs Staffel bis 10 h' })).toBeTruthy();
@@ -204,6 +211,7 @@ describe('FundingSimulationPanel', () => {
       </Provider>
     );
 
+    openFuchsTariffGroup();
     const slider = screen.getByRole('slider', { name: 'Simulationspreis Fuchs ZEITKAT 05' });
     for (let index = 0; index < 10; index += 1) {
       fireEvent.keyDown(slider, { key: 'ArrowRight', code: 'ArrowRight' });
@@ -242,6 +250,7 @@ describe('FundingSimulationPanel', () => {
       </Provider>
     );
 
+    openFuchsTariffGroup();
     const tariffSlider = screen.getByRole('slider', { name: 'Simulationspreis Fuchs ZEITKAT 05' });
     for (let index = 0; index < 10; index += 1) {
       fireEvent.keyDown(tariffSlider, { key: 'ArrowRight', code: 'ArrowRight' });
