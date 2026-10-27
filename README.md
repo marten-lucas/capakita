@@ -62,7 +62,16 @@ npm run build
 
 ### GitHub Pages
 
-Das Projekt enthält einen Workflow für automatisches Deployment nach GitHub Pages bei Änderungen auf dem Hauptbranch.
+Das Projekt enthält einen Workflow für automatisches Deployment nach GitHub Pages bei Änderungen auf dem Hauptbranch. `npm run build:pages` erzeugt dafür den Build mit relativen Assetpfaden.
+
+### Coolify (NPM / Docker)
+
+Für Coolify stehen zwei Wege zur Verfügung:
+
+- **Dockerfile (empfohlen):** Repository verbinden, Dockerfile-Build verwenden und Container-Port `3000` veröffentlichen. Der mehrstufige Build führt `npm ci` und `npm run build:coolify` aus; der Runtime-Container startet mit `npm start`. Healthcheck: `/healthz`.
+- **Nixpacks/Node:** Build-Befehl `npm ci && npm run build:coolify`, Start-Befehl `npm start`, Port `3000`.
+
+Der Coolify-Build verwendet root-relative Assets und der Produktionsserver liefert die SPA-Fallback-Route sowie den STMAS-Dokumentproxy aus. GitHub Pages bleibt davon unabhängig. Szenarien und Autosave liegen weiterhin im jeweiligen Browser (`localStorage`); die Coolify-Instanz stellt keine gemeinsame Datenbank oder benutzerübergreifende Speicherung bereit.
 
 ### GitHub Release
 

@@ -177,13 +177,54 @@ describe('simulateContributionChanges', () => {
     expect(result.totals.deltaYearlyTotal).toBe(633);
   });
 
-  it('ignoriert Alternativ- und Ferienbuchungen und zählt fehlende ZEITKAT separat', () => {
+  it('ignoriert Alternativ- und Ferienbuchungen und zählt ZEITKAT ohne Buchungszeiten als nicht ableitbar', () => {
     const result = runSimulation({
-      bookings: [makeBooking({ art: 'F' }), makeBooking({ itemId: 'child-2', zone: '' })],
+      bookings: [makeBooking({ art: 'F' }), makeBooking({ itemId: 'child-2', zone: '', days: 0 })],
     });
-    expect(result.totals.bookingHoursBefore).toBe(3);
+    expect(result.totals.bookingHoursBefore).toBe(0);
     expect(result.totals.affectedChildren).toBe(0);
     expect(result.skippedNoZone).toBe(1);
+  });
+
+  it('leitet fehlende ZEITKAT aus Capakita-Buchungszeiten ab und simuliert JSON-Wochenstunden-Bänder', () => {
+    const booking = makeBooking({ zone: '', dailyHours: 3, days: 3 });
+    const result = simulateContributionChanges({
+      demandBookings: [booking],
+      dataItems: CHILD,
+      groupDefs: [{ id: 'g1', name: 'Sonnengruppe' }],
+      bayKiBiGRules: RULES,
+      groupFeeCatalogs: {
+        g1: [
+          { id: 'json-tier-10', label: 'Staffel bis 10 h', maxHours: 10, monthlyAmount: 100 },
+          { id: 'json-tier-20', label: 'Staffel bis 20 h', maxHours: 20, monthlyAmount: 200 },
+        ],
+      },
+      temporaryPrices: { g1: { 'band:json-tier-10': 150, 'band:json-tier-20': 150 } },
+      utilizationPercent: 50,
+      referenceDate: REF,
+    });
+
+    expect(result.perChild[0]).toMatchObject({
+      fromZone: '02',
+      toZone: '07',
+      weeklyHoursBefore: 9,
+      weeklyHoursAfter: 14.5,
+      deltaWeeklyHours: 5.5,
+      parentFeeBefore: 100,
+      parentFeeAfter: 150,
+      deltaMonthlyParentFees: 50,
+      deltaMonthly: 5.5,
+    });
+    expect(result.totals).toMatchObject({
+      childrenWithMoreHours: 1,
+      familiesWithMoreHours: 1,
+      weeklyHoursAdded: 5.5,
+      childrenWithHigherFees: 1,
+      monthlyParentCostIncrease: 50,
+      migratedBookings: 0.5,
+    });
+    expect(result.simulatedBookings[0].rawdata.ZEITKAT).toBe('07');
+    expect(booking.rawdata.ZEITKAT).toBe('');
   });
 
   it('mutiert weder die geladenen Staffeln noch Buchungen', () => {

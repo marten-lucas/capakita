@@ -7,6 +7,7 @@ import { refreshAllEvents } from '../store/eventSlice';
 import { extractAdebisData } from '../utils/adebis-reader';
 import { buildFamilyRelations, attachFamilyInfo } from '../utils/adebisFamily';
 import { adebis2FeeCatalogs } from '../utils/adebisFeeCatalog';
+import { hasZeitkatFeeCatalog, mergeImportedZeitkatFeeCatalogs } from '../utils/scenarioFinanceImport';
 import { isRecordActiveOnDate } from '../utils/financeUtils';
 import {
   adebis2simData,
@@ -579,11 +580,23 @@ export function useScenarioImport() {
       const shouldTakeIncomingFinance = mergeMode === 'replace'
         || conflictPolicy === 'overwrite'
         || !hasExistingScenarioFinanceData;
+      const isAdebisFeeImport = preparedImport.importMeta?.mode !== 'capakita'
+        && hasZeitkatFeeCatalog(incomingScenarioFinance.groupFeeCatalogs);
 
       if (shouldTakeIncomingFinance) {
         mergedScenarioFinance = {
           ...defaultScenarioFinance,
           ...incomingScenarioFinance,
+        };
+      } else if (mergeMode === 'append' && isAdebisFeeImport) {
+        // ADEBIS rates are additive source data: don't let existing manual
+        // weekly-hour bands prevent the new per-ZEITKAT rates from loading.
+        mergedScenarioFinance = {
+          ...existingScenarioFinance,
+          groupFeeCatalogs: mergeImportedZeitkatFeeCatalogs(
+            existingScenarioFinance.groupFeeCatalogs,
+            incomingScenarioFinance.groupFeeCatalogs
+          ),
         };
       }
     }

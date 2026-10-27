@@ -586,7 +586,7 @@ function OrgaTabFinance({ section = 'all' }) {
           <div>
             <Text fw={600}>Beitragskataloge pro Gruppe</Text>
             <Text size="sm" c="dimmed">
-              Jede Gruppe hat ihren eigenen Katalog mit maximalen Wochenstunden und Gueltigkeiten.
+              ZEITKAT-Beitragssätze aus ADEBIS und manuelle Wochenstunden-Bänder werden hier getrennt erkannt.
             </Text>
           </div>
 
@@ -624,13 +624,19 @@ function OrgaTabFinance({ section = 'all' }) {
             <Accordion variant="separated">
               {groupDefs.map((group) => {
                 const entries = financeScenario.groupFeeCatalogs?.[group.id] || [];
+                const zeitkatCount = entries.filter((entry) => Boolean(getFeeBandZeitkatId(entry))).length;
+                const weeklyBandCount = entries.length - zeitkatCount;
+                const entrySummary = [
+                  zeitkatCount > 0 ? `${zeitkatCount} ZEITKAT-Sätze` : null,
+                  weeklyBandCount > 0 ? `${weeklyBandCount} Wochenstunden-Bänder` : null,
+                ].filter(Boolean).join(' · ') || '0 Staffeln';
                 return (
                   <Accordion.Item key={group.id} value={group.id}>
                     <Accordion.Control>
                       <Group justify="space-between" wrap="wrap">
                         <div>
                           <Text fw={500}>{group.name || 'Gruppe'}</Text>
-                          <Text size="sm" c="dimmed">{entries.length} Staffel{entries.length === 1 ? '' : 'n'}</Text>
+                          <Text size="sm" c="dimmed">{entrySummary}</Text>
                         </div>
                       </Group>
                     </Accordion.Control>

@@ -6,8 +6,8 @@ import { setSelectedItem } from '../../store/simScenarioSlice';
 import { useOverlayData } from '../../hooks/useOverlayData';
 import { filterBookings } from '../../utils/chartUtils/chartUtils';
 import { simulateContributionChanges } from '../../utils/foerderSimulation';
-import { calculateZeitkatFeeAmount } from '../../utils/financeUtils';
-import { ZEITKAT_CATALOG } from '../../utils/adebisConstants';
+import { getFeeBandZeitkatId } from '../../utils/adebisConstants';
+import { getFeeCatalogSimulationRows } from '../../utils/foerderSimulation';
 import { CopyTableButton } from '../common/CopyToClipboardButton';
 
 const formatEuro = (value) => `${Number(value || 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
@@ -51,33 +51,26 @@ function FundingSimulationPanel({ accent }) {
     (groupDefs || []).map((group) => [String(group.id), group.name || String(group.id)])
   ), [groupDefs]);
 
-  const categoryPriceRows = React.useMemo(() => Object.entries(groupFeeCatalogs).flatMap(([groupId, catalog]) => (
-    ZEITKAT_CATALOG.flatMap((zone) => {
-      const { entry, baseAmount } = calculateZeitkatFeeAmount(catalog, zone.id, referenceDate);
-      return entry ? [{
-        groupId: String(groupId),
-        groupName: groupLabels.get(String(groupId)) || String(groupId),
-        zone,
-        originalAmount: baseAmount,
-      }] : [];
-    })
-  )), [groupFeeCatalogs, groupLabels, referenceDate]);
+  const categoryPriceRows = React.useMemo(
+    () => getFeeCatalogSimulationRows(groupFeeCatalogs, groupLabels, referenceDate),
+    [groupFeeCatalogs, groupLabels, referenceDate]
+  );
 
-  const getTemporaryPrice = (groupId, zeitkatId, originalAmount) => {
-    const value = temporaryPrices?.[groupId]?.[zeitkatId];
+  const getTemporaryPrice = (groupId, priceKey, originalAmount) => {
+    const value = temporaryPrices?.[groupId]?.[priceKey];
     return Number.isFinite(Number(value)) ? Number(value) : originalAmount;
   };
-  const setTemporaryPrice = (groupId, zeitkatId, value) => {
+  const setTemporaryPrice = (groupId, priceKey, value) => {
     if (!Number.isFinite(Number(value))) return;
     setTemporaryPrices((current) => ({
       ...current,
-      [groupId]: { ...(current[groupId] || {}), [zeitkatId]: Math.max(0, Number(value)) },
+      [groupId]: { ...(current[groupId] || {}), [priceKey]: Math.max(0, Number(value)) },
     }));
   };
-  const resetTemporaryPrice = (groupId, zeitkatId) => {
+  const resetTemporaryPrice = (groupId, priceKey) => {
     setTemporaryPrices((current) => {
       const next = { ...current, [groupId]: { ...(current[groupId] || {}) } };
-      delete next[groupId][zeitkatId];
+      delete next[groupId][priceKey];
       if (Object.keys(next[groupId]).length === 0) delete next[groupId];
       return next;
     });
@@ -154,7 +147,11 @@ function FundingSimulationPanel({ accent }) {
     monthlyParentCostReduction: 0,
   };
   const hasRule = Boolean(result?.rule && Number(result.rule.baseValue) > 0);
-  const hasZeitkatRates = categoryPriceRows.length > 0;
+  const catalogEntries = Object.values(groupFeeCatalogs).flatMap((entries) => (Array.isArray(entries) ? entries : []));
+  const hasAnyZeitkatEntries = catalogEntries.some((entry) => Boolean(getFeeBandZeitkatId(entry)));
+  const hasZeitkatRates = categoryPriceRows.some((row) => row.kind === 'zeitkat');
+  const hasWeeklyHourRates = categoryPriceRows.some((row) => row.kind === 'weeklyHours');
+  const hasSimulationFeeRows = categoryPriceRows.length > 0;
 
   const kpis = [
     { label: 'Buchungsstunden vorher', value: formatHours(totals.bookingHoursBefore), icon: IconUsers },
@@ -170,17 +167,32 @@ function FundingSimulationPanel({ accent }) {
       <Stack gap={2}>
         <Text fw={700} size="sm" style={{ color: accent }}>Simulation von Beitragsänderungen</Text>
         <Text size="xs" c="dimmed">
-          Simuliert neue absolute Elternbeiträge je ZEITKAT. Bei gleichem Preis zweier direkt aufeinanderfolgender Staffeln
-          wechselt der eingestellte Anteil der Buchungen in die höhere Stundenkategorie. Änderungen gelten nur hier und werden nicht gespeichert.
+          Verwendet die im Capakita-Datenspeicher hinterlegten ZEITKAT-Sätze oder, falls diese fehlen, JSON-importierte Wochenstunden-Bänder.
+          Fehlende ZEITKAT werden aus den gespeicherten Buchungszeiten abgeleitet. Bei gleichem Preis wechselt die Ausschöpfungsquote anteilig in die nächste Staffel.
+          Simulationspreise bleiben lokal und verändern weder Optionen noch gespeicherte Buchungen.
         </Text>
         {!hasRule ? (
           <Badge color="orange" variant="light" w="fit-content">
             Keine Förderregel mit Basiswert hinterlegt (Einstellungen → Förderregel) – Förderänderungen = 0.
           </Badge>
         ) : null}
-        {!hasZeitkatRates ? (
+        {result?.skippedNoZone > 0 ? (
           <Badge color="orange" variant="light" w="fit-content">
-            Keine ZEITKAT-Beitragsstaffeln geladen. Bitte zuerst Beitragsstaffeln aus den Optionen importieren.
+            Für {result.skippedNoZone} Buchung{result.skippedNoZone === 1 ? '' : 'en'} fehlen sowohl ZEITKAT als auch auswertbare Buchungszeiten; dafür kann keine Förderänderung berechnet werden.
+          </Badge>
+        ) : null}
+        {!hasSimulationFeeRows ? (
+          <Badge color="orange" variant="light" w="fit-content">
+            {!catalogEntries.length
+              ? 'Keine Beitragsstaffeln im Capakita-Datenspeicher gefunden. JSON-Katalog unter Optionen → Beiträge importieren.'
+              : hasAnyZeitkatEntries
+                ? `ZEITKAT-Beitragssätze sind vorhanden, aber am Stichtag ${referenceDate} nicht gültig. Bitte die Gültigkeitszeiträume in Optionen → Beiträge prüfen.`
+                : 'Der gespeicherte Katalog enthält keine verwendbaren Beitragsstaffeln für den ausgewählten Stichtag.'}
+          </Badge>
+        ) : null}
+        {!hasZeitkatRates && hasWeeklyHourRates ? (
+          <Badge color="blue" variant="light" w="fit-content">
+            ZEITKAT-Sätze fehlen; die JSON-importierten Wochenstunden-Bänder werden direkt verwendet. Fehlende ZEITKAT werden, soweit Buchungszeiten vorhanden sind, aus dem Capakita-Datenspeicher abgeleitet.
           </Badge>
         ) : null}
       </Stack>
@@ -191,7 +203,7 @@ function FundingSimulationPanel({ accent }) {
             <Stack gap={2}>
               <Text fw={600} size="sm">Ausschöpfungsquote Mehrstunden</Text>
               <Text size="xs" c="dimmed">
-                Anteil der Buchungen, die bei gleichem Beitrag in die direkt höhere ZEITKAT-Staffel wechseln.
+                Anteil der passenden Buchungen, die bei gleichem Beitrag in die nächste ZEITKAT- oder Wochenstunden-Staffel wechseln.
               </Text>
             </Stack>
             <Text fw={700} size="sm" data-testid="utilization-value">{utilizationPercent} %</Text>
@@ -208,7 +220,7 @@ function FundingSimulationPanel({ accent }) {
             data-testid="utilization-slider"
           />
           <Text size="xs" c="dimmed">
-            Beispiel: Bei 50 % wechseln rechnerisch die Hälfte der passenden Buchungen; Buchungsstunden und Förderwirkung werden anteilig berechnet.
+            Beispiel: Bei 50 % wechseln rechnerisch die Hälfte der passenden Buchungen; Stunden und Förderwirkung werden soweit aus den Buchungszeiten berechenbar anteilig ermittelt.
           </Text>
         </Stack>
       </Paper>
@@ -217,8 +229,8 @@ function FundingSimulationPanel({ accent }) {
         <Stack gap="sm">
           <Group justify="space-between" align="center" wrap="wrap">
             <Stack gap={2}>
-              <Text fw={600} size="sm">Beitragsstaffeln aus den Optionen</Text>
-              <Text size="xs" c="dimmed">Ausgangswert bleibt sichtbar. Simulationspreise sind absolute Eurobeträge und bleiben lokal/temporär.</Text>
+              <Text fw={600} size="sm">Beitragsstaffeln aus dem Capakita-Datenspeicher</Text>
+              <Text size="xs" c="dimmed">ZEITKAT-Sätze und JSON-importierte Wochenstunden-Bänder werden angezeigt. Preise sind absolute Eurobeträge; Ausgangswerte bleiben sichtbar.</Text>
             </Stack>
             {categoryPriceRows.length > 0 ? (
               <Button size="xs" variant="subtle" onClick={() => setTemporaryPrices(EMPTY_TEMPORARY_PRICES)} data-testid="reset-all-temporary-prices">
@@ -228,19 +240,24 @@ function FundingSimulationPanel({ accent }) {
           </Group>
           {categoryPriceRows.length > 0 ? (
             <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xs">
-              {categoryPriceRows.map(({ groupId, groupName, zone, originalAmount }) => {
-                const value = getTemporaryPrice(groupId, zone.id, originalAmount);
+              {categoryPriceRows.map(({ groupId, groupName, key, kind, label, detail, zeitkatId, originalAmount }) => {
+                const value = getTemporaryPrice(groupId, key, originalAmount);
                 const sliderMax = Math.max(500, Math.ceil(Math.max(originalAmount, value) / 100) * 100);
+                const cardLabel = kind === 'zeitkat' ? `${groupName} · ${label} (${detail})` : `${groupName} · ${label}`;
+                const sliderLabel = kind === 'zeitkat'
+                  ? `Simulationspreis ${groupName} ZEITKAT ${zeitkatId}`
+                  : `Simulationspreis ${groupName} ${label}`;
+                const testKey = `${groupId}-${key}`.replace(/[^a-zA-Z0-9_-]/g, '-');
                 return (
-                  <Paper key={`${groupId}-${zone.id}`} withBorder p="xs" radius="sm" data-testid={`tariff-${groupId}-${zone.id}`}>
+                  <Paper key={`${groupId}-${key}`} withBorder p="xs" radius="sm" data-testid={`tariff-${testKey}`}>
                     <Stack gap={5}>
                       <Group justify="space-between" align="flex-start" wrap="nowrap">
                         <Stack gap={1}>
-                          <Text size="sm" fw={600}>{groupName} · ZEITKAT {zone.id} ({zone.kurzbez})</Text>
-                          <Text size="xs" c="dimmed">Ausgangswert: {formatEuro(originalAmount)}</Text>
+                          <Text size="sm" fw={600}>{cardLabel}</Text>
+                          <Text size="xs" c="dimmed">{detail ? `${detail} · ` : ''}Ausgangswert: {formatEuro(originalAmount)} / Monat</Text>
                         </Stack>
                         {value !== originalAmount ? (
-                          <Button size="compact-xs" variant="subtle" onClick={() => resetTemporaryPrice(groupId, zone.id)}>
+                          <Button size="compact-xs" variant="subtle" onClick={() => resetTemporaryPrice(groupId, key)}>
                             Zurücksetzen
                           </Button>
                         ) : <Badge variant="light">unverändert</Badge>}
@@ -253,18 +270,18 @@ function FundingSimulationPanel({ accent }) {
                         decimalScale={2}
                         step={5}
                         value={value}
-                        onChange={(nextValue) => setTemporaryPrice(groupId, zone.id, nextValue)}
-                        data-testid={`tariff-input-${groupId}-${zone.id}`}
+                        onChange={(nextValue) => setTemporaryPrice(groupId, key, nextValue)}
+                        data-testid={`tariff-input-${testKey}`}
                       />
                       <Slider
                         min={0}
                         max={sliderMax}
                         step={5}
                         value={Math.min(value, sliderMax)}
-                        onChange={(nextValue) => setTemporaryPrice(groupId, zone.id, nextValue)}
-                        aria-label={`Simulationspreis ${groupName} ZEITKAT ${zone.id}`}
-                        thumbLabel={`Simulationspreis ${groupName} ZEITKAT ${zone.id}`}
-                        data-testid={`tariff-slider-${groupId}-${zone.id}`}
+                        onChange={(nextValue) => setTemporaryPrice(groupId, key, nextValue)}
+                        aria-label={sliderLabel}
+                        thumbLabel={sliderLabel}
+                        data-testid={`tariff-slider-${testKey}`}
                       />
                     </Stack>
                   </Paper>

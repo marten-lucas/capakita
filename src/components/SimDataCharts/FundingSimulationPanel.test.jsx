@@ -10,7 +10,7 @@ import simBookingReducer from '../../store/simBookingSlice';
 import simGroupReducer from '../../store/simGroupSlice';
 import simQualificationReducer from '../../store/simQualificationSlice';
 import simOverlayReducer from '../../store/simOverlaySlice';
-import simFinanceReducer from '../../store/simFinanceSlice';
+import simFinanceReducer, { setGroupFeeCatalogs } from '../../store/simFinanceSlice';
 import chartReducer from '../../store/chartSlice';
 
 const REF = '2026-03-15';
@@ -136,8 +136,8 @@ describe('FundingSimulationPanel', () => {
     );
 
     expect(screen.getByText('Simulation von Beitragsänderungen')).toBeTruthy();
-    expect(screen.getByText('Ausgangswert: 100,00 €')).toBeTruthy();
-    expect(screen.getByText('Ausgangswert: 150,00 €')).toBeTruthy();
+    expect(screen.getByText(/Ausgangswert: 100,00 € \/ Monat/)).toBeTruthy();
+    expect(screen.getByText(/Ausgangswert: 150,00 € \/ Monat/)).toBeTruthy();
     expect(screen.getByText('Gruppen & Gesamt')).toBeTruthy();
     expect(screen.getByTestId('simulation-total-row')).toBeTruthy();
     expect(screen.getByText('Buchungsstunden vorher')).toBeTruthy();
@@ -161,13 +161,38 @@ describe('FundingSimulationPanel', () => {
 
     expect(sourceSlider.getAttribute('aria-valuenow')).toBe('150');
     expect(screen.getAllByText('5,50 €').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('100,00 €').length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/100,00 €/).length).toBeGreaterThan(0);
     expect(within(screen.getByTestId('simulation-more-hours-impact')).getByText('+8,00 h pro Woche')).toBeTruthy();
     expect(within(screen.getByTestId('simulation-more-hours-impact')).getByText(/2 Kinder in 1 Familie/)).toBeTruthy();
     expect(within(screen.getByTestId('simulation-parent-cost-impact')).getByText('+100,00 € pro Monat')).toBeTruthy();
     expect(within(screen.getByTestId('simulation-parent-cost-impact')).getByText(/2 Kinder in 1 Familie/)).toBeTruthy();
     expect(store.getState().simFinance.financeByScenario['scenario-1'].groupFeeCatalogs.g1[0].monthlyAmount).toBe(100);
     expect(store.getState().simFinance.financeByScenario['scenario-1'].groupFeeCatalogs.g1[1].monthlyAmount).toBe(150);
+  });
+
+  it('zeigt JSON-importierte Wochenstunden-Staffeln als absolute Simulationspreise', () => {
+    const store = createTestStore();
+    store.dispatch(setGroupFeeCatalogs({
+      scenarioId: 'scenario-1',
+      catalogs: {
+        g1: [
+          { id: 'json-band-10', label: 'Staffel bis 10 h', maxHours: 10, monthlyAmount: 100 },
+          { id: 'json-band-20', label: 'Staffel bis 20 h', maxHours: 20, monthlyAmount: 200 },
+        ],
+      },
+    }));
+
+    render(
+      <Provider store={store}>
+        <MantineProvider>
+          <FundingSimulationPanel accent="#0f766e" />
+        </MantineProvider>
+      </Provider>
+    );
+
+    expect(screen.getByText('Fuchs · Staffel bis 10 h')).toBeTruthy();
+    expect(screen.getByText(/ZEITKAT-Sätze fehlen; die JSON-importierten Wochenstunden-Bänder werden direkt verwendet/)).toBeTruthy();
+    expect(screen.getByRole('slider', { name: 'Simulationspreis Fuchs Staffel bis 10 h' })).toBeTruthy();
   });
 
   it('setzt den temporären Einzelpreis zurück auf den geladenen Wert', () => {

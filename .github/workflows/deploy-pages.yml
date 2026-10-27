@@ -34,6 +34,9 @@ jobs:
       - name: Run unit test gate
         run: npm test
 
+      - name: Build Coolify container
+        run: docker build -t capakita-coolify-check .
+
       - name: Build app
         run: npm run build:pages
 

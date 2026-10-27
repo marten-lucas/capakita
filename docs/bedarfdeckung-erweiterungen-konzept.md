@@ -11,7 +11,7 @@ Status: **UMGESETZT (v2, 26.10.2026)** · Basis: Code-Ist-Analyse + Reverse-Engi
 | A2 Buchungskategorien-Histogramm | `chartUtilsZeitkat.calculateZeitkatDistribution` (children/bookings-Modi, nur Basisbuchungen, „ohne Kategorie"-Bucket) + Slide `kategorie-hist` mit Zeitfaktor-Tooltip | `chartUtilsZeitkat.test.js` (4) |
 | B Förderformel-Korrektur | `financeUtils.resolveZeitkatFactorForChild` + `applyZeitkatFactor`-Parameter in `calculateChildMonthlyRevenue` — **bewusst default OFF** (Decision: KPI-Sprung „später machen"); Simulation rechnet immer mit Faktor | `adebisFoerder.test.js` (10) |
 | C Simulation + Betroffenheit | `foerderSimulation.simulateContributionChanges` + Story-Step 06 „Simulation von Beitragsänderungen": absolute lokale Simulationspreise je Gruppe/ZEITKAT (Optionen-Ausgangswert bleibt sichtbar, Einzel-/Gesamt-Reset), Mehrstunden-Ausschöpfungsquote 0–100 % bei identischem Preis benachbarter Staffeln und Ergebnisübersicht nach Gruppe/Gesamt (Stunden, Förderung, Elternbeiträge, Gesamteinnahmen); Kinder-/Familien-Detail bleibt verfügbar. Lokale Änderungen werden nicht gespeichert. | `foerderSimulation.test.js`, `FundingSimulationPanel.test.jsx` |
-| Beitragssatz-Import | Reader liest `beitrart.xml`/`bartbetr.xml`; `adebisFeeCatalog.adebis2FeeCatalogs` mappt BETRAGZn direkt auf `zeitkatId` (historische Zone '03' übersprungen, einrichtungsweite Staffel → alle Gruppen, `__DEFAULT__` ohne Gruppen); tatsächliche Gebührenauswahl verwendet nun ZEITKAT statt Wochenstunden. Alte automatische Einträge mit `bart<BARTNR>-z<ZEITKAT>-…`-IDs werden beim Laden/Übertragen migriert; manuelle `maxHours`-Wochenbänder bleiben rückwärtskompatibel. Automatische Übernahme via `preparedImport.scenarioFinance` (Erstimport, überschreibt keine manuellen Kataloge). | `adebisFeeCatalog.test.js` (7), `financeUtils.test.js` (ZEITKAT vs Wochenstunden + Legacy-Migration), `simFinanceSlice.test.js` (Legacy-ID-Migration), `feeCatalogTransfer.test.js`, Reader-Regression |
+| Beitragssatz-Import | Reader liest `beitrart.xml`/`bartbetr.xml`; `adebisFeeCatalog.adebis2FeeCatalogs` mappt BETRAGZn direkt auf `zeitkatId` (historische Zone '03' übersprungen, einrichtungsweite Staffel → alle Gruppen, `__DEFAULT__` ohne Gruppen); tatsächliche Gebührenauswahl verwendet nun ZEITKAT statt Wochenstunden. Alte automatische Einträge mit `bart<BARTNR>-z<ZEITKAT>-…`-IDs werden beim Laden/Übertragen migriert; manuelle `maxHours`-Wochenbänder bleiben rückwärtskompatibel. Automatische Übernahme via `preparedImport.scenarioFinance`; auch beim ADEBIS-Anhängen werden fehlende ZEITKAT-Sätze zu bestehenden manuellen Wochenstunden-Bändern ergänzt, ohne diese zu überschreiben. Reimporte sind idempotent. | `adebisFeeCatalog.test.js` (7), `financeUtils.test.js` (ZEITKAT vs Wochenstunden + Legacy-Migration), `simFinanceSlice.test.js` (Legacy-ID-Migration), `feeCatalogTransfer.test.js`, Reader-Regression |
 
 **Export-Nachtrag (26.10.2026, RE: frmxmlbackup):** Der Dialog „Sicherungsdatei erstellen“
 (Datei → Export/Import) IST der XML-Export mit fester Tabellen-Registry — erzber/
@@ -148,18 +148,13 @@ Gruppenfilter), Regression gegen `kita-anonym-*.zip` (ZEITKAT-Verteilung nicht l
 
 ## 3. A3 – Simulation von Beitragsänderungen
 
-**Ziel-Flow**: Analyse → „Simulation von Beitragsänderungen". Die geladenen Beitragsstaffeln
-werden als Ausgangswerte je Gruppe und `ZEITKAT` angezeigt. Preise können für die Simulation
-auf absolute Monatsbeträge gesetzt werden; Ausgangswerte lassen sich einzeln oder insgesamt
-wiederherstellen. Nichts davon wird in Optionen oder Szenarien gespeichert.
+**Ziel-Flow**: Analyse → „Simulation von Beitragsänderungen". Die geladenen Beitragsstaffeln aus dem Capakita-Datenspeicher werden gruppenweise als absolute Monatsbeträge angezeigt. ZEITKAT-Sätze werden bevorzugt; JSON-importierte Wochenstunden-Bänder sind ebenfalls verwendbar. Preise können lokal geändert und einzeln oder insgesamt zurückgesetzt werden; Optionen und Szenarien bleiben unverändert.
 
 ### 3.1 Simulationsmodell
 
-- Ausschöpfungsquote (0–100 %) ist der erwartete Anteil der aktiven Basisbuchungen, der in die
-  **direkt nächste ZEITKAT** wechselt, sofern beide Staffeln derselben Gruppe nach der
-  Preisänderung exakt denselben Cent-Betrag kosten. Ohne Preisgleichheit gibt es keinen Wechsel.
-- Stunden und Förderänderung werden mit dieser Quote anteilig hochgerechnet. Förderdelta je
-  Wechsel: `Basiswert × Gewichtung × (Zeitfaktor Ziel − Zeitfaktor Ausgang)`.
+- Ausschöpfungsquote (0–100 %) ist der erwartete Anteil der aktiven Basisbuchungen, der bei identischem Simulationspreis in die direkt nächste Staffel wechselt: ZEITKAT-Sätze werden nach Buchungskategorie, JSON-Wochenstunden-Bänder nach Wochenstunden ausgewählt.
+- Wenn `rawdata.ZEITKAT` fehlt, wird die Kategorie aus mittleren Tagesstunden der gespeicherten Buchungssegmente abgeleitet. Ohne auswertbare Segmente bleibt die Förderwirkung für diesen Datensatz unbestimmt; ein Wochenstunden-Band kann weiterhin für Elternbeiträge und Mehrstunden verwendet werden.
+- Stunden und Förderänderung werden mit der Quote anteilig hochgerechnet. Förderdelta je Wechsel: `Basiswert × Gewichtung × (Zeitfaktor Ziel − Zeitfaktor Ausgang)`, sofern eine ZEITKAT vorliegt oder abgeleitet werden kann.
 - Elternbeiträge basieren vor der Simulation auf dem geladenen Satz; danach auf dem absoluten
   Simulationspreis der Ausgangsstaffel bzw. dem gewichteten Übergang, wenn die Staffelpreise
   gleich sind. Gesamteinnahmen = Förderung + Elternbeiträge.
@@ -174,7 +169,7 @@ wiederherstellen. Nichts davon wird in Optionen oder Szenarien gespeichert.
 
 `src/utils/foerderSimulation.js` stellt `simulateContributionChanges` als reine
 Transformationsfunktion bereit. Eingaben sind gefilterte Basisbuchungen, Gruppenkataloge,
-`temporaryPrices` als `{ [groupId]: { [zeitkatId]: euroBetrag } }`, Ausschöpfungsquote,
+`temporaryPrices` als `{ [groupId]: { [feeBandKey]: euroBetrag } }`, Ausschöpfungsquote,
 Förderregeln und Stichtag. Ergebnisse enthalten `groups`, `totals`, Kinder-/Familien-Drilldown
 und Overlay-artige simulierte Buchungskopien; Ausgangsdaten werden nicht mutiert.
 

@@ -1,14 +1,17 @@
 import {
   ZEITKAT_CATALOG,
   decodeBuchungsart,
+  getFeeBandZeitkatId,
   getZeitkatFactor,
   getZeitkatZoneBounds,
   getZeitkatZoneIndex,
 } from './adebisConstants';
 import { sumWeightedBookingHours } from './chartUtils/chartUtils';
 import {
-  calculateZeitkatFeeAmount,
+  findFeeEntryForHours,
+  findFeeEntryForZeitkat,
   getBayKiBiGWeightForChild,
+  isDateWithinRange,
   pickApplicableValidityEntry,
   pickLatestValidityEntry,
 } from './financeUtils';
@@ -16,6 +19,47 @@ import { minutesToTime, timeToMinutes } from './timeUtils';
 
 const roundMoney = (value) => Math.round((Number(value) || 0) * 100) / 100;
 const roundHours = (value) => Math.round((Number(value) || 0) * 100) / 100;
+
+export function getFeeBandSimulationPriceKey(entry) {
+  const zeitkatId = getFeeBandZeitkatId(entry);
+  return zeitkatId || `band:${String(entry?.id || '')}`;
+}
+
+export function getFeeCatalogSimulationRows(groupFeeCatalogs = {}, groupLabels = new Map(), referenceDate) {
+  return Object.entries(groupFeeCatalogs || {}).flatMap(([groupId, catalog]) => {
+    const feeEntries = Array.isArray(catalog) ? catalog : [];
+    const zeitkatRows = ZEITKAT_CATALOG.flatMap((zone) => {
+      const entry = findFeeEntryForZeitkat(feeEntries, zone.id, referenceDate);
+      return entry ? [{
+        groupId: String(groupId),
+        groupName: groupLabels.get(String(groupId)) || String(groupId),
+        key: getFeeBandSimulationPriceKey(entry),
+        kind: 'zeitkat',
+        label: `ZEITKAT ${zone.id}`,
+        detail: `${zone.kurzbez} h/Tag`,
+        zeitkatId: zone.id,
+        entry,
+        originalAmount: Number(entry.monthlyAmount) || 0,
+      }] : [];
+    });
+    const weeklyBandRows = feeEntries
+      .filter((entry) => !getFeeBandZeitkatId(entry))
+      .filter((entry) => isDateWithinRange(referenceDate, entry.validFrom || '', entry.validUntil || ''))
+      .map((entry) => ({
+        groupId: String(groupId),
+        groupName: groupLabels.get(String(groupId)) || String(groupId),
+        key: getFeeBandSimulationPriceKey(entry),
+        kind: 'weeklyHours',
+        label: entry.label || (Number.isFinite(Number(entry.maxHours))
+          ? `bis ${String(entry.maxHours).replace('.', ',')} Wochenstunden`
+          : 'offene Wochenstundenstaffel'),
+        detail: Number.isFinite(Number(entry.maxHours)) ? `Max. ${String(entry.maxHours).replace('.', ',')} Wochenstunden` : 'offene Wochenstundenobergrenze',
+        entry,
+        originalAmount: Number(entry.monthlyAmount) || 0,
+      }));
+    return [...zeitkatRows, ...weeklyBandRows];
+  });
+}
 
 function isBasisBooking(booking) {
   const art = booking?.buchungsart || decodeBuchungsart(booking?.rawdata?.ART);
@@ -31,61 +75,121 @@ function bookingGroupId(booking, child) {
   return String(booking?.groupId || child?.groupId || '');
 }
 
-function getEditedPrice(groupFeeCatalogs, temporaryPrices, groupId, zeitkatId, referenceDate) {
-  const feeCatalog = groupFeeCatalogs?.[groupId] || [];
-  const { entry, baseAmount } = calculateZeitkatFeeAmount(feeCatalog, zeitkatId, referenceDate);
+function segmentShareFactor(segment) {
+  const allocation = Number(segment?.allocationSharePercent);
+  return Number.isFinite(allocation) ? Math.max(0, allocation) / 100 : 1;
+}
+
+function dailyMinutes(day) {
+  return (day?.segments || []).reduce((total, segment) => {
+    const start = timeToMinutes(segment?.booking_start);
+    const end = timeToMinutes(segment?.booking_end);
+    if (start === null || end === null || end <= start) return total;
+    return total + (end - start) * segmentShareFactor(segment);
+  }, 0);
+}
+
+/** Use stored ZEITKAT first, then infer it from the mean daily duration in Capakita's booking schedule. */
+export function deriveZeitkatIdFromBooking(booking) {
+  const days = (booking?.times || []).map(dailyMinutes).filter((minutes) => minutes > 0);
+  if (days.length === 0) return null;
+  const meanDailyHours = days.reduce((sum, minutes) => sum + minutes, 0) / days.length / 60;
+  return ZEITKAT_CATALOG.find((zone) => meanDailyHours > zone.minHours && meanDailyHours <= zone.maxHours)?.id
+    || (meanDailyHours > 12 ? '13' : null);
+}
+
+function resolveBookingZeitkat(booking) {
+  const stored = String(booking?.rawdata?.ZEITKAT || '').trim();
+  return getZeitkatZoneIndex(stored) >= 0 ? stored : deriveZeitkatIdFromBooking(booking);
+}
+
+function withResolvedZeitkat(booking, zeitkatId) {
+  const stored = String(booking?.rawdata?.ZEITKAT || '').trim();
+  if (!zeitkatId || getZeitkatZoneIndex(stored) >= 0) return booking;
+  return { ...booking, rawdata: { ...(booking.rawdata || {}), ZEITKAT: zeitkatId } };
+}
+
+function getEditedFeeEntryPrice(entry, groupId, temporaryPrices) {
   if (!entry) return { entry: null, originalAmount: null, amount: null };
-  const override = temporaryPrices?.[groupId]?.[zeitkatId];
+  const originalAmount = Number(entry.monthlyAmount) || 0;
+  const key = getFeeBandSimulationPriceKey(entry);
+  const override = temporaryPrices?.[groupId]?.[key];
   return {
     entry,
-    originalAmount: baseAmount,
-    amount: Number.isFinite(Number(override)) ? roundMoney(override) : roundMoney(baseAmount),
+    originalAmount,
+    amount: Number.isFinite(Number(override)) ? roundMoney(override) : roundMoney(originalAmount),
   };
+}
+
+function getEditedZeitkatPrice(feeCatalog, groupId, zeitkatId, referenceDate, temporaryPrices) {
+  const entry = findFeeEntryForZeitkat(feeCatalog, zeitkatId, referenceDate);
+  return getEditedFeeEntryPrice(entry, groupId, temporaryPrices);
 }
 
 function chooseRule(rules, referenceDate) {
   return pickApplicableValidityEntry(rules, referenceDate) || pickLatestValidityEntry(rules) || null;
 }
 
-function resizedBooking(booking, toZeitkat, utilizationPercent) {
+function resizeBookingToZeitkat(booking, toZeitkat) {
   const targetHours = getZeitkatZoneBounds(toZeitkat)?.maxHours;
-  const utilization = Math.max(0, Math.min(100, Number(utilizationPercent) || 0)) / 100;
-  if (!Number.isFinite(targetHours) || utilization <= 0) return booking;
+  if (!Number.isFinite(targetHours)) return booking;
 
   const times = (booking?.times || []).map((day) => {
     const segments = Array.isArray(day?.segments) ? day.segments : [];
-    const validSegments = segments.map((segment) => {
-      const start = timeToMinutes(segment?.booking_start);
-      const end = timeToMinutes(segment?.booking_end);
-      return { segment, start, end };
-    }).filter(({ start, end }) => start !== null && end !== null && end > start);
-    const currentMinutes = validSegments.reduce((total, { segment, start, end }) => {
-      const allocation = Number(segment?.allocationSharePercent);
-      return total + (end - start) * (Number.isFinite(allocation) ? Math.max(0, allocation) / 100 : 1);
-    }, 0);
-    if (validSegments.length === 0 || currentMinutes <= 0) return day;
+    const currentMinutes = dailyMinutes(day);
+    if (segments.length === 0 || currentMinutes <= 0) return day;
 
     const targetMinutes = Math.max(targetHours * 60, currentMinutes);
-    const resultingMinutes = currentMinutes + (targetMinutes - currentMinutes) * utilization;
-    const scale = resultingMinutes / currentMinutes;
-    const nextSegments = segments.map((segment) => {
+    const scale = targetMinutes / currentMinutes;
+    return {
+      ...day,
+      segments: segments.map((segment) => {
+        const start = timeToMinutes(segment?.booking_start);
+        const end = timeToMinutes(segment?.booking_end);
+        if (start === null || end === null || end <= start) return segment;
+        return {
+          ...segment,
+          booking_end: minutesToTime(Math.max(start + 1, Math.round(start + (end - start) * scale))),
+        };
+      }),
+    };
+  });
+
+  const { BETRSTD: _betrstd, betrstd: _betrstdLower, ...rawdata } = booking?.rawdata || {};
+  return { ...booking, times, rawdata: { ...rawdata, ZEITKAT: toZeitkat } };
+}
+
+function resizeBookingByFactor(booking, factor) {
+  const segmentHours = sumWeightedBookingHours(booking, { preferBetrstd: false });
+  if (!Array.isArray(booking?.times) || segmentHours <= 0 || factor <= 1) return booking;
+  const times = booking.times.map((day) => ({
+    ...day,
+    segments: (day?.segments || []).map((segment) => {
       const start = timeToMinutes(segment?.booking_start);
       const end = timeToMinutes(segment?.booking_end);
       if (start === null || end === null || end <= start) return segment;
       return {
         ...segment,
-        booking_end: minutesToTime(Math.max(start + 1, Math.round(start + (end - start) * scale))),
+        booking_end: minutesToTime(Math.max(start + 1, Math.round(start + (end - start) * factor))),
       };
-    });
-    return { ...day, segments: nextSegments };
-  });
-
+    }),
+  }));
   const { BETRSTD: _betrstd, betrstd: _betrstdLower, ...rawdata } = booking?.rawdata || {};
-  return {
-    ...booking,
-    times,
-    rawdata: { ...rawdata, ZEITKAT: toZeitkat },
-  };
+  const resized = { ...booking, times, rawdata };
+  const derivedZeitkat = deriveZeitkatIdFromBooking(resized);
+  if (derivedZeitkat) resized.rawdata.ZEITKAT = derivedZeitkat;
+  return resized;
+}
+
+function findNextWeeklyBand(feeCatalog, currentEntry, referenceDate) {
+  const currentMaxHours = Number(currentEntry?.maxHours);
+  if (!Number.isFinite(currentMaxHours)) return null;
+  return (feeCatalog || [])
+    .filter((entry) => !getFeeBandZeitkatId(entry))
+    .filter((entry) => isDateWithinRange(referenceDate, entry.validFrom || '', entry.validUntil || ''))
+    .filter((entry) => Number.isFinite(Number(entry.maxHours)) && Number(entry.maxHours) > currentMaxHours)
+    .sort((left, right) => Number(left.maxHours) - Number(right.maxHours)
+      || String(right.validFrom || '').localeCompare(String(left.validFrom || '')))[0] || null;
 }
 
 function makeGroupTotals(groupId, groupName) {
@@ -102,9 +206,9 @@ function makeGroupTotals(groupId, groupName) {
 }
 
 /**
- * Simuliert absolute Elternbeitragssätze je ZEITKAT und die anteilige Nutzung
- * einer Mehrstunden-Staffel, sofern Quelle und direkt nächste Staffel gleich teuer sind.
- * Sämtliche Preisänderungen bleiben Eingabewerte der Berechnung und werden nie gespeichert.
+ * Simulate Capakita's stored tariff catalogs: ZEITKAT rates are matched by daily
+ * category; legacy JSON maxHours rates are matched by weekly booking hours. When
+ * ZEITKAT is missing, active booking times provide a read-only category fallback.
  */
 export function simulateContributionChanges({
   demandBookings = [],
@@ -149,7 +253,7 @@ export function simulateContributionChanges({
     const primaryGroupId = bookingGroupId(firstBooking, child);
     const primaryGroup = groupDefById.get(primaryGroupId) || null;
     const weight = getBayKiBiGWeightForChild(child, primaryGroup, referenceDate, weightFactors);
-    let childHoursBefore = 0;
+    const childHoursBefore = bookings.reduce((sum, booking) => sum + sumWeightedBookingHours(booking), 0);
     let childHoursAfter = 0;
     let childFundingDelta = 0;
     let childMigratedBookings = 0;
@@ -157,47 +261,48 @@ export function simulateContributionChanges({
     let firstTargetZone = null;
     let childChanged = false;
     let firstBookingGroupId = primaryGroupId;
+    const childSimulatedBookings = [];
+    const childBookingGroups = [];
 
     bookings.forEach((booking) => {
-      const zoneBefore = String(booking?.rawdata?.ZEITKAT || '').trim();
+      const zoneBefore = resolveBookingZeitkat(booking);
+      const bookingWithZone = withResolvedZeitkat(booking, zoneBefore);
       const zoneIndex = getZeitkatZoneIndex(zoneBefore);
       const groupId = bookingGroupId(booking, child);
-      const hoursBefore = sumWeightedBookingHours(booking);
-      childHoursBefore += hoursBefore;
-      totalBookingHoursBefore += hoursBefore;
+      const bookingHoursBefore = sumWeightedBookingHours(booking);
+      totalBookingHoursBefore += bookingHoursBefore;
       const groupName = groupNames.get(groupId) || groupId || 'Ohne Gruppe';
       if (!groups.has(groupId)) groups.set(groupId, makeGroupTotals(groupId, groupName));
       const group = groups.get(groupId);
       group.bookings += 1;
-      group.bookingHoursBefore += hoursBefore;
+      group.bookingHoursBefore += bookingHoursBefore;
+      childBookingGroups.push(group);
 
-      if (zoneIndex < 0) {
-        skippedNoZone += 1;
-        childHoursAfter += hoursBefore;
-        totalBookingHoursAfter += hoursBefore;
-        group.bookingHoursAfter += hoursBefore;
-        simulatedBookings.push(booking);
-        return;
-      }
-
-      const nextZone = ZEITKAT_CATALOG[zoneIndex + 1] || null;
-      const sourcePrice = getEditedPrice(groupFeeCatalogs, temporaryPrices, groupId, zoneBefore, referenceDate);
+      if (zoneIndex < 0) skippedNoZone += 1;
+      const nextZone = zoneIndex >= 0 ? ZEITKAT_CATALOG[zoneIndex + 1] || null : null;
+      const feeCatalog = groupFeeCatalogs?.[groupId] || [];
+      const sourcePrice = zoneBefore
+        ? getEditedZeitkatPrice(feeCatalog, groupId, zoneBefore, referenceDate, temporaryPrices)
+        : { entry: null, originalAmount: null, amount: null };
       const nextPrice = nextZone
-        ? getEditedPrice(groupFeeCatalogs, temporaryPrices, groupId, nextZone.id, referenceDate)
-        : { entry: null, amount: null, originalAmount: null };
-      const sameSimulatedPrice = sourcePrice.entry && nextPrice.entry
+        ? getEditedZeitkatPrice(feeCatalog, groupId, nextZone.id, referenceDate, temporaryPrices)
+        : { entry: null, originalAmount: null, amount: null };
+      const sameSimulatedZeitkatPrice = sourcePrice.entry && nextPrice.entry
         && Math.round(sourcePrice.amount * 100) === Math.round(nextPrice.amount * 100);
-      const migrationShare = sameSimulatedPrice ? utilization : 0;
+      const migrationShare = sameSimulatedZeitkatPrice ? utilization : 0;
       const zoneAfter = migrationShare > 0 ? nextZone.id : zoneBefore;
-      const originalFactor = getZeitkatFactor(zoneBefore) ?? 1;
-      const nextFactor = nextZone ? (getZeitkatFactor(nextZone.id) ?? originalFactor) : originalFactor;
-      const fundingDelta = baseValue * weight * (nextFactor - originalFactor) * migrationShare;
+      const factorBefore = zoneBefore ? getZeitkatFactor(zoneBefore) ?? 1 : null;
+      const factorAfter = zoneAfter ? getZeitkatFactor(zoneAfter) ?? factorBefore : factorBefore;
+      const fundingDelta = factorBefore == null || factorAfter == null
+        ? 0
+        : baseValue * weight * (factorAfter - factorBefore) * migrationShare;
       const simulatedBooking = migrationShare > 0
-        ? resizedBooking(booking, nextZone.id, 100)
-        : booking;
-      const hoursAfter = sumWeightedBookingHours(simulatedBooking);
-      const expectedHoursAfter = hoursBefore + (hoursAfter - hoursBefore) * migrationShare;
-      const changed = migrationShare > 0 || (sourcePrice.entry && sourcePrice.amount !== sourcePrice.originalAmount);
+        ? resizeBookingToZeitkat(bookingWithZone, nextZone.id)
+        : bookingWithZone;
+      const bookingHoursAfter = sumWeightedBookingHours(simulatedBooking);
+      const expectedHoursAfter = bookingHoursBefore + (bookingHoursAfter - bookingHoursBefore) * migrationShare;
+      const priceOverrideApplied = sourcePrice.entry && sourcePrice.amount !== sourcePrice.originalAmount;
+      const changed = migrationShare > 0 || priceOverrideApplied;
 
       childHoursAfter += expectedHoursAfter;
       totalBookingHoursAfter += expectedHoursAfter;
@@ -208,48 +313,112 @@ export function simulateContributionChanges({
         totalMigratedBookings += migrationShare;
       }
       childChanged = childChanged || changed;
-      if (!firstZone) {
+      if (!firstZone && zoneBefore) {
         firstZone = zoneBefore;
         firstTargetZone = zoneAfter;
         firstBookingGroupId = groupId;
       }
-
       group.migratedBookings += migrationShare;
       group.bookingHoursAfter += expectedHoursAfter;
       group.deltaMonthlyFunding += fundingDelta;
-
-      simulatedBookings.push(simulatedBooking);
+      childSimulatedBookings.push(simulatedBooking);
     });
 
-    const primaryZone = String(firstBooking?.rawdata?.ZEITKAT || '').trim();
-    const originalParentFee = getEditedPrice(groupFeeCatalogs, {}, primaryGroupId, primaryZone, referenceDate);
-    const simulatedSourceFee = getEditedPrice(groupFeeCatalogs, temporaryPrices, primaryGroupId, primaryZone, referenceDate);
-    const primaryZoneIndex = getZeitkatZoneIndex(primaryZone);
-    const primaryNextZone = primaryZoneIndex >= 0 ? ZEITKAT_CATALOG[primaryZoneIndex + 1] : null;
-    const primaryNextFee = primaryNextZone
-      ? getEditedPrice(groupFeeCatalogs, temporaryPrices, primaryGroupId, primaryNextZone.id, referenceDate)
-      : { entry: null, amount: null };
-    const primaryCanMigrate = Boolean(simulatedSourceFee.entry && primaryNextFee.entry
-      && Math.round(simulatedSourceFee.amount * 100) === Math.round(primaryNextFee.amount * 100));
-    const primaryMigrationShare = primaryCanMigrate ? utilization : 0;
-    const parentFeeBefore = originalParentFee.entry ? originalParentFee.originalAmount : 0;
-    const parentFeeAfter = simulatedSourceFee.entry
-      ? simulatedSourceFee.amount * (1 - primaryMigrationShare)
-        + (primaryCanMigrate ? primaryNextFee.amount * primaryMigrationShare : 0)
-      : 0;
-    const parentFeeDelta = parentFeeAfter - parentFeeBefore;
+    const primaryZone = resolveBookingZeitkat(firstBooking);
+    const primaryFeeCatalog = groupFeeCatalogs?.[primaryGroupId] || [];
+    let parentFeeBefore = 0;
+    let parentFeeAfter = 0;
+    let parentFeeDelta = 0;
+    let weeklyMigrationShare = 0;
+    const directFeeEntry = primaryZone
+      ? findFeeEntryForZeitkat(primaryFeeCatalog, primaryZone, referenceDate)
+      : null;
+
+    if (directFeeEntry) {
+      const sourceFee = getEditedFeeEntryPrice(directFeeEntry, primaryGroupId, temporaryPrices);
+      const baselineFee = getEditedFeeEntryPrice(directFeeEntry, primaryGroupId, {});
+      const primaryNextZone = ZEITKAT_CATALOG[getZeitkatZoneIndex(primaryZone) + 1] || null;
+      const nextFee = primaryNextZone
+        ? getEditedZeitkatPrice(primaryFeeCatalog, primaryGroupId, primaryNextZone.id, referenceDate, temporaryPrices)
+        : { entry: null, originalAmount: null, amount: null };
+      const canMigrate = Boolean(nextFee.entry && Math.round(sourceFee.amount * 100) === Math.round(nextFee.amount * 100));
+      const migrationShare = canMigrate ? utilization : 0;
+      parentFeeBefore = baselineFee.originalAmount;
+      parentFeeAfter = sourceFee.amount * (1 - migrationShare)
+        + (canMigrate ? nextFee.amount * migrationShare : 0);
+      parentFeeDelta = parentFeeAfter - parentFeeBefore;
+      childChanged = childChanged || sourceFee.amount !== sourceFee.originalAmount;
+    } else {
+      const sourceBand = findFeeEntryForHours(primaryFeeCatalog, childHoursBefore, referenceDate);
+      const nextBand = sourceBand ? findNextWeeklyBand(primaryFeeCatalog, sourceBand, referenceDate) : null;
+      if (sourceBand) {
+        const baselineFee = getEditedFeeEntryPrice(sourceBand, primaryGroupId, {});
+        const sourceFee = getEditedFeeEntryPrice(sourceBand, primaryGroupId, temporaryPrices);
+        const nextFee = getEditedFeeEntryPrice(nextBand, primaryGroupId, temporaryPrices);
+        const canMigrate = Boolean(nextBand && Math.round(sourceFee.amount * 100) === Math.round(nextFee.amount * 100));
+        weeklyMigrationShare = canMigrate ? utilization : 0;
+        parentFeeBefore = baselineFee.originalAmount;
+        parentFeeAfter = sourceFee.amount * (1 - weeklyMigrationShare)
+          + (canMigrate ? nextFee.amount * weeklyMigrationShare : 0);
+        parentFeeDelta = parentFeeAfter - parentFeeBefore;
+        childChanged = childChanged || sourceFee.amount !== sourceFee.originalAmount;
+
+        if (weeklyMigrationShare > 0 && Number.isFinite(Number(nextBand.maxHours))) {
+          const targetWeeklyHours = Math.max(childHoursBefore, Number(nextBand.maxHours));
+          const weeklyGrowth = (targetWeeklyHours - childHoursBefore) * weeklyMigrationShare;
+          const segmentHoursBefore = bookings.reduce(
+            (sum, booking) => sum + sumWeightedBookingHours(booking, { preferBetrstd: false }),
+            0
+          );
+          const scale = segmentHoursBefore > 0 ? targetWeeklyHours / segmentHoursBefore : 1;
+          if (weeklyGrowth > 0) {
+            childHoursAfter += weeklyGrowth;
+            totalBookingHoursAfter += weeklyGrowth;
+            const primaryGroup = groups.get(primaryGroupId);
+            if (primaryGroup) {
+              primaryGroup.bookingHoursAfter += weeklyGrowth;
+              primaryGroup.migratedBookings += weeklyMigrationShare;
+            }
+            childMigratedBookings += weeklyMigrationShare;
+            totalMigratedBookings += weeklyMigrationShare;
+            childChanged = true;
+
+            bookings.forEach((booking, index) => {
+              const resized = resizeBookingByFactor(withResolvedZeitkat(booking, resolveBookingZeitkat(booking)), scale);
+              const fromZone = resolveBookingZeitkat(booking);
+              const toZone = deriveZeitkatIdFromBooking(resized) || fromZone;
+              if (fromZone && toZone) {
+                const grantDelta = baseValue * weight
+                  * ((getZeitkatFactor(toZone) ?? 1) - (getZeitkatFactor(fromZone) ?? 1))
+                  * weeklyMigrationShare;
+                childFundingDelta += grantDelta;
+                totalDeltaMonthlyFunding += grantDelta;
+                const group = childBookingGroups[index];
+                if (group) group.deltaMonthlyFunding += grantDelta;
+              }
+              childSimulatedBookings[index] = resized;
+              if (index === 0 && toZone) {
+                firstZone = fromZone || firstZone;
+                firstTargetZone = toZone;
+              }
+            });
+          }
+        }
+      }
+    }
+
     totalDeltaMonthlyParentFees += parentFeeDelta;
     childChanged = childChanged || Math.abs(parentFeeDelta) >= 0.005;
-
-    const childDeltaMonthlyTotal = childFundingDelta + parentFeeDelta;
-    if (primaryGroupId || Math.abs(childDeltaMonthlyTotal) > 0.005 || childChanged) {
+    if (primaryGroupId || Math.abs(parentChangedTotal(childFundingDelta, parentFeeDelta)) > 0.005 || childChanged) {
       if (!groups.has(primaryGroupId)) {
         groups.set(primaryGroupId, makeGroupTotals(primaryGroupId, groupNames.get(primaryGroupId)));
       }
       groups.get(primaryGroupId).deltaMonthlyParentFees += parentFeeDelta;
     }
 
+    simulatedBookings.push(...childSimulatedBookings);
     if (!childChanged && childMigratedBookings === 0) return;
+    const childDeltaMonthlyTotal = childFundingDelta + parentFeeDelta;
     perChild.push({
       itemId: childKey,
       name: child?.name || childKey,
@@ -257,8 +426,8 @@ export function simulateContributionChanges({
       familyLabel: child?.familyLabel || '',
       groupId: firstBookingGroupId,
       groupName: groupNames.get(firstBookingGroupId) || firstBookingGroupId || 'Ohne Gruppe',
-      fromZone: firstZone || primaryZone,
-      toZone: firstTargetZone || primaryZone,
+      fromZone: firstZone,
+      toZone: firstTargetZone || firstZone,
       weight,
       deltaMonthly: roundMoney(childFundingDelta),
       deltaYearly: roundMoney(childFundingDelta * 12),
@@ -379,6 +548,10 @@ export function simulateContributionChanges({
     skippedNoZone,
     rule,
   };
+}
+
+function parentChangedTotal(fundingDelta, parentFeeDelta) {
+  return fundingDelta + parentFeeDelta;
 }
 
 // Kept as an alias for callers from older local branches; simulation semantics are now tariff-based.
