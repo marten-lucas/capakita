@@ -1,5 +1,5 @@
 import React from 'react';
-import { Badge, Button, Group, NumberInput, Paper, Slider, Stack, Table, Tabs, Text, SimpleGrid } from '@mantine/core';
+import { Accordion, Badge, Box, Button, Group, NumberInput, Paper, Slider, Stack, Table, Tabs, Text, SimpleGrid } from '@mantine/core';
 import { IconArrowRight, IconCoins, IconUsers } from '@tabler/icons-react';
 import { useDispatch, useSelector } from 'react-redux';
 import { setSelectedItem } from '../../store/simScenarioSlice';
@@ -37,6 +37,7 @@ function FundingSimulationPanel({ accent }) {
   const [utilizationPercent, setUtilizationPercent] = React.useState(100);
   const [temporaryPrices, setTemporaryPrices] = React.useState(EMPTY_TEMPORARY_PRICES);
   const [activeTab, setActiveTab] = React.useState('groups');
+  const [openFeeGroup, setOpenFeeGroup] = React.useState(null);
   const groupTableRef = React.useRef(null);
   const childTableRef = React.useRef(null);
   const familyTableRef = React.useRef(null);
@@ -55,6 +56,24 @@ function FundingSimulationPanel({ accent }) {
     () => getFeeCatalogSimulationRows(groupFeeCatalogs, groupLabels, referenceDate),
     [groupFeeCatalogs, groupLabels, referenceDate]
   );
+  const tariffGroups = React.useMemo(() => {
+    const byGroup = new Map();
+    categoryPriceRows.forEach((row) => {
+      if (!byGroup.has(row.groupId)) {
+        byGroup.set(row.groupId, { id: row.groupId, name: row.groupName, rows: [] });
+      }
+      byGroup.get(row.groupId).rows.push(row);
+    });
+    return Array.from(byGroup.values());
+  }, [categoryPriceRows]);
+
+  React.useEffect(() => {
+    setOpenFeeGroup((current) => (
+      current && tariffGroups.some((group) => group.id === current)
+        ? current
+        : (tariffGroups[0]?.id || null)
+    ));
+  }, [tariffGroups]);
 
   const getTemporaryPrice = (groupId, priceKey, originalAmount) => {
     const value = temporaryPrices?.[groupId]?.[priceKey];
@@ -197,6 +216,95 @@ function FundingSimulationPanel({ accent }) {
         ) : null}
       </Stack>
 
+      <Paper withBorder p="sm" radius="md" data-testid="temporary-category-prices">
+        <Stack gap="sm">
+          <Group justify="space-between" align="center" wrap="wrap">
+            <Stack gap={2}>
+              <Text fw={600} size="sm">Beitragsstaffeln aus dem Capakita-Datenspeicher</Text>
+              <Text size="xs" c="dimmed">Nach Gruppe sortiert. Eine Zeile pro Staffel; Preise sind absolute Eurobeträge und bleiben nur für diese Simulation geändert.</Text>
+            </Stack>
+            {categoryPriceRows.length > 0 ? (
+              <Button size="xs" variant="subtle" onClick={() => setTemporaryPrices(EMPTY_TEMPORARY_PRICES)} data-testid="reset-all-temporary-prices">
+                Alle auf Ausgangswerte zurücksetzen
+              </Button>
+            ) : null}
+          </Group>
+          {tariffGroups.length > 0 ? (
+            <Accordion
+              variant="separated"
+              value={openFeeGroup}
+              onChange={setOpenFeeGroup}
+              data-testid="simulation-tariff-groups"
+            >
+              {tariffGroups.map((group) => (
+                <Accordion.Item key={group.id} value={group.id}>
+                  <Accordion.Control>
+                    <Group justify="space-between" pr="md" wrap="wrap">
+                      <Text fw={600}>{group.name}</Text>
+                      <Text size="xs" c="dimmed">{group.rows.length} Staffeln</Text>
+                    </Group>
+                  </Accordion.Control>
+                  <Accordion.Panel>
+                    <Stack gap="xs">
+                      {group.rows.map(({ key, kind, label, detail, zeitkatId, originalAmount }) => {
+                        const value = getTemporaryPrice(group.id, key, originalAmount);
+                        const sliderMax = Math.max(500, Math.ceil(Math.max(originalAmount, value) / 100) * 100);
+                        const sliderLabel = kind === 'zeitkat'
+                          ? `Simulationspreis ${group.name} ZEITKAT ${zeitkatId}`
+                          : `Simulationspreis ${group.name} ${label}`;
+                        const rowId = `${group.id}-${key}`.replace(/[^a-zA-Z0-9_-]/g, '-');
+                        return (
+                          <Paper key={key} withBorder p="xs" radius="sm" data-testid={`tariff-${rowId}`}>
+                            <Group align="center" gap="sm" wrap="wrap">
+                              <Stack gap={1} style={{ flex: '1 1 210px', minWidth: 180 }}>
+                                <Text size="sm" fw={600}>{label}</Text>
+                                <Text size="xs" c="dimmed">{detail || 'Beitragsstaffel'}</Text>
+                              </Stack>
+                              <Box style={{ flex: '2 1 220px', minWidth: 180 }}>
+                                <Text size="xs" c="dimmed" mb={4}>Ausgangswert: {formatEuro(originalAmount)} / Monat</Text>
+                                <Slider
+                                  min={0}
+                                  max={sliderMax}
+                                  step={5}
+                                  value={Math.min(value, sliderMax)}
+                                  onChange={(nextValue) => setTemporaryPrice(group.id, key, nextValue)}
+                                  aria-label={sliderLabel}
+                                  thumbLabel={sliderLabel}
+                                  data-testid={`tariff-slider-${rowId}`}
+                                />
+                              </Box>
+                              <NumberInput
+                                size="xs"
+                                w={160}
+                                label="Simulationspreis / Monat"
+                                min={0}
+                                max={100000}
+                                decimalScale={2}
+                                step={5}
+                                value={value}
+                                onChange={(nextValue) => setTemporaryPrice(group.id, key, nextValue)}
+                                data-testid={`tariff-input-${rowId}`}
+                              />
+                              {value !== originalAmount ? (
+                                <Button size="compact-xs" variant="subtle" onClick={() => resetTemporaryPrice(group.id, key)}>
+                                  Zurücksetzen
+                                </Button>
+                              ) : <Badge variant="light">unverändert</Badge>}
+                            </Group>
+                          </Paper>
+                        );
+                      })}
+                    </Stack>
+                  </Accordion.Panel>
+                </Accordion.Item>
+              ))}
+            </Accordion>
+          ) : (
+            <Text size="xs" c="dimmed">Es gibt für den ausgewählten Stichtag keine ZEITKAT- oder Wochenstunden-Beitragsstaffeln.</Text>
+          )}
+        </Stack>
+      </Paper>
+
       <Paper withBorder p="sm" radius="md">
         <Stack gap="xs">
           <Group justify="space-between" align="center" wrap="wrap">
@@ -222,75 +330,6 @@ function FundingSimulationPanel({ accent }) {
           <Text size="xs" c="dimmed">
             Beispiel: Bei 50 % wechseln rechnerisch die Hälfte der passenden Buchungen; Stunden und Förderwirkung werden soweit aus den Buchungszeiten berechenbar anteilig ermittelt.
           </Text>
-        </Stack>
-      </Paper>
-
-      <Paper withBorder p="sm" radius="md" data-testid="temporary-category-prices">
-        <Stack gap="sm">
-          <Group justify="space-between" align="center" wrap="wrap">
-            <Stack gap={2}>
-              <Text fw={600} size="sm">Beitragsstaffeln aus dem Capakita-Datenspeicher</Text>
-              <Text size="xs" c="dimmed">ZEITKAT-Sätze und JSON-importierte Wochenstunden-Bänder werden angezeigt. Preise sind absolute Eurobeträge; Ausgangswerte bleiben sichtbar.</Text>
-            </Stack>
-            {categoryPriceRows.length > 0 ? (
-              <Button size="xs" variant="subtle" onClick={() => setTemporaryPrices(EMPTY_TEMPORARY_PRICES)} data-testid="reset-all-temporary-prices">
-                Alle auf Ausgangswerte zurücksetzen
-              </Button>
-            ) : null}
-          </Group>
-          {categoryPriceRows.length > 0 ? (
-            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xs">
-              {categoryPriceRows.map(({ groupId, groupName, key, kind, label, detail, zeitkatId, originalAmount }) => {
-                const value = getTemporaryPrice(groupId, key, originalAmount);
-                const sliderMax = Math.max(500, Math.ceil(Math.max(originalAmount, value) / 100) * 100);
-                const cardLabel = kind === 'zeitkat' ? `${groupName} · ${label} (${detail})` : `${groupName} · ${label}`;
-                const sliderLabel = kind === 'zeitkat'
-                  ? `Simulationspreis ${groupName} ZEITKAT ${zeitkatId}`
-                  : `Simulationspreis ${groupName} ${label}`;
-                const testKey = `${groupId}-${key}`.replace(/[^a-zA-Z0-9_-]/g, '-');
-                return (
-                  <Paper key={`${groupId}-${key}`} withBorder p="xs" radius="sm" data-testid={`tariff-${testKey}`}>
-                    <Stack gap={5}>
-                      <Group justify="space-between" align="flex-start" wrap="nowrap">
-                        <Stack gap={1}>
-                          <Text size="sm" fw={600}>{cardLabel}</Text>
-                          <Text size="xs" c="dimmed">{detail ? `${detail} · ` : ''}Ausgangswert: {formatEuro(originalAmount)} / Monat</Text>
-                        </Stack>
-                        {value !== originalAmount ? (
-                          <Button size="compact-xs" variant="subtle" onClick={() => resetTemporaryPrice(groupId, key)}>
-                            Zurücksetzen
-                          </Button>
-                        ) : <Badge variant="light">unverändert</Badge>}
-                      </Group>
-                      <NumberInput
-                        size="xs"
-                        label="Simulationspreis / Monat"
-                        min={0}
-                        max={100000}
-                        decimalScale={2}
-                        step={5}
-                        value={value}
-                        onChange={(nextValue) => setTemporaryPrice(groupId, key, nextValue)}
-                        data-testid={`tariff-input-${testKey}`}
-                      />
-                      <Slider
-                        min={0}
-                        max={sliderMax}
-                        step={5}
-                        value={Math.min(value, sliderMax)}
-                        onChange={(nextValue) => setTemporaryPrice(groupId, key, nextValue)}
-                        aria-label={sliderLabel}
-                        thumbLabel={sliderLabel}
-                        data-testid={`tariff-slider-${testKey}`}
-                      />
-                    </Stack>
-                  </Paper>
-                );
-              })}
-            </SimpleGrid>
-          ) : (
-            <Text size="xs" c="dimmed">Es gibt für den ausgewählten Stichtag keine ZEITKAT-gebundenen Beitragssätze.</Text>
-          )}
         </Stack>
       </Paper>
 
