@@ -146,7 +146,7 @@ function OriginalMarker({ amount, maxAmount }) {
   );
 }
 
-function StairSlider({ label, detail, value, originalAmount, priceMax, simulation, onChange, testId, width }) {
+function StairSlider({ label, detail, value, originalAmount, priceMax, simulation, onChange, testId, width, boundaryValue, boundaryLabel, boundaryMin, onBoundaryChange, onRemove, removeLabel }) {
   return (
     <Stack gap={4} align="center" style={{ flex: width || '1 0 96px', minWidth: 90, padding: '0 6px' }}>
       <Text size="xs" fw={700} ta="center" lh={1.2}>{label}</Text>
@@ -172,6 +172,20 @@ function StairSlider({ label, detail, value, originalAmount, priceMax, simulatio
         onChange={onChange}
         testId={`${testId}-amount`}
       />
+      {onBoundaryChange ? (
+        <NumberInput
+          size="xs"
+          min={boundaryMin ?? 0.5}
+          step={0.5}
+          decimalScale={2}
+          value={boundaryValue ?? ''}
+          onChange={onBoundaryChange}
+          suffix=" h"
+          aria-label={boundaryLabel}
+          w="100%"
+        />
+      ) : null}
+      {onRemove ? <ActionIcon color="red" variant="subtle" aria-label={removeLabel} onClick={onRemove}><IconTrash size={14} /></ActionIcon> : null}
       {simulation ? (
         <Text size="10px" c="dimmed" ta="center">
           Original {originalAmount == null ? '–' : `${Number(originalAmount).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`}
@@ -406,7 +420,7 @@ export default function FeeStaircaseEditor({
           w={190}
           aria-label="Tarif gültig bis"
         />
-        <Text size="xs" c="dimmed">Slider und direkte Eingabe werden synchron gehalten.</Text>
+        <Text size="xs" c="dimmed">Slider und Zahlenfelder darunter werden synchron gehalten.</Text>
       </Group>
 
       {kind === 'zeitkat' ? (
@@ -433,7 +447,10 @@ export default function FeeStaircaseEditor({
               })}
             </Box>
           </Box>
-          {activeEntries.some((entry) => Number(getFeeBandZeitkatId(entry)) > 8) ? (
+          {simulation && activeEntries.some((entry) => Number(getFeeBandZeitkatId(entry)) > 8) ? (
+            <Text size="xs" c="dimmed">ZEITKAT über 8 Stunden bleiben in dieser Simulation auf dem Originalwert; der Sliderbereich endet bei 8 Stunden.</Text>
+          ) : null}
+          {!simulation && activeEntries.some((entry) => Number(getFeeBandZeitkatId(entry)) > 8) ? (
             <Paper withBorder p="xs" radius="sm">
               <Text size="xs" fw={600} mb="xs">Über 8 Stunden (vorhandene Staffeln)</Text>
               <Stack gap="xs">
@@ -473,6 +490,12 @@ export default function FeeStaircaseEditor({
                   onChange={(value) => updateEntry(entry.id, { monthlyAmount: Number(value) || 0 })}
                   testId={`fee-staircase-slider-${entry.id}`}
                   width={`${width} 0 126px`}
+                  boundaryValue={getWeeklyLimit(entry) ?? ''}
+                  boundaryLabel={`Obergrenze Staffel ${entry.id} Wochenstunden`}
+                  boundaryMin={lower + 0.5}
+                  onBoundaryChange={(value) => updateWeeklyLimit(entry.id, value)}
+                  onRemove={() => removeEntry(entry.id)}
+                  removeLabel={`Staffel ${entry.id} löschen`}
                 />
               );
             })}
@@ -481,46 +504,6 @@ export default function FeeStaircaseEditor({
         </Box>
       )}
 
-      <Text fw={600} size="sm">Direkte Eingabe</Text>
-      {kind === 'weekly' ? (
-        <Paper withBorder radius="sm" style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 620 }}>
-            <thead><tr>
-              <th style={{ textAlign: 'left', padding: 8 }}>Stundenbereich</th>
-              <th style={{ textAlign: 'right', padding: 8 }}>Obergrenze (Wochenstunden)</th>
-              {simulation ? <th style={{ textAlign: 'right', padding: 8 }}>Original</th> : null}
-              {!simulation ? <th style={{ padding: 8 }} /> : null}
-            </tr></thead>
-            <tbody>
-              {activeEntries.map((entry, index) => {
-                const priorLimit = getWeeklyLimit(activeEntries[index - 1]);
-                const lower = priorLimit ?? 0;
-                const upper = getWeeklyLimit(entry);
-                const original = baselineEntriesForPeriod.find((item) => String(item.id) === String(entry.id));
-                return (
-                  <tr key={entry.id}>
-                    <td style={{ padding: 8 }}>{`${lower}–${upper ?? '∞'} h/Woche`}</td>
-                    <td style={{ padding: 8 }}>
-                      <NumberInput
-                        size="xs"
-                        min={lower + 0.5}
-                        step={0.5}
-                        decimalScale={2}
-                        value={upper ?? ''}
-                        onChange={(value) => updateWeeklyLimit(entry.id, value)}
-                        aria-label={`Obergrenze Staffel ${index + 1} Wochenstunden`}
-                      />
-                    </td>
-                    {simulation ? <td style={{ padding: 8, textAlign: 'right' }}>{original ? `${Number(original.monthlyAmount || 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €` : 'neu'}</td> : null}
-                    {!simulation ? <td style={{ padding: 8 }}><ActionIcon color="red" variant="subtle" aria-label={`Staffel ${index + 1} löschen`} onClick={() => removeEntry(entry.id)}><IconTrash size={15} /></ActionIcon></td> : null}
-                  </tr>
-                );
-              })}
-              {activeEntries.length === 0 ? <tr><td colSpan={simulation ? 3 : 3} style={{ padding: 12, color: 'var(--mantine-color-dimmed)' }}>In dieser Gültigkeitsversion sind noch keine Staffeln vorhanden.</td></tr> : null}
-            </tbody>
-          </table>
-        </Paper>
-      ) : null}
 
       {weeklyStructureInvalid ? (
         <Alert color="red" variant="light" py="xs">Die Wochenstaffel braucht eindeutige, aufsteigende Obergrenzen und genau eine offene Schlussstaffel. Ergänze sie über „Staffel hinzufügen“ oder korrigiere die Tabelle; Grenzen bleiben lücken- und überlappungsfrei.</Alert>

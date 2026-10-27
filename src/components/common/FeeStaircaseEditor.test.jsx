@@ -52,7 +52,7 @@ describe('FeeStaircaseEditor', () => {
 
     expect(screen.getByTestId('fee-staircase-zeitkat')).toBeTruthy();
     expect(screen.getByRole('slider', { name: 'Simulierter Beitrag ZEITKAT 05' })).toBeTruthy();
-    expect(screen.getByText('Direkte Eingabe')).toBeTruthy();
+    expect(screen.queryByText('Direkte Eingabe')).toBeNull();
     expect(screen.getByLabelText('Betrag ZEITKAT 05').value).toBe('150 EUR');
     expect(screen.getByText('Original 100,00 €')).toBeTruthy();
   });
