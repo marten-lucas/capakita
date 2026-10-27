@@ -62,7 +62,7 @@ npm run build
 
 ### GitHub Pages
 
-Das Projekt enthält einen Workflow für automatisches Deployment nach GitHub Pages bei Änderungen auf dem Hauptbranch. `npm run build:pages` erzeugt dafür den Build mit relativen Assetpfaden.
+Das Projekt enthält einen Workflow für automatisches Deployment nach GitHub Pages bei Änderungen auf dem Hauptbranch. `npm run build:pages` erzeugt dafür den Build mit relativen Assetpfaden. Weil STMAS CORS für die offizielle XLS-Datei nicht freigibt, wird eine same-origin-Kopie unter `public/reference/` mit ausgeliefert; bei Änderungen an der Quelle lässt sie sich mit `npm run update:baykibig-cache` aktualisieren und anschließend committen.
 
 ### Coolify (NPM / Docker)
 

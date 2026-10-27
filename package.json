@@ -24,6 +24,7 @@
     "test:e2e:full:all": "TEST_LEVEL=full-all playwright test",
     "test:e2e:full:all:headed": "TEST_LEVEL=full-all playwright test --headed",
     "export:testset-json": "node scripts/export-testset-json.mjs",
+    "update:baykibig-cache": "node scripts/update-baykibig-cache.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

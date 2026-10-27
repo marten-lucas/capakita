@@ -52,19 +52,32 @@ async function parseBayKiBiGArrayBuffer(arrayBuffer) {
   return parseBayKiBiGWorkbook(workbook);
 }
 
-//
-// Download-Kandidaten (Reihenfolge = Fallback-Kette):
-// 1. stmas-URLs: Vite-Dev-Proxy /stmas-proxy (nur im Dev-Server vorhanden;
-//    auf GitHub Pages 404 → naechster Kandidat)
-// 2. Direkter Fetch (funktioniert, wenn die Quelle CORS erlaubt)
-// 3. Oeffentliche CORS-Proxys — die BayKiBiG-Tabelle ist oeffentliche
-//    Behoerdendatei; es werden keine Nutzerdaten uebertragen.
+// Download-Reihenfolge für die offizielle Tabelle:
+// 1. same-origin STMAS-Proxy (Dev/Coolify),
+// 2. same-origin, im Pages-Build ausgelieferte öffentliche Tabellenkopie,
+// 3. direkter Fetch und optionale CORS-Proxys für frei eingegebene URLs.
+const OFFICIAL_STMAS_HOST = 'www.stmas.bayern.de';
+const OFFICIAL_STMAS_PATH = '/imperia/md/content/stmas/stmas_inet/kinderbetreuung/3.7.2.2_kfa-131118.xls';
+const LOCAL_OFFICIAL_TABLE_PATH = 'reference/baykibig-foerdertabellen.xls';
 const CORS_PROXY_BUILDERS = [
   (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
   (url) => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
 ];
 
-function buildDownloadCandidates(url) {
+function resolveApplicationBaseUrl() {
+  if (typeof window !== 'undefined' && String(import.meta.env.BASE_URL || '').startsWith('/')) {
+    return new URL(import.meta.env.BASE_URL, window.location.origin);
+  }
+  if (typeof window !== 'undefined' && import.meta.env.DEV) {
+    return new URL(import.meta.env.BASE_URL || '/', window.location.origin);
+  }
+  return new URL('../', new URL('.', import.meta.url));
+}
+
+export function buildDownloadCandidates(url, {
+  applicationBaseUrl = resolveApplicationBaseUrl(),
+  serverProxyAvailable = import.meta.env.DEV || String(import.meta.env.BASE_URL || '').startsWith('/'),
+} = {}) {
   const trimmed = String(url || '').trim();
   const candidates = [];
   let parsed = null;
@@ -74,8 +87,14 @@ function buildDownloadCandidates(url) {
     parsed = null;
   }
 
-  if (parsed && parsed.host === 'www.stmas.bayern.de') {
-    candidates.push(`/stmas-proxy${parsed.pathname}${parsed.search || ''}`);
+  if (parsed && parsed.host === OFFICIAL_STMAS_HOST) {
+    if (serverProxyAvailable) {
+      const proxyPath = `stmas-proxy${parsed.pathname}${parsed.search || ''}`;
+      candidates.push(new URL(proxyPath, applicationBaseUrl).href);
+    }
+    if (parsed.pathname === OFFICIAL_STMAS_PATH) {
+      candidates.push(new URL(LOCAL_OFFICIAL_TABLE_PATH, applicationBaseUrl).href);
+    }
   }
   candidates.push(trimmed);
   CORS_PROXY_BUILDERS.forEach((build) => candidates.push(build(trimmed)));
@@ -84,7 +103,8 @@ function buildDownloadCandidates(url) {
 
 function shortCandidateLabel(candidate) {
   const text = String(candidate);
-  if (text.startsWith('/stmas-proxy')) return 'Dev-Proxy';
+  if (text.includes('/stmas-proxy/')) return 'STMAS-Proxy';
+  if (text.includes(LOCAL_OFFICIAL_TABLE_PATH)) return 'lokale Tabellenkopie';
   if (text.includes('allorigins')) return 'CORS-Proxy allorigins';
   if (text.includes('corsproxy')) return 'CORS-Proxy corsproxy.io';
   try {
@@ -124,13 +144,13 @@ export async function importBayKiBiGTableFromExcel(file) {
   });
 }
 
-export async function importBayKiBiGTableFromUrl(url) {
+export async function importBayKiBiGTableFromUrl(url, options = {}) {
   if (!url || typeof url !== 'string') {
     throw new Error('Bitte eine gueltige URL angeben.');
   }
 
   const attempts = [];
-  for (const candidate of buildDownloadCandidates(url)) {
+  for (const candidate of buildDownloadCandidates(url, options)) {
     try {
       const response = await fetch(candidate);
       if (!response.ok) {

@@ -16,7 +16,7 @@ vi.mock('xlsx', () => ({
   })),
 }));
 
-import { importBayKiBiGTableFromUrl } from './financeImport';
+import { buildDownloadCandidates, importBayKiBiGTableFromUrl } from './financeImport';
 
 const STMAS_URL = 'https://www.stmas.bayern.de/imperia/md/content/stmas/stmas_inet/kinderbetreuung/3.7.2.2_kfa-131118.xls';
 
@@ -32,15 +32,18 @@ describe('financeImport URL import (Fallback-Kette)', () => {
     vi.restoreAllMocks();
   });
 
-  it('nutzt den Dev-Proxy als ersten Kandidaten für STMAS-URLs', async () => {
+  it('nutzt den same-origin STMAS-Proxy als ersten Kandidaten', async () => {
     const fetchMock = vi.fn().mockResolvedValue(okResponse());
     vi.stubGlobal('fetch', fetchMock);
 
-    const result = await importBayKiBiGTableFromUrl(STMAS_URL);
+    const result = await importBayKiBiGTableFromUrl(STMAS_URL, {
+      applicationBaseUrl: new URL('http://localhost:4173/'),
+      serverProxyAvailable: true,
+    });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith(
-      '/stmas-proxy/imperia/md/content/stmas/stmas_inet/kinderbetreuung/3.7.2.2_kfa-131118.xls'
+      'http://localhost:4173/stmas-proxy/imperia/md/content/stmas/stmas_inet/kinderbetreuung/3.7.2.2_kfa-131118.xls'
     );
     expect(result.baseValue).toBe(929.26);
     expect(result.weightFactors).toEqual({
@@ -52,20 +55,20 @@ describe('financeImport URL import (Fallback-Kette)', () => {
     });
   });
 
-  it('GitHub-Pages-Fall: Dev-Proxy 404 → direkter Fetch (CORS) → CORS-Proxy erfolgreich', async () => {
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce({ ok: false, status: 404 }) // /stmas-proxy existiert auf Pages nicht
-      .mockRejectedValueOnce(new TypeError('Failed to fetch')) // direkter Fetch: CORS
-      .mockResolvedValueOnce(okResponse()); // allorigins
+  it('nutzt auf GitHub Pages die lokale Tabellenkopie vor Cross-Origin-Fallbacks', async () => {
+    const pagesBase = new URL('https://marten-lucas.github.io/capakita/');
+    const pagesOptions = { applicationBaseUrl: pagesBase, serverProxyAvailable: false };
+    const candidates = buildDownloadCandidates(STMAS_URL, pagesOptions);
+    expect(candidates[0]).toBe(`${pagesBase.href}reference/baykibig-foerdertabellen.xls`);
+    expect(candidates[1]).toBe(STMAS_URL);
+
+    const fetchMock = vi.fn().mockResolvedValueOnce(okResponse());
     vi.stubGlobal('fetch', fetchMock);
 
-    const result = await importBayKiBiGTableFromUrl(STMAS_URL);
+    const result = await importBayKiBiGTableFromUrl(STMAS_URL, pagesOptions);
 
-    expect(fetchMock).toHaveBeenCalledTimes(3);
-    expect(fetchMock.mock.calls[1][0]).toBe(STMAS_URL);
-    expect(fetchMock.mock.calls[2][0]).toBe(
-      `https://api.allorigins.win/raw?url=${encodeURIComponent(STMAS_URL)}`
-    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(`${pagesBase.href}reference/baykibig-foerdertabellen.xls`);
     expect(result.baseValue).toBe(929.26);
   });
 
@@ -74,18 +77,23 @@ describe('financeImport URL import (Fallback-Kette)', () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce({ ok: false, status: 404 })
       .mockResolvedValueOnce({ ok: true, status: 200, arrayBuffer: async () => htmlBuffer })
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
       .mockResolvedValueOnce(okResponse());
     vi.stubGlobal('fetch', fetchMock);
 
-    const result = await importBayKiBiGTableFromUrl(STMAS_URL);
+    const result = await importBayKiBiGTableFromUrl(STMAS_URL, {
+      applicationBaseUrl: new URL('http://localhost:4173/'),
+      serverProxyAvailable: true,
+    });
     expect(result.baseValue).toBe(929.26);
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 
   it('aggregiert alle Fehlversuche in der Fehlermeldung, wenn alles scheitert', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
 
     await expect(importBayKiBiGTableFromUrl(STMAS_URL)).rejects.toThrow(/Download fehlgeschlagen/);
+    await expect(importBayKiBiGTableFromUrl(STMAS_URL)).rejects.toThrow(/lokale Tabellenkopie/);
     await expect(importBayKiBiGTableFromUrl(STMAS_URL)).rejects.toThrow(/CORS-Proxy allorigins/);
     await expect(importBayKiBiGTableFromUrl(STMAS_URL)).rejects.toThrow(/Datei-Import/);
   });
