@@ -217,10 +217,14 @@ describe('FundingSimulationPanel', () => {
       </Provider>
     );
 
-    fireEvent.click(screen.getByText('Kinder (2)'));
+    const tariffSlider = screen.getByRole('slider', { name: 'Simulationspreis Fuchs ZEITKAT 05' });
+    for (let index = 0; index < 10; index += 1) {
+      fireEvent.keyDown(tariffSlider, { key: 'ArrowRight', code: 'ArrowRight' });
+    }
+    fireEvent.click(screen.getByRole('tab', { name: /Kinder/ }));
     fireEvent.click(screen.getByTestId('funding-child-child-2'));
     expect(store.getState().simScenario.selectedItems['scenario-1']).toEqual(['child-2']);
-    fireEvent.click(screen.getByText('Familien (1)'));
+    fireEvent.click(screen.getByRole('tab', { name: /Familien/ }));
     expect(screen.getByText('Familie Reuter')).toBeTruthy();
   });
 });
