@@ -5,6 +5,7 @@ import {
   convertMonthlyAmountToPeriod,
   getPeriodBoundsForCategory,
   hasAnyBookingInWeek,
+  findFeeEntryForZeitkat,
   getBayKiBiGWeightForChild,
   resolveGroupIdsForBounds,
   splitBookingByGroupAtDate,
@@ -83,6 +84,45 @@ describe('financeUtils', () => {
     expect(result.parentFeeAmount).toBe(280);
     expect(result.bayKiBiGAmount).toBe(240);
     expect(result.totalAmount).toBe(520);
+  });
+
+  it('selects imported category-specific fee rates by ZEITKAT, not total weekly hours', () => {
+    const result = calculateChildMonthlyRevenue({
+      item: { id: 'child-zone-rate', type: 'demand', dateofbirth: '2022-01-10', validFrom: '2026-01-01' },
+      bookings: [{
+        id: 'booking-zone-rate',
+        startdate: '2026-01-01',
+        enddate: '2026-12-31',
+        rawdata: { ZEITKAT: '05', ART: '0' },
+        times: Array.from({ length: 5 }, (_, index) => ({
+          day_name: ['Mo', 'Di', 'Mi', 'Do', 'Fr'][index],
+          segments: [{ booking_start: '08:00', booking_end: '12:00' }],
+        })),
+      }],
+      groupAssignments: { a1: { id: 'a1', groupId: 'g1', start: '2026-01-01', end: '2026-12-31' } },
+      groupDefs: [{ id: 'g1', type: 'Kindergarten', name: 'Fuchs' }],
+      financeScenario: {
+        bayKiBiGRules: [],
+        groupFeeCatalogs: {
+          g1: [
+            // Legacy automatic import ID still gets recognized/migrated by the stable ID pattern.
+            { id: 'bart1-z05-2026-01-01', maxHours: 5, monthlyAmount: 135, validFrom: '2026-01-01' },
+            { id: 'zone-06', zeitkatId: '06', monthlyAmount: 175, validFrom: '2026-01-01' },
+            // Legacy week-band exists alongside imported rates but must not override ZEITKAT.
+            { id: 'legacy-week', maxHours: 100, monthlyAmount: 999, validFrom: '2026-01-01' },
+          ],
+        },
+      },
+      referenceDate: '2026-04-15',
+    });
+
+    expect(result.weeklyHours).toBe(20);
+    expect(result.feeEntry?.id).toBe('bart1-z05-2026-01-01');
+    expect(result.parentFeeAmount).toBe(135);
+    expect(findFeeEntryForZeitkat([
+      { id: 'old', zeitkatId: '05', monthlyAmount: 50, validFrom: '2025-01-01', validUntil: '2025-12-31' },
+      { id: 'current', zeitkatId: '05', monthlyAmount: 135, validFrom: '2026-01-01' },
+    ], '05', '2026-04-15')?.id).toBe('current');
   });
 
   it('reduces sickness costs to zero after six weeks for partially paid absence', () => {

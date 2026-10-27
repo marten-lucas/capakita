@@ -1,5 +1,5 @@
 import React from 'react';
-import HighchartsReact from 'highcharts-react-official';
+import { CopyableHighcharts as HighchartsReact } from '../common/CopyToClipboardButton';
 import Highcharts from 'highcharts';
 import { Box, Group, MultiSelect, Stack, Text, useMantineTheme } from '@mantine/core';
 import { trimTrailingEmptyCategories } from '../../utils/chartUtils/chartUtilsHistogram';

@@ -116,6 +116,20 @@ export function getZeitkatZoneBounds(zeitkatId) {
   return entry ? { minHours: entry.minHours, maxHours: entry.maxHours } : null;
 }
 
+/**
+ * ZEITKAT-Schlüssel eines Beitragssatzes. Frühere Capakita-Imports speicherten
+ * BETRAGZn fälschlich als Wochenstundenband, ließen den Schlüssel aber im stabilen
+ * Import-ID-Muster `bart<BARTNR>-z<ZEITKAT>-...` stehen; damit werden solche bereits
+ * gespeicherten Kataloge ohne Neuimport sicher migriert.
+ */
+export function getFeeBandZeitkatId(entry) {
+  const explicit = String(entry?.zeitkatId || '').trim();
+  if (ZEITKAT_CATALOG.some((zone) => zone.id === explicit)) return explicit;
+  const legacyImportId = /^bart[^-]*-z(\d{2})-/i.exec(String(entry?.id || ''));
+  const inferred = legacyImportId?.[1] || '';
+  return ZEITKAT_CATALOG.some((zone) => zone.id === inferred) ? inferred : null;
+}
+
 /** Position einer Zeitkategorie im Katalog (für Zonensprünge; -1 = unbekannt). */
 export function getZeitkatZoneIndex(zeitkatId) {
   if (!zeitkatId) return -1;

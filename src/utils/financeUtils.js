@@ -1,6 +1,6 @@
 import { sumBookingHours } from './bookingUtils';
 import { minutesToTime, timeToMinutes } from './timeUtils';
-import { decodeBuchungsart, getZeitkatFactor } from './adebisConstants';
+import { decodeBuchungsart, getFeeBandZeitkatId, getZeitkatFactor } from './adebisConstants';
 
 function parseIsoDate(value) {
   if (!value || typeof value !== 'string') return null;
@@ -677,6 +677,7 @@ export function calculateMonthlyStaffCost({
  */
 export function findFeeEntryForHours(feeCatalog, weeklyHours, referenceDate) {
   return (feeCatalog || [])
+    .filter((entry) => !getFeeBandZeitkatId(entry))
     .filter((entry) => isDateWithinRange(referenceDate, entry.validFrom || '', entry.validUntil || ''))
     .sort((left, right) => {
       const leftStart = left.validFrom || '';
@@ -699,6 +700,62 @@ export function findFeeEntryForHours(feeCatalog, weeklyHours, referenceDate) {
     }) || null;
 }
 
+
+/**
+ * Wählt einen zeitkategoriegebundenen Beitragssatz (adebis BETRAGZ1..13).
+ * Anders als manuelle maxHours-Bänder wird ZEITKAT direkt und tagesbezogen
+ * abgeglichen – nicht gegen die aufsummierten Wochenstunden.
+ */
+export function findFeeEntryForZeitkat(feeCatalog, zeitkatId, referenceDate) {
+  const normalizedZeitkatId = String(zeitkatId || '').trim();
+  if (!normalizedZeitkatId) return null;
+
+  return (feeCatalog || [])
+    .filter((entry) => getFeeBandZeitkatId(entry) === normalizedZeitkatId)
+    .filter((entry) => isDateWithinRange(referenceDate, entry.validFrom || '', entry.validUntil || ''))
+    .sort((left, right) => {
+      const leftStart = left.validFrom || '';
+      const rightStart = right.validFrom || '';
+      if (leftStart === rightStart) return String(left.id).localeCompare(String(right.id));
+      return rightStart.localeCompare(leftStart);
+    })[0] || null;
+}
+
+/**
+ * ZEITKAT der am Stichtag aktiven Basisbuchung eines Kindes.
+ */
+export function resolveZeitkatIdForChild(bookings, referenceDate) {
+  const activeBasis = (bookings || [])
+    .filter((booking) => {
+      const art = booking?.buchungsart || decodeBuchungsart(booking?.rawdata?.ART);
+      if (art?.basis === false) return false;
+      const start = booking?.startdate || '';
+      const end = booking?.enddate || '';
+      return (!start || start <= referenceDate) && (!end || end >= referenceDate);
+    })
+    .sort((left, right) => String(right?.startdate || '').localeCompare(String(left?.startdate || '')));
+
+  return activeBasis
+    .map((booking) => String(booking?.rawdata?.ZEITKAT || '').trim())
+    .find((zoneId) => getZeitkatFactor(zoneId) != null) || null;
+}
+
+/**
+ * Elternbeitrag für genau eine Kategorie und Stichtag. `multiplierPercent` ist
+ * nur für temporäre Simulations-Overrides gedacht; Standardfinanzen bleiben 100 %.
+ */
+export function calculateZeitkatFeeAmount(feeCatalog, zeitkatId, referenceDate, multiplierPercent = 100) {
+  const entry = findFeeEntryForZeitkat(feeCatalog, zeitkatId, referenceDate);
+  if (!entry) return { entry: null, baseAmount: 0, amount: 0 };
+  const baseAmount = Number(entry.monthlyAmount) || 0;
+  const multiplier = Math.max(0, Number(multiplierPercent) || 0) / 100;
+  return {
+    entry,
+    baseAmount,
+    amount: Math.round(baseAmount * multiplier * 100) / 100,
+  };
+}
+
 /**
  * Buchungszeitfaktor eines Kindes am Stichtag (RE adebisKITA 7.5:
  * Förderbetrag = Basiswert × Buchungszeitfaktor × Gewichtungsfaktor).
@@ -709,21 +766,8 @@ export function findFeeEntryForHours(feeCatalog, weeklyHours, referenceDate) {
  * Rückgabe: Faktor (number) oder null, wenn keine verwertbare Zone vorliegt.
  */
 export function resolveZeitkatFactorForChild(bookings, referenceDate) {
-  const activeBasis = (bookings || [])
-    .filter((booking) => {
-      const art = booking?.buchungsart || decodeBuchungsart(booking?.rawdata?.ART);
-      if (art && art.basis === false) return false;
-      const start = booking?.startdate || '';
-      const end = booking?.enddate || '';
-      return (!start || start <= referenceDate) && (!end || end >= referenceDate);
-    })
-    .sort((left, right) => String(right?.startdate || '').localeCompare(String(left?.startdate || '')));
-
-  for (const booking of activeBasis) {
-    const factor = getZeitkatFactor(booking?.rawdata?.ZEITKAT);
-    if (factor != null) return factor;
-  }
-  return null;
+  const zeitkatId = resolveZeitkatIdForChild(bookings, referenceDate);
+  return zeitkatId ? getZeitkatFactor(zeitkatId) : null;
 }
 
 export function calculateChildMonthlyRevenue({
@@ -752,7 +796,12 @@ export function calculateChildMonthlyRevenue({
   const groupId = resolveGroupIdAtDate(groupAssignments, referenceDate, item.groupId || null);
   const groupDef = (groupDefs || []).find((entry) => String(entry.id) === String(groupId));
   const feeCatalog = financeScenario?.groupFeeCatalogs?.[groupId] || [];
-  const feeEntry = findFeeEntryForHours(feeCatalog, weeklyHours, referenceDate);
+  const zeitkatId = resolveZeitkatIdForChild(bookings, referenceDate);
+  const hasZeitkatRates = feeCatalog.some((entry) => Boolean(getFeeBandZeitkatId(entry)));
+  const feeEntry = hasZeitkatRates
+    ? (findFeeEntryForZeitkat(feeCatalog, zeitkatId, referenceDate)
+      || findFeeEntryForHours(feeCatalog, weeklyHours, referenceDate))
+    : findFeeEntryForHours(feeCatalog, weeklyHours, referenceDate);
   const bayKiBiGRule = pickApplicableValidityEntry(financeScenario?.bayKiBiGRules, referenceDate)
     || pickLatestValidityEntry(financeScenario?.bayKiBiGRules);
   const bayKiBiGWeight = getBayKiBiGWeightForChild(item, groupDef, referenceDate, bayKiBiGRule?.weightFactors);

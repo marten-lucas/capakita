@@ -13,10 +13,11 @@
  *   Gruppen-Unterschiede bleiben manuell pflegbar (Settings → Beitragssätze).
  *
  * Mapping auf das Capakita-Datenmodell (groupFeeCatalogs):
- *   FeeBand { id, label, maxHours, monthlyAmount, validFrom, validUntil }
+ *   FeeBand { id, label, zeitkatId, monthlyAmount, validFrom, validUntil }
  *   - BETRAGZn → ZEITKAT-Zone `String(n).padStart(2,'0')`; Zonen, die im
  *     aktuellen Katalog nicht existieren (historisch '03'), werden übersprungen
- *   - maxHours = Zonen-Obergrenze (Capakita wählt das engste Band ≤ Stunden)
+ *   - `zeitkatId` bleibt explizit erhalten: adebis-BETRAGZn sind Tageskategorien,
+ *     keine maxHours-Wochenstundenbänder.
  *   - Gültigkeit GUELTIGVON/GUELTIGBIS (dd.mm.yyyy) → ISO validFrom/validUntil
  */
 
@@ -29,10 +30,20 @@ function parseAdebisAmount(value) {
   return Number.isFinite(amount) && amount > 0 ? amount : null;
 }
 
-/** Beitragsart als Elternbeitrags-Kandidat erkennen (heuristisch, dokumentiert). */
+/** Explizit benannten Elternbeitrag bevorzugen (z. B. vor Essensbeiträgen). */
+function isExplicitParentFee(beitrart) {
+  const labels = [beitrart?.BEZ, beitrart?.KURZBEZ, beitrart?.TEXT]
+    .map((value) => String(value || '').toLowerCase());
+  return labels.some((label) => label.includes('eltern'));
+}
+
+/** Beitragsart als Fallback-Kandidat erkennen (heuristisch, dokumentiert). */
 function isLikelyParentFee(beitrart) {
-  const bez = String(beitrart?.BEZ || beitrart?.KURZBEZ || '').toLowerCase();
-  return bez.includes('eltern') || bez.includes('beitrag');
+  const labels = [beitrart?.BEZ, beitrart?.KURZBEZ, beitrart?.TEXT]
+    .map((value) => String(value || '').toLowerCase());
+  const label = labels.join(' ');
+  if (/(essen|verpflegung|mittag|getränk|getraenk)/.test(label)) return false;
+  return label.includes('beitrag');
 }
 
 /**
@@ -87,7 +98,7 @@ export function adebis2FeeCatalogs({ beitrartRaw = [], bartbetrRaw = [], groupsR
           return {
             id: `bart${bartnr}-z${zone.id}-${validFrom || 'offen'}`,
             label: `${bez} (${zone.kurzbez})`,
-            maxHours: zone.maxHours,
+            zeitkatId: zone.id,
             monthlyAmount: amount,
             validFrom,
             validUntil,
@@ -101,14 +112,23 @@ export function adebis2FeeCatalogs({ beitrartRaw = [], bartbetrRaw = [], groupsR
       candidates.push({
         bartnr,
         bez,
-        bands: bands.sort((left, right) => Number(left.maxHours) - Number(right.maxHours)),
+        bands: bands.sort((left, right) => (
+          ZEITKAT_CATALOG.findIndex((zone) => zone.id === left.zeitkatId)
+          - ZEITKAT_CATALOG.findIndex((zone) => zone.id === right.zeitkatId)
+        )),
+        isExplicitParentFee: isExplicitParentFee(beitrart),
         isParentFee: isLikelyParentFee(beitrart),
       });
     }
   });
 
-  // Primäre Beitragsart: bevorzugt Elternbeitrag (bez-Heuristik), sonst die erste
-  const primary = candidates.find((candidate) => candidate.isParentFee) || candidates[0] || null;
+  // Auswahlpriorität: explizite Elternbeitrag-Bezeichnung zuerst, dann andere
+  // Beitragsart (Essens-/Verpflegungsbeiträge werden im Fallback ausgeschlossen),
+  // sonst erste vorhandene Beitragsart.
+  const primary = candidates.find((candidate) => candidate.isExplicitParentFee)
+    || candidates.find((candidate) => candidate.isParentFee)
+    || candidates[0]
+    || null;
 
   const catalogs = {};
   if (primary) {

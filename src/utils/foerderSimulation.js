@@ -1,24 +1,3 @@
-/**
- * Förder-Simulation „Buchungsgruppen verändern" für Capakita.
- *
- * Reverse-Engineering-Basis (adebisKITA 7.5, adebis-re/docs/fachdomaene.md §3/§6):
- * - Förderbetrag = Basiswert × Buchungszeitfaktor × Gewichtungsfaktor (§ 21 BayKiBiG,
- *   Repabrechnung: „Monate x Gew.-faktor x Zeitfaktor)/12 x Basiswert").
- * - Zeitkategorien (ZEITKAT) sind tagesbezogene Stundenzonen (01 „>1-2" … 13 „>12");
- *   Faktoren 0,5–2,5 mit Deckelung >9 h.
- * - Nur Basisbuchungen (art 0/K) tragen den Förderanspruch; Alternativ- (A/B) und
- *   Ferienbuchungen (F/G/H) werden nicht angehoben und nicht doppelt gezählt.
- *
- * Getrennte Wirkungen (Konzeptentscheid 26.10.2026):
- * - Zeitkat-Upgrade → Förderbetrag (Anspruch, nutzungsunabhängig)
- * - Nutzungsgrad (globaler Slider, 0–100 %) → Wochenstunden/Bedarf: gebuchte Tage
- *   werden anteilig auf die Zielzone ausgedehnt (100 % = Zonenvollausnutzung).
- *
- * Die Simulation ist eine reine Transformationsfunktion: Basisdaten werden nie
- * mutiert, es entstehen Overlay-artige Kopien (simulatedBookings) für die
- * bestehenden Chart-Pipelines.
- */
-
 import {
   ZEITKAT_CATALOG,
   decodeBuchungsart,
@@ -28,12 +7,15 @@ import {
 } from './adebisConstants';
 import { sumWeightedBookingHours } from './chartUtils/chartUtils';
 import {
-  findFeeEntryForHours,
+  calculateZeitkatFeeAmount,
   getBayKiBiGWeightForChild,
   pickApplicableValidityEntry,
   pickLatestValidityEntry,
 } from './financeUtils';
 import { minutesToTime, timeToMinutes } from './timeUtils';
+
+const roundMoney = (value) => Math.round((Number(value) || 0) * 100) / 100;
+const roundHours = (value) => Math.round((Number(value) || 0) * 100) / 100;
 
 function isBasisBooking(booking) {
   const art = booking?.buchungsart || decodeBuchungsart(booking?.rawdata?.ART);
@@ -41,124 +23,108 @@ function isBasisBooking(booking) {
 }
 
 function isBookingActiveOnDate(booking, referenceDate) {
-  const start = booking?.startdate || '';
-  const end = booking?.enddate || '';
-  return (!start || start <= referenceDate) && (!end || end >= referenceDate);
+  return (!booking?.startdate || booking.startdate <= referenceDate)
+    && (!booking?.enddate || booking.enddate >= referenceDate);
 }
 
-function segmentShareFactor(segment) {
-  const allocation = Number(segment?.allocationSharePercent);
-  if (!Number.isFinite(allocation)) return 1;
-  return Math.max(0, allocation) / 100;
+function bookingGroupId(booking, child) {
+  return String(booking?.groupId || child?.groupId || '');
 }
 
-/** Netto-Tagesminuten eines Buchungstags (Allocation-Shares eingerechnet). */
-function dailyMinutes(day) {
-  return (day?.segments || []).reduce((sum, segment) => {
-    const start = timeToMinutes(segment?.booking_start);
-    const end = timeToMinutes(segment?.booking_end);
-    if (start === null || end === null || end <= start) return sum;
-    return sum + (end - start) * segmentShareFactor(segment);
-  }, 0);
+function getEditedPrice(groupFeeCatalogs, temporaryPrices, groupId, zeitkatId, referenceDate) {
+  const feeCatalog = groupFeeCatalogs?.[groupId] || [];
+  const { entry, baseAmount } = calculateZeitkatFeeAmount(feeCatalog, zeitkatId, referenceDate);
+  if (!entry) return { entry: null, originalAmount: null, amount: null };
+  const override = temporaryPrices?.[groupId]?.[zeitkatId];
+  return {
+    entry,
+    originalAmount: baseAmount,
+    amount: Number.isFinite(Number(override)) ? roundMoney(override) : roundMoney(baseAmount),
+  };
 }
 
-/**
- * Streckt die Segmente je gebuchter Tag proportional auf die Zieltagesstunden
- * (Startzeiten bleiben; 100 % = Zonenvollausnutzung, 0 % = unverändert).
- * Tage ohne Segmente bleiben unverändert (keine erfundenen Betreuungstage).
- */
-function scaleTimesToDailyMinutes(times, targetDailyMinutes, utilizationPercent) {
-  const util = Math.max(0, Math.min(100, Number(utilizationPercent))) / 100;
-  if (!Array.isArray(times) || util <= 0) return times;
+function chooseRule(rules, referenceDate) {
+  return pickApplicableValidityEntry(rules, referenceDate) || pickLatestValidityEntry(rules) || null;
+}
 
-  return times.map((day) => {
-    const current = dailyMinutes(day);
-    if (!Array.isArray(day?.segments) || day.segments.length === 0 || current <= 0) {
-      return day;
-    }
-    const target = current + (targetDailyMinutes - current) * util;
-    const factor = target / current;
-    const segments = day.segments.map((segment) => {
+function resizedBooking(booking, toZeitkat, utilizationPercent) {
+  const targetHours = getZeitkatZoneBounds(toZeitkat)?.maxHours;
+  const utilization = Math.max(0, Math.min(100, Number(utilizationPercent) || 0)) / 100;
+  if (!Number.isFinite(targetHours) || utilization <= 0) return booking;
+
+  const times = (booking?.times || []).map((day) => {
+    const segments = Array.isArray(day?.segments) ? day.segments : [];
+    const validSegments = segments.map((segment) => {
+      const start = timeToMinutes(segment?.booking_start);
+      const end = timeToMinutes(segment?.booking_end);
+      return { segment, start, end };
+    }).filter(({ start, end }) => start !== null && end !== null && end > start);
+    const currentMinutes = validSegments.reduce((total, { segment, start, end }) => {
+      const allocation = Number(segment?.allocationSharePercent);
+      return total + (end - start) * (Number.isFinite(allocation) ? Math.max(0, allocation) / 100 : 1);
+    }, 0);
+    if (validSegments.length === 0 || currentMinutes <= 0) return day;
+
+    const targetMinutes = Math.max(targetHours * 60, currentMinutes);
+    const resultingMinutes = currentMinutes + (targetMinutes - currentMinutes) * utilization;
+    const scale = resultingMinutes / currentMinutes;
+    const nextSegments = segments.map((segment) => {
       const start = timeToMinutes(segment?.booking_start);
       const end = timeToMinutes(segment?.booking_end);
       if (start === null || end === null || end <= start) return segment;
-      const scaledEnd = Math.round(start + (end - start) * factor);
       return {
         ...segment,
-        booking_end: minutesToTime(Math.max(start + 1, scaledEnd)),
+        booking_end: minutesToTime(Math.max(start + 1, Math.round(start + (end - start) * scale))),
       };
     });
-    return { ...day, segments };
+    return { ...day, segments: nextSegments };
   });
+
+  const { BETRSTD: _betrstd, betrstd: _betrstdLower, ...rawdata } = booking?.rawdata || {};
+  return {
+    ...booking,
+    times,
+    rawdata: { ...rawdata, ZEITKAT: toZeitkat },
+  };
+}
+
+function makeGroupTotals(groupId, groupName) {
+  return {
+    id: groupId,
+    name: groupName || groupId || 'Ohne Gruppe',
+    bookings: 0,
+    migratedBookings: 0,
+    bookingHoursBefore: 0,
+    bookingHoursAfter: 0,
+    deltaMonthlyFunding: 0,
+    deltaMonthlyParentFees: 0,
+  };
 }
 
 /**
- * Ermittelt die Zielzone eines Zonensprungs.
- * - 'nextZone': nächsthöhere Zone (Default)
- * - 'targetZone': feste Zielzone (nur aufwärts; Gleichbleiben = null)
- * - 'minHours': kleinste Zone, deren Obergrenze ≥ minHours (keine Änderung, wenn
- *   die aktuelle Zone das Ziel bereits abdeckt)
- * Rückgabe: Ziel-ZEITKAT-Id oder null (keine Änderung möglich/nötig).
+ * Simuliert absolute Elternbeitragssätze je ZEITKAT und die anteilige Nutzung
+ * einer Mehrstunden-Staffel, sofern Quelle und direkt nächste Staffel gleich teuer sind.
+ * Sämtliche Preisänderungen bleiben Eingabewerte der Berechnung und werden nie gespeichert.
  */
-export function computeUpgradeTarget(fromZeitkat, upgrade = {}) {
-  const fromIndex = getZeitkatZoneIndex(fromZeitkat);
-  if (fromIndex < 0) return null;
-
-  const mode = upgrade?.mode || 'nextZone';
-  if (mode === 'targetZone') {
-    const targetIndex = getZeitkatZoneIndex(upgrade.targetZeitkat);
-    return targetIndex > fromIndex ? ZEITKAT_CATALOG[targetIndex].id : null;
-  }
-  if (mode === 'minHours') {
-    const minHours = Number(upgrade.minHours);
-    if (!Number.isFinite(minHours)) return null;
-    const bounds = getZeitkatZoneBounds(fromZeitkat);
-    if (bounds && bounds.maxHours >= minHours) return null;
-    const target = ZEITKAT_CATALOG.find((zone) => zone.maxHours >= minHours);
-    return target ? target.id : null;
-  }
-  const next = ZEITKAT_CATALOG[fromIndex + 1];
-  return next ? next.id : null;
-}
-
-function resolveBayKiBiGRule(bayKiBiGRules, referenceDate) {
-  return pickApplicableValidityEntry(bayKiBiGRules, referenceDate)
-    || pickLatestValidityEntry(bayKiBiGRules)
-    || null;
-}
-
-/**
- * Führt die Zeitkat-Upgrade-Simulation aus.
- *
- * @param {Object} params
- * @param {Array} params.demandBookings - gefilterte Demand-Buchungen (filterBookings,
- *   enthält itemId/groupId, aktiv am Stichtag)
- * @param {Object} params.dataItems - { [itemId]: childItem }
- * @param {Array} params.groupDefs
- * @param {Array} [params.bayKiBiGRules] - Förderregeln (simFinanceSlice)
- * @param {Object} [params.groupFeeCatalogs] - { [groupId]: [{ maxHours, monthlyAmount, … }] }
- * @param {Object} [params.upgrade] - { mode, targetZeitkat, minHours, utilizationPercent }
- * @param {string} params.referenceDate
- * @returns {{ perChild: Array, families: Array, totals: Object, simulatedBookings: Array,
- *   skippedNoZone: number, rule: Object|null }}
- */
-export function simulateZeitkatUpgrade({
+export function simulateContributionChanges({
   demandBookings = [],
   dataItems = {},
   groupDefs = [],
   bayKiBiGRules = [],
   groupFeeCatalogs = {},
-  upgrade = {},
+  temporaryPrices = {},
+  utilizationPercent = 100,
   referenceDate,
-}) {
-  const rule = resolveBayKiBiGRule(bayKiBiGRules, referenceDate);
+} = {}) {
+  const rule = chooseRule(bayKiBiGRules, referenceDate);
   const baseValue = Number(rule?.baseValue) || 0;
   const weightFactors = rule?.weightFactors || null;
-  const utilizationPercent = upgrade?.utilizationPercent ?? 100;
-
-  // Aktive Basisbuchungen je Kind gruppieren
+  const utilization = Math.max(0, Math.min(100, Number(utilizationPercent) || 0)) / 100;
+  const groupNames = new Map((groupDefs || []).map((group) => [String(group.id), group.name]));
+  const groupDefById = new Map((groupDefs || []).map((group) => [String(group.id), group]));
   const bookingsByChild = new Map();
-  demandBookings.forEach((booking) => {
+
+  (demandBookings || []).forEach((booking) => {
     if (!isBasisBooking(booking) || !isBookingActiveOnDate(booking, referenceDate)) return;
     const childKey = String(booking?.itemId ?? '');
     if (!childKey) return;
@@ -166,164 +132,254 @@ export function simulateZeitkatUpgrade({
     bookingsByChild.get(childKey).push(booking);
   });
 
-  const groupDefById = new Map(groupDefs.map((groupDef) => [String(groupDef.id), groupDef]));
   const perChild = [];
   const simulatedBookings = [];
-  const familiesMap = new Map();
+  const groups = new Map();
   let skippedNoZone = 0;
-  let deltaMonthlyBayKiBiG = 0;
-  let deltaParentFees = 0;
-  let deltaWeeklyDemandHours = 0;
+  let totalBookingHoursBefore = 0;
+  let totalBookingHoursAfter = 0;
+  let totalDeltaMonthlyFunding = 0;
+  let totalDeltaMonthlyParentFees = 0;
+  let totalMigratedBookings = 0;
 
   bookingsByChild.forEach((childBookings, childKey) => {
+    const bookings = childBookings.slice().sort((a, b) => String(b?.startdate || '').localeCompare(String(a?.startdate || '')));
     const child = dataItems?.[childKey] || null;
-    const groupId = String(childBookings[0]?.groupId || '');
-    const groupDef = groupDefById.get(groupId) || null;
-    const weight = getBayKiBiGWeightForChild(child, groupDef, referenceDate, weightFactors);
+    const firstBooking = bookings[0];
+    const primaryGroupId = bookingGroupId(firstBooking, child);
+    const primaryGroup = groupDefById.get(primaryGroupId) || null;
+    const weight = getBayKiBiGWeightForChild(child, primaryGroup, referenceDate, weightFactors);
+    let childHoursBefore = 0;
+    let childHoursAfter = 0;
+    let childFundingDelta = 0;
+    let childMigratedBookings = 0;
+    let firstZone = null;
+    let firstTargetZone = null;
+    let childChanged = false;
+    let firstBookingGroupId = primaryGroupId;
 
-    let amountBefore = 0;
-    let amountAfter = 0;
-    let hoursBefore = 0;
-    let hoursAfter = 0;
-    let fromZone = null;
-    let toZone = null;
-    let changed = false;
-    const childSimulated = [];
-
-    childBookings.forEach((booking) => {
-      hoursBefore += sumWeightedBookingHours(booking);
-
+    bookings.forEach((booking) => {
       const zoneBefore = String(booking?.rawdata?.ZEITKAT || '').trim();
-      const zoneAfter = computeUpgradeTarget(zoneBefore, upgrade);
-      if (!zoneBefore || getZeitkatZoneIndex(zoneBefore) < 0) {
+      const zoneIndex = getZeitkatZoneIndex(zoneBefore);
+      const groupId = bookingGroupId(booking, child);
+      const hoursBefore = sumWeightedBookingHours(booking);
+      childHoursBefore += hoursBefore;
+      totalBookingHoursBefore += hoursBefore;
+      const groupName = groupNames.get(groupId) || groupId || 'Ohne Gruppe';
+      if (!groups.has(groupId)) groups.set(groupId, makeGroupTotals(groupId, groupName));
+      const group = groups.get(groupId);
+      group.bookings += 1;
+      group.bookingHoursBefore += hoursBefore;
+
+      if (zoneIndex < 0) {
         skippedNoZone += 1;
-        hoursAfter += sumWeightedBookingHours(booking);
+        childHoursAfter += hoursBefore;
+        totalBookingHoursAfter += hoursBefore;
+        group.bookingHoursAfter += hoursBefore;
+        simulatedBookings.push(booking);
         return;
       }
-      if (!zoneAfter) {
-        hoursAfter += sumWeightedBookingHours(booking);
-        return;
+
+      const nextZone = ZEITKAT_CATALOG[zoneIndex + 1] || null;
+      const sourcePrice = getEditedPrice(groupFeeCatalogs, temporaryPrices, groupId, zoneBefore, referenceDate);
+      const nextPrice = nextZone
+        ? getEditedPrice(groupFeeCatalogs, temporaryPrices, groupId, nextZone.id, referenceDate)
+        : { entry: null, amount: null, originalAmount: null };
+      const sameSimulatedPrice = sourcePrice.entry && nextPrice.entry
+        && Math.round(sourcePrice.amount * 100) === Math.round(nextPrice.amount * 100);
+      const migrationShare = sameSimulatedPrice ? utilization : 0;
+      const zoneAfter = migrationShare > 0 ? nextZone.id : zoneBefore;
+      const originalFactor = getZeitkatFactor(zoneBefore) ?? 1;
+      const nextFactor = nextZone ? (getZeitkatFactor(nextZone.id) ?? originalFactor) : originalFactor;
+      const fundingDelta = baseValue * weight * (nextFactor - originalFactor) * migrationShare;
+      const simulatedBooking = migrationShare > 0
+        ? resizedBooking(booking, nextZone.id, 100)
+        : booking;
+      const hoursAfter = sumWeightedBookingHours(simulatedBooking);
+      const expectedHoursAfter = hoursBefore + (hoursAfter - hoursBefore) * migrationShare;
+      const changed = migrationShare > 0 || (sourcePrice.entry && sourcePrice.amount !== sourcePrice.originalAmount);
+
+      childHoursAfter += expectedHoursAfter;
+      totalBookingHoursAfter += expectedHoursAfter;
+      childFundingDelta += fundingDelta;
+      totalDeltaMonthlyFunding += fundingDelta;
+      if (migrationShare > 0) {
+        childMigratedBookings += migrationShare;
+        totalMigratedBookings += migrationShare;
+      }
+      childChanged = childChanged || changed;
+      if (!firstZone) {
+        firstZone = zoneBefore;
+        firstTargetZone = zoneAfter;
+        firstBookingGroupId = groupId;
       }
 
-      const bounds = getZeitkatZoneBounds(zoneAfter);
-      const targetDailyMinutes = (bounds?.maxHours ?? 0) * 60;
-      const factorBefore = getZeitkatFactor(zoneBefore) ?? 1;
-      const factorAfter = getZeitkatFactor(zoneAfter) ?? 1;
+      group.migratedBookings += migrationShare;
+      group.bookingHoursAfter += expectedHoursAfter;
+      group.deltaMonthlyFunding += fundingDelta;
 
-      amountBefore += baseValue * weight * factorBefore;
-      amountAfter += baseValue * weight * factorAfter;
-      fromZone = fromZone || zoneBefore;
-      toZone = zoneAfter;
-      changed = changed || factorAfter !== factorBefore;
-
-      const simulatedBooking = {
-        ...booking,
-        times: scaleTimesToDailyMinutes(booking.times, targetDailyMinutes, utilizationPercent),
-        rawdata: (() => {
-          // BETRSTD entfernen: nach Segment-Umstellung ist die Segment-Summe die Wahrheit
-          const { BETRSTD: _betrstd, betrstd: _betrstdLower, ...rest } = booking?.rawdata || {};
-          return { ...rest, ZEITKAT: zoneAfter };
-        })(),
-      };
-      hoursAfter += sumWeightedBookingHours(simulatedBooking);
-      childSimulated.push(simulatedBooking);
       simulatedBookings.push(simulatedBooking);
     });
 
-    if (!changed) {
-      // Nicht betroffen (Zone bereits am Ziel oder Zielzone ≤ Ist) – trotzdem für
-      // Wochenstunden-Vergleich melden? Nur betroffene Kinder in perChild aufnehmen.
-      return;
+    const primaryZone = String(firstBooking?.rawdata?.ZEITKAT || '').trim();
+    const originalParentFee = getEditedPrice(groupFeeCatalogs, {}, primaryGroupId, primaryZone, referenceDate);
+    const simulatedSourceFee = getEditedPrice(groupFeeCatalogs, temporaryPrices, primaryGroupId, primaryZone, referenceDate);
+    const primaryZoneIndex = getZeitkatZoneIndex(primaryZone);
+    const primaryNextZone = primaryZoneIndex >= 0 ? ZEITKAT_CATALOG[primaryZoneIndex + 1] : null;
+    const primaryNextFee = primaryNextZone
+      ? getEditedPrice(groupFeeCatalogs, temporaryPrices, primaryGroupId, primaryNextZone.id, referenceDate)
+      : { entry: null, amount: null };
+    const primaryCanMigrate = Boolean(simulatedSourceFee.entry && primaryNextFee.entry
+      && Math.round(simulatedSourceFee.amount * 100) === Math.round(primaryNextFee.amount * 100));
+    const primaryMigrationShare = primaryCanMigrate ? utilization : 0;
+    const parentFeeBefore = originalParentFee.entry ? originalParentFee.originalAmount : 0;
+    const parentFeeAfter = simulatedSourceFee.entry
+      ? simulatedSourceFee.amount * (1 - primaryMigrationShare)
+        + (primaryCanMigrate ? primaryNextFee.amount * primaryMigrationShare : 0)
+      : 0;
+    const parentFeeDelta = parentFeeAfter - parentFeeBefore;
+    totalDeltaMonthlyParentFees += parentFeeDelta;
+    childChanged = childChanged || Math.abs(parentFeeDelta) >= 0.005;
+
+    const childDeltaMonthlyTotal = childFundingDelta + parentFeeDelta;
+    if (primaryGroupId || Math.abs(childDeltaMonthlyTotal) > 0.005 || childChanged) {
+      if (!groups.has(primaryGroupId)) {
+        groups.set(primaryGroupId, makeGroupTotals(primaryGroupId, groupNames.get(primaryGroupId)));
+      }
+      groups.get(primaryGroupId).deltaMonthlyParentFees += parentFeeDelta;
     }
 
-    // Elternbeitragsband (FeeCatalog) vor/nachher
-    const feeCatalog = groupFeeCatalogs?.[groupId] || [];
-    const feeEntryBefore = findFeeEntryForHours(feeCatalog, hoursBefore, referenceDate);
-    const feeEntryAfter = findFeeEntryForHours(feeCatalog, hoursAfter, referenceDate);
-    const parentFeeBefore = Number(feeEntryBefore?.monthlyAmount) || 0;
-    const parentFeeAfter = Number(feeEntryAfter?.monthlyAmount) || 0;
-    const feeBandChange = Boolean(feeEntryBefore && feeEntryAfter && feeEntryBefore.id !== feeEntryAfter.id);
-
-    const deltaMonthly = amountAfter - amountBefore;
-    const deltaWeeklyHours = hoursAfter - hoursBefore;
-    deltaMonthlyBayKiBiG += deltaMonthly;
-    deltaParentFees += parentFeeAfter - parentFeeBefore;
-    deltaWeeklyDemandHours += deltaWeeklyHours;
-
-    const row = {
+    if (!childChanged && childMigratedBookings === 0) return;
+    perChild.push({
       itemId: childKey,
       name: child?.name || childKey,
       familyId: child?.familyId || '',
       familyLabel: child?.familyLabel || '',
-      groupId,
-      groupName: groupDef?.name || '',
-      fromZone,
-      toZone,
+      groupId: firstBookingGroupId,
+      groupName: groupNames.get(firstBookingGroupId) || firstBookingGroupId || 'Ohne Gruppe',
+      fromZone: firstZone || primaryZone,
+      toZone: firstTargetZone || primaryZone,
       weight,
-      factorBefore: getZeitkatFactor(fromZone) ?? 1,
-      factorAfter: getZeitkatFactor(toZone) ?? 1,
-      amountBefore,
-      amountAfter,
-      deltaMonthly,
-      deltaYearly: deltaMonthly * 12,
-      weeklyHoursBefore: Math.round(hoursBefore * 100) / 100,
-      weeklyHoursAfter: Math.round(hoursAfter * 100) / 100,
-      deltaWeeklyHours: Math.round(deltaWeeklyHours * 100) / 100,
-      parentFeeBefore,
-      parentFeeAfter,
-      feeBandChange,
-    };
-    perChild.push(row);
-
-    if (row.familyId) {
-      if (!familiesMap.has(row.familyId)) {
-        familiesMap.set(row.familyId, {
-          id: row.familyId,
-          label: row.familyLabel || row.familyId,
-          affectedChildren: 0,
-          deltaMonthly: 0,
-          deltaYearly: 0,
-          deltaWeeklyHours: 0,
-        });
-      }
-      const family = familiesMap.get(row.familyId);
-      family.affectedChildren += 1;
-      family.deltaMonthly += deltaMonthly;
-      family.deltaYearly += deltaMonthly * 12;
-      family.deltaWeeklyHours += deltaWeeklyHours;
-    }
+      deltaMonthly: roundMoney(childFundingDelta),
+      deltaYearly: roundMoney(childFundingDelta * 12),
+      deltaMonthlyParentFees: roundMoney(parentFeeDelta),
+      deltaYearlyParentFees: roundMoney(parentFeeDelta * 12),
+      deltaMonthlyTotal: roundMoney(childDeltaMonthlyTotal),
+      deltaYearlyTotal: roundMoney(childDeltaMonthlyTotal * 12),
+      weeklyHoursBefore: roundHours(childHoursBefore),
+      weeklyHoursAfter: roundHours(childHoursAfter),
+      deltaWeeklyHours: roundHours(childHoursAfter - childHoursBefore),
+      parentFeeBefore: roundMoney(parentFeeBefore),
+      parentFeeAfter: roundMoney(parentFeeAfter),
+      migratedBookings: roundHours(childMigratedBookings),
+      parentFeeChanged: Math.abs(parentFeeDelta) >= 0.005,
+    });
   });
 
-  const families = Array.from(familiesMap.values())
-    .map((family) => ({
-      ...family,
-      deltaMonthly: Math.round(family.deltaMonthly * 100) / 100,
-      deltaYearly: Math.round(family.deltaYearly * 100) / 100,
-      deltaWeeklyHours: Math.round(family.deltaWeeklyHours * 100) / 100,
-    }))
-    .sort((left, right) => Math.abs(right.deltaMonthly) - Math.abs(left.deltaMonthly));
+  const roundedGroups = Array.from(groups.values()).map((group) => ({
+    ...group,
+    migratedBookings: roundHours(group.migratedBookings),
+    bookingHoursBefore: roundHours(group.bookingHoursBefore),
+    bookingHoursAfter: roundHours(group.bookingHoursAfter),
+    deltaMonthlyFunding: roundMoney(group.deltaMonthlyFunding),
+    deltaMonthlyParentFees: roundMoney(group.deltaMonthlyParentFees),
+    deltaMonthlyTotal: roundMoney(group.deltaMonthlyFunding + group.deltaMonthlyParentFees),
+    deltaYearlyFunding: roundMoney(group.deltaMonthlyFunding * 12),
+    deltaYearlyParentFees: roundMoney(group.deltaMonthlyParentFees * 12),
+    deltaYearlyTotal: roundMoney((group.deltaMonthlyFunding + group.deltaMonthlyParentFees) * 12),
+  })).sort((a, b) => a.name.localeCompare(b.name, 'de'));
 
-  const sortedPerChild = perChild
-    .map((row) => ({
-      ...row,
-      amountBefore: Math.round(row.amountBefore * 100) / 100,
-      amountAfter: Math.round(row.amountAfter * 100) / 100,
-    }))
-    .sort((left, right) => Math.abs(right.deltaMonthly) - Math.abs(left.deltaMonthly));
+  const familiesMap = new Map();
+  perChild.forEach((row) => {
+    if (!row.familyId) return;
+    if (!familiesMap.has(row.familyId)) {
+      familiesMap.set(row.familyId, {
+        id: row.familyId,
+        label: row.familyLabel || row.familyId,
+        affectedChildren: 0,
+        childrenWithMoreHours: 0,
+        childrenWithHigherFees: 0,
+        childrenWithLowerFees: 0,
+        weeklyHoursAdded: 0,
+        monthlyParentCostIncrease: 0,
+        monthlyParentCostReduction: 0,
+        deltaMonthlyFunding: 0,
+        deltaMonthlyParentFees: 0,
+        deltaMonthlyTotal: 0,
+        deltaYearlyTotal: 0,
+        deltaWeeklyHours: 0,
+      });
+    }
+    const family = familiesMap.get(row.familyId);
+    family.affectedChildren += 1;
+    if (row.deltaWeeklyHours > 0.005) {
+      family.childrenWithMoreHours += 1;
+      family.weeklyHoursAdded += row.deltaWeeklyHours;
+    }
+    if (row.deltaMonthlyParentFees > 0.005) {
+      family.childrenWithHigherFees += 1;
+      family.monthlyParentCostIncrease += row.deltaMonthlyParentFees;
+    }
+    if (row.deltaMonthlyParentFees < -0.005) {
+      family.childrenWithLowerFees += 1;
+      family.monthlyParentCostReduction += Math.abs(row.deltaMonthlyParentFees);
+    }
+    family.deltaMonthlyFunding += row.deltaMonthly;
+    family.deltaMonthlyParentFees += row.deltaMonthlyParentFees;
+    family.deltaMonthlyTotal += row.deltaMonthlyTotal;
+    family.deltaYearlyTotal += row.deltaYearlyTotal;
+    family.deltaWeeklyHours += row.deltaWeeklyHours;
+  });
+  const families = Array.from(familiesMap.values()).map((family) => ({
+    ...family,
+    weeklyHoursAdded: roundHours(family.weeklyHoursAdded),
+    monthlyParentCostIncrease: roundMoney(family.monthlyParentCostIncrease),
+    monthlyParentCostReduction: roundMoney(family.monthlyParentCostReduction),
+    deltaMonthlyFunding: roundMoney(family.deltaMonthlyFunding),
+    deltaMonthlyParentFees: roundMoney(family.deltaMonthlyParentFees),
+    deltaMonthlyTotal: roundMoney(family.deltaMonthlyTotal),
+    deltaYearlyTotal: roundMoney(family.deltaYearlyTotal),
+    deltaWeeklyHours: roundHours(family.deltaWeeklyHours),
+  })).sort((a, b) => Math.abs(b.deltaMonthlyTotal) - Math.abs(a.deltaMonthlyTotal));
+
+  const childrenWithMoreHours = perChild.filter((row) => row.deltaWeeklyHours > 0.005);
+  const childrenWithHigherFees = perChild.filter((row) => row.deltaMonthlyParentFees > 0.005);
+  const childrenWithLowerFees = perChild.filter((row) => row.deltaMonthlyParentFees < -0.005);
+  const familiesWithMoreHours = families.filter((family) => family.childrenWithMoreHours > 0);
+  const familiesWithHigherFees = families.filter((family) => family.childrenWithHigherFees > 0);
+  const familiesWithLowerFees = families.filter((family) => family.childrenWithLowerFees > 0);
 
   return {
-    perChild: sortedPerChild,
+    perChild: perChild.sort((a, b) => Math.abs(b.deltaMonthlyTotal) - Math.abs(a.deltaMonthlyTotal)),
     families,
+    groups: roundedGroups,
     totals: {
-      deltaMonthlyBayKiBiG: Math.round(deltaMonthlyBayKiBiG * 100) / 100,
-      deltaYearlyBayKiBiG: Math.round(deltaMonthlyBayKiBiG * 12 * 100) / 100,
-      deltaParentFees: Math.round(deltaParentFees * 100) / 100,
-      deltaWeeklyDemandHours: Math.round(deltaWeeklyDemandHours * 100) / 100,
-      affectedChildren: sortedPerChild.length,
+      bookingHoursBefore: roundHours(totalBookingHoursBefore),
+      bookingHoursAfter: roundHours(totalBookingHoursAfter),
+      deltaWeeklyDemandHours: roundHours(totalBookingHoursAfter - totalBookingHoursBefore),
+      migratedBookings: roundHours(totalMigratedBookings),
+      deltaMonthlyBayKiBiG: roundMoney(totalDeltaMonthlyFunding),
+      deltaYearlyBayKiBiG: roundMoney(totalDeltaMonthlyFunding * 12),
+      deltaParentFees: roundMoney(totalDeltaMonthlyParentFees),
+      deltaMonthlyTotal: roundMoney(totalDeltaMonthlyFunding + totalDeltaMonthlyParentFees),
+      deltaYearlyTotal: roundMoney((totalDeltaMonthlyFunding + totalDeltaMonthlyParentFees) * 12),
+      affectedChildren: perChild.length,
       affectedFamilies: families.length,
+      childrenWithMoreHours: childrenWithMoreHours.length,
+      familiesWithMoreHours: familiesWithMoreHours.length,
+      weeklyHoursAdded: roundHours(childrenWithMoreHours.reduce((sum, row) => sum + row.deltaWeeklyHours, 0)),
+      childrenWithHigherFees: childrenWithHigherFees.length,
+      familiesWithHigherFees: familiesWithHigherFees.length,
+      monthlyParentCostIncrease: roundMoney(childrenWithHigherFees.reduce((sum, row) => sum + row.deltaMonthlyParentFees, 0)),
+      childrenWithLowerFees: childrenWithLowerFees.length,
+      familiesWithLowerFees: familiesWithLowerFees.length,
+      monthlyParentCostReduction: roundMoney(childrenWithLowerFees.reduce((sum, row) => sum + Math.abs(row.deltaMonthlyParentFees), 0)),
     },
     simulatedBookings,
     skippedNoZone,
     rule,
   };
 }
+
+// Kept as an alias for callers from older local branches; simulation semantics are now tariff-based.
+export const simulateZeitkatUpgrade = simulateContributionChanges;

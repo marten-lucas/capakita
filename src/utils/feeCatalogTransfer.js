@@ -1,3 +1,5 @@
+import { getFeeBandZeitkatId } from './adebisConstants';
+
 export function buildFeeCatalogExportPayload({ scenarioId, groupDefs, groupFeeCatalogs }) {
   return {
     type: 'kiga-simulator.groupFeeCatalogs',
@@ -34,6 +36,9 @@ function normalizeImportedFeeBand(entry = {}, { preferNonMember = true } = {}) {
   return {
     id: entry.id,
     label: entry.label || '',
+    // Adebis-Import: ZEITKAT-specific amount (BARTBETR.BETRAGZ1..13).
+    // Preserve the category key; it is not a weekly maxHours band.
+    ...(getFeeBandZeitkatId(entry) ? { zeitkatId: getFeeBandZeitkatId(entry) } : {}),
     maxHours: entry.maxHours ?? entry.hoursTo ?? entry.minHours ?? entry.hoursFrom ?? '',
     monthlyAmount: amount,
     validFrom: entry.validFrom || '',

@@ -1,209 +1,207 @@
 import { describe, expect, it } from 'vitest';
-import { computeUpgradeTarget, simulateZeitkatUpgrade } from './foerderSimulation';
+import { simulateContributionChanges } from './foerderSimulation';
 
 const REF = '2026-03-15';
-const RULE = [{ id: 'r1', baseValue: 11.0, validFrom: '2026-01-01', weightFactors: { regelkind_3to6: 1.0 } }];
+const RULES = [{
+  id: 'rule-1',
+  baseValue: 11,
+  validFrom: '2026-01-01',
+  weightFactors: { regelkind_3to6: 1 },
+}];
 
-const makeBooking = ({ itemId = 'child-1', zone = '05', art = '0', dailyHours = 4, days = 2 } = {}) => {
-  const dayNames = ['Mo', 'Di', 'Mi', 'Do', 'Fr'];
-  const times = Array.from({ length: days }, (_, index) => ({
-    day: index + 1,
-    day_name: dayNames[index],
-    segments: [{
-      booking_start: '07:00',
-      booking_end: `${String(7 + dailyHours).padStart(2, '0')}:00`,
-      category: 'pedagogical',
-    }],
-  }));
+function makeBooking({ itemId = 'child-1', groupId = 'g1', zone = '04', art = '0', dailyHours = 3, days = 1 } = {}) {
   return {
     id: `booking-${itemId}-${zone}`,
     itemId,
-    groupId: 'g1',
+    groupId,
     startdate: '2026-01-01',
     enddate: '',
-    buchungsart: { code: art, label: art === '0' ? 'R' : art, gruppe: art === '0' ? 'regel' : 'ferien', basis: art === '0' },
+    buchungsart: { code: art, basis: art === '0' },
     rawdata: { ZEITKAT: zone, ART: art },
-    times,
+    times: Array.from({ length: days }, (_, index) => ({
+      day: index + 1,
+      segments: [{
+        booking_start: '07:00',
+        booking_end: `${String(7 + dailyHours).padStart(2, '0')}:00`,
+        category: 'pedagogical',
+      }],
+    })),
   };
+}
+
+function makeCatalog({ source = 100, next = 200 } = {}) {
+  return {
+    g1: [
+      { id: 'zone-04', zeitkatId: '04', monthlyAmount: source, validFrom: '2026-01-01' },
+      { id: 'zone-05', zeitkatId: '05', monthlyAmount: next, validFrom: '2026-01-01' },
+    ],
+  };
+}
+
+const CHILD = {
+  'child-1': { id: 'child-1', name: 'Kind A', dateofbirth: '2022-01-01', familyId: 'fam-1', familyLabel: 'Familie A', groupId: 'g1' },
 };
 
-describe('computeUpgradeTarget (Zonensprünge)', () => {
-  it('nextZone: nächsthöhere Zone', () => {
-    expect(computeUpgradeTarget('05', { mode: 'nextZone' })).toBe('06');
-    expect(computeUpgradeTarget('13', { mode: 'nextZone' })).toBeNull(); // höchste Zone
+function runSimulation({ utilizationPercent = 100, source = 100, next = 200, temporaryPrices = {}, bookings = [makeBooking()] } = {}) {
+  return simulateContributionChanges({
+    demandBookings: bookings,
+    dataItems: CHILD,
+    groupDefs: [{ id: 'g1', name: 'Sonnengruppe' }],
+    bayKiBiGRules: RULES,
+    groupFeeCatalogs: makeCatalog({ source, next }),
+    temporaryPrices,
+    utilizationPercent,
+    referenceDate: REF,
+  });
+}
+
+describe('simulateContributionChanges', () => {
+  it('berechnet absolute Simulationspreise und anteilige Wechsel bei gleichem Staffelpreis', () => {
+    const result = runSimulation({
+      utilizationPercent: 50,
+      temporaryPrices: { g1: { '04': 150, '05': 150 } },
+    });
+
+    // Hälfte von 3 h/Tag wechselt in die 5 h-Obergrenze: +1 Wochenstunde.
+    expect(result.totals.bookingHoursBefore).toBe(3);
+    expect(result.totals.bookingHoursAfter).toBe(4);
+    expect(result.totals.migratedBookings).toBe(0.5);
+    // Δ-Förderung = 11 € × (1,25 - 1,0) × 50 %.
+    expect(result.totals.deltaMonthlyBayKiBiG).toBe(1.38);
+    // Der Beitrag wird auf den absoluten Simulationspreis 150 € gesetzt.
+    expect(result.totals.deltaParentFees).toBe(50);
+    expect(result.totals.deltaMonthlyTotal).toBe(51.38);
+    expect(result.totals).toMatchObject({
+      childrenWithMoreHours: 1,
+      familiesWithMoreHours: 1,
+      weeklyHoursAdded: 1,
+      childrenWithHigherFees: 1,
+      familiesWithHigherFees: 1,
+      monthlyParentCostIncrease: 50,
+      childrenWithLowerFees: 0,
+      familiesWithLowerFees: 0,
+    });
+    expect(result.families[0]).toMatchObject({
+      childrenWithMoreHours: 1,
+      childrenWithHigherFees: 1,
+      weeklyHoursAdded: 1,
+      monthlyParentCostIncrease: 50,
+    });
+    expect(result.groups[0]).toMatchObject({
+      name: 'Sonnengruppe',
+      bookings: 1,
+      migratedBookings: 0.5,
+      bookingHoursBefore: 3,
+      bookingHoursAfter: 4,
+      deltaMonthlyFunding: 1.38,
+      deltaMonthlyParentFees: 50,
+      deltaMonthlyTotal: 51.38,
+    });
+    expect(result.perChild[0]).toMatchObject({
+      parentFeeBefore: 100,
+      parentFeeAfter: 150,
+      deltaMonthlyParentFees: 50,
+      deltaWeeklyHours: 1,
+    });
   });
 
-  it('targetZone: nur aufwärts, sonst null', () => {
-    expect(computeUpgradeTarget('05', { mode: 'targetZone', targetZeitkat: '07' })).toBe('07');
-    expect(computeUpgradeTarget('07', { mode: 'targetZone', targetZeitkat: '05' })).toBeNull();
-    expect(computeUpgradeTarget('07', { mode: 'targetZone', targetZeitkat: '07' })).toBeNull();
+  it('wechselt nicht, wenn die absoluten Simulationspreise benachbarter Staffeln verschieden sind', () => {
+    const result = runSimulation({
+      utilizationPercent: 100,
+      temporaryPrices: { g1: { '04': 150, '05': 200 } },
+    });
+
+    expect(result.totals.migratedBookings).toBe(0);
+    expect(result.totals.bookingHoursAfter).toBe(3);
+    expect(result.totals.deltaMonthlyBayKiBiG).toBe(0);
+    expect(result.totals.deltaParentFees).toBe(50);
   });
 
-  it('minHours: kleinste Zone ≥ Ziel, keine Änderung wenn abgedeckt', () => {
-    expect(computeUpgradeTarget('04', { mode: 'minHours', minHours: 6 })).toBe('06');
-    expect(computeUpgradeTarget('06', { mode: 'minHours', minHours: 6 })).toBeNull();
+  it('wendet Ausschöpfungsquote 0 auf Wechsel, aber nicht auf Preisänderungen an', () => {
+    const result = runSimulation({
+      utilizationPercent: 0,
+      temporaryPrices: { g1: { '04': 150, '05': 150 } },
+    });
+
+    expect(result.totals.migratedBookings).toBe(0);
+    expect(result.totals.deltaWeeklyDemandHours).toBe(0);
+    expect(result.totals.deltaMonthlyBayKiBiG).toBe(0);
+    expect(result.totals.deltaParentFees).toBe(50);
   });
 
-  it('unbekannte Zone → null', () => {
-    expect(computeUpgradeTarget('', {})).toBeNull();
-    expect(computeUpgradeTarget('99', {})).toBeNull();
-  });
-});
+  it('weist Elternbeitragsentlastungen getrennt von Mehrkosten aus', () => {
+    const result = runSimulation({
+      utilizationPercent: 0,
+      temporaryPrices: { g1: { '04': 50 } },
+    });
 
-describe('simulateZeitkatUpgrade – Förderdelta (RE-Formel)', () => {
-  it('nextZone: Basiswert × Gewicht × ΔZeitfaktor, ×12 fürs Jahr', () => {
-    // Zone 05 (1,25) → 06 (1,5): Δ = 11,0 × 1,0 × 0,25 = 2,75/Monat
-    const result = simulateZeitkatUpgrade({
-      demandBookings: [makeBooking({ zone: '05' })],
-      dataItems: { 'child-1': { id: 'child-1', name: 'Kind A', dateofbirth: '2022-01-01' } },
-      groupDefs: [{ id: 'g1', name: 'Fuchs' }],
-      bayKiBiGRules: RULE,
-      upgrade: { mode: 'nextZone', utilizationPercent: 100 },
+    expect(result.totals.childrenWithHigherFees).toBe(0);
+    expect(result.totals.monthlyParentCostIncrease).toBe(0);
+    expect(result.totals.childrenWithLowerFees).toBe(1);
+    expect(result.totals.familiesWithLowerFees).toBe(1);
+    expect(result.totals.monthlyParentCostReduction).toBe(50);
+    expect(result.families[0].monthlyParentCostReduction).toBe(50);
+  });
+
+  it('berechnet Gruppen- und Gesamtwerte über mehrere Gruppen', () => {
+    const bookings = [
+      makeBooking({ itemId: 'child-1', groupId: 'g1' }),
+      makeBooking({ itemId: 'child-2', groupId: 'g2' }),
+    ];
+    const result = simulateContributionChanges({
+      demandBookings: bookings,
+      dataItems: {
+        ...CHILD,
+        'child-2': { id: 'child-2', name: 'Kind B', dateofbirth: '2022-01-01', groupId: 'g2' },
+      },
+      groupDefs: [{ id: 'g1', name: 'Sonnengruppe' }, { id: 'g2', name: 'Regenbogengruppe' }],
+      bayKiBiGRules: RULES,
+      groupFeeCatalogs: {
+        ...makeCatalog(),
+        g2: [
+          { id: 'g2-zone-04', zeitkatId: '04', monthlyAmount: 80, validFrom: '2026-01-01' },
+          { id: 'g2-zone-05', zeitkatId: '05', monthlyAmount: 120, validFrom: '2026-01-01' },
+        ],
+      },
+      temporaryPrices: { g1: { '04': 150, '05': 150 } },
+      utilizationPercent: 100,
       referenceDate: REF,
     });
 
-    expect(result.totals.affectedChildren).toBe(1);
-    expect(result.perChild[0].deltaMonthly).toBe(2.75);
-    expect(result.perChild[0].deltaYearly).toBe(33);
+    expect(result.groups.map(({ name }) => name)).toEqual(['Regenbogengruppe', 'Sonnengruppe']);
+    expect(result.totals.bookingHoursBefore).toBe(6);
+    expect(result.totals.bookingHoursAfter).toBe(8);
+    expect(result.totals.migratedBookings).toBe(1);
     expect(result.totals.deltaMonthlyBayKiBiG).toBe(2.75);
-    expect(result.totals.deltaYearlyBayKiBiG).toBe(33);
-    expect(result.perChild[0].fromZone).toBe('05');
-    expect(result.perChild[0].toZone).toBe('06');
+    expect(result.totals.deltaParentFees).toBe(50);
+    expect(result.totals.deltaYearlyTotal).toBe(633);
   });
 
-  it('Nutzungsgrad streckt Wochenstunden auf die Zielzone (100 % = voll)', () => {
-    // 2 Tage × 4 h = 8 h; Zone 05 („>4-5") → 06 („>5-6", Obergrenze 6 h/Tag):
-    // 100 % → 2 × 6 h = 12 h
-    const full = simulateZeitkatUpgrade({
-      demandBookings: [makeBooking({ zone: '05', dailyHours: 4, days: 2 })],
-      dataItems: { 'child-1': { id: 'child-1', dateofbirth: '2022-01-01' } },
-      groupDefs: [],
-      bayKiBiGRules: RULE,
-      upgrade: { mode: 'nextZone', utilizationPercent: 100 },
-      referenceDate: REF,
+  it('ignoriert Alternativ- und Ferienbuchungen und zählt fehlende ZEITKAT separat', () => {
+    const result = runSimulation({
+      bookings: [makeBooking({ art: 'F' }), makeBooking({ itemId: 'child-2', zone: '' })],
     });
-    expect(full.perChild[0].weeklyHoursAfter).toBe(12);
-    expect(full.perChild[0].deltaWeeklyHours).toBe(4);
-    expect(full.totals.deltaWeeklyDemandHours).toBe(4);
-
-    // 0 % → Stunden unverändert, Förderdelta trotzdem voll (Anspruch)
-    const none = simulateZeitkatUpgrade({
-      demandBookings: [makeBooking({ zone: '05', dailyHours: 4, days: 2 })],
-      dataItems: { 'child-1': { id: 'child-1', dateofbirth: '2022-01-01' } },
-      groupDefs: [],
-      bayKiBiGRules: RULE,
-      upgrade: { mode: 'nextZone', utilizationPercent: 0 },
-      referenceDate: REF,
-    });
-    expect(none.perChild[0].weeklyHoursAfter).toBe(8);
-    expect(none.perChild[0].deltaWeeklyHours).toBe(0);
-    expect(none.totals.deltaMonthlyBayKiBiG).toBe(2.75);
-  });
-
-  it('simulierte Buchungen tragen kein BETRSTD (Segment-Summe gilt nach Umstellung)', () => {
-    const booking = makeBooking({ zone: '05', dailyHours: 4, days: 2 });
-    booking.rawdata.BETRSTD = '25,5';
-    const result = simulateZeitkatUpgrade({
-      demandBookings: [booking],
-      dataItems: { 'child-1': { id: 'child-1', dateofbirth: '2022-01-01' } },
-      groupDefs: [],
-      bayKiBiGRules: RULE,
-      upgrade: { mode: 'nextZone', utilizationPercent: 100 },
-      referenceDate: REF,
-    });
-    expect(result.simulatedBookings[0].rawdata.BETRSTD).toBeUndefined();
-    expect(result.simulatedBookings[0].rawdata.ZEITKAT).toBe('06');
-    // Wochenstunden nachher = skalierte Segmente (2 × 6 h), nicht 25,5
-    expect(result.perChild[0].weeklyHoursAfter).toBe(12);
-  });
-
-  it('Alternativ-/Ferienbuchungen werden weder angehoben noch gezählt', () => {
-    const result = simulateZeitkatUpgrade({
-      demandBookings: [makeBooking({ zone: '05', art: 'F' })],
-      dataItems: { 'child-1': { id: 'child-1', dateofbirth: '2022-01-01' } },
-      groupDefs: [],
-      bayKiBiGRules: RULE,
-      upgrade: { mode: 'nextZone', utilizationPercent: 100 },
-      referenceDate: REF,
-    });
-    expect(result.totals.affectedChildren).toBe(0);
-    expect(result.perChild).toHaveLength(0);
-  });
-
-  it('Kinder ohne ZEITKAT werden als skippedNoZone gemeldet', () => {
-    const booking = makeBooking({ zone: '' });
-    const result = simulateZeitkatUpgrade({
-      demandBookings: [booking],
-      dataItems: { 'child-1': { id: 'child-1', dateofbirth: '2022-01-01' } },
-      groupDefs: [],
-      bayKiBiGRules: RULE,
-      upgrade: { mode: 'nextZone', utilizationPercent: 100 },
-      referenceDate: REF,
-    });
+    expect(result.totals.bookingHoursBefore).toBe(3);
     expect(result.totals.affectedChildren).toBe(0);
     expect(result.skippedNoZone).toBe(1);
   });
 
-  it('minHours hebt nur an, wenn die Zone das Ziel nicht abdeckt', () => {
-    const result = simulateZeitkatUpgrade({
-      demandBookings: [makeBooking({ zone: '04', dailyHours: 3, days: 5 }), makeBooking({ itemId: 'child-2', zone: '06', dailyHours: 5, days: 5 })],
-      dataItems: {
-        'child-1': { id: 'child-1', name: 'Kleines Kind', dateofbirth: '2022-01-01' },
-        'child-2': { id: 'child-2', name: 'Großes Kind', dateofbirth: '2022-01-01' },
-      },
+  it('mutiert weder die geladenen Staffeln noch Buchungen', () => {
+    const booking = makeBooking();
+    const catalog = makeCatalog();
+    const result = simulateContributionChanges({
+      demandBookings: [booking],
+      dataItems: CHILD,
       groupDefs: [],
-      bayKiBiGRules: RULE,
-      upgrade: { mode: 'minHours', minHours: 6, utilizationPercent: 100 },
-      referenceDate: REF,
-    });
-    expect(result.totals.affectedChildren).toBe(1);
-    expect(result.perChild[0].name).toBe('Kleines Kind');
-    expect(result.perChild[0].toZone).toBe('06');
-  });
-});
-
-describe('simulateZeitkatUpgrade – Familien + Elternbeitragsbänder', () => {
-  it('aggregiert Geschwister zur Familie (neue familyId-Logik)', () => {
-    const result = simulateZeitkatUpgrade({
-      demandBookings: [
-        makeBooking({ itemId: 'child-1', zone: '05' }),
-        makeBooking({ itemId: 'child-2', zone: '05' }),
-      ],
-      dataItems: {
-        'child-1': { id: 'child-1', name: 'A', familyId: 'fam-1', familyLabel: 'Familie Reuter', dateofbirth: '2022-01-01' },
-        'child-2': { id: 'child-2', name: 'B', familyId: 'fam-1', familyLabel: 'Familie Reuter', dateofbirth: '2019-01-01' },
-      },
-      groupDefs: [],
-      bayKiBiGRules: RULE,
-      upgrade: { mode: 'nextZone', utilizationPercent: 100 },
+      bayKiBiGRules: RULES,
+      groupFeeCatalogs: catalog,
+      temporaryPrices: { g1: { '04': 150, '05': 150 } },
+      utilizationPercent: 100,
       referenceDate: REF,
     });
 
-    expect(result.totals.affectedFamilies).toBe(1);
-    expect(result.families[0]).toMatchObject({ label: 'Familie Reuter', affectedChildren: 2, deltaMonthly: 5.5 });
-  });
-
-  it('markiert Elternbeitrags-Bandwechsel bei Stundenanstieg', () => {
-    // 1 Tag × 4 h = 4 h → Band 4 (40 €); nach Upgrade (Zone 05): 5 h → Band 9 (70 €)
-    const catalogs = {
-      g1: [
-        { id: 'band-4', maxHours: 4, monthlyAmount: 40 },
-        { id: 'band-9', maxHours: 9, monthlyAmount: 70 },
-      ],
-    };
-    const result = simulateZeitkatUpgrade({
-      demandBookings: [makeBooking({ zone: '04', dailyHours: 4, days: 1 })],
-      dataItems: { 'child-1': { id: 'child-1', dateofbirth: '2022-01-01' } },
-      groupDefs: [],
-      bayKiBiGRules: RULE,
-      groupFeeCatalogs: catalogs,
-      upgrade: { mode: 'nextZone', utilizationPercent: 100 },
-      referenceDate: REF,
-    });
-
-    expect(result.perChild[0].parentFeeBefore).toBe(40);
-    expect(result.perChild[0].parentFeeAfter).toBe(70);
-    expect(result.perChild[0].feeBandChange).toBe(true);
-    expect(result.totals.deltaParentFees).toBe(30);
+    expect(catalog.g1[0].monthlyAmount).toBe(100);
+    expect(booking.rawdata.ZEITKAT).toBe('04');
+    expect(result.simulatedBookings[0].rawdata.ZEITKAT).toBe('05');
   });
 });

@@ -36,6 +36,7 @@ import {
   importBayKiBiGTableFromExcel,
   importBayKiBiGTableFromUrl,
 } from '../../utils/financeImport';
+import { getFeeBandZeitkatId, ZEITKAT_CATALOG } from '../../utils/adebisConstants';
 import {
   buildFeeCatalogExportPayload,
   extractFeeCatalogImportData,
@@ -252,12 +253,16 @@ function BayKiBiGDetail({ item, scenarioId, dispatch }) {
 }
 
 function FeeEntrySummary({ item }) {
-  const hoursLabel = item.maxHours ? `bis ${item.maxHours} h` : 'offene Stundenobergrenze';
+  const feeZeitkatId = getFeeBandZeitkatId(item);
+  const zone = ZEITKAT_CATALOG.find((entry) => String(entry.id) === String(feeZeitkatId));
+  const hoursLabel = zone
+    ? `ZEITKAT ${zone.id} · ${zone.kurzbez} h/Tag`
+    : (item.maxHours ? `bis ${item.maxHours} Wochenstunden` : 'offene Wochenstundenobergrenze');
   return (
     <Stack gap={2}>
       <Text fw={500}>{item.label || hoursLabel}</Text>
       <Text size="sm" c="dimmed">
-        {formatCurrency(item.monthlyAmount)} im Monat
+        {formatCurrency(item.monthlyAmount)} im Monat{zone ? ` · ${hoursLabel}` : ''}
       </Text>
     </Stack>
   );
@@ -300,20 +305,26 @@ function FeeEntryDetail({ item, groupId, scenarioId, dispatch }) {
           clearable
         />
       </SimpleGrid>
-      <BufferedNumberInput
-        label="Max. Wochenstunden"
-        value={item.maxHours}
-        onCommit={(value) => dispatch(updateGroupFeeEntry({
-          scenarioId,
-          groupId,
-          entryId: item.id,
-          updates: { maxHours: value ?? '' },
-        }))}
-        decimalScale={2}
-        min={0}
-        thousandSeparator="."
-        decimalSeparator="," 
-      />
+      {getFeeBandZeitkatId(item) ? (
+        <Text size="sm" c="dimmed">
+          Beitragssatz ist an ZEITKAT {getFeeBandZeitkatId(item)} gebunden und wird nach der aktiven Buchungskategorie ausgewählt.
+        </Text>
+      ) : (
+        <BufferedNumberInput
+          label="Max. Wochenstunden"
+          value={item.maxHours}
+          onCommit={(value) => dispatch(updateGroupFeeEntry({
+            scenarioId,
+            groupId,
+            entryId: item.id,
+            updates: { maxHours: value ?? '' },
+          }))}
+          decimalScale={2}
+          min={0}
+          thousandSeparator="."
+          decimalSeparator=","
+        />
+      )}
       <BufferedNumberInput
         label="Monatsbeitrag"
         value={item.monthlyAmount}

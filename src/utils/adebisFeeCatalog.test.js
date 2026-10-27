@@ -27,7 +27,7 @@ const BARTBETR = [
 ];
 
 describe('adebis2FeeCatalogs – automatischer Beitragssatz-Import (RE §3)', () => {
-  it('mappt BETRAGZn auf ZEITKAT-Zonen mit Zonen-Obergrenze als maxHours', () => {
+  it('mappt BETRAGZn direkt auf ZEITKAT-IDs (nicht auf Wochenstunden-Grenzen)', () => {
     const { catalogs, sources, primaryBartnr } = adebis2FeeCatalogs({
       beitrartRaw: BEITRART,
       bartbetrRaw: BARTBETR,
@@ -40,13 +40,14 @@ describe('adebis2FeeCatalogs – automatischer Beitragssatz-Import (RE §3)', ()
     expect(bands).toHaveLength(5); // Z1, Z2, Z4, Z5, Z13 (Z3 historisch übersprungen)
 
     expect(bands[0]).toMatchObject({
-      maxHours: 2,          // Zone 01 „>1-2"
+      zeitkatId: '01',
       monthlyAmount: 80,
       label: 'Elternbeitrag Regelgruppe (>1-2)',
       validFrom: '2026-01-01',
     });
-    expect(bands.find((band) => band.maxHours === 4).monthlyAmount).toBe(110.5);
-    expect(bands.find((band) => band.maxHours === 13).monthlyAmount).toBe(150);
+    expect(bands[0].maxHours).toBeUndefined();
+    expect(bands.find((band) => band.zeitkatId === '04').monthlyAmount).toBe(110.5);
+    expect(bands.find((band) => band.zeitkatId === '13').monthlyAmount).toBe(150);
   });
 
   it('Gültigkeitsende wird nach ISO konvertiert', () => {
@@ -97,6 +98,21 @@ describe('adebis2FeeCatalogs – automatischer Beitragssatz-Import (RE §3)', ()
     // Ohne verwertbare Bänder entsteht kein Katalog-Eintrag (kein Leeren bestehender Daten)
     expect(partial.catalogs['1']).toBeUndefined();
     expect(partial.catalogs).toEqual({});
+  });
+
+  it('priorisiert expliziten Elternbeitrag vor Essensbeitrag unabhängig von XML-Reihenfolge', () => {
+    const { primaryBartnr } = adebis2FeeCatalogs({
+      beitrartRaw: [
+        { BARTNR: '2', BEZ: 'Essensbeitrag' },
+        { BARTNR: '1', BEZ: 'Elternbeitrag' },
+      ],
+      bartbetrRaw: [
+        { BARTNR: '2', BETRAGZ1: '30' },
+        { BARTNR: '1', BETRAGZ1: '80' },
+      ],
+      groupsRaw: [{ GRUNR: '1' }],
+    });
+    expect(primaryBartnr).toBe(1);
   });
 
   it('Fallback auf erste Beitragsart, wenn keine „Eltern…"-Bezeichnung existiert', () => {

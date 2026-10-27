@@ -1,5 +1,5 @@
 import React from 'react';
-import HighchartsReact from 'highcharts-react-official';
+import { CopyableHighcharts as HighchartsReact } from '../components/common/CopyToClipboardButton';
 import Highcharts from 'highcharts';
 import {
   Alert,

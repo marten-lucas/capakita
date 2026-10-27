@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { MantineProvider } from '@mantine/core';
@@ -66,6 +66,7 @@ function createTestStore() {
               startdate: '2026-01-01',
               enddate: '',
               dateofbirth: '2022-01-01',
+              groupId: 'g1',
               familyId: 'fam-1',
               familyLabel: 'Familie Reuter',
               absences: [],
@@ -77,6 +78,7 @@ function createTestStore() {
               startdate: '2026-01-01',
               enddate: '',
               dateofbirth: '2019-01-01',
+              groupId: 'g1',
               familyId: 'fam-1',
               familyLabel: 'Familie Reuter',
               absences: [],
@@ -101,7 +103,12 @@ function createTestStore() {
           'scenario-1': {
             settings: { partialAbsenceThresholdDays: 42, partialAbsenceEmployerSharePercent: 0 },
             bayKiBiGRules: [{ id: 'r1', baseValue: 11.0, validFrom: '2026-01-01', weightFactors: { regelkind_3to6: 1.0 } }],
-            groupFeeCatalogs: {},
+            groupFeeCatalogs: {
+              g1: [
+                { id: 'fee-zone-05', zeitkatId: '05', monthlyAmount: 100, validFrom: '2026-01-01' },
+                { id: 'fee-zone-06', zeitkatId: '06', monthlyAmount: 150, validFrom: '2026-01-01' },
+              ],
+            },
             itemFinances: {},
           },
         },
@@ -118,7 +125,7 @@ function createTestStore() {
 }
 
 describe('FundingSimulationPanel', () => {
-  it('berechnet Förderdelta und zeigt betroffene Kinder/Familien', () => {
+  it('zeigt Tarif-Ausgangswerte, Gruppenergebnisse und Gesamtwerte', () => {
     const store = createTestStore();
     render(
       <Provider store={store}>
@@ -128,17 +135,76 @@ describe('FundingSimulationPanel', () => {
       </Provider>
     );
 
-    // Zone 05 (1,25) → 06 (1,5): Δ = 11,0 × 1,0 × 0,25 = 2,75 €/Monat je Kind
-    // KPI = Summe beider Geschwister (5,50 €/Monat, 66,00 €/Jahr)
-    expect(screen.getByText('5,50 €')).toBeTruthy();
-    expect(screen.getByText('66,00 €')).toBeTruthy();
-    expect(screen.getAllByText('2,75 €')).toHaveLength(2); // Tabellenzeilen
-    expect(screen.getAllByText('33,00 €')).toHaveLength(2);
-    expect(screen.getByText('Betroffene Kinder')).toBeTruthy();
+    expect(screen.getByText('Simulation von Beitragsänderungen')).toBeTruthy();
+    expect(screen.getByText('Ausgangswert: 100,00 €')).toBeTruthy();
+    expect(screen.getByText('Ausgangswert: 150,00 €')).toBeTruthy();
+    expect(screen.getByText('Gruppen & Gesamt')).toBeTruthy();
+    expect(screen.getByTestId('simulation-total-row')).toBeTruthy();
+    expect(screen.getByText('Buchungsstunden vorher')).toBeTruthy();
+  });
 
-    // Kinder-Tab: beide Geschwister, Familie aggregiert
-    fireEvent.click(screen.getByText(/Familien \(/));
-    expect(screen.getByText('Familie Reuter')).toBeTruthy();
+  it('simuliert absolute Preise und lässt die gespeicherten Optionen unverändert', () => {
+    const store = createTestStore();
+    render(
+      <Provider store={store}>
+        <MantineProvider>
+          <FundingSimulationPanel accent="#0f766e" />
+        </MantineProvider>
+      </Provider>
+    );
+
+    const sourceSlider = screen.getByRole('slider', { name: 'Simulationspreis Fuchs ZEITKAT 05' });
+    // Setze ZEITKAT 05 auf 150 €, identisch zum geladenen ZEITKAT-06-Preis.
+    for (let index = 0; index < 10; index += 1) {
+      fireEvent.keyDown(sourceSlider, { key: 'ArrowRight', code: 'ArrowRight' });
+    }
+
+    expect(sourceSlider.getAttribute('aria-valuenow')).toBe('150');
+    expect(screen.getAllByText('5,50 €').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('100,00 €').length).toBeGreaterThan(0);
+    expect(within(screen.getByTestId('simulation-more-hours-impact')).getByText('+8,00 h pro Woche')).toBeTruthy();
+    expect(within(screen.getByTestId('simulation-more-hours-impact')).getByText(/2 Kinder in 1 Familie/)).toBeTruthy();
+    expect(within(screen.getByTestId('simulation-parent-cost-impact')).getByText('+100,00 € pro Monat')).toBeTruthy();
+    expect(within(screen.getByTestId('simulation-parent-cost-impact')).getByText(/2 Kinder in 1 Familie/)).toBeTruthy();
+    expect(store.getState().simFinance.financeByScenario['scenario-1'].groupFeeCatalogs.g1[0].monthlyAmount).toBe(100);
+    expect(store.getState().simFinance.financeByScenario['scenario-1'].groupFeeCatalogs.g1[1].monthlyAmount).toBe(150);
+  });
+
+  it('setzt den temporären Einzelpreis zurück auf den geladenen Wert', () => {
+    render(
+      <Provider store={createTestStore()}>
+        <MantineProvider>
+          <FundingSimulationPanel accent="#0f766e" />
+        </MantineProvider>
+      </Provider>
+    );
+
+    const slider = screen.getByRole('slider', { name: 'Simulationspreis Fuchs ZEITKAT 05' });
+    for (let index = 0; index < 10; index += 1) {
+      fireEvent.keyDown(slider, { key: 'ArrowRight', code: 'ArrowRight' });
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Zurücksetzen' }));
+    expect(screen.getByRole('slider', { name: 'Simulationspreis Fuchs ZEITKAT 05' }).getAttribute('aria-valuenow')).toBe('100');
+  });
+
+  it('kopiert die aktive Tabelle als tab-getrennte Daten', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+    render(
+      <Provider store={createTestStore()}>
+        <MantineProvider>
+          <FundingSimulationPanel accent="#0f766e" />
+        </MantineProvider>
+      </Provider>
+    );
+
+    fireEvent.click(screen.getByTestId('copy-simulation-groups'));
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    expect(writeText.mock.calls[0][0]).toContain('Gruppe\tBuchungen / Wechsel');
+    expect(writeText.mock.calls[0][0]).toContain('Gesamt');
   });
 
   it('springt per Klick in der Kinder-Tabelle zum Kind-Datensatz', () => {
@@ -151,7 +217,10 @@ describe('FundingSimulationPanel', () => {
       </Provider>
     );
 
+    fireEvent.click(screen.getByText('Kinder (2)'));
     fireEvent.click(screen.getByTestId('funding-child-child-2'));
     expect(store.getState().simScenario.selectedItems['scenario-1']).toEqual(['child-2']);
+    fireEvent.click(screen.getByText('Familien (1)'));
+    expect(screen.getByText('Familie Reuter')).toBeTruthy();
   });
 });

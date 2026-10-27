@@ -10,8 +10,8 @@ Status: **UMGESETZT (v2, 26.10.2026)** · Basis: Code-Ist-Analyse + Reverse-Engi
 | A1 Buchungsstunden-Histogramm | Neuer Slide `hours-hist` im Bedarfsdeckung-Karussell; `BookingHistogram` prop-gesteuert (Store-Selector bleibt Fallback); Gruppen-Select im Slide | VisuView-Regression |
 | A2 Buchungskategorien-Histogramm | `chartUtilsZeitkat.calculateZeitkatDistribution` (children/bookings-Modi, nur Basisbuchungen, „ohne Kategorie"-Bucket) + Slide `kategorie-hist` mit Zeitfaktor-Tooltip | `chartUtilsZeitkat.test.js` (4) |
 | B Förderformel-Korrektur | `financeUtils.resolveZeitkatFactorForChild` + `applyZeitkatFactor`-Parameter in `calculateChildMonthlyRevenue` — **bewusst default OFF** (Decision: KPI-Sprung „später machen"); Simulation rechnet immer mit Faktor | `adebisFoerder.test.js` (10) |
-| C Simulation + Betroffenheit | `foerderSimulation.simulateZeitkatUpgrade` (nextZone/targetZone/minHours, globaler Nutzungsgrad-Slider, Δ×12 Jahresbetrachtung) + `FundingSimulationPanel` im Story-Step 06 „Optionen-Check" (KPIs, Kinder-/Familien-Ranking, Klick-Sprung ins Kind-Detail) | `foerderSimulation.test.js` (12), `FundingSimulationPanel.test.jsx` (2) |
-| Beitragssatz-Import | Reader liest `beitrart.xml`/`bartbetr.xml`; `adebisFeeCatalog.adebis2FeeCatalogs` mappt BETRAGZn → ZEITKAT-Zonen-Bänder (historische Zone '03' übersprungen, einrichtungsweite Staffel → alle Gruppen, `__DEFAULT__` ohne Gruppen); automatische Übernahme via `preparedImport.scenarioFinance` (greift bei Erstimport, überschreibt keine manuellen Kataloge) | `adebisFeeCatalog.test.js` (6), Reader-Regression |
+| C Simulation + Betroffenheit | `foerderSimulation.simulateContributionChanges` + Story-Step 06 „Simulation von Beitragsänderungen": absolute lokale Simulationspreise je Gruppe/ZEITKAT (Optionen-Ausgangswert bleibt sichtbar, Einzel-/Gesamt-Reset), Mehrstunden-Ausschöpfungsquote 0–100 % bei identischem Preis benachbarter Staffeln und Ergebnisübersicht nach Gruppe/Gesamt (Stunden, Förderung, Elternbeiträge, Gesamteinnahmen); Kinder-/Familien-Detail bleibt verfügbar. Lokale Änderungen werden nicht gespeichert. | `foerderSimulation.test.js`, `FundingSimulationPanel.test.jsx` |
+| Beitragssatz-Import | Reader liest `beitrart.xml`/`bartbetr.xml`; `adebisFeeCatalog.adebis2FeeCatalogs` mappt BETRAGZn direkt auf `zeitkatId` (historische Zone '03' übersprungen, einrichtungsweite Staffel → alle Gruppen, `__DEFAULT__` ohne Gruppen); tatsächliche Gebührenauswahl verwendet nun ZEITKAT statt Wochenstunden. Alte automatische Einträge mit `bart<BARTNR>-z<ZEITKAT>-…`-IDs werden beim Laden/Übertragen migriert; manuelle `maxHours`-Wochenbänder bleiben rückwärtskompatibel. Automatische Übernahme via `preparedImport.scenarioFinance` (Erstimport, überschreibt keine manuellen Kataloge). | `adebisFeeCatalog.test.js` (7), `financeUtils.test.js` (ZEITKAT vs Wochenstunden + Legacy-Migration), `simFinanceSlice.test.js` (Legacy-ID-Migration), `feeCatalogTransfer.test.js`, Reader-Regression |
 
 **Export-Nachtrag (26.10.2026, RE: frmxmlbackup):** Der Dialog „Sicherungsdatei erstellen“
 (Datei → Export/Import) IST der XML-Export mit fester Tabellen-Registry — erzber/
@@ -19,8 +19,9 @@ adressen/beitrart/bartbetr sind bereits im Standardexport enthalten, keine Erwei
 nötig. Reader-Fixes daraus: UTF-8-Erkennung (Export-Option „in UTF-8“) und
 Record-Erkennung über direkte Root-Kinder (ERZBER-Feld/Tag-Kollision).
 
-Entscheidungen des Users (26.10.2026): Zielzonen = alle 3 Modi (Default nextZone) · Δ×12 genügt ·
-Nutzungsgrad globaler Slider · Finanz-KPI-Sprung später (deshalb gated) · nur Wochenstunden-Histogramm.
+Entscheidungen des Users (27.10.2026): Simulation = absolute lokale Preise je Gruppe/ZEITKAT ·
+Mehrstundenwechsel nur bei identischen benachbarten Simulationspreisen · Ausschöpfungsquote global ·
+Buchungsstunden, Förder-, Elternbeitrags- und Gesamteinnahmenänderung je Gruppe und gesamt.
 
 ---
 
@@ -145,89 +146,41 @@ Gruppenfilter), Regression gegen `kita-anonym-*.zip` (ZEITKAT-Verteilung nicht l
 
 ---
 
-## 3. A3 – Förder-Simulation „Buchungsgruppen verändern"
+## 3. A3 – Simulation von Beitragsänderungen
 
-**Anforderung (User)**: vergleichen, wie die **Fördereinnahmen** wären, wenn Buchungen in
-höhere Stundenzonen verschoben werden („mehrere Stunden umfassen") und die Eltern die
-Zusatzstunden optional **voll ausnutzen**.
+**Ziel-Flow**: Analyse → „Simulation von Beitragsänderungen". Die geladenen Beitragsstaffeln
+werden als Ausgangswerte je Gruppe und `ZEITKAT` angezeigt. Preise können für die Simulation
+auf absolute Monatsbeträge gesetzt werden; Ausgangswerte lassen sich einzeln oder insgesamt
+wiederherstellen. Nichts davon wird in Optionen oder Szenarien gespeichert.
 
-### 3.1 Modell (RE-basiert)
+### 3.1 Simulationsmodell
 
-Die Stundenzonen sind die `ZEITKAT`-Kategorien; ein „Upgrade" = Zonensprung. Zwei getrennte
-Wirkungen — bewusst entkoppelt, weil sie unterschiedliche Mechanismen treffen:
+- Ausschöpfungsquote (0–100 %) ist der erwartete Anteil der aktiven Basisbuchungen, der in die
+  **direkt nächste ZEITKAT** wechselt, sofern beide Staffeln derselben Gruppe nach der
+  Preisänderung exakt denselben Cent-Betrag kosten. Ohne Preisgleichheit gibt es keinen Wechsel.
+- Stunden und Förderänderung werden mit dieser Quote anteilig hochgerechnet. Förderdelta je
+  Wechsel: `Basiswert × Gewichtung × (Zeitfaktor Ziel − Zeitfaktor Ausgang)`.
+- Elternbeiträge basieren vor der Simulation auf dem geladenen Satz; danach auf dem absoluten
+  Simulationspreis der Ausgangsstaffel bzw. dem gewichteten Übergang, wenn die Staffelpreise
+  gleich sind. Gesamteinnahmen = Förderung + Elternbeiträge.
+- Preiseingaben sind rein lokale React-Komponentenzustände und werden beim Szenariowechsel
+  zurückgesetzt. Nur aktive Basisbuchungen (Regel-/Kurzzeitbuchungen) fließen in die Berechnung;
+  Alternativ- und Ferienbuchungen bleiben ausgeschlossen.
+- Ergebnisaggregation: je organisatorischer Gruppe und gesamt Buchungsstunden vorher/nachher,
+  monatliche Förderänderung, Elternbeitragsänderung und Gesamteinnahmenänderung (zusätzlich
+  Jahresdelta); Kinder-/Familien-Details bleiben als Drilldown verfügbar.
 
-| Hebel | Wirkt auf | Mechanismus |
-|---|---|---|
-| **Zeitkat-Upgrade** | Förderbetrag | `Basiswert × ZeitkatFaktor(Zielzone) × Gewichtung` — Anspruch, nicht Nutzung |
-| **Nutzungsgrad** (optional, 0–100 %) | Bedarf/Kapazitätsvergleich | Segmentausweitung: gebuchte Zeiten skalieren/erweitern auf die Zielzone (bei 100 % = Zonenvollausnutzung, z. B. Zone „>5–6 h" → 6,0 h) |
+### 3.2 Umsetzung und Tests
 
-Förderseitig ist der Nutzungsgrad **irrelevant** (BayKiBiG fördert den Buchungsanspruch);
-bedarfsseitig (Anstellungsschlüssel, Engpässe) wirkt nur der Nutzungsgrad. Das erklärt die
-User-Beobachtung „optional" sauber aus dem Datenmodell heraus.
+`src/utils/foerderSimulation.js` stellt `simulateContributionChanges` als reine
+Transformationsfunktion bereit. Eingaben sind gefilterte Basisbuchungen, Gruppenkataloge,
+`temporaryPrices` als `{ [groupId]: { [zeitkatId]: euroBetrag } }`, Ausschöpfungsquote,
+Förderregeln und Stichtag. Ergebnisse enthalten `groups`, `totals`, Kinder-/Familien-Drilldown
+und Overlay-artige simulierte Buchungskopien; Ausgangsdaten werden nicht mutiert.
 
-### 3.2 Simulations-Engine (rein funktional, keine Basisdaten-Mutation)
-
-Neues `src/utils/foerderSimulation.js`:
-
-```js
-simulateZeitkatUpgrade({
-  demandBookings,          // gefilterte Basisbuchungen (filterBookings-Ergebnis)
-  children,                // dataByScenario-Items (für Gewichtung)
-  groupDefs,
-  bayKiBiGRule,            // { baseValue, weightFactors } aus simFinanceSlice
-  upgrade: {
-    mode: 'nextZone' | 'targetZone' | 'minHours',  // Zielzonenauswahl
-    targetZeitkat: '07',                            // bei targetZone
-    minHours: 6,                                    // bei minHours → kleinste Zone ≥ x h
-    scope: 'all' | { fromZones: ['05','06'] },      // nur bestimmte Zonen anheben
-    utilizationPercent: 100,                        // 0–100 (Eltern-Nutzung)
-  },
-  referenceDate,
-})
-→ {
-  perChild: [{ itemId, kindnr, familyId, fromZone, toZone, zeitFactorBefore,
-               zeitFactorAfter, weight, amountBefore, amountAfter, deltaMonthly,
-               deltaYearly, feeBandChange: boolean, weeklyHoursBefore, weeklyHoursAfter }],
-  totals: { deltaMonthlyBayKiBiG, deltaYearlyBayKiBiG, deltaParentFees,
-            deltaWeeklyDemandHours, affectedChildren, affectedFamilies },
-  simulatedBookings: [...],   // für Chart-Pipelines (Overlay-artige Kopien)
-}
-```
-
-Regeln der Transformation:
-
-- Nur **Basisbuchungen** (art 0/K) werden angehoben; Alternativ-/Ferienbuchungen bleiben
-  unverändert (RE: kein doppelter Förderanspruch).
-- Zonensprung: Zielzone = nächsthöhere bzw. gewählte Zone; `ZEITKAT_CATALOG` liefert die
-  Faktoren (0,5→2,5, Deckelung >9 h — RE-Handbuch Z. 8247).
-- Segmentausweitung bei Nutzungsgrad > 0: bestehende Segmente auf Zonenumfang erweitern
-  (proportional bei <100 %), damit `generateCareRatioSeries`/Weekly-Chart die simulierten
-  Engpässe realistisch zeigen.
-- **Förderformel-Korrektur** (0.4) zuerst umsetzen: `calculateChildMonthlyRevenue` erhält
-  den Buchungszeitfaktor (aus `rawdata.ZEITKAT` der aktiven Basisbuchung); ohne ZEITKAT
-  → Faktor 1,0 = heutiges Verhalten (rückwärtskompatibel + Warnung im Import-Meta).
-- Elternbeiträge: `feeEntry`-Bänder (maxHours) können durch den Zonensprung wechseln →
-  `feeBandChange`-Flag und Δ Elternbeiträge separat ausweisen (wichtig für
-  Elternkommunikation — und für A4).
-- Jahresbetrachtung: `deltaYearly = deltaMonthly × 12` (Option „Förderjahr" mit
- semesterweiser Buchungslage kann später über die Midterm-Pipeline folgen).
-
-### 3.3 UI
-
-- Bedarfsdeckung/Optionen-Check (Story-Step 06 „Optionen-Check" ist für Szenarien-Ranking
-  vorgesehen — Simulation gehört dort hin; alternativ eigener Slide im Step 02):
-  - Parameterform: Zielzonenauswahl, Scope (alle/bestimmte Zonen), Nutzungsgrad-Slider,
-    Förderjahr-Basiswert-Anzeige
-  - Ergebnis-KPIs: Δ Fördermonat/−jahr, Δ Elternbeiträge, Δ Wochenbedarfsstunden,
-    betroffene Kinder/Familien
-  - Vorher/Nachher-Vergleichschart (Gruppen-Balken: Förderbetrag je Zone ist/nachher)
-
-### 3.4 Tests
-
-- Transformations-Unit-Tests: Zonensprung (Faktor 1,25→1,5), Scope-Begrenzung, Nutzungsgrad
-  0/50/100, nur-Basis-Regel (F-Buchung unverändert), Bandwechsel Elternbeitrag.
-- Förderformel-Regression: mit/ohne ZEITKAT, Deckelung >9 h.
-- Integration: Simulation → calculateScenarioMonthlyFinance-Summen ändern sich konsistent.
+Tests prüfen absolute statt prozentuale Preise, Wechsel nur bei identischen Preisen, Quoten
+0/50/100 %, Förder-, Elternbeitrags- und Stundenwirkung, Gruppen-/Gesamtsummen sowie die
+Unverändertheit geladener Optionen und Buchungen.
 
 ---
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import dayjs from 'dayjs';
-import HighchartsReact from 'highcharts-react-official';
+import { CopyableHighcharts as HighchartsReact } from '../common/CopyToClipboardButton';
 import Highcharts from 'highcharts';
 import { DatePickerInput } from '@mantine/dates';
 import { ActionIcon, Box, Badge, Group, Paper, Stack, Text, useMantineTheme } from '@mantine/core';

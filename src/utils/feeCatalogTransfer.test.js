@@ -39,6 +39,32 @@ describe('feeCatalogTransfer roundtrip with PDF data', () => {
     expect(importedFromLegacyShape).toEqual(groupFeeCatalogs);
   });
 
+  it('migrates earlier automatic-import IDs to ZEITKAT during fee JSON transfer', () => {
+    const imported = extractFeeCatalogImportData({
+      groupFeeCatalogs: {
+        g1: [{ id: 'bart4-z05-2026-01-01', label: 'Elternbeitrag (>4-5)', maxHours: 5, monthlyAmount: 120 }],
+      },
+    });
+    expect(imported.catalogsByKey.g1[0]).toMatchObject({ zeitkatId: '05', monthlyAmount: 120 });
+  });
+
+  it('preserves ZEITKAT-specific imported fee entries through JSON transfer', () => {
+    const payload = buildFeeCatalogExportPayload({
+      scenarioId: 'zeitkat-roundtrip',
+      groupDefs: [{ id: 'g1', name: 'Gruppe 1' }],
+      groupFeeCatalogs: {
+        g1: [{ id: 'fee-z05', label: 'Elternbeitrag (>4-5)', zeitkatId: '05', monthlyAmount: 123, validFrom: '2026-01-01' }],
+      },
+    });
+
+    const imported = extractFeeCatalogImportData(payload);
+    expect(imported.catalogsByKey.g1[0]).toMatchObject({
+      zeitkatId: '05',
+      monthlyAmount: 123,
+      validFrom: '2026-01-01',
+    });
+  });
+
   it('rejects invalid payloads', () => {
     expect(() => parseFeeCatalogImportPayload(null)).toThrow('Ungueltiges JSON-Format.');
     expect(() => parseFeeCatalogImportPayload({ foo: 'bar' })).toThrow('JSON enthaelt keine groupFeeCatalogs oder catalogs.');

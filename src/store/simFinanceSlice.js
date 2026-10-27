@@ -1,5 +1,6 @@
 import { createSlice } from '@reduxjs/toolkit';
 import { createId } from '../utils/idUtils';
+import { getFeeBandZeitkatId } from '../utils/adebisConstants';
 
 function createEmptyScenarioFinance() {
   return {
@@ -44,7 +45,11 @@ function normalizeFeeBand(entry = {}) {
     ...rest
   } = entry;
 
-  return normalizeValidityEntry(rest, {
+  const inferredZeitkatId = getFeeBandZeitkatId(entry);
+  return normalizeValidityEntry({
+    ...rest,
+    ...(inferredZeitkatId ? { zeitkatId: inferredZeitkatId } : {}),
+  }, {
     maxHours: entry.maxHours ?? entry.hoursTo ?? entry.minHours ?? entry.hoursFrom ?? '',
     monthlyAmount: entry.monthlyAmount ?? '',
     label: entry.label || '',

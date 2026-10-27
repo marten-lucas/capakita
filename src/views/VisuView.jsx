@@ -20,7 +20,7 @@ import { MonthPickerInput } from '@mantine/dates';
 import Highcharts from 'highcharts';
 import HighchartsHeatmap from 'highcharts/modules/heatmap';
 import HighchartsSankey from 'highcharts/modules/sankey';
-import HighchartsReact from 'highcharts-react-official';
+import { CopySvgButton, CopyableHighcharts as HighchartsReact } from '../components/common/CopyToClipboardButton';
 import ChartFilterForm from '../components/SimDataCharts/ChartFilterForm';
 import WeeklyChart from '../components/SimDataCharts/WeeklyChart';
 import GroupIcon from '../components/common/GroupIcon';
@@ -221,8 +221,8 @@ const STORY_STEPS = [
   {
     id: 'options',
     category: '06',
-    title: 'Optionen-Check',
-    subtitle: 'Szenarien-Ranking & Entscheidungshilfe',
+    title: 'Simulation von Beitragsänderungen',
+    subtitle: 'Beitragssätze und Mehrstunden-Ausschöpfung vergleichen',
     gradient: 'linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%)',
     accent: '#7c3aed',
     icon: IconArrowsSplit,
@@ -1001,6 +1001,7 @@ function CoverageStageCarousel({ weeklyData, categories, groups, heatValues, hou
 }
 
 function ResilienceScorePanel({ monteCarlo }) {
+  const ringSvgRef = React.useRef(null);
   const resilienceScore = Number(monteCarlo?.resilienceScorePct || 0);
   const regularDaysPct = Number(monteCarlo?.regularDaysPct || 0);
   const closurePct = Number(monteCarlo?.closurePct || 0);
@@ -1008,13 +1009,16 @@ function ResilienceScorePanel({ monteCarlo }) {
   return (
     <Paper withBorder p="md" className="analysis-coverage-heatmap-panel" style={{ height: '100%' }}>
       <Stack gap="md" align="center" justify="center" style={{ height: '100%' }}>
-        <RingProgress
-          size={180}
-          thickness={16}
-          roundCaps
-          sections={[{ value: resilienceScore, color: resilienceScore >= 75 ? 'teal' : resilienceScore >= 55 ? 'yellow' : 'red' }]}
-          label={<Text ta="center" fw={800} size="xl">{resilienceScore.toFixed(1)}%</Text>}
-        />
+        <Box ref={ringSvgRef}>
+          <RingProgress
+            size={180}
+            thickness={16}
+            roundCaps
+            sections={[{ value: resilienceScore, color: resilienceScore >= 75 ? 'teal' : resilienceScore >= 55 ? 'yellow' : 'red' }]}
+            label={<Text ta="center" fw={800} size="xl">{resilienceScore.toFixed(1)}%</Text>}
+          />
+        </Box>
+        <CopySvgButton svgRef={ringSvgRef} testId="copy-resilience-score" />
         <Text fw={700}>Resilienz-Score</Text>
         <Text size="xs" c="dimmed" ta="center">
           Toleranzgewichtet: Tage mit wenig Schließung senken den Score nur anteilig.

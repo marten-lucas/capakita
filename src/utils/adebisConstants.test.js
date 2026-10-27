@@ -3,12 +3,19 @@ import {
   ZEITKAT_CATALOG,
   GEWKAT_CATALOG,
   getZeitkatFactor,
+  getFeeBandZeitkatId,
   getGewkatFactor,
   decodeBuchungsart,
   qualifikationInfo,
 } from './adebisConstants';
 
 describe('adebisConstants – Zeitkataloge (RE: vendor seed system/zeitkat.dbf)', () => {
+  it('erkennt ZEITKAT-Raten explizit und migriert alte Adebis-Import-IDs', () => {
+    expect(getFeeBandZeitkatId({ zeitkatId: '05' })).toBe('05');
+    expect(getFeeBandZeitkatId({ id: 'bart12-z07-2026-01-01', maxHours: 7 })).toBe('07');
+    expect(getFeeBandZeitkatId({ id: 'manual-fee-1', maxHours: 20 })).toBeNull();
+  });
+
   it('liefert die BayKiBiG-Buchungszeitfaktoren (§ 19 Abs. 1 AVBayKiBiG)', () => {
     expect(getZeitkatFactor('01')).toBe(0.5);
     expect(getZeitkatFactor('02')).toBe(0.75);

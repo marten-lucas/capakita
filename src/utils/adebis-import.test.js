@@ -665,6 +665,6 @@ describe('Adebis import regression', () => {
     const { catalogs } = adebis2FeeCatalogs(rawdata);
     const bands = catalogs.__DEFAULT__;
     expect(bands).toHaveLength(3);
-    expect(bands.find((band) => band.maxHours === 3).monthlyAmount).toBe(90.5);
+    expect(bands.find((band) => band.zeitkatId === '02').monthlyAmount).toBe(90.5);
   });
 });

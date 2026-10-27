@@ -6,6 +6,28 @@ import simFinanceReducer, {
   updatePersonnelCostEntry,
 } from './simFinanceSlice';
 
+describe('simFinanceSlice', () => {
+  it('migrates existing automatic Adebis fee entries to ZEITKAT keys', () => {
+    const state = simFinanceReducer(undefined, loadFinanceByScenario({
+      'scenario-1': {
+        groupFeeCatalogs: {
+          g1: [{
+            id: 'bart4-z05-2026-01-01',
+            label: 'Elternbeitrag (>4-5)',
+            maxHours: 5,
+            monthlyAmount: 120,
+          }],
+        },
+      },
+    }));
+
+    expect(state.financeByScenario['scenario-1'].groupFeeCatalogs.g1[0]).toMatchObject({
+      zeitkatId: '05',
+      monthlyAmount: 120,
+    });
+  });
+});
+
 describe('simFinanceSlice personnel costs', () => {
   it('migrates legacy salary and on-cost histories into unified personnelCostHistory', () => {
     const nextState = simFinanceReducer(undefined, loadFinanceByScenario({

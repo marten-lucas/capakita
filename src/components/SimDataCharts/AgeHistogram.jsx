@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import HighchartsReact from 'highcharts-react-official';
+import { CopyableHighcharts as HighchartsReact } from '../common/CopyToClipboardButton';
 import Highcharts from 'highcharts';
 import { Box, useMantineTheme } from '@mantine/core';
 import { useSelector } from 'react-redux';
