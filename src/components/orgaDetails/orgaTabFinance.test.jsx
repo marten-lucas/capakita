@@ -135,7 +135,7 @@ describe('OrgaTabFinance', () => {
     expect(screen.getByText('Kindergarten Wald')).toBeTruthy();
   });
 
-  it('stores reform inputs alongside the existing BayKiBiG finance options', () => {
+  it('keeps reform inputs out of the finance options while retaining the subsidy end date', () => {
     const store = createTestStore();
 
     render(
@@ -146,13 +146,9 @@ describe('OrgaTabFinance', () => {
       </MantineProvider>
     );
 
-    expect(screen.getByTestId('reform-forecast-settings')).toBeTruthy();
+    expect(screen.queryByTestId('reform-forecast-settings')).toBeNull();
+    expect(screen.queryByTestId('reform-actual-bookingTime')).toBeNull();
     expect(screen.getByTestId('parent-fee-subsidy-end-date')).toBeTruthy();
-    const bookingTimeInput = screen.getByTestId('reform-actual-bookingTime');
-    fireEvent.change(bookingTimeInput, { target: { value: '9000' } });
-    fireEvent.blur(bookingTimeInput);
-
-    expect(store.getState().simFinance.financeByScenario['scenario-1'].settings.reformForecast.actualFunding.bookingTime).toBe(9000);
   });
 
   it('adds a new BayKiBiG rule via the add button', () => {

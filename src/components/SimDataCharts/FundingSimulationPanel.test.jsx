@@ -161,6 +161,25 @@ describe('FundingSimulationPanel', () => {
     expect(screen.getByText('Buchungsstunden vorher')).toBeTruthy();
   });
 
+  it('zeigt die Reform-Zusatzdaten in der Simulation und speichert den 2026-Istwert', () => {
+    const store = createTestStore();
+    render(
+      <Provider store={store}>
+        <MantineProvider>
+          <FundingSimulationPanel accent="#0f766e" />
+        </MantineProvider>
+      </Provider>
+    );
+
+    fireEvent.click(screen.getByText('BayKiBiG-Reform · Zusatzdaten für die Berechnung'));
+    const bookingTimeInput = screen.getByLabelText('Ist 2026 · Förderung nach Buchungszeiten');
+    fireEvent.change(bookingTimeInput, { target: { value: '9000' } });
+    fireEvent.blur(bookingTimeInput);
+
+    expect(store.getState().simFinance.financeByScenario['scenario-1'].settings.reformForecast.actualFunding.bookingTime).toBe(9000);
+    expect(screen.getByTestId('reform-team-grant-eligible')).toBeTruthy();
+  });
+
   it('simuliert absolute Preise und lässt die gespeicherten Optionen unverändert', () => {
     const store = createTestStore();
     render(

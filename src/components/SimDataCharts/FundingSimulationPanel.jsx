@@ -1,15 +1,16 @@
 import React from 'react';
-import { Accordion, Alert, Badge, Box, Button, Group, NumberInput, Paper, Slider, Stack, Table, Tabs, Text, SimpleGrid } from '@mantine/core';
+import { Accordion, Alert, Badge, Box, Button, Group, NumberInput, Paper, Slider, Stack, Switch, Table, Tabs, Text, SimpleGrid } from '@mantine/core';
 import { IconArrowRight, IconCoins, IconUsers } from '@tabler/icons-react';
 import { useDispatch, useSelector } from 'react-redux';
 import { setSelectedItem } from '../../store/simScenarioSlice';
+import { updateScenarioFinanceSettings } from '../../store/simFinanceSlice';
 import { useOverlayData } from '../../hooks/useOverlayData';
 import { filterBookings } from '../../utils/chartUtils/chartUtils';
 import { simulateAnnualContributionChanges, simulateContributionChanges } from '../../utils/foerderSimulation';
 import { getFeeBandZeitkatId } from '../../utils/adebisConstants';
 import { getFeeBandSimulationPriceKey, getFeeCatalogSimulationRows } from '../../utils/foerderSimulation';
 import FeeStaircaseEditor from '../common/FeeStaircaseEditor';
-import { calculateReformForecast } from '../../utils/reformSimulation';
+import { calculateReformForecast, REFORM_FIXED_ASSUMPTIONS, REFORM_YEARS } from '../../utils/reformSimulation';
 import { calculateScenarioMonthlyFinance } from '../../utils/financeUtils';
 import { CopyTableButton } from '../common/CopyToClipboardButton';
 
@@ -20,6 +21,117 @@ const formatAffectedCount = (children, families) => (
 );
 const EMPTY_FINANCE = {};
 const EMPTY_GROUP_FEE_CATALOGS = {};
+
+function ReformAmountInput({ value, onCommit, ...props }) {
+  const [draft, setDraft] = React.useState(value ?? 0);
+  React.useEffect(() => setDraft(value ?? 0), [value]);
+
+  return (
+    <NumberInput
+      {...props}
+      value={draft}
+      onChange={setDraft}
+      onBlur={() => onCommit(draft === '' ? 0 : Number(draft))}
+    />
+  );
+}
+
+const REFORM_ACTUAL_FIELDS = [
+  ['bookingTime', 'Förderung nach Buchungszeiten'],
+  ['qualityBonus', 'Qualitätsbonus'],
+  ['preparatoryCourses', 'Vorkurse'],
+  ['under3Additional', 'Zusatzförderung U3'],
+  ['under3Federal', 'U3-Bundesmittel'],
+  ['parentFeeSubsidy', 'Elternbeitragszuschuss (durchlaufend)'],
+  ['assistance', 'Fördersumme Assistenzkräfte'],
+  ['personnelBonus', 'Fördersumme Personalbonus'],
+  ['languageSpecialists', 'Fördersumme Sprachfachkräfte'],
+];
+
+function ReformForecastInputs({ settings, scenarioId, dispatch }) {
+  const forecast = settings?.reformForecast || {};
+  const actual = forecast.actualFunding || {};
+  const update = (field, value) => {
+    dispatch(updateScenarioFinanceSettings({
+      scenarioId,
+      updates: {
+        reformForecast: {
+          ...forecast,
+          actualFunding: { ...actual, [field]: value ?? 0 },
+        },
+      },
+    }));
+  };
+  const updateApprovedPlaces = (value) => {
+    dispatch(updateScenarioFinanceSettings({
+      scenarioId,
+      updates: { reformForecast: { ...forecast, approvedPlaces: Number(value) || 0 } },
+    }));
+  };
+  const updateTeamGrantEligibility = (value) => {
+    dispatch(updateScenarioFinanceSettings({
+      scenarioId,
+      updates: { reformForecast: { ...forecast, teamGrantEligible: value } },
+    }));
+  };
+
+  return (
+    <Accordion variant="separated" data-testid="reform-forecast-settings">
+      <Accordion.Item value="reform-inputs">
+        <Accordion.Control>
+          <Stack gap={2}>
+            <Text fw={600}>BayKiBiG-Reform · Zusatzdaten für die Berechnung</Text>
+            <Text size="xs" c="dimmed">2026-Istwerte aus KiBiG.web, genehmigte Plätze und Personalangabe</Text>
+          </Stack>
+        </Accordion.Control>
+        <Accordion.Panel>
+          <Stack gap="md">
+            <Text size="sm" c="dimmed">
+              Die Eingaben werden mit den simulierten ZEITKAT-Beitragsänderungen und der offiziellen Förderregel kombiniert.
+            </Text>
+            <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="sm">
+              {REFORM_ACTUAL_FIELDS.map(([key, label]) => (
+                <ReformAmountInput
+                  key={key}
+                  label={`Ist 2026 · ${label}`}
+                  value={actual[key] ?? 0}
+                  onCommit={(value) => update(key, value)}
+                  min={0}
+                  decimalScale={2}
+                  thousandSeparator="."
+                  decimalSeparator=","
+                  suffix=" EUR"
+                  data-testid={`reform-actual-${key}`}
+                />
+              ))}
+            </SimpleGrid>
+            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+              <ReformAmountInput
+                label="Genehmigte Plätze (gemäß Betriebserlaubnis)"
+                min={0}
+                step={1}
+                value={forecast.approvedPlaces ?? 0}
+                onCommit={updateApprovedPlaces}
+                data-testid="reform-approved-places"
+              />
+              <Switch
+                mt="xl"
+                label="Ab 2027 Personal außerhalb des Anstellungsschlüssels eingesetzt?"
+                description="Ja: Teamkräfteförderung wird berücksichtigt."
+                checked={forecast.teamGrantEligible === true}
+                onChange={(event) => updateTeamGrantEligibility(event.currentTarget.checked)}
+                data-testid="reform-team-grant-eligible"
+              />
+            </SimpleGrid>
+            <Alert color="blue" variant="light" title="Fixe Berechnungsannahmen">
+              Basiswert-Erhöhung jährlich: {REFORM_FIXED_ASSUMPTIONS.baseValueIncreasePercent.toLocaleString('de-DE')} %. Qualitätsbonus-Benchmark 2026–2029: {REFORM_YEARS.map((year) => REFORM_FIXED_ASSUMPTIONS.qualityBonusBenchmarkByYear[year].toLocaleString('de-DE', { minimumFractionDigits: 2 })).join(' · ')} €. Die Benchmarkwerte bestimmen die jährliche Fortschreibung des eingegebenen Qualitätsbonus 2026.
+            </Alert>
+          </Stack>
+        </Accordion.Panel>
+      </Accordion.Item>
+    </Accordion>
+  );
+}
 
 const DEFAULT_PARENT_FEE_SUBSIDY = {
   enabled: true,
@@ -222,9 +334,17 @@ function FundingSimulationPanel({ accent }) {
       temporaryPrices,
       utilizationPercent,
     };
+    const reformYears = Object.fromEntries(REFORM_YEARS.map((year) => [
+      year,
+      simulateAnnualContributionChanges({ ...options, year }),
+    ]));
+    const currentYear = Number(referenceDate.slice(0, 4));
+
     return {
       current: simulateContributionChanges({ ...options, referenceDate }),
-      annual: simulateAnnualContributionChanges({ ...options, year: Number(referenceDate.slice(0, 4)) }),
+      annual: reformYears[currentYear]
+        || simulateAnnualContributionChanges({ ...options, year: currentYear }),
+      reformYears,
     };
   }, [
     getEffectiveDataItems,
@@ -245,9 +365,10 @@ function FundingSimulationPanel({ accent }) {
 
   const result = simulation.current;
   const annualResult = simulation.annual;
+  const reformChangesByYear = simulation.reformYears;
   const reformForecast = React.useMemo(
-    () => calculateReformForecast(financeScenario?.settings?.reformForecast || {}),
-    [financeScenario?.settings?.reformForecast]
+    () => calculateReformForecast(financeScenario?.settings?.reformForecast || {}, reformChangesByYear),
+    [financeScenario?.settings?.reformForecast, reformChangesByYear]
   );
   const totals = result?.totals || {
     bookingHoursBefore: 0,
@@ -475,22 +596,30 @@ function FundingSimulationPanel({ accent }) {
         </Paper>
       ) : null}
 
+      <ReformForecastInputs
+        settings={financeScenario.settings}
+        scenarioId={selectedScenarioId}
+        dispatch={dispatch}
+      />
+
       <Paper withBorder p="sm" radius="md" data-testid="reform-forecast-results">
         <Stack gap="sm">
           <div>
             <Text fw={600} size="sm">BayKiBiG-Reformrechnung · Jahreswerte</Text>
-            <Text size="xs" c="dimmed">Formellogik der freigegebenen Berechnungsvorlage 2027; der Elternbeitragszuschuss wird separat ausgewiesen und nicht in das Reformergebnis addiert.</Text>
+            <Text size="xs" c="dimmed">Formellogik der Berechnungsvorlage 2027, kombiniert mit den jährlichen Förder- und Elternbeitragsänderungen aus den simulierten ZEITKAT-Sätzen. Der Elternbeitragszuschuss wird separat als Durchlaufposten ausgewiesen.</Text>
           </div>
           {!reformForecast.assumptions.hasActualBaseline ? (
-            <Badge color="orange" variant="light" w="fit-content">Ist-Jahressummen 2026 fehlen noch. Trage sie unter Optionen → Finanzen → BayKiBiG-Rahmen ein, um belastbare Ergebnisse zu erhalten.</Badge>
+            <Badge color="orange" variant="light" w="fit-content">Ist-Jahressummen 2026 fehlen noch. Trage sie im Bereich „BayKiBiG-Reform · Zusatzdaten“ ein, um belastbare Ergebnisse zu erhalten.</Badge>
           ) : null}
           <Paper withBorder radius="sm" style={{ overflowX: 'auto' }}>
-            <Table highlightOnHover withTableBorder={false} miw={760} fz="xs">
+            <Table highlightOnHover withTableBorder={false} miw={1240} fz="xs">
               <Table.Thead><Table.Tr>
                 <Table.Th>Jahr</Table.Th><Table.Th style={{ textAlign: 'right' }}>Kindbezogene Förderung</Table.Th>
                 <Table.Th style={{ textAlign: 'right' }}>Teamkräfte brutto</Table.Th><Table.Th style={{ textAlign: 'right' }}>Bisherige Richtlinienförderung</Table.Th>
                 <Table.Th style={{ textAlign: 'right' }}>Teamkräfte netto</Table.Th><Table.Th style={{ textAlign: 'right' }}>Reformergebnis</Table.Th>
-                <Table.Th style={{ textAlign: 'right' }}>Δ zum Vorjahr</Table.Th><Table.Th style={{ textAlign: 'right' }}>Zuschuss (durchlaufend)</Table.Th>
+                <Table.Th style={{ textAlign: 'right' }}>Δ Beitragsänderung Förderung</Table.Th><Table.Th style={{ textAlign: 'right' }}>Δ Elternbeiträge / Zuschuss</Table.Th>
+                <Table.Th style={{ textAlign: 'right' }}>Reformergebnis inkl. Δ Simulation</Table.Th><Table.Th style={{ textAlign: 'right' }}>Δ zum Vorjahr</Table.Th>
+                <Table.Th style={{ textAlign: 'right' }}>Zuschuss 2026 (durchlaufend)</Table.Th>
               </Table.Tr></Table.Thead>
               <Table.Tbody>
                 {reformForecast.results.map((row) => (
@@ -501,6 +630,9 @@ function FundingSimulationPanel({ accent }) {
                     <Table.Td style={{ textAlign: 'right' }}>−{formatEuro(row.priorGuidelineFunding)}</Table.Td>
                     <Table.Td style={{ textAlign: 'right' }}>{formatEuro(row.teamGrantNet)}</Table.Td>
                     <Table.Td style={{ textAlign: 'right', fontWeight: 700 }}>{formatEuro(row.result)}</Table.Td>
+                    <Table.Td style={{ textAlign: 'right' }}>{formatEuro(row.simulationFundingDelta)}</Table.Td>
+                    <Table.Td style={{ textAlign: 'right' }}>{formatEuro(row.simulationParentFeesDelta + row.simulationParentSubsidyDelta)}</Table.Td>
+                    <Table.Td style={{ textAlign: 'right', fontWeight: 700 }}>{formatEuro(row.combinedResult)}</Table.Td>
                     <Table.Td style={{ textAlign: 'right' }}>{row.changeFromPreviousYear == null ? '–' : formatEuro(row.changeFromPreviousYear)}</Table.Td>
                     <Table.Td style={{ textAlign: 'right' }}>{formatEuro(row.parentFeeSubsidyPassThrough)}</Table.Td>
                   </Table.Tr>
@@ -509,10 +641,10 @@ function FundingSimulationPanel({ accent }) {
             </Table>
           </Paper>
           <Alert color="gray" variant="light" title="Abstimmung mit dem kindbezogenen Capakita-Modell">
-            2026 Ist nach Eingabe: {formatEuro(financeScenario.settings?.reformForecast?.actualFunding?.bookingTime || 0)} · Capakita-Modellhochrechnung aus aktiven Buchungen und den vorhandenen BayKiBiG-Regeln: {formatEuro(reformBaseline.capakitaModeledAnnualFunding)} · Differenz (Modell − Ist): {formatEuro(reformBaseline.capakitaModeledAnnualFunding - (Number(financeScenario.settings?.reformForecast?.actualFunding?.bookingTime) || 0))}. Die Differenz ist ein Abstimmungshinweis, keine Korrektur der eingegebenen KiBiG.web-Istsumme.
+            2026 Ist nach Eingabe: {formatEuro(financeScenario.settings?.reformForecast?.actualFunding?.bookingTime || 0)} · Capakita-Modellhochrechnung aus aktiven Buchungen und den vorhandenen BayKiBiG-Regeln: {formatEuro(reformBaseline.capakitaModeledAnnualFunding)} · Differenz (Modell − Ist): {formatEuro(reformBaseline.capakitaModeledAnnualFunding - (Number(financeScenario.settings?.reformForecast?.actualFunding?.bookingTime) || 0))}. Der simulierte Förderdelta wird zusätzlich je Jahr in der Tabelle ausgewiesen.
           </Alert>
           <Text size="xs" c="dimmed">
-            Teamkräfte: {reformForecast.assumptions.approvedPlaces} genehmigte Plätze · {reformForecast.assumptions.teamGrantEligible ? 'Förderung aktiviert' : 'Förderung nicht aktiviert'}. Die Vorlage führt Jahresbeträge; 2027 ff. sind Prognosen nach den editierbaren Annahmen.
+            Teamkräfte: {reformForecast.assumptions.approvedPlaces} genehmigte Plätze · {reformForecast.assumptions.teamGrantEligible ? 'Förderung aktiviert' : 'Förderung nicht aktiviert'}. Basiswert: jährlich {reformForecast.assumptions.baseValueIncreasePercent.toLocaleString('de-DE')} %; Qualitätsbonus wird anhand der festen Benchmarkreihe fortgeschrieben. Die Slider-Auswirkungen beruhen auf den jeweiligen Jahresstaffeln.
           </Text>
         </Stack>
       </Paper>
