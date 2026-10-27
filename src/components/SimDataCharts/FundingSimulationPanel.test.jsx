@@ -129,6 +129,16 @@ function openFuchsTariffGroup() {
   if (control.getAttribute('aria-expanded') !== 'true') fireEvent.click(control);
 }
 
+function openFuchsTariffTable() {
+  openFuchsTariffGroup();
+}
+
+function setFeeAmount(label, value) {
+  const input = screen.getByLabelText(label);
+  fireEvent.change(input, { target: { value: String(value) } });
+  fireEvent.blur(input);
+}
+
 describe('FundingSimulationPanel', () => {
   it('zeigt Tarif-Ausgangswerte, Gruppenergebnisse und Gesamtwerte', () => {
     const store = createTestStore();
@@ -141,8 +151,11 @@ describe('FundingSimulationPanel', () => {
     );
 
     expect(screen.getByText('Simulation von Beitragsänderungen')).toBeTruthy();
-    expect(screen.getByText(/Ausgangswert: 100,00 € \/ Monat/)).toBeTruthy();
-    expect(screen.getByText(/Ausgangswert: 150,00 € \/ Monat/)).toBeTruthy();
+    openFuchsTariffGroup();
+    expect(screen.getByTestId('fee-staircase-zeitkat')).toBeTruthy();
+    openFuchsTariffTable();
+    expect(screen.getByLabelText('Betrag ZEITKAT 05')).toBeTruthy();
+    expect(screen.getByLabelText('Betrag ZEITKAT 06')).toBeTruthy();
     expect(screen.getByText('Gruppen & Gesamt')).toBeTruthy();
     expect(screen.getByTestId('simulation-total-row')).toBeTruthy();
     expect(screen.getByText('Buchungsstunden vorher')).toBeTruthy();
@@ -158,14 +171,11 @@ describe('FundingSimulationPanel', () => {
       </Provider>
     );
 
-    openFuchsTariffGroup();
-    const sourceSlider = screen.getByRole('slider', { name: 'Simulationspreis Fuchs ZEITKAT 05' });
+    openFuchsTariffTable();
     // Setze ZEITKAT 05 auf 150 €, identisch zum geladenen ZEITKAT-06-Preis.
-    for (let index = 0; index < 10; index += 1) {
-      fireEvent.keyDown(sourceSlider, { key: 'ArrowRight', code: 'ArrowRight' });
-    }
+    setFeeAmount('Betrag ZEITKAT 05', 150);
 
-    expect(sourceSlider.getAttribute('aria-valuenow')).toBe('150');
+    expect(screen.getByLabelText('Betrag ZEITKAT 05').value).toBe('150 EUR');
     expect(screen.getAllByText('5,50 €').length).toBeGreaterThan(0);
     expect(screen.getAllByText(/100,00 €/).length).toBeGreaterThan(0);
     expect(within(screen.getByTestId('simulation-more-hours-impact')).getByText('+8,00 h pro Woche')).toBeTruthy();
@@ -197,9 +207,31 @@ describe('FundingSimulationPanel', () => {
     );
 
     openFuchsTariffGroup();
-    expect(screen.getByText('Staffel bis 10 h')).toBeTruthy();
     expect(screen.getByText(/ZEITKAT-Sätze fehlen; die JSON-importierten Wochenstunden-Bänder werden direkt verwendet/)).toBeTruthy();
-    expect(screen.getByRole('slider', { name: 'Simulationspreis Fuchs Staffel bis 10 h' })).toBeTruthy();
+    expect(screen.getByTestId('fee-staircase-weekly')).toBeTruthy();
+    expect(screen.getByLabelText('Betrag Staffel 1')).toBeTruthy();
+  });
+
+  it('simuliert den 100-Euro-Elternbeitragszuschuss als lokalen Rabatt für berechtigte Kinder', () => {
+    const store = createTestStore();
+    render(
+      <Provider store={store}>
+        <MantineProvider>
+          <FundingSimulationPanel accent="#0f766e" />
+        </MantineProvider>
+      </Provider>
+    );
+
+    const subsidySlider = screen.getByRole('slider', { name: 'Simulierter Elternbeitragszuschuss pro Kind' });
+    expect(subsidySlider.getAttribute('aria-valuenow')).toBe('100');
+    for (let index = 0; index < 10; index += 1) {
+      fireEvent.keyDown(subsidySlider, { key: 'ArrowLeft', code: 'ArrowLeft' });
+    }
+
+    expect(subsidySlider.getAttribute('aria-valuenow')).toBe('50');
+    expect(screen.getByText('+50,00 € pro Monat')).toBeTruthy();
+    expect(screen.getAllByText('-50,00 €').length).toBeGreaterThan(0);
+    expect(store.getState().simFinance.financeByScenario['scenario-1'].parentFeeSubsidy).toBeUndefined();
   });
 
   it('setzt den temporären Einzelpreis zurück auf den geladenen Wert', () => {
@@ -212,12 +244,10 @@ describe('FundingSimulationPanel', () => {
     );
 
     openFuchsTariffGroup();
-    const slider = screen.getByRole('slider', { name: 'Simulationspreis Fuchs ZEITKAT 05' });
-    for (let index = 0; index < 10; index += 1) {
-      fireEvent.keyDown(slider, { key: 'ArrowRight', code: 'ArrowRight' });
-    }
-    fireEvent.click(screen.getByRole('button', { name: 'Zurücksetzen' }));
-    expect(screen.getByRole('slider', { name: 'Simulationspreis Fuchs ZEITKAT 05' }).getAttribute('aria-valuenow')).toBe('100');
+    setFeeAmount('Betrag ZEITKAT 05', 175);
+    expect(screen.getByLabelText('Betrag ZEITKAT 05').value).toBe('175 EUR');
+    fireEvent.click(screen.getByRole('button', { name: 'Gruppe zurücksetzen' }));
+    expect(screen.getByLabelText('Betrag ZEITKAT 05').value).toBe('100 EUR');
   });
 
   it('kopiert die aktive Tabelle als tab-getrennte Daten', async () => {
@@ -250,11 +280,8 @@ describe('FundingSimulationPanel', () => {
       </Provider>
     );
 
-    openFuchsTariffGroup();
-    const tariffSlider = screen.getByRole('slider', { name: 'Simulationspreis Fuchs ZEITKAT 05' });
-    for (let index = 0; index < 10; index += 1) {
-      fireEvent.keyDown(tariffSlider, { key: 'ArrowRight', code: 'ArrowRight' });
-    }
+    openFuchsTariffTable();
+    setFeeAmount('Betrag ZEITKAT 05', 150);
     fireEvent.click(screen.getByRole('tab', { name: /Kinder/ }));
     fireEvent.click(screen.getByTestId('funding-child-child-2'));
     expect(store.getState().simScenario.selectedItems['scenario-1']).toEqual(['child-2']);

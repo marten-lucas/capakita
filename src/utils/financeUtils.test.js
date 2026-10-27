@@ -6,6 +6,7 @@ import {
   getPeriodBoundsForCategory,
   hasAnyBookingInWeek,
   findFeeEntryForZeitkat,
+  findFeeEntryForHours,
   getBayKiBiGWeightForChild,
   resolveGroupIdsForBounds,
   splitBookingByGroupAtDate,
@@ -123,6 +124,18 @@ describe('financeUtils', () => {
       { id: 'old', zeitkatId: '05', monthlyAmount: 50, validFrom: '2025-01-01', validUntil: '2025-12-31' },
       { id: 'current', zeitkatId: '05', monthlyAmount: 135, validFrom: '2026-01-01' },
     ], '05', '2026-04-15')?.id).toBe('current');
+  });
+
+  it('treats an empty weekly-hours limit as an open-ended final tariff tier', () => {
+    const entries = [
+      { id: 'up-to-10', maxHours: 10, monthlyAmount: 100 },
+      { id: 'open', maxHours: '', monthlyAmount: 180 },
+    ];
+
+    expect(findFeeEntryForHours(entries, 8, '2026-04-15')?.id).toBe('up-to-10');
+    expect(findFeeEntryForHours(entries, 10, '2026-04-15')?.id).toBe('up-to-10');
+    expect(findFeeEntryForHours(entries, 11, '2026-04-15')?.id).toBe('open');
+    expect(findFeeEntryForHours(entries, 40, '2026-04-15')?.id).toBe('open');
   });
 
   it('reduces sickness costs to zero after six weeks for partially paid absence', () => {

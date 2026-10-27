@@ -155,9 +155,7 @@ Gruppenfilter), Regression gegen `kita-anonym-*.zip` (ZEITKAT-Verteilung nicht l
 - Ausschöpfungsquote (0–100 %) ist der erwartete Anteil der aktiven Basisbuchungen, der bei identischem Simulationspreis in die direkt nächste Staffel wechselt: ZEITKAT-Sätze werden nach Buchungskategorie, JSON-Wochenstunden-Bänder nach Wochenstunden ausgewählt.
 - Wenn `rawdata.ZEITKAT` fehlt, wird die Kategorie aus mittleren Tagesstunden der gespeicherten Buchungssegmente abgeleitet. Ohne auswertbare Segmente bleibt die Förderwirkung für diesen Datensatz unbestimmt; ein Wochenstunden-Band kann weiterhin für Elternbeiträge und Mehrstunden verwendet werden.
 - Stunden und Förderänderung werden mit der Quote anteilig hochgerechnet. Förderdelta je Wechsel: `Basiswert × Gewichtung × (Zeitfaktor Ziel − Zeitfaktor Ausgang)`, sofern eine ZEITKAT vorliegt oder abgeleitet werden kann.
-- Elternbeiträge basieren vor der Simulation auf dem geladenen Satz; danach auf dem absoluten
-  Simulationspreis der Ausgangsstaffel bzw. dem gewichteten Übergang, wenn die Staffelpreise
-  gleich sind. Gesamteinnahmen = Förderung + Elternbeiträge.
+- Elternanteil basiert auf dem geladenen Satz abzüglich des modellierten Elternbeitragszuschusses (Standard: 100 €/Monat für berechtigte Kinder ab 3 Jahren bis vor Schuleintritt, begrenzt auf den Bruttobeitrag). Der Simulationszuschuss ist lokal änderbar. Zuschuss-Einnahme und netto zu zahlender Elternanteil werden getrennt ausgewiesen; Gesamteinnahmen = Förderung + Elternanteil + Zuschuss.
 - Preiseingaben sind rein lokale React-Komponentenzustände und werden beim Szenariowechsel
   zurückgesetzt. Nur aktive Basisbuchungen (Regel-/Kurzzeitbuchungen) fließen in die Berechnung;
   Alternativ- und Ferienbuchungen bleiben ausgeschlossen.

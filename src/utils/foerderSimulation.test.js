@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { simulateContributionChanges } from './foerderSimulation';
+import { simulateAnnualContributionChanges, simulateContributionChanges } from './foerderSimulation';
 
 const REF = '2026-03-15';
 const RULES = [{
@@ -98,9 +98,14 @@ describe('simulateContributionChanges', () => {
       deltaMonthlyTotal: 51.38,
     });
     expect(result.perChild[0]).toMatchObject({
-      parentFeeBefore: 100,
-      parentFeeAfter: 150,
+      grossParentFeeBefore: 100,
+      grossParentFeeAfter: 150,
+      parentFeeBefore: 0,
+      parentFeeAfter: 50,
+      parentFeeSubsidyBefore: 100,
+      parentFeeSubsidyAfter: 100,
       deltaMonthlyParentFees: 50,
+      deltaMonthlyParentSubsidy: 0,
       deltaWeeklyHours: 1,
     });
   });
@@ -129,18 +134,121 @@ describe('simulateContributionChanges', () => {
     expect(result.totals.deltaParentFees).toBe(50);
   });
 
-  it('weist Elternbeitragsentlastungen getrennt von Mehrkosten aus', () => {
-    const result = runSimulation({
+  it('berechnet Elternanteil und Zuschuss getrennt und kappt den Zuschuss auf den Bruttobeitrag', () => {
+    const result = simulateContributionChanges({
+      demandBookings: [makeBooking()],
+      dataItems: CHILD,
+      groupDefs: [{ id: 'g1', name: 'Sonnengruppe' }],
+      bayKiBiGRules: RULES,
+      groupFeeCatalogs: {
+        g1: [
+          { id: 'fee-04', zeitkatId: '04', monthlyAmount: 80, validFrom: '2026-01-01' },
+          { id: 'fee-05', zeitkatId: '05', monthlyAmount: 120, validFrom: '2026-01-01' },
+        ],
+      },
+      parentFeeSubsidy: { monthlyAmount: 100, minimumAgeYears: 3, maximumAgeYears: 7 },
+      temporaryParentFeeSubsidyAmount: 50,
       utilizationPercent: 0,
-      temporaryPrices: { g1: { '04': 50 } },
+      referenceDate: REF,
     });
 
-    expect(result.totals.childrenWithHigherFees).toBe(0);
-    expect(result.totals.monthlyParentCostIncrease).toBe(0);
-    expect(result.totals.childrenWithLowerFees).toBe(1);
-    expect(result.totals.familiesWithLowerFees).toBe(1);
-    expect(result.totals.monthlyParentCostReduction).toBe(50);
-    expect(result.families[0].monthlyParentCostReduction).toBe(50);
+    expect(result.perChild[0]).toMatchObject({
+      grossParentFeeBefore: 80,
+      parentFeeSubsidyBefore: 80,
+      parentFeeBefore: 0,
+      parentFeeSubsidyAfter: 50,
+      parentFeeAfter: 30,
+      deltaMonthlyParentFees: 30,
+      deltaMonthlyParentSubsidy: -30,
+      deltaMonthlyTotal: 0,
+    });
+    expect(result.totals).toMatchObject({
+      deltaParentFees: 30,
+      deltaParentFeeSubsidy: -30,
+      deltaMonthlyTotal: 0,
+      childrenWithHigherFees: 1,
+      monthlyParentCostIncrease: 30,
+    });
+  });
+
+  it('bildet den Wegfall des Elternbeitragszuschusses ab 2027 als Elternmehrbelastung ab, nicht als Mehreinnahme', () => {
+    const result = simulateContributionChanges({
+      demandBookings: [makeBooking()],
+      dataItems: CHILD,
+      groupDefs: [{ id: 'g1', name: 'Sonnengruppe' }],
+      bayKiBiGRules: RULES,
+      groupFeeCatalogs: { g1: [{ id: 'fee-04', zeitkatId: '04', monthlyAmount: 150, validFrom: '2026-01-01' }] },
+      parentFeeSubsidy: { monthlyAmount: 100, endDate: '2026-12-31' },
+      referenceDate: '2027-01-01',
+    });
+
+    expect(result.perChild[0]).toMatchObject({
+      parentFeeSubsidyBefore: 100,
+      parentFeeSubsidyAfter: 0,
+      parentFeeBefore: 50,
+      parentFeeAfter: 150,
+      deltaMonthlyParentFees: 100,
+      deltaMonthlyParentSubsidy: -100,
+      deltaMonthlyTotal: 0,
+    });
+  });
+
+  it('summiert Jahresbeiträge monatsgenau und beachtet das Zuschuss-Enddatum', () => {
+    const result = simulateAnnualContributionChanges({
+      year: 2027,
+      demandBookings: [makeBooking()],
+      dataItems: CHILD,
+      groupDefs: [{ id: 'g1', name: 'Sonnengruppe' }],
+      bayKiBiGRules: RULES,
+      groupFeeCatalogs: { g1: [{ id: 'fee-04', zeitkatId: '04', monthlyAmount: 150, validFrom: '2026-01-01' }] },
+      parentFeeSubsidy: { monthlyAmount: 100, endDate: '2027-06-30' },
+    });
+
+    expect(result.months).toHaveLength(12);
+    expect(result.totals).toMatchObject({
+      deltaYearlyParentFees: 600,
+      deltaYearlyParentSubsidy: -600,
+      deltaYearlyTotal: 0,
+      deltaMonthlyParentFees: 50,
+      deltaMonthlyParentSubsidy: -50,
+    });
+  });
+
+  it('vergleicht Änderungen der Wochenstunden-Grenzen mit den ursprünglichen Bändern', () => {
+    const booking = makeBooking({ zone: '', dailyHours: 3, days: 5 });
+    const originalGroupFeeCatalogs = {
+      g1: [
+        { id: 'old-10', maxHours: 10, monthlyAmount: 100, validFrom: '2026-01-01' },
+        { id: 'old-20', maxHours: 20, monthlyAmount: 200, validFrom: '2026-01-01' },
+        { id: 'old-open', maxHours: '', monthlyAmount: 300, validFrom: '2026-01-01' },
+      ],
+    };
+    const result = simulateContributionChanges({
+      demandBookings: [booking],
+      dataItems: CHILD,
+      groupDefs: [{ id: 'g1', name: 'Sonnengruppe' }],
+      bayKiBiGRules: RULES,
+      originalGroupFeeCatalogs,
+      groupFeeCatalogs: {
+        g1: [
+          { id: 'old-10', maxHours: 10, monthlyAmount: 100, validFrom: '2026-01-01' },
+          { id: 'new-15', maxHours: 15, monthlyAmount: 0, validFrom: '2026-01-01' },
+          { id: 'old-20', maxHours: 20, monthlyAmount: 200, validFrom: '2026-01-01' },
+          { id: 'old-open', maxHours: '', monthlyAmount: 300, validFrom: '2026-01-01' },
+        ],
+      },
+      temporaryPrices: { g1: { 'band:new-15': 150 } },
+      parentFeeSubsidy: { enabled: false },
+      referenceDate: REF,
+    });
+
+    expect(result.perChild[0]).toMatchObject({
+      parentFeeBefore: 200,
+      parentFeeAfter: 150,
+      deltaMonthlyParentFees: -50,
+    });
+    expect(originalGroupFeeCatalogs.g1[1].maxHours).toBe(20);
+    expect(originalGroupFeeCatalogs.g1[1].monthlyAmount).toBe(200);
   });
 
   it('berechnet Gruppen- und Gesamtwerte über mehrere Gruppen', () => {
@@ -210,9 +318,12 @@ describe('simulateContributionChanges', () => {
       weeklyHoursBefore: 9,
       weeklyHoursAfter: 14.5,
       deltaWeeklyHours: 5.5,
-      parentFeeBefore: 100,
-      parentFeeAfter: 150,
+      parentFeeBefore: 0,
+      parentFeeAfter: 50,
+      parentFeeSubsidyBefore: 100,
+      parentFeeSubsidyAfter: 100,
       deltaMonthlyParentFees: 50,
+      deltaMonthlyParentSubsidy: 0,
       deltaMonthly: 5.5,
     });
     expect(result.totals).toMatchObject({

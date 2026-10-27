@@ -684,8 +684,8 @@ export function findFeeEntryForHours(feeCatalog, weeklyHours, referenceDate) {
       const rightStart = right.validFrom || '';
       if (leftStart !== rightStart) return rightStart.localeCompare(leftStart);
 
-      const leftMax = Number(left.maxHours);
-      const rightMax = Number(right.maxHours);
+      const leftMax = left.maxHours === '' || left.maxHours == null ? Number.NaN : Number(left.maxHours);
+      const rightMax = right.maxHours === '' || right.maxHours == null ? Number.NaN : Number(right.maxHours);
       const leftFinite = Number.isFinite(leftMax);
       const rightFinite = Number.isFinite(rightMax);
       if (leftFinite && rightFinite) return leftMax - rightMax;
@@ -695,7 +695,7 @@ export function findFeeEntryForHours(feeCatalog, weeklyHours, referenceDate) {
       return String(left.id).localeCompare(String(right.id));
     })
     .find((entry) => {
-      const maxHours = Number(entry.maxHours);
+      const maxHours = entry.maxHours === '' || entry.maxHours == null ? Number.NaN : Number(entry.maxHours);
       return !Number.isFinite(maxHours) || weeklyHours <= maxHours;
     }) || null;
 }

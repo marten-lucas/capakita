@@ -7,6 +7,26 @@ import simFinanceReducer, {
 } from './simFinanceSlice';
 
 describe('simFinanceSlice', () => {
+  it('adds the legacy monthly parent-fee subsidy to the scenario finance model', () => {
+    const state = simFinanceReducer(undefined, loadFinanceByScenario({
+      'scenario-default': {},
+      'scenario-custom': { parentFeeSubsidy: { monthlyAmount: 75, maximumAgeYears: 6 } },
+    }));
+
+    expect(state.financeByScenario['scenario-default'].parentFeeSubsidy).toMatchObject({
+      enabled: true,
+      monthlyAmount: 100,
+      minimumAgeYears: 3,
+      maximumAgeYears: 7,
+      excludeSchoolChildren: true,
+    });
+    expect(state.financeByScenario['scenario-custom'].parentFeeSubsidy).toMatchObject({
+      monthlyAmount: 75,
+      minimumAgeYears: 3,
+      maximumAgeYears: 6,
+    });
+  });
+
   it('migrates existing automatic Adebis fee entries to ZEITKAT keys', () => {
     const state = simFinanceReducer(undefined, loadFinanceByScenario({
       'scenario-1': {

@@ -2,8 +2,35 @@ import { createSlice } from '@reduxjs/toolkit';
 import { createId } from '../utils/idUtils';
 import { getFeeBandZeitkatId } from '../utils/adebisConstants';
 
+const DEFAULT_PARENT_FEE_SUBSIDY = {
+  enabled: true,
+  monthlyAmount: 100,
+  minimumAgeYears: 3,
+  maximumAgeYears: 7,
+  excludeSchoolChildren: true,
+  endDate: '2026-12-31',
+};
+
+function normalizeParentFeeSubsidy(subsidy = {}) {
+  const source = typeof subsidy === 'number' ? { monthlyAmount: subsidy } : (subsidy || {});
+  const monthlyAmount = Number(source.monthlyAmount ?? DEFAULT_PARENT_FEE_SUBSIDY.monthlyAmount);
+  const minimumAgeYears = Number(source.minimumAgeYears ?? DEFAULT_PARENT_FEE_SUBSIDY.minimumAgeYears);
+  const maximumAgeYears = Number(source.maximumAgeYears ?? DEFAULT_PARENT_FEE_SUBSIDY.maximumAgeYears);
+  return {
+    ...DEFAULT_PARENT_FEE_SUBSIDY,
+    ...source,
+    enabled: source.enabled !== false,
+    monthlyAmount: Number.isFinite(monthlyAmount) ? Math.max(0, monthlyAmount) : DEFAULT_PARENT_FEE_SUBSIDY.monthlyAmount,
+    minimumAgeYears: Number.isFinite(minimumAgeYears) ? Math.max(0, minimumAgeYears) : DEFAULT_PARENT_FEE_SUBSIDY.minimumAgeYears,
+    maximumAgeYears: Number.isFinite(maximumAgeYears) ? Math.max(0, maximumAgeYears) : DEFAULT_PARENT_FEE_SUBSIDY.maximumAgeYears,
+    excludeSchoolChildren: source.excludeSchoolChildren !== false,
+    endDate: source.endDate === '' ? '' : (source.endDate ?? DEFAULT_PARENT_FEE_SUBSIDY.endDate),
+  };
+}
+
 function createEmptyScenarioFinance() {
   return {
+    parentFeeSubsidy: normalizeParentFeeSubsidy(),
     settings: {
       partialAbsenceThresholdDays: 42,
       partialAbsenceEmployerSharePercent: 0,
@@ -143,6 +170,7 @@ function normalizeScenarioFinance(finance = {}) {
   };
 
   return {
+    parentFeeSubsidy: normalizeParentFeeSubsidy(finance.parentFeeSubsidy),
     settings,
     bayKiBiGRules: Array.isArray(finance.bayKiBiGRules)
       ? finance.bayKiBiGRules.map((rule) => normalizeBayKiBiGRule(rule))
@@ -194,6 +222,14 @@ const simFinanceSlice = createSlice({
         ...scenarioFinance.settings,
         ...updates,
       };
+    },
+    updateParentFeeSubsidy(state, action) {
+      const { scenarioId, updates } = action.payload;
+      const scenarioFinance = ensureScenarioFinanceState(state, scenarioId);
+      scenarioFinance.parentFeeSubsidy = normalizeParentFeeSubsidy({
+        ...scenarioFinance.parentFeeSubsidy,
+        ...updates,
+      });
     },
     addBayKiBiGRule(state, action) {
       const { scenarioId, rule } = action.payload;
@@ -352,6 +388,7 @@ const simFinanceSlice = createSlice({
 
 export const {
   updateScenarioFinanceSettings,
+  updateParentFeeSubsidy,
   addBayKiBiGRule,
   updateBayKiBiGRule,
   deleteBayKiBiGRule,

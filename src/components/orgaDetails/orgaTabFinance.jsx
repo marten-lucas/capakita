@@ -11,6 +11,7 @@ import {
   Select,
   SimpleGrid,
   Stack,
+  Switch,
   Text,
   TextInput,
   FileInput,
@@ -24,19 +25,19 @@ import AccordionListDetail from '../common/AccordionListDetail';
 import { useOverlayData } from '../../hooks/useOverlayData';
 import {
   addBayKiBiGRule,
-  addGroupFeeEntry,
   updateBayKiBiGRule,
-  updateGroupFeeEntry,
   deleteBayKiBiGRule,
-  deleteGroupFeeEntry,
   setGroupFeeCatalogs,
+  updateParentFeeSubsidy,
   updateScenarioFinanceSettings,
 } from '../../store/simFinanceSlice';
 import {
   importBayKiBiGTableFromExcel,
   importBayKiBiGTableFromUrl,
 } from '../../utils/financeImport';
-import { getFeeBandZeitkatId, ZEITKAT_CATALOG } from '../../utils/adebisConstants';
+import { getFeeBandZeitkatId } from '../../utils/adebisConstants';
+import FeeStaircaseEditor from '../common/FeeStaircaseEditor';
+import { DEFAULT_REFORM_FORECAST, REFORM_YEARS } from '../../utils/reformSimulation';
 import {
   buildFeeCatalogExportPayload,
   extractFeeCatalogImportData,
@@ -177,7 +178,7 @@ function BayKiBiGDetail({ item, scenarioId, dispatch }) {
         decimalScale={2}
         min={0}
         thousandSeparator="."
-        decimalSeparator="," 
+        decimalSeparator=","
         suffix=" EUR"
       />
       
@@ -252,102 +253,206 @@ function BayKiBiGDetail({ item, scenarioId, dispatch }) {
   );
 }
 
-function FeeEntrySummary({ item }) {
-  const feeZeitkatId = getFeeBandZeitkatId(item);
-  const zone = ZEITKAT_CATALOG.find((entry) => String(entry.id) === String(feeZeitkatId));
-  const hoursLabel = zone
-    ? `ZEITKAT ${zone.id} · ${zone.kurzbez} h/Tag`
-    : (item.maxHours ? `bis ${item.maxHours} Wochenstunden` : 'offene Wochenstundenobergrenze');
+function ForecastNumberInput({ value, onCommit, ...props }) {
+  const [draft, setDraft] = React.useState(value ?? '');
+
+  React.useEffect(() => setDraft(value ?? ''), [value]);
+
   return (
-    <Stack gap={2}>
-      <Text fw={500}>{item.label || hoursLabel}</Text>
-      <Text size="sm" c="dimmed">
-        {formatCurrency(item.monthlyAmount)} im Monat{zone ? ` · ${hoursLabel}` : ''}
-      </Text>
-    </Stack>
+    <NumberInput
+      {...props}
+      value={draft}
+      onChange={setDraft}
+      onBlur={() => onCommit(draft === '' ? null : Number(draft))}
+      decimalScale={2}
+      min={0}
+      thousandSeparator="."
+      decimalSeparator=","
+      suffix=" EUR"
+    />
   );
 }
 
-function FeeEntryDetail({ item, groupId, scenarioId, dispatch }) {
+function ReformForecastSettings({ settings, parentFeeSubsidy, scenarioId, dispatch }) {
+  const forecast = settings?.reformForecast || {};
+  const actual = forecast.actualFunding || {};
+  const update = (path, value) => {
+    const next = { ...forecast, actualFunding: { ...actual } };
+    const [section, key] = path;
+    if (section === 'actualFunding') next.actualFunding = { ...actual, [key]: value ?? 0 };
+    else if (section === 'approvedPlaces' || section === 'teamGrantEligible') next[section] = value;
+    else next[section] = { ...(forecast[section] || {}), [key]: value };
+    dispatch(updateScenarioFinanceSettings({
+      scenarioId,
+      updates: { reformForecast: next },
+    }));
+  };
+  const updateTeamRate = (year, key, value) => {
+    const rates = forecast.teamRatesByYear || {};
+    const yearRates = rates[year] || {};
+    dispatch(updateScenarioFinanceSettings({
+      scenarioId,
+      updates: {
+        reformForecast: {
+          ...forecast,
+          teamRatesByYear: { ...rates, [year]: { ...yearRates, [key]: value } },
+        },
+      },
+    }));
+  };
+  const actualFields = [
+    ['bookingTime', 'Förderung nach Buchungszeiten'],
+    ['qualityBonus', 'Qualitätsbonus'],
+    ['preparatoryCourses', 'Vorkurse'],
+    ['under3Additional', 'Zusatzförderung U3'],
+    ['under3Federal', 'U3-Bundesmittel'],
+    ['parentFeeSubsidy', 'Elternbeitragszuschuss (durchlaufend)'],
+    ['assistance', 'Bisherige Richtlinienförderung: Assistenzkräfte'],
+    ['personnelBonus', 'Bisherige Richtlinienförderung: Personalbonus'],
+    ['languageSpecialists', 'Bisherige Richtlinienförderung: Sprachfachkräfte'],
+  ];
+
   return (
-    <Stack gap="sm">
-      <BufferedTextInput
-        label="Bezeichnung"
-        value={item.label || ''}
-        onCommit={(nextLabel) => dispatch(updateGroupFeeEntry({
-          scenarioId,
-          groupId,
-          entryId: item.id,
-          updates: { label: nextLabel },
-        }))}
-      />
-      <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
+    <Paper withBorder p="md" radius="md" data-testid="reform-forecast-settings">
+      <Stack gap="md">
+        <div>
+          <Text fw={600}>BayKiBiG-Reform – Jahresrechnung nach Berechnungsvorlage 2027</Text>
+          <Text size="sm" c="dimmed">
+            Übernimm die Ist-Jahressummen 2026 aus KiBiG.web. Die vorhandenen BayKiBiG-Regeln und Gewichtungsfaktoren bleiben die Quelle für die kindbezogene Simulation; diese Tabelle bildet zusätzlich die Jahresrechnung der freigegebenen Vorlage ab.
+          </Text>
+        </div>
+        <Alert color="blue" variant="light" title="Abgrenzung">
+          Der Elternbeitragszuschuss wird 2026 separat als durchlaufender Posten gezeigt, ab 2027 mit 0 angesetzt und nicht in das Reformergebnis eingerechnet. Unbekannte Steigerungen des Basiswerts stehen zunächst auf 0 % und sind editierbare Annahmen.
+        </Alert>
         <DatePickerInput
-          label="Gueltig von"
-          value={toDateValue(item.validFrom)}
-          onChange={(value) => dispatch(updateGroupFeeEntry({
+          label="Elternbeitragszuschuss gilt bis einschließlich"
+          description="Danach wird in der Beitrags- und Jahres-Simulation kein Zuschuss mehr angesetzt. Feld leeren, wenn er unbegrenzt weiterläuft."
+          value={toDateValue(parentFeeSubsidy?.endDate)}
+          onChange={(value) => dispatch(updateParentFeeSubsidy({
             scenarioId,
-            groupId,
-            entryId: item.id,
-            updates: { validFrom: toIsoDate(value) },
+            updates: { endDate: toIsoDate(value) },
           }))}
+          valueFormat="DD.MM.YYYY"
           clearable
+          data-testid="parent-fee-subsidy-end-date"
         />
-        <DatePickerInput
-          label="Gueltig bis"
-          value={toDateValue(item.validUntil)}
-          onChange={(value) => dispatch(updateGroupFeeEntry({
-            scenarioId,
-            groupId,
-            entryId: item.id,
-            updates: { validUntil: toIsoDate(value) },
-          }))}
-          clearable
-        />
-      </SimpleGrid>
-      {getFeeBandZeitkatId(item) ? (
-        <Text size="sm" c="dimmed">
-          Beitragssatz ist an ZEITKAT {getFeeBandZeitkatId(item)} gebunden und wird nach der aktiven Buchungskategorie ausgewählt.
-        </Text>
-      ) : (
-        <BufferedNumberInput
-          label="Max. Wochenstunden"
-          value={item.maxHours}
-          onCommit={(value) => dispatch(updateGroupFeeEntry({
-            scenarioId,
-            groupId,
-            entryId: item.id,
-            updates: { maxHours: value ?? '' },
-          }))}
-          decimalScale={2}
-          min={0}
-          thousandSeparator="."
-          decimalSeparator=","
-        />
-      )}
-      <BufferedNumberInput
-        label="Monatsbeitrag"
-        value={item.monthlyAmount}
-        onCommit={(value) => dispatch(updateGroupFeeEntry({
-          scenarioId,
-          groupId,
-          entryId: item.id,
-          updates: { monthlyAmount: value ?? '' },
-        }))}
-        decimalScale={2}
-        min={0}
-        thousandSeparator="."
-        decimalSeparator="," 
-        suffix=" EUR"
-      />
-    </Stack>
+        <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="sm">
+          {actualFields.map(([key, label]) => (
+            <ForecastNumberInput
+              key={key}
+              label={`Ist 2026 · ${label}`}
+              value={actual[key] ?? 0}
+              onCommit={(value) => update(['actualFunding', key], value ?? 0)}
+              data-testid={`reform-actual-${key}`}
+            />
+          ))}
+        </SimpleGrid>
+        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+          <NumberInput
+            label="Genehmigte Plätze (Betriebserlaubnis)"
+            min={0}
+            step={1}
+            value={forecast.approvedPlaces ?? 0}
+            onChange={(value) => update(['approvedPlaces', Number(value) || 0])}
+            data-testid="reform-approved-places"
+          />
+          <Switch
+            mt="xl"
+            label="Teamkräfteförderung ab 2027 berücksichtigen"
+            checked={forecast.teamGrantEligible === true}
+            onChange={(event) => update(['teamGrantEligible', event.currentTarget.checked])}
+            data-testid="reform-team-grant-eligible"
+          />
+        </SimpleGrid>
+        <div>
+          <Text fw={500} mb="xs">Jahresannahmen und Fördersätze</Text>
+          <Paper withBorder radius="sm" style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 720 }}>
+              <thead><tr>
+                <th style={{ textAlign: 'left', padding: 8 }}>Baustein</th>
+                {REFORM_YEARS.map((year) => <th key={year} style={{ textAlign: 'right', padding: 8 }}>{year}</th>)}
+              </tr></thead>
+              <tbody>
+                <tr>
+                  <td style={{ padding: 8 }}>Basiswert-Steigerung</td>
+                  {REFORM_YEARS.map((year) => (
+                    <td key={year} style={{ padding: 8 }}>
+                      {year === 2026 ? <Text ta="right" c="dimmed">Istwert</Text> : (
+                        <ForecastNumberInput
+                          aria-label={`Basiswert-Steigerung ${year} Prozent`}
+                          value={forecast.baseValueIncreasePercentByYear?.[year] ?? 0}
+                          onCommit={(value) => update(['baseValueIncreasePercentByYear', year], value ?? 0)}
+                          suffix=" %"
+                          data-testid={`reform-base-increase-${year}`}
+                        />
+                      )}
+                    </td>
+                  ))}
+                </tr>
+                {[
+                  ['qualityBonusByYear', 'Qualitätsbonus'],
+                  ['preparatoryCoursesByYear', 'Vorkurse (leer = Fortschreibung mit Basiswertrate)'],
+                  ['under3AdditionalByYear', 'Zusatzförderung U3'],
+                  ['under3FederalByYear', 'U3-Bundesmittel'],
+                ].map(([section, label]) => (
+                  <tr key={section}>
+                    <td style={{ padding: 8 }}>{label}</td>
+                    {REFORM_YEARS.map((year) => (
+                      <td key={year} style={{ padding: 8 }}>
+                        {year === 2026 ? <Text ta="right" c="dimmed">Istwert oben</Text> : (
+                          <ForecastNumberInput
+                            aria-label={`${label} ${year}`}
+                            value={forecast[section]?.[year] ?? DEFAULT_REFORM_FORECAST[section]?.[year] ?? ''}
+                            onCommit={(value) => update([section, year], value)}
+                            data-testid={`reform-${section}-${year}`}
+                          />
+                        )}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+                <tr>
+                  <td style={{ padding: 8 }}>Teamkräfte · Satz je Platz bis 50</td>
+                  {REFORM_YEARS.map((year) => <td key={year} style={{ padding: 8 }}>{year === 2026 ? <Text ta="right" c="dimmed">–</Text> : (
+                    <ForecastNumberInput
+                      aria-label={`Teamkräfte Satz bis 50 Plätze ${year}`}
+                      value={forecast.teamRatesByYear?.[year]?.first50 ?? DEFAULT_REFORM_FORECAST.teamRatesByYear[year]?.first50}
+                      onCommit={(value) => updateTeamRate(year, 'first50', value ?? 0)}
+                      data-testid={`reform-team-rate-first50-${year}`}
+                    />
+                  )}</td>)}
+                </tr>
+                <tr>
+                  <td style={{ padding: 8 }}>Teamkräfte · Satz je Platz 51–150</td>
+                  {REFORM_YEARS.map((year) => <td key={year} style={{ padding: 8 }}>{year === 2026 ? <Text ta="right" c="dimmed">–</Text> : (
+                    <ForecastNumberInput
+                      aria-label={`Teamkräfte Satz Plätze 51 bis 150 ${year}`}
+                      value={forecast.teamRatesByYear?.[year]?.remaining100 ?? DEFAULT_REFORM_FORECAST.teamRatesByYear[year]?.remaining100}
+                      onCommit={(value) => updateTeamRate(year, 'remaining100', value ?? 0)}
+                      data-testid={`reform-team-rate-remaining-${year}`}
+                    />
+                  )}</td>)}
+                </tr>
+              </tbody>
+            </table>
+          </Paper>
+          <Text size="xs" c="dimmed" mt="xs">
+            Teamkräfte-Sätze sind gemäß Vorlage vorbelegt. Die Tarife werden versioniert in der bestehenden Szenario-Finanzkonfiguration gespeichert; die Ist-Jahressummen bleiben manuelle KiBiG.web-Eingaben.
+          </Text>
+        </div>
+      </Stack>
+    </Paper>
   );
 }
+
+
 
 function OrgaTabFinance({ section = 'all' }) {
   const dispatch = useDispatch();
   const isMobile = useMediaQuery('(max-width: 48em)');
   const selectedScenarioId = useSelector((state) => state.simScenario.selectedScenarioId);
+  const referenceDate = useSelector((state) => state.chart?.[selectedScenarioId]?.referenceDate)
+    || new Date().toISOString().slice(0, 10);
   const financeScenario = useSelector(
     (state) => state.simFinance.financeByScenario[selectedScenarioId] || EMPTY_FINANCE_SCENARIO
   );
@@ -540,6 +645,12 @@ function OrgaTabFinance({ section = 'all' }) {
               URL importieren
             </Button>
           </SimpleGrid>
+          <ReformForecastSettings
+            settings={financeScenario.settings}
+            parentFeeSubsidy={financeScenario.parentFeeSubsidy}
+            scenarioId={selectedScenarioId}
+            dispatch={dispatch}
+          />
         </Stack>
       </Paper>
       )}
@@ -641,28 +752,15 @@ function OrgaTabFinance({ section = 'all' }) {
                       </Group>
                     </Accordion.Control>
                     <Accordion.Panel>
-                      <AccordionListDetail
-                        items={entries}
-                        SummaryComponent={({ item }) => <FeeEntrySummary item={item} />}
-                        DetailComponent={({ item }) => (
-                          <FeeEntryDetail
-                            item={item}
-                            groupId={group.id}
-                            scenarioId={selectedScenarioId}
-                            dispatch={dispatch}
-                          />
-                        )}
-                        AddButtonLabel="Beitragsstaffel hinzufuegen"
-                        emptyText="Noch keine Beitragsstaffel hinterlegt."
-                        onAdd={() => dispatch(addGroupFeeEntry({
+                      <FeeStaircaseEditor
+                        entries={entries}
+                        referenceDate={referenceDate}
+                        onChangeEntries={(nextEntries) => dispatch(setGroupFeeCatalogs({
                           scenarioId: selectedScenarioId,
-                          groupId: group.id,
-                          entry: { validFrom: '', validUntil: '', maxHours: '', monthlyAmount: '' },
-                        }))}
-                        onDelete={(_, item) => dispatch(deleteGroupFeeEntry({
-                          scenarioId: selectedScenarioId,
-                          groupId: group.id,
-                          entryId: item.id,
+                          catalogs: {
+                            ...(financeScenario.groupFeeCatalogs || {}),
+                            [String(group.id)]: nextEntries,
+                          },
                         }))}
                       />
                     </Accordion.Panel>
