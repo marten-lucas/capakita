@@ -8,6 +8,7 @@ import {
   NumberInput,
   Paper,
   Select,
+  Slider,
   Stack,
   Text,
 } from '@mantine/core';
@@ -17,11 +18,9 @@ import { createId } from '../../utils/idUtils';
 import { getFeeBandZeitkatId, ZEITKAT_CATALOG } from '../../utils/adebisConstants';
 import { isDateWithinRange } from '../../utils/financeUtils';
 
-const SVG_WIDTH = 820;
-const SVG_HEIGHT = 310;
-const PLOT = { left: 62, right: 16, top: 18, bottom: 42 };
-const PLOT_WIDTH = SVG_WIDTH - PLOT.left - PLOT.right;
-const PLOT_HEIGHT = SVG_HEIGHT - PLOT.top - PLOT.bottom;
+const MAX_ZEITKAT_HOURS = 8;
+const SLIDER_HEIGHT = 166;
+const ZEITKAT_SLIDER_ZONES = ZEITKAT_CATALOG.filter((zone) => zone.maxHours <= MAX_ZEITKAT_HOURS);
 
 function makePeriodKey(entry) {
   return `${entry?.validFrom || ''}|${entry?.validUntil || ''}`;
@@ -58,11 +57,9 @@ function sortEntries(entries, kind) {
     }
     const leftMax = getWeeklyLimit(left);
     const rightMax = getWeeklyLimit(right);
-    const leftOpen = leftMax == null;
-    const rightOpen = rightMax == null;
-    if (leftOpen && rightOpen) return String(left.id).localeCompare(String(right.id));
-    if (leftOpen) return 1;
-    if (rightOpen) return -1;
+    if (leftMax == null && rightMax == null) return String(left.id).localeCompare(String(right.id));
+    if (leftMax == null) return 1;
+    if (rightMax == null) return -1;
     return leftMax - rightMax;
   });
 }
@@ -107,9 +104,9 @@ function makeEntryLike(entry, changes = {}) {
   return { ...entry, ...changes, id: changes.id || createId('fee') };
 }
 
-function PriceField({ entry, label, onChange, testId }) {
-  const [draft, setDraft] = React.useState(entry.monthlyAmount ?? '');
-  React.useEffect(() => setDraft(entry.monthlyAmount ?? ''), [entry.monthlyAmount]);
+function PriceField({ value, label, onChange, testId }) {
+  const [draft, setDraft] = React.useState(value ?? 0);
+  React.useEffect(() => setDraft(value ?? 0), [value]);
   return (
     <NumberInput
       size="xs"
@@ -129,145 +126,59 @@ function PriceField({ entry, label, onChange, testId }) {
   );
 }
 
-function FeeStaircaseChart({ kind, entries, baselineEntries, onDraw, onDrawError, simulation }) {
-  const [drawing, setDrawing] = React.useState(null);
-  const allEntries = [...entries, ...(baselineEntries || [])];
-  const priceMax = getPriceMax(entries, baselineEntries);
-  const domainMin = kind === 'zeitkat' ? 1 : 0;
-  const domainMax = kind === 'zeitkat'
-    ? 13
-    : Math.max(40, Math.ceil(Math.max(0, ...allEntries.map((entry) => Number(entry.maxHours) || 0)) / 10) * 10);
-  const xAt = (hours) => PLOT.left + ((hours - domainMin) / (domainMax - domainMin)) * PLOT_WIDTH;
-  const yAt = (price) => PLOT.top + PLOT_HEIGHT - (Math.max(0, Number(price) || 0) / priceMax) * PLOT_HEIGHT;
-  const priceAt = (svgY) => {
-    const ratio = Math.max(0, Math.min(1, (PLOT.top + PLOT_HEIGHT - svgY) / PLOT_HEIGHT));
-    return Math.round((ratio * priceMax) / 5) * 5;
-  };
-  const getPoint = (event) => {
-    const rect = event.currentTarget.getBoundingClientRect();
-    if (!rect.width || !rect.height) return null;
-    const svgX = ((event.clientX - rect.left) / rect.width) * SVG_WIDTH;
-    const svgY = ((event.clientY - rect.top) / rect.height) * SVG_HEIGHT;
-    const hours = domainMin + ((svgX - PLOT.left) / PLOT_WIDTH) * (domainMax - domainMin);
-    return {
-      hours: Math.max(domainMin, Math.min(domainMax, hours)),
-      y: Math.max(PLOT.top, Math.min(PLOT.top + PLOT_HEIGHT, svgY)),
-    };
-  };
-  const currentZoneById = new Map(entries.map((entry) => [getFeeBandZeitkatId(entry), entry]));
-  const baselineZoneById = new Map((baselineEntries || []).map((entry) => [getFeeBandZeitkatId(entry), entry]));
-  const weeklySegments = kind === 'weekly' ? getWeeklySegments(entries, domainMax) : [];
-  const baselineWeeklySegments = kind === 'weekly' ? getWeeklySegments(baselineEntries || [], domainMax) : [];
-  const xTicks = kind === 'zeitkat' ? [1, 2, 4, 6, 8, 10, 12, 13] : Array.from({ length: Math.floor(domainMax / 10) + 1 }, (_, index) => index * 10);
-  const yTicks = [0, priceMax / 2, priceMax];
-
-  function beginDrawing(event) {
-    if (event.button !== 0) return;
-    const point = getPoint(event);
-    if (!point) return;
-    event.currentTarget.setPointerCapture?.(event.pointerId);
-    setDrawing({ start: point, end: point });
-    onDrawError?.('');
-  }
-
-  function moveDrawing(event) {
-    if (!drawing) return;
-    const point = getPoint(event);
-    if (point) setDrawing((current) => current ? { ...current, end: point } : null);
-  }
-
-  function finishDrawing(event) {
-    if (!drawing) return;
-    const point = getPoint(event) || drawing.end;
-    onDraw({ startHours: drawing.start.hours, endHours: point.hours, amount: priceAt(point.y), domainMin, domainMax });
-    setDrawing(null);
-  }
-
-  const previewRect = drawing ? (() => {
-    const startHours = Math.min(drawing.start.hours, drawing.end.hours);
-    const endHours = Math.max(drawing.start.hours, drawing.end.hours);
-    const lowY = Math.min(drawing.start.y, drawing.end.y);
-    const highY = Math.max(drawing.start.y, drawing.end.y);
-    return {
-      x: xAt(startHours),
-      y: Math.min(yAt(priceAt(drawing.end.y)), lowY),
-      width: Math.max(2, xAt(endHours) - xAt(startHours)),
-      height: Math.max(3, highY - lowY),
-    };
-  })() : null;
-
+function OriginalMarker({ amount, maxAmount }) {
+  if (amount == null) return null;
+  const percent = 100 - (Math.max(0, Math.min(maxAmount, Number(amount) || 0)) / maxAmount) * 100;
   return (
-    <Box>
-      <svg
-        viewBox={`0 0 ${SVG_WIDTH} ${SVG_HEIGHT}`}
-        role="img"
-        aria-label={kind === 'zeitkat' ? 'Beitragsstaffel nach täglicher Buchungszeit' : 'Beitragsstaffel nach Wochenstunden'}
-        data-testid={`fee-staircase-${kind}`}
-        style={{ display: 'block', width: '100%', minHeight: 240, border: '1px solid var(--mantine-color-gray-3)', borderRadius: 8, background: 'var(--mantine-color-body)', touchAction: 'none', cursor: 'crosshair' }}
-        onPointerDown={beginDrawing}
-        onPointerMove={moveDrawing}
-        onPointerUp={finishDrawing}
-        onPointerCancel={() => setDrawing(null)}
-      >
-        {yTicks.map((tick) => (
-          <g key={`y-${tick}`}>
-            <line x1={PLOT.left} x2={SVG_WIDTH - PLOT.right} y1={yAt(tick)} y2={yAt(tick)} stroke="var(--mantine-color-gray-3)" strokeDasharray={tick === 0 ? undefined : '4 4'} />
-            <text x={PLOT.left - 8} y={yAt(tick) + 4} textAnchor="end" fill="var(--mantine-color-dimmed)" fontSize="11">{Math.round(tick)} €</text>
-          </g>
-        ))}
-        {xTicks.map((tick) => (
-          <g key={`x-${tick}`}>
-            <line x1={xAt(tick)} x2={xAt(tick)} y1={PLOT.top} y2={PLOT.top + PLOT_HEIGHT} stroke="var(--mantine-color-gray-2)" />
-            <text x={xAt(tick)} y={SVG_HEIGHT - 10} textAnchor="middle" fill="var(--mantine-color-dimmed)" fontSize="11">{tick} h</text>
-          </g>
-        ))}
-        {kind === 'weekly' ? (
-          <>
-            {baselineWeeklySegments.map(({ entry, lower, upper }) => (
-              <rect key={`original-${entry.id}`} x={xAt(lower)} y={yAt(entry.monthlyAmount)} width={Math.max(0, xAt(upper) - xAt(lower))} height={PLOT.top + PLOT_HEIGHT - yAt(entry.monthlyAmount)} fill="var(--mantine-color-gray-5)" fillOpacity={simulation ? 0.18 : 0.05} stroke={simulation ? 'var(--mantine-color-gray-6)' : 'var(--mantine-color-gray-5)'} strokeOpacity={simulation ? 0.45 : 0.2} strokeDasharray={simulation ? '5 4' : undefined} />
-            ))}
-            {weeklySegments.map(({ entry, lower, upper }) => (
-              <g key={entry.id}>
-                <rect x={xAt(lower)} y={yAt(entry.monthlyAmount)} width={Math.max(0, xAt(upper) - xAt(lower))} height={PLOT.top + PLOT_HEIGHT - yAt(entry.monthlyAmount)} fill="var(--mantine-color-blue-5)" fillOpacity={0.8} stroke="var(--mantine-color-blue-7)" strokeWidth={1} />
-                {xAt(upper) - xAt(lower) > 74 ? <text x={(xAt(lower) + xAt(upper)) / 2} y={yAt(entry.monthlyAmount) + 18} textAnchor="middle" fill="white" fontSize="12" fontWeight="600">{formatBandLabel(lower, upper, entry.maxHours)}</text> : null}
-              </g>
-            ))}
-            {simulation ? baselineWeeklySegments.map(({ entry, lower, upper }) => (
-              <rect key={`original-outline-${entry.id}`} x={xAt(lower)} y={yAt(entry.monthlyAmount)} width={Math.max(0, xAt(upper) - xAt(lower))} height={PLOT.top + PLOT_HEIGHT - yAt(entry.monthlyAmount)} fill="none" stroke="var(--mantine-color-gray-7)" strokeOpacity={0.7} strokeWidth={1.5} strokeDasharray="5 4" pointerEvents="none" />
-            )) : null}
-          </>
-        ) : ZEITKAT_CATALOG.map((zone) => {
-          const currentEntry = currentZoneById.get(zone.id);
-          const baselineEntry = baselineZoneById.get(zone.id);
-          const x1 = xAt(zone.minHours);
-          const x2 = xAt(zone.maxHours);
-          return (
-            <g key={zone.id}>
-              {baselineEntry ? <rect x={x1} y={yAt(baselineEntry.monthlyAmount)} width={x2 - x1} height={PLOT.top + PLOT_HEIGHT - yAt(baselineEntry.monthlyAmount)} fill="var(--mantine-color-gray-5)" fillOpacity={simulation ? 0.18 : 0.05} stroke={simulation ? 'var(--mantine-color-gray-6)' : 'var(--mantine-color-gray-5)'} strokeOpacity={simulation ? 0.45 : 0.2} strokeDasharray={simulation ? '5 4' : undefined} /> : null}
-              {currentEntry ? (
-                <>
-                  <rect x={x1} y={yAt(currentEntry.monthlyAmount)} width={x2 - x1} height={PLOT.top + PLOT_HEIGHT - yAt(currentEntry.monthlyAmount)} fill="var(--mantine-color-teal-5)" fillOpacity={0.82} stroke="var(--mantine-color-teal-7)" strokeWidth={1} />
-                  {x2 - x1 > 38 ? <text x={(x1 + x2) / 2} y={yAt(currentEntry.monthlyAmount) + 17} textAnchor="middle" fill="white" fontSize="10" fontWeight="600">{zone.id}</text> : null}
-                </>
-              ) : <rect x={x1} y={PLOT.top} width={x2 - x1} height={PLOT_HEIGHT} fill="var(--mantine-color-gray-1)" fillOpacity={0.6} stroke="var(--mantine-color-gray-4)" strokeDasharray="3 3" />}
-              {simulation && baselineEntry ? <rect x={x1} y={yAt(baselineEntry.monthlyAmount)} width={x2 - x1} height={PLOT.top + PLOT_HEIGHT - yAt(baselineEntry.monthlyAmount)} fill="none" stroke="var(--mantine-color-gray-7)" strokeOpacity={0.7} strokeWidth={1.5} strokeDasharray="5 4" pointerEvents="none" /> : null}
-            </g>
-          );
-        })}
-        {previewRect ? <rect {...previewRect} fill="var(--mantine-color-orange-5)" fillOpacity={0.35} stroke="var(--mantine-color-orange-7)" strokeDasharray="4 3" pointerEvents="none" /> : null}
-        <text x={SVG_WIDTH / 2} y={SVG_HEIGHT - 1} textAnchor="middle" fill="var(--mantine-color-dimmed)" fontSize="11">{kind === 'zeitkat' ? 'Stunden pro Tag (ZEITKAT)' : 'Betreuungsstunden pro Woche'}</text>
-      </svg>
-      <Group justify="space-between" mt={4} wrap="wrap">
-        <Text size="xs" c="dimmed">{simulation ? 'Gestrichelt: Original · farbig: Simulation' : 'Ziehe auf einer Staffel, um sie zu ändern oder einen Teilbereich als neue Staffel abzutrennen.'}</Text>
-        {simulation ? <Text size="xs" c="dimmed">Die Änderungen gelten nur lokal für diese Simulation.</Text> : null}
-      </Group>
-    </Box>
+    <Box
+      aria-hidden="true"
+      style={{
+        position: 'absolute',
+        zIndex: 3,
+        top: `${percent}%`,
+        left: 'calc(50% - 20px)',
+        width: 40,
+        borderTop: '2px dashed var(--mantine-color-gray-7)',
+        opacity: 0.65,
+        pointerEvents: 'none',
+      }}
+    />
   );
 }
 
-function formatBandLabel(lower, upper, configuredMax) {
-  const number = (value) => Number(value).toLocaleString('de-DE', { maximumFractionDigits: 1 });
-  return Number.isFinite(Number(configuredMax)) ? `${number(lower)}–${number(upper)} h` : `ab ${number(lower)} h`;
+function StairSlider({ label, detail, value, originalAmount, priceMax, simulation, onChange, testId, width }) {
+  return (
+    <Stack gap={4} align="center" style={{ flex: width || '1 0 96px', minWidth: 90, padding: '0 6px' }}>
+      <Text size="xs" fw={700} ta="center" lh={1.2}>{label}</Text>
+      {detail ? <Text size="10px" c="dimmed" ta="center" lh={1.1}>{detail}</Text> : <Box h={12} />}
+      <Box style={{ position: 'relative', height: SLIDER_HEIGHT, width: 46, display: 'flex', justifyContent: 'center' }}>
+        <OriginalMarker amount={simulation ? originalAmount : null} maxAmount={priceMax} />
+        <Slider
+          orientation="vertical"
+          min={0}
+          max={priceMax}
+          step={5}
+          value={Math.max(0, Math.min(priceMax, Number(value) || 0))}
+          onChange={onChange}
+          aria-label={`${simulation ? 'Simulierter Beitrag' : 'Beitrag'} ${label}`}
+          thumbLabel={`${simulation ? 'Simulierter Beitrag' : 'Beitrag'} ${label}`}
+          data-testid={testId}
+          style={{ height: SLIDER_HEIGHT, width: 34, zIndex: 1 }}
+        />
+      </Box>
+      <PriceField
+        value={value}
+        label={`Betrag ${label}`}
+        onChange={onChange}
+        testId={`${testId}-amount`}
+      />
+      {simulation ? (
+        <Text size="10px" c="dimmed" ta="center">
+          Original {originalAmount == null ? '–' : `${Number(originalAmount).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`}
+        </Text>
+      ) : null}
+    </Stack>
+  );
 }
 
 export default function FeeStaircaseEditor({
@@ -278,7 +189,7 @@ export default function FeeStaircaseEditor({
   onChangeEntries,
   onResetAll,
 }) {
-  const availableKinds = ['weekly', 'zeitkat'];
+
   const [kind, setKind] = React.useState(() => entries.some((entry) => getEntryKind(entry) === 'zeitkat') ? 'zeitkat' : 'weekly');
   const [selectedPeriodKey, setSelectedPeriodKey] = React.useState(null);
   const [drawError, setDrawError] = React.useState('');
@@ -313,13 +224,14 @@ export default function FeeStaircaseEditor({
     || finiteWeeklyLimits.some((limit, index) => limit <= 0 || (index > 0 && limit <= finiteWeeklyLimits[index - 1]))
   );
   const missingZeitkatZones = kind === 'zeitkat'
-    ? ZEITKAT_CATALOG.filter((zone) => !activeEntries.some((entry) => getFeeBandZeitkatId(entry) === zone.id))
+    ? ZEITKAT_SLIDER_ZONES.filter((zone) => !activeEntries.some((entry) => getFeeBandZeitkatId(entry) === zone.id))
     : [];
   const baselineEntriesForPeriod = sortEntries((originalEntries || []).filter((entry) =>
     getEntryKind(entry) === kind && makePeriodKey(entry) === periodKey
   ), kind);
   const periodStart = activeEntries[0]?.validFrom || '';
   const periodEnd = activeEntries[0]?.validUntil || '';
+  const priceMax = getPriceMax(activeEntries, baselineEntriesForPeriod);
 
   function replaceActiveEntries(nextActiveEntries) {
     const preserved = entries.filter((entry) => getEntryKind(entry) !== kind || makePeriodKey(entry) !== periodKey);
@@ -330,6 +242,19 @@ export default function FeeStaircaseEditor({
     replaceActiveEntries(activeEntries.map((entry) => (
       String(entry.id) === String(entryId) ? { ...entry, ...updates } : entry
     )));
+  }
+
+  function updateZeitkatAmount(zone, amount) {
+    const existing = activeEntries.find((entry) => getFeeBandZeitkatId(entry) === zone.id);
+    if (existing) {
+      updateEntry(existing.id, { monthlyAmount: amount });
+      return;
+    }
+    const inheritedDate = activeEntries[0] || {};
+    replaceActiveEntries(sortEntries([
+      ...activeEntries,
+      makeEntryLike(inheritedDate, { zeitkatId: zone.id, maxHours: zone.maxHours, monthlyAmount: amount }),
+    ], 'zeitkat'));
   }
 
   function updateWeeklyLimit(entryId, value) {
@@ -388,68 +313,6 @@ export default function FeeStaircaseEditor({
     replaceActiveEntries(sortEntries([...activeEntries, newEntry], 'zeitkat'));
   }
 
-  function onDraw({ startHours, endHours, amount, domainMax }) {
-    const start = Math.min(startHours, endHours);
-    const end = Math.max(startHours, endHours);
-    const snap = (value) => Math.round(value * 2) / 2;
-    const snappedStart = snap(start);
-    const snappedEnd = snap(end);
-    if (kind === 'zeitkat') {
-      const selectedZones = ZEITKAT_CATALOG.filter((zone) => zone.maxHours > start && zone.minHours < Math.max(end, start + 0.15));
-      if (selectedZones.length === 0) return;
-      const next = [...activeEntries];
-      selectedZones.forEach((zone) => {
-        const existingIndex = next.findIndex((entry) => getFeeBandZeitkatId(entry) === zone.id);
-        if (existingIndex >= 0) next[existingIndex] = { ...next[existingIndex], monthlyAmount: amount };
-        else next.push(makeEntryLike(activeEntries[0] || {}, { zeitkatId: zone.id, maxHours: zone.maxHours, monthlyAmount: amount }));
-      });
-      replaceActiveEntries(sortEntries(next, 'zeitkat'));
-      setDrawError('');
-      return;
-    }
-
-    const segments = getWeeklySegments(activeEntries, domainMax);
-    const targetIndex = segments.findIndex((segment) => (snappedStart + snappedEnd) / 2 >= segment.lower
-      && (snappedStart + snappedEnd) / 2 <= segment.upper);
-    const target = segments[targetIndex];
-    if (!target) return;
-    if (Math.abs(endHours - startHours) < 0.35) {
-      updateEntry(target.entry.id, { monthlyAmount: amount });
-      return;
-    }
-    const selectedStart = Math.max(target.lower, snappedStart);
-    const selectedEnd = Math.min(target.upper, Math.max(snappedEnd, selectedStart + 0.5));
-    if (selectedEnd <= selectedStart || selectedEnd - selectedStart < 0.49) {
-      updateEntry(target.entry.id, { monthlyAmount: amount });
-      return;
-    }
-    if (snappedStart < target.lower - 0.01 || snappedEnd > target.upper + 0.01) {
-      setDrawError('Neue Rechtecke bitte innerhalb einer bestehenden Staffel zeichnen.');
-      return;
-    }
-
-    const sorted = sortEntries(activeEntries, 'weekly');
-    const sourceIndex = sorted.findIndex((entry) => String(entry.id) === String(target.entry.id));
-    const beforeNeeded = selectedStart > target.lower + 0.01;
-    const afterNeeded = selectedEnd < target.upper - 0.01;
-    const replacement = [];
-    const selectedMax = target.openEnded && selectedEnd >= domainMax - 0.01 ? '' : selectedEnd;
-    if (beforeNeeded) {
-      replacement.push({ ...target.entry, maxHours: selectedStart });
-      replacement.push(makeEntryLike(target.entry, { maxHours: selectedMax, monthlyAmount: amount }));
-    } else {
-      replacement.push({ ...target.entry, maxHours: selectedMax, monthlyAmount: amount });
-    }
-    if (afterNeeded) {
-      replacement.push(makeEntryLike(target.entry, { maxHours: target.entry.maxHours ?? '', monthlyAmount: Number(target.entry.monthlyAmount) || 0 }));
-    } else if (target.openEnded && selectedEnd < domainMax - 0.01) {
-      replacement.push(makeEntryLike(target.entry, { maxHours: '', monthlyAmount: Number(target.entry.monthlyAmount) || 0 }));
-    }
-    sorted.splice(sourceIndex, 1, ...replacement);
-    replaceActiveEntries(sortEntries(sorted, 'weekly'));
-    setDrawError('');
-  }
-
   function updateValidity(field, value) {
     const validFrom = field === 'validFrom' ? value : periodStart;
     const validUntil = field === 'validUntil' ? value : periodEnd;
@@ -471,20 +334,24 @@ export default function FeeStaircaseEditor({
     replaceActiveEntries(sortEntries(next, kind));
   }
 
+  const weeklyDomainMax = Math.max(40, Math.ceil(Math.max(0, ...activeEntries.map((entry) => Number(entry.maxHours) || 0)) / 10) * 10);
+  const weeklySegments = getWeeklySegments(activeEntries, weeklyDomainMax);
+
+  const zeitkatMap = new Map(activeEntries.map((entry) => [getFeeBandZeitkatId(entry), entry]));
+  const baselineZeitkatMap = new Map(baselineEntriesForPeriod.map((entry) => [getFeeBandZeitkatId(entry), entry]));
+
   return (
     <Stack gap="sm" data-testid="fee-staircase-editor">
       <Group justify="space-between" align="flex-end" wrap="wrap">
         <Group align="flex-end" wrap="wrap">
-          {availableKinds.length > 1 ? (
-            <Select
-              label="Staffelart"
-              value={kind}
-              onChange={(value) => value && setKind(value)}
-              data={[{ value: 'zeitkat', label: 'ZEITKAT / Stunden pro Tag' }, { value: 'weekly', label: 'Wochenstunden' }]}
-              w={230}
-              data-testid="fee-staircase-kind"
-            />
-          ) : <Text size="sm" fw={600}>{kind === 'zeitkat' ? 'ZEITKAT / Stunden pro Tag' : 'Wochenstunden'}</Text>}
+          <Select
+            label="Staffelart"
+            value={kind}
+            onChange={(value) => value && setKind(value)}
+            data={[{ value: 'zeitkat', label: 'ZEITKAT / Stunden pro Tag' }, { value: 'weekly', label: 'Wochenstunden' }]}
+            w={230}
+            data-testid="fee-staircase-kind"
+          />
           {periodOptions.length > 1 ? (
             <Select
               label="Gültigkeitsversion"
@@ -505,10 +372,10 @@ export default function FeeStaircaseEditor({
             <Select
               size="xs"
               placeholder="ZEITKAT ergänzen"
-              data={ZEITKAT_CATALOG.filter((zone) => !activeEntries.some((entry) => getFeeBandZeitkatId(entry) === zone.id)).map((zone) => ({ value: zone.id, label: `ZEITKAT ${zone.id} · ${zone.kurzbez} h/Tag` }))}
+              data={ZEITKAT_SLIDER_ZONES.filter((zone) => !activeEntries.some((entry) => getFeeBandZeitkatId(entry) === zone.id)).map((zone) => ({ value: zone.id, label: `ZEITKAT ${zone.id} · ${zone.kurzbez} h/Tag` }))}
               value={null}
               onChange={(value) => {
-                const zone = ZEITKAT_CATALOG.find((item) => item.id === value);
+                const zone = ZEITKAT_SLIDER_ZONES.find((item) => item.id === value);
                 if (zone) addZeitkatZone(zone);
               }}
               data-testid="add-zeitkat-tier"
@@ -539,73 +406,127 @@ export default function FeeStaircaseEditor({
           w={190}
           aria-label="Tarif gültig bis"
         />
-        <Text size="xs" c="dimmed">Grafische und tabellarische Eingabe werden synchron gehalten.</Text>
+        <Text size="xs" c="dimmed">Slider und direkte Eingabe werden synchron gehalten.</Text>
       </Group>
 
-      <FeeStaircaseChart
-        kind={kind}
-        entries={activeEntries}
-        baselineEntries={baselineEntriesForPeriod}
-        onDraw={onDraw}
-        onDrawError={setDrawError}
-        simulation={simulation}
-      />
+      {kind === 'zeitkat' ? (
+        <>
+          <Box style={{ overflowX: 'auto', border: '1px solid var(--mantine-color-gray-3)', borderRadius: 8, padding: 10 }}>
+            <Box data-testid="fee-staircase-zeitkat" style={{ display: 'flex', gap: 6, minWidth: `${ZEITKAT_SLIDER_ZONES.length * 112}px`, alignItems: 'stretch' }}>
+              {ZEITKAT_SLIDER_ZONES.map((zone) => {
+                const entry = zeitkatMap.get(zone.id);
+                const original = baselineZeitkatMap.get(zone.id);
+                return (
+                  <StairSlider
+                    key={zone.id}
+                    label={`ZEITKAT ${zone.id}`}
+                    detail={`${zone.kurzbez} h/Tag`}
+                    value={entry?.monthlyAmount ?? 0}
+                    originalAmount={original?.monthlyAmount}
+                    priceMax={priceMax}
+                    simulation={simulation}
+                    onChange={(value) => updateZeitkatAmount(zone, Number(value) || 0)}
+                    testId={`fee-staircase-slider-${zone.id}`}
+                    width="1 0 106px"
+                  />
+                );
+              })}
+            </Box>
+          </Box>
+          {activeEntries.some((entry) => Number(getFeeBandZeitkatId(entry)) > 8) ? (
+            <Paper withBorder p="xs" radius="sm">
+              <Text size="xs" fw={600} mb="xs">Über 8 Stunden (vorhandene Staffeln)</Text>
+              <Stack gap="xs">
+                {sortEntries(activeEntries.filter((entry) => Number(getFeeBandZeitkatId(entry)) > 8), 'zeitkat').map((entry) => {
+                  const zone = ZEITKAT_CATALOG.find((item) => item.id === getFeeBandZeitkatId(entry));
+                  return (
+                    <Group key={entry.id} justify="space-between" wrap="wrap">
+                      <Text size="sm">ZEITKAT {zone.id} · {zone.kurzbez} h/Tag</Text>
+                      <PriceField
+                        value={entry.monthlyAmount}
+                        label={`Betrag ZEITKAT ${zone.id}`}
+                        onChange={(value) => updateEntry(entry.id, { monthlyAmount: value })}
+                        testId={`fee-staircase-price-${entry.id}`}
+                      />
+                    </Group>
+                  );
+                })}
+              </Stack>
+            </Paper>
+          ) : null}
+        </>
+      ) : (
+        <Box style={{ overflowX: 'auto', border: '1px solid var(--mantine-color-gray-3)', borderRadius: 8, padding: 10 }}>
+          <Box data-testid="fee-staircase-weekly" style={{ display: 'flex', gap: 6, minWidth: `${Math.max(1, weeklySegments.length) * 126}px`, alignItems: 'stretch' }}>
+            {weeklySegments.map(({ entry, lower, upper }) => {
+              const original = baselineEntriesForPeriod.find((item) => String(item.id) === String(entry.id));
+              const width = Math.max(1, upper - lower);
+              return (
+                <StairSlider
+                  key={entry.id}
+                  label={getWeeklyLimit(entry) != null ? `${lower}–${upper} h` : `${lower}+ h`}
+                  detail="Wochenstunden"
+                  value={entry.monthlyAmount}
+                  originalAmount={original?.monthlyAmount}
+                  priceMax={priceMax}
+                  simulation={simulation}
+                  onChange={(value) => updateEntry(entry.id, { monthlyAmount: Number(value) || 0 })}
+                  testId={`fee-staircase-slider-${entry.id}`}
+                  width={`${width} 0 126px`}
+                />
+              );
+            })}
+          </Box>
+          {activeEntries.length === 0 ? <Text size="sm" c="dimmed" ta="center" py="md">Noch keine Staffel angelegt. Mit „Staffel hinzufügen“ startest du bei 0 Stunden.</Text> : null}
+        </Box>
+      )}
+
       <Text fw={600} size="sm">Direkte Eingabe</Text>
-      <Paper withBorder radius="sm" style={{ overflowX: 'auto' }}>
+      {kind === 'weekly' ? (
+        <Paper withBorder radius="sm" style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 620 }}>
             <thead><tr>
-              <th style={{ textAlign: 'left', padding: 8 }}>{kind === 'zeitkat' ? 'Zeitkategorie' : 'Stundenbereich'}</th>
-              {kind === 'weekly' ? <th style={{ textAlign: 'right', padding: 8 }}>Obergrenze</th> : null}
-              <th style={{ textAlign: 'right', padding: 8 }}>Monatsbeitrag</th>
+              <th style={{ textAlign: 'left', padding: 8 }}>Stundenbereich</th>
+              <th style={{ textAlign: 'right', padding: 8 }}>Obergrenze (Wochenstunden)</th>
               {simulation ? <th style={{ textAlign: 'right', padding: 8 }}>Original</th> : null}
-              {kind === 'weekly' && !simulation ? <th style={{ padding: 8 }} /> : null}
+              {!simulation ? <th style={{ padding: 8 }} /> : null}
             </tr></thead>
             <tbody>
               {activeEntries.map((entry, index) => {
-                const zone = ZEITKAT_CATALOG.find((item) => item.id === getFeeBandZeitkatId(entry));
-                const priorLimit = kind === 'weekly' ? getWeeklyLimit(activeEntries[index - 1]) : null;
+                const priorLimit = getWeeklyLimit(activeEntries[index - 1]);
                 const lower = priorLimit ?? 0;
                 const upper = getWeeklyLimit(entry);
                 const original = baselineEntriesForPeriod.find((item) => String(item.id) === String(entry.id));
                 return (
                   <tr key={entry.id}>
-                    <td style={{ padding: 8 }}>{zone ? `ZEITKAT ${zone.id} · ${zone.kurzbez} h/Tag` : `${lower}–${upper != null ? upper : '∞'} h/Woche`}</td>
-                    {kind === 'weekly' ? (
-                      <td style={{ padding: 8 }}>
-                        <NumberInput
-                          size="xs"
-                          min={lower + 0.5}
-                          step={0.5}
-                          decimalScale={2}
-                          value={upper ?? ''}
-                          onChange={(value) => updateWeeklyLimit(entry.id, value)}
-                          aria-label={`Obergrenze Staffel ${index + 1} Wochenstunden`}
-                        />
-                      </td>
-                    ) : null}
+                    <td style={{ padding: 8 }}>{`${lower}–${upper ?? '∞'} h/Woche`}</td>
                     <td style={{ padding: 8 }}>
-                      <PriceField
-                        entry={entry}
-                        label={`Betrag ${zone ? `ZEITKAT ${zone.id}` : `Staffel ${index + 1}`}`}
-                        onChange={(value) => updateEntry(entry.id, { monthlyAmount: value })}
-                        testId={`fee-staircase-price-${entry.id}`}
+                      <NumberInput
+                        size="xs"
+                        min={lower + 0.5}
+                        step={0.5}
+                        decimalScale={2}
+                        value={upper ?? ''}
+                        onChange={(value) => updateWeeklyLimit(entry.id, value)}
+                        aria-label={`Obergrenze Staffel ${index + 1} Wochenstunden`}
                       />
                     </td>
                     {simulation ? <td style={{ padding: 8, textAlign: 'right' }}>{original ? `${Number(original.monthlyAmount || 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €` : 'neu'}</td> : null}
-                    {kind === 'weekly' && !simulation ? <td style={{ padding: 8 }}><ActionIcon color="red" variant="subtle" aria-label={`Staffel ${index + 1} löschen`} onClick={() => removeEntry(entry.id)}><IconTrash size={15} /></ActionIcon></td> : null}
+                    {!simulation ? <td style={{ padding: 8 }}><ActionIcon color="red" variant="subtle" aria-label={`Staffel ${index + 1} löschen`} onClick={() => removeEntry(entry.id)}><IconTrash size={15} /></ActionIcon></td> : null}
                   </tr>
                 );
               })}
-              {activeEntries.length === 0 ? <tr><td colSpan={kind === 'weekly' ? 3 : 2} style={{ padding: 12, color: 'var(--mantine-color-dimmed)' }}>In dieser Gültigkeitsversion sind noch keine Staffeln vorhanden.</td></tr> : null}
+              {activeEntries.length === 0 ? <tr><td colSpan={simulation ? 3 : 3} style={{ padding: 12, color: 'var(--mantine-color-dimmed)' }}>In dieser Gültigkeitsversion sind noch keine Staffeln vorhanden.</td></tr> : null}
             </tbody>
           </table>
-      </Paper>
+        </Paper>
+      ) : null}
 
       {weeklyStructureInvalid ? (
         <Alert color="red" variant="light" py="xs">Die Wochenstaffel braucht eindeutige, aufsteigende Obergrenzen und genau eine offene Schlussstaffel. Ergänze sie über „Staffel hinzufügen“ oder korrigiere die Tabelle; Grenzen bleiben lücken- und überlappungsfrei.</Alert>
       ) : null}
       {missingZeitkatZones.length > 0 ? (
-        <Alert color="yellow" variant="light" py="xs">{missingZeitkatZones.length} ZEITKAT-Sätze fehlen. Die leeren Rasterfelder sind markiert; ergänze sie über „ZEITKAT ergänzen“ oder zeichne über die fehlenden Stunden.</Alert>
+        <Alert color="yellow" variant="light" py="xs">{missingZeitkatZones.length} ZEITKAT-Sätze bis einschließlich 8 Stunden fehlen. Die Sliderpositionen bleiben sichtbar und lassen sich direkt befüllen.</Alert>
       ) : null}
       {drawError ? <Alert color="yellow" variant="light" py="xs">{drawError}</Alert> : null}
     </Stack>

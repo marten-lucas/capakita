@@ -209,7 +209,7 @@ describe('FundingSimulationPanel', () => {
     openFuchsTariffGroup();
     expect(screen.getByText(/ZEITKAT-Sätze fehlen; die JSON-importierten Wochenstunden-Bänder werden direkt verwendet/)).toBeTruthy();
     expect(screen.getByTestId('fee-staircase-weekly')).toBeTruthy();
-    expect(screen.getByLabelText('Betrag Staffel 1')).toBeTruthy();
+    expect(screen.getByLabelText('Betrag 0–10 h')).toBeTruthy();
   });
 
   it('simuliert den 100-Euro-Elternbeitragszuschuss als lokalen Rabatt für berechtigte Kinder', () => {

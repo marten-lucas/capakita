@@ -10,7 +10,7 @@ const weeklyEntries = [
 ];
 
 describe('FeeStaircaseEditor', () => {
-  it('draws a new weekly rectangle by splitting a tier without creating gaps or overlaps', () => {
+  it('keeps weekly slider tiers contiguous and adds a new tier before the open-ended band', () => {
     const onChangeEntries = vi.fn();
     render(
       <MantineProvider>
@@ -22,43 +22,22 @@ describe('FeeStaircaseEditor', () => {
       </MantineProvider>
     );
 
-    const chart = screen.getByTestId('fee-staircase-weekly');
-    vi.spyOn(chart, 'getBoundingClientRect').mockReturnValue({
-      left: 0,
-      top: 0,
-      width: 820,
-      height: 310,
-      right: 820,
-      bottom: 310,
-      x: 0,
-      y: 0,
-      toJSON: () => ({}),
-    });
+    expect(screen.getByTestId('fee-staircase-weekly')).toBeTruthy();
+    const amountSlider = screen.getByRole('slider', { name: 'Beitrag 0–10 h' });
+    fireEvent.keyDown(amountSlider, { key: 'ArrowUp', code: 'ArrowUp' });
+    expect(onChangeEntries).toHaveBeenCalledTimes(1);
+    expect(onChangeEntries.mock.calls[0][0][0].monthlyAmount).toBe(105);
 
-    const xForHours = (hours) => 62 + (hours / 40) * 742;
-    const yForPrice = (price) => 18 + 250 - (price / 500) * 250;
-    fireEvent.pointerDown(chart, {
-      button: 0,
-      pointerId: 1,
-      clientX: xForHours(2),
-      clientY: yForPrice(100),
-    });
-    fireEvent.pointerUp(chart, {
-      button: 0,
-      pointerId: 1,
-      clientX: xForHours(6),
-      clientY: yForPrice(250),
-    });
-
+    onChangeEntries.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: 'Staffel hinzufügen' }));
     expect(onChangeEntries).toHaveBeenCalledTimes(1);
     const result = onChangeEntries.mock.calls[0][0];
-    const finiteLimits = result.filter((entry) => entry.maxHours !== '').map((entry) => Number(entry.maxHours)).filter(Number.isFinite);
-    expect(finiteLimits).toEqual([2, 6, 10, 20]);
-    expect(result.map((entry) => entry.monthlyAmount)).toEqual([100, 250, 100, 200, 300]);
+    const finiteLimits = result.filter((entry) => entry.maxHours !== '').map((entry) => Number(entry.maxHours));
+    expect(finiteLimits).toEqual([10, 20, 30]);
     expect(result.at(-1).maxHours).toBe('');
   });
 
-  it('shows the numeric alternative and keeps the original scale visible in simulation mode', () => {
+  it('shows direct amount fields below the ZEITKAT sliders and a faint original in simulation', () => {
     render(
       <MantineProvider>
         <FeeStaircaseEditor
@@ -72,8 +51,9 @@ describe('FeeStaircaseEditor', () => {
     );
 
     expect(screen.getByTestId('fee-staircase-zeitkat')).toBeTruthy();
+    expect(screen.getByRole('slider', { name: 'Simulierter Beitrag ZEITKAT 05' })).toBeTruthy();
     expect(screen.getByText('Direkte Eingabe')).toBeTruthy();
     expect(screen.getByLabelText('Betrag ZEITKAT 05').value).toBe('150 EUR');
-    expect(screen.getByText('100,00 €')).toBeTruthy();
+    expect(screen.getByText('Original 100,00 €')).toBeTruthy();
   });
 });
