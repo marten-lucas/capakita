@@ -197,7 +197,7 @@ describe('FundingSimulationPanel', () => {
     );
 
     openFuchsTariffGroup();
-    expect(screen.getByText('Fuchs · Staffel bis 10 h')).toBeTruthy();
+    expect(screen.getByText('Staffel bis 10 h')).toBeTruthy();
     expect(screen.getByText(/ZEITKAT-Sätze fehlen; die JSON-importierten Wochenstunden-Bänder werden direkt verwendet/)).toBeTruthy();
     expect(screen.getByRole('slider', { name: 'Simulationspreis Fuchs Staffel bis 10 h' })).toBeTruthy();
   });
