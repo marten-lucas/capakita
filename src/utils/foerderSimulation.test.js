@@ -214,42 +214,6 @@ describe('simulateContributionChanges', () => {
     });
   });
 
-  it('vergleicht Änderungen der Wochenstunden-Grenzen mit den ursprünglichen Bändern', () => {
-    const booking = makeBooking({ zone: '', dailyHours: 3, days: 5 });
-    const originalGroupFeeCatalogs = {
-      g1: [
-        { id: 'old-10', maxHours: 10, monthlyAmount: 100, validFrom: '2026-01-01' },
-        { id: 'old-20', maxHours: 20, monthlyAmount: 200, validFrom: '2026-01-01' },
-        { id: 'old-open', maxHours: '', monthlyAmount: 300, validFrom: '2026-01-01' },
-      ],
-    };
-    const result = simulateContributionChanges({
-      demandBookings: [booking],
-      dataItems: CHILD,
-      groupDefs: [{ id: 'g1', name: 'Sonnengruppe' }],
-      bayKiBiGRules: RULES,
-      originalGroupFeeCatalogs,
-      groupFeeCatalogs: {
-        g1: [
-          { id: 'old-10', maxHours: 10, monthlyAmount: 100, validFrom: '2026-01-01' },
-          { id: 'new-15', maxHours: 15, monthlyAmount: 0, validFrom: '2026-01-01' },
-          { id: 'old-20', maxHours: 20, monthlyAmount: 200, validFrom: '2026-01-01' },
-          { id: 'old-open', maxHours: '', monthlyAmount: 300, validFrom: '2026-01-01' },
-        ],
-      },
-      temporaryPrices: { g1: { 'band:new-15': 150 } },
-      parentFeeSubsidy: { enabled: false },
-      referenceDate: REF,
-    });
-
-    expect(result.perChild[0]).toMatchObject({
-      parentFeeBefore: 200,
-      parentFeeAfter: 150,
-      deltaMonthlyParentFees: -50,
-    });
-    expect(originalGroupFeeCatalogs.g1[1].maxHours).toBe(20);
-    expect(originalGroupFeeCatalogs.g1[1].monthlyAmount).toBe(200);
-  });
 
   it('berechnet Gruppen- und Gesamtwerte über mehrere Gruppen', () => {
     const bookings = [
@@ -294,7 +258,7 @@ describe('simulateContributionChanges', () => {
     expect(result.skippedNoZone).toBe(1);
   });
 
-  it('leitet fehlende ZEITKAT aus Capakita-Buchungszeiten ab und simuliert JSON-Wochenstunden-Bänder', () => {
+  it('leitet eine fehlende ZEITKAT aus Buchungszeiten ab und simuliert den Wechsel zur nächsten Kategorie', () => {
     const booking = makeBooking({ zone: '', dailyHours: 3, days: 3 });
     const result = simulateContributionChanges({
       demandBookings: [booking],
@@ -303,38 +267,37 @@ describe('simulateContributionChanges', () => {
       bayKiBiGRules: RULES,
       groupFeeCatalogs: {
         g1: [
-          { id: 'json-tier-10', label: 'Staffel bis 10 h', maxHours: 10, monthlyAmount: 100 },
-          { id: 'json-tier-20', label: 'Staffel bis 20 h', maxHours: 20, monthlyAmount: 200 },
+          { id: 'zeitkat-02', zeitkatId: '02', monthlyAmount: 100, validFrom: '2026-01-01' },
+          { id: 'zeitkat-04', zeitkatId: '04', monthlyAmount: 200, validFrom: '2026-01-01' },
         ],
       },
-      temporaryPrices: { g1: { 'band:json-tier-10': 150, 'band:json-tier-20': 150 } },
+      temporaryPrices: { g1: { '02': 150, '04': 150 } },
       utilizationPercent: 50,
       referenceDate: REF,
     });
 
     expect(result.perChild[0]).toMatchObject({
       fromZone: '02',
-      toZone: '07',
+      toZone: '04',
       weeklyHoursBefore: 9,
-      weeklyHoursAfter: 14.5,
-      deltaWeeklyHours: 5.5,
+      weeklyHoursAfter: 10.5,
+      deltaWeeklyHours: 1.5,
       parentFeeBefore: 0,
       parentFeeAfter: 50,
       parentFeeSubsidyBefore: 100,
       parentFeeSubsidyAfter: 100,
       deltaMonthlyParentFees: 50,
       deltaMonthlyParentSubsidy: 0,
-      deltaMonthly: 5.5,
     });
     expect(result.totals).toMatchObject({
       childrenWithMoreHours: 1,
       familiesWithMoreHours: 1,
-      weeklyHoursAdded: 5.5,
+      weeklyHoursAdded: 1.5,
       childrenWithHigherFees: 1,
       monthlyParentCostIncrease: 50,
       migratedBookings: 0.5,
     });
-    expect(result.simulatedBookings[0].rawdata.ZEITKAT).toBe('07');
+    expect(result.simulatedBookings[0].rawdata.ZEITKAT).toBe('04');
     expect(booking.rawdata.ZEITKAT).toBe('');
   });
 

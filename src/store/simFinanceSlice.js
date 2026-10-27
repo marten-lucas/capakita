@@ -1,6 +1,6 @@
 import { createSlice } from '@reduxjs/toolkit';
 import { createId } from '../utils/idUtils';
-import { getFeeBandZeitkatId } from '../utils/adebisConstants';
+import { getFeeBandZeitkatId, getZeitkatIdForMaximumHours } from '../utils/adebisConstants';
 
 const DEFAULT_PARENT_FEE_SUBSIDY = {
   enabled: true,
@@ -68,19 +68,36 @@ function normalizeBayKiBiGRule(rule = {}) {
 function normalizeFeeBand(entry = {}) {
   const {
     minHours: _legacyMinHours,
+    maxHours: legacyMaxHours,
+    hoursTo: legacyHoursTo,
     hoursFrom: _legacyHoursFrom,
     ...rest
   } = entry;
+  const hasLegacyHours = legacyMaxHours !== undefined || legacyHoursTo !== undefined
+    || entry.minHours !== undefined || entry.hoursFrom !== undefined;
+  const inferredZeitkatId = getFeeBandZeitkatId(entry)
+    || (hasLegacyHours
+      ? getZeitkatIdForMaximumHours(legacyMaxHours ?? legacyHoursTo ?? entry.minHours ?? entry.hoursFrom)
+      : null);
 
-  const inferredZeitkatId = getFeeBandZeitkatId(entry);
   return normalizeValidityEntry({
     ...rest,
     ...(inferredZeitkatId ? { zeitkatId: inferredZeitkatId } : {}),
   }, {
-    maxHours: entry.maxHours ?? entry.hoursTo ?? entry.minHours ?? entry.hoursFrom ?? '',
     monthlyAmount: entry.monthlyAmount ?? '',
     label: entry.label || '',
   });
+}
+
+function normalizeFeeCatalog(entries = []) {
+  const byZeitkatAndValidity = new Map();
+  (Array.isArray(entries) ? entries : []).map((entry) => normalizeFeeBand(entry)).forEach((entry) => {
+    const identity = entry.zeitkatId
+      ? `${entry.zeitkatId}|${entry.validFrom || ''}|${entry.validUntil || ''}`
+      : `unmapped:${entry.id}`;
+    byZeitkatAndValidity.set(identity, entry);
+  });
+  return Array.from(byZeitkatAndValidity.values());
 }
 
 function normalizeSalaryHistoryEntry(entry = {}) {
@@ -178,7 +195,7 @@ function normalizeScenarioFinance(finance = {}) {
     groupFeeCatalogs: Object.fromEntries(
       Object.entries(finance.groupFeeCatalogs || {}).map(([groupId, entries]) => [
         String(groupId),
-        Array.isArray(entries) ? entries.map((entry) => normalizeFeeBand(entry)) : [],
+        normalizeFeeCatalog(entries),
       ])
     ),
     itemFinances: Object.fromEntries(
@@ -260,7 +277,10 @@ const simFinanceSlice = createSlice({
       if (!scenarioFinance.groupFeeCatalogs[normalizedGroupId]) {
         scenarioFinance.groupFeeCatalogs[normalizedGroupId] = [];
       }
-      scenarioFinance.groupFeeCatalogs[normalizedGroupId].push(normalizeFeeBand(entry));
+      scenarioFinance.groupFeeCatalogs[normalizedGroupId] = normalizeFeeCatalog([
+        ...scenarioFinance.groupFeeCatalogs[normalizedGroupId],
+        entry,
+      ]);
     },
     updateGroupFeeEntry(state, action) {
       const { scenarioId, groupId, entryId, updates } = action.payload;
@@ -275,6 +295,7 @@ const simFinanceSlice = createSlice({
         ...entries[index],
         ...updates,
       });
+      scenarioFinance.groupFeeCatalogs[normalizedGroupId] = normalizeFeeCatalog(entries);
     },
     deleteGroupFeeEntry(state, action) {
       const { scenarioId, groupId, entryId } = action.payload;
@@ -296,7 +317,7 @@ const simFinanceSlice = createSlice({
       scenarioFinance.groupFeeCatalogs = Object.fromEntries(
         Object.entries(catalogs || {}).map(([groupId, entries]) => [
           String(groupId),
-          Array.isArray(entries) ? entries.map((entry) => normalizeFeeBand(entry)) : [],
+          normalizeFeeCatalog(entries),
         ])
       );
     },

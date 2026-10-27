@@ -697,7 +697,7 @@ function OrgaTabFinance({ section = 'all' }) {
           <div>
             <Text fw={600}>Beitragskataloge pro Gruppe</Text>
             <Text size="sm" c="dimmed">
-              ZEITKAT-Beitragssätze aus ADEBIS und manuelle Wochenstunden-Bänder werden hier getrennt erkannt.
+              Beitragssätze werden je Gruppe und ZEITKAT (Stunden pro Tag) gepflegt. Alte Stundenobergrenzen werden beim Import in die passende ZEITKAT-Kategorie überführt.
             </Text>
           </div>
 
@@ -736,11 +736,7 @@ function OrgaTabFinance({ section = 'all' }) {
               {groupDefs.map((group) => {
                 const entries = financeScenario.groupFeeCatalogs?.[group.id] || [];
                 const zeitkatCount = entries.filter((entry) => Boolean(getFeeBandZeitkatId(entry))).length;
-                const weeklyBandCount = entries.length - zeitkatCount;
-                const entrySummary = [
-                  zeitkatCount > 0 ? `${zeitkatCount} ZEITKAT-Sätze` : null,
-                  weeklyBandCount > 0 ? `${weeklyBandCount} Wochenstunden-Bänder` : null,
-                ].filter(Boolean).join(' · ') || '0 Staffeln';
+                const entrySummary = `${zeitkatCount} ZEITKAT-Sätze`;
                 return (
                   <Accordion.Item key={group.id} value={group.id}>
                     <Accordion.Control>

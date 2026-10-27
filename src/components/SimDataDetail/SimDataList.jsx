@@ -379,7 +379,7 @@ function SimDataList() {
 
   React.useEffect(() => {
     if (submenuData.length === 0) {
-      dispatch(setSelectedItems([]));
+      if (selectedItemIds.length > 0) dispatch(setSelectedItems([]));
       return;
     }
 

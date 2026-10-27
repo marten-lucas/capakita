@@ -6,7 +6,6 @@ import {
   getPeriodBoundsForCategory,
   hasAnyBookingInWeek,
   findFeeEntryForZeitkat,
-  findFeeEntryForHours,
   getBayKiBiGWeightForChild,
   resolveGroupIdsForBounds,
   splitBookingByGroupAtDate,
@@ -73,8 +72,8 @@ describe('financeUtils', () => {
         bayKiBiGRules: [{ id: 'b1', validFrom: '2026-01-01', baseValue: 120 }],
         groupFeeCatalogs: {
           g1: [
-            { id: 'f1', validFrom: '2026-01-01', maxHours: 20, monthlyAmount: 280 },
-            { id: 'f2', validFrom: '2026-01-01', maxHours: 30, monthlyAmount: 320 },
+            { id: 'f1', validFrom: '2026-01-01', zeitkatId: '04', monthlyAmount: 280 },
+            { id: 'f2', validFrom: '2026-01-01', zeitkatId: '05', monthlyAmount: 320 },
           ],
         },
       },
@@ -109,8 +108,8 @@ describe('financeUtils', () => {
             // Legacy automatic import ID still gets recognized/migrated by the stable ID pattern.
             { id: 'bart1-z05-2026-01-01', maxHours: 5, monthlyAmount: 135, validFrom: '2026-01-01' },
             { id: 'zone-06', zeitkatId: '06', monthlyAmount: 175, validFrom: '2026-01-01' },
-            // Legacy week-band exists alongside imported rates but must not override ZEITKAT.
-            { id: 'legacy-week', maxHours: 100, monthlyAmount: 999, validFrom: '2026-01-01' },
+            // Legacy maxHours entries migrate to ZEITKAT 13 and must not override ZEITKAT 05.
+            { id: 'legacy-max-100', maxHours: 100, monthlyAmount: 999, validFrom: '2026-01-01' },
           ],
         },
       },
@@ -126,17 +125,6 @@ describe('financeUtils', () => {
     ], '05', '2026-04-15')?.id).toBe('current');
   });
 
-  it('treats an empty weekly-hours limit as an open-ended final tariff tier', () => {
-    const entries = [
-      { id: 'up-to-10', maxHours: 10, monthlyAmount: 100 },
-      { id: 'open', maxHours: '', monthlyAmount: 180 },
-    ];
-
-    expect(findFeeEntryForHours(entries, 8, '2026-04-15')?.id).toBe('up-to-10');
-    expect(findFeeEntryForHours(entries, 10, '2026-04-15')?.id).toBe('up-to-10');
-    expect(findFeeEntryForHours(entries, 11, '2026-04-15')?.id).toBe('open');
-    expect(findFeeEntryForHours(entries, 40, '2026-04-15')?.id).toBe('open');
-  });
 
   it('reduces sickness costs to zero after six weeks for partially paid absence', () => {
     const result = calculateMonthlyStaffCost({
@@ -321,11 +309,11 @@ describe('financeUtils', () => {
             startdate: '2025-01-01',
             enddate: '2025-12-31',
             times: [
-              { day_name: 'Mo', segments: [{ booking_start: '08:00', booking_end: '09:00' }] },
-              { day_name: 'Di', segments: [{ booking_start: '08:00', booking_end: '09:00' }] },
-              { day_name: 'Mi', segments: [{ booking_start: '08:00', booking_end: '09:00' }] },
-              { day_name: 'Do', segments: [{ booking_start: '08:00', booking_end: '09:00' }] },
-              { day_name: 'Fr', segments: [{ booking_start: '08:00', booking_end: '09:00' }] },
+              { day_name: 'Mo', segments: [{ booking_start: '08:00', booking_end: '09:30' }] },
+              { day_name: 'Di', segments: [{ booking_start: '08:00', booking_end: '09:30' }] },
+              { day_name: 'Mi', segments: [{ booking_start: '08:00', booking_end: '09:30' }] },
+              { day_name: 'Do', segments: [{ booking_start: '08:00', booking_end: '09:30' }] },
+              { day_name: 'Fr', segments: [{ booking_start: '08:00', booking_end: '09:30' }] },
             ],
           },
         ],
@@ -343,8 +331,8 @@ describe('financeUtils', () => {
             { id: 'b2', validFrom: '2025-07-01', validUntil: '2025-12-31', baseValue: 200 },
           ],
           groupFeeCatalogs: {
-            g1: [{ id: 'g1f1', validFrom: '2025-01-01', maxHours: 10, monthlyAmount: 165 }],
-            g2: [{ id: 'g2f1', validFrom: '2025-01-01', maxHours: 10, monthlyAmount: 225 }],
+            g1: [{ id: 'g1f1', validFrom: '2025-01-01', zeitkatId: '01', monthlyAmount: 165 }],
+            g2: [{ id: 'g2f1', validFrom: '2025-01-01', zeitkatId: '01', monthlyAmount: 225 }],
           },
         },
       };
@@ -439,7 +427,7 @@ describe('financeUtils', () => {
             { id: 'b1', validFrom: '2026-01-01', validUntil: '2026-12-31', baseValue: 100 },
           ],
           groupFeeCatalogs: {
-            g1: [{ id: 'g1f1', validFrom: '2025-01-01', maxHours: 20, monthlyAmount: 100 }],
+            g1: [{ id: 'g1f1', validFrom: '2025-01-01', zeitkatId: '01', monthlyAmount: 100 }],
           },
         },
         referenceDate: '2025-06-15',

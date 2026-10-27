@@ -186,7 +186,7 @@ describe('FundingSimulationPanel', () => {
     expect(store.getState().simFinance.financeByScenario['scenario-1'].groupFeeCatalogs.g1[1].monthlyAmount).toBe(150);
   });
 
-  it('zeigt JSON-importierte Wochenstunden-Staffeln als absolute Simulationspreise', () => {
+  it('ordnet importierte Stundenobergrenzen ZEITKAT zu', () => {
     const store = createTestStore();
     store.dispatch(setGroupFeeCatalogs({
       scenarioId: 'scenario-1',
@@ -206,10 +206,11 @@ describe('FundingSimulationPanel', () => {
       </Provider>
     );
 
+    expect(store.getState().simFinance.financeByScenario['scenario-1'].groupFeeCatalogs.g1.map((entry) => entry.zeitkatId)).toEqual(['10', '13']);
+    expect(store.getState().simFinance.financeByScenario['scenario-1'].groupFeeCatalogs.g1.every((entry) => !Object.hasOwn(entry, 'maxHours'))).toBe(true);
     openFuchsTariffGroup();
-    expect(screen.getByText(/ZEITKAT-Sätze fehlen; die JSON-importierten Wochenstunden-Bänder werden direkt verwendet/)).toBeTruthy();
-    expect(screen.getByTestId('fee-staircase-weekly')).toBeTruthy();
-    expect(screen.getByLabelText('Betrag 0–10 h')).toBeTruthy();
+    expect(screen.getByTestId('fee-staircase-zeitkat')).toBeTruthy();
+    expect(screen.getByTestId('fee-staircase-slider-01')).toBeTruthy();
   });
 
   it('simuliert den 100-Euro-Elternbeitragszuschuss als lokalen Rabatt für berechtigte Kinder', () => {

@@ -71,7 +71,9 @@ describe('feeCatalogTransfer roundtrip with PDF data', () => {
   });
 
   it('maps catalogs to target groups even with different IDs via wizard proposal', () => {
-    const extracted = extractFeeCatalogImportData(gramschatzData, { preferNonMember: true });
+    const extracted = extractFeeCatalogImportData({
+      groupFeeCatalog: gramschatzData.testScenarios.baykibig_weights_gramschatz_2025.groupFeeCatalog,
+    }, { preferNonMember: true });
 
     const groupDefs = [
       { id: 'g-target-1', name: 'Krippe Sonnen' },
@@ -98,12 +100,16 @@ describe('feeCatalogTransfer roundtrip with PDF data', () => {
     expect(mapped['g-target-3']).toBeTruthy();
   });
 
-  it('prefers non-member amounts when source contains members/non-members split', () => {
-    const extracted = extractFeeCatalogImportData({ feeStructures: gramschatzData.feeStructures }, { preferNonMember: true });
+  it('imports Gramschatz hour bands as ZEITKAT categories and prefers non-member amounts', () => {
+    const extracted = extractFeeCatalogImportData(gramschatzData, { preferNonMember: true });
     const under3Catalog = extracted.catalogsByKey.childrenUnder3;
 
     expect(Array.isArray(under3Catalog)).toBe(true);
-    expect(under3Catalog[0].monthlyAmount).toBe(170);
-    expect(under3Catalog[1].monthlyAmount).toBe(200);
+    expect(under3Catalog.map((entry) => entry.zeitkatId)).toEqual(['04', '05', '06', '07', '08', '09', '10']);
+    expect(under3Catalog[0]).toMatchObject({ zeitkatId: '04', monthlyAmount: 170 });
+    expect(under3Catalog[1]).toMatchObject({ zeitkatId: '05', monthlyAmount: 200 });
+    expect(under3Catalog.every((entry) => !Object.hasOwn(entry, 'maxHours'))).toBe(true);
+    expect(extracted.catalogsByKey.childrenOver3[0]).toMatchObject({ zeitkatId: '04', monthlyAmount: 150 });
+    expect(extracted.catalogsByKey.schoolChildren[0]).toMatchObject({ zeitkatId: '01', monthlyAmount: 110 });
   });
 });

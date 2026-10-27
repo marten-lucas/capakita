@@ -16,7 +16,7 @@ function feeBandIdentity(entry) {
 
 /**
  * Add ADEBIS category rates to existing scenario catalogs without replacing
- * manually maintained weekly-hour bands or other finance settings.
+ * already configured ZEITKAT entries or other finance settings.
  */
 export function mergeImportedZeitkatFeeCatalogs(existingCatalogs = {}, incomingCatalogs = {}) {
   const merged = Object.fromEntries(

@@ -4,6 +4,7 @@ import {
   GEWKAT_CATALOG,
   getZeitkatFactor,
   getFeeBandZeitkatId,
+  getZeitkatIdForMaximumHours,
   getGewkatFactor,
   decodeBuchungsart,
   qualifikationInfo,
@@ -13,7 +14,16 @@ describe('adebisConstants – Zeitkataloge (RE: vendor seed system/zeitkat.dbf)'
   it('erkennt ZEITKAT-Raten explizit und migriert alte Adebis-Import-IDs', () => {
     expect(getFeeBandZeitkatId({ zeitkatId: '05' })).toBe('05');
     expect(getFeeBandZeitkatId({ id: 'bart12-z07-2026-01-01', maxHours: 7 })).toBe('07');
-    expect(getFeeBandZeitkatId({ id: 'manual-fee-1', maxHours: 20 })).toBeNull();
+    expect(getFeeBandZeitkatId({ id: 'manual-fee-1', maxHours: 20 })).toBe('13');
+  });
+
+  it('ordnet alte Stundenobergrenzen einer ZEITKAT-Kategorie zu', () => {
+    expect(getZeitkatIdForMaximumHours(2)).toBe('01');
+    expect(getZeitkatIdForMaximumHours(4)).toBe('04');
+    expect(getZeitkatIdForMaximumHours(8)).toBe('08');
+    expect(getZeitkatIdForMaximumHours(10)).toBe('10');
+    expect(getZeitkatIdForMaximumHours(20)).toBe('13');
+    expect(getZeitkatIdForMaximumHours('')).toBe('13');
   });
 
   it('liefert die BayKiBiG-Buchungszeitfaktoren (§ 19 Abs. 1 AVBayKiBiG)', () => {

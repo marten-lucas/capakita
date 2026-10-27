@@ -2,20 +2,20 @@ import { describe, expect, it } from 'vitest';
 import { hasZeitkatFeeCatalog, mergeImportedZeitkatFeeCatalogs } from './scenarioFinanceImport';
 
 describe('ADEBIS-Beitragsstaffeln für bestehende Szenarien', () => {
-  it('erkennt ZEITKAT-Kataloge und ignoriert manuelle Wochenstunden-Bänder', () => {
+  it('erkennt alte Stundenobergrenzen als migrierte ZEITKAT-Kategorien', () => {
     expect(hasZeitkatFeeCatalog({
-      '1': [{ id: 'manual-1', maxHours: 20, monthlyAmount: 100 }],
-    })).toBe(false);
+      '1': [{ id: 'legacy-max-10', maxHours: 10, monthlyAmount: 100 }],
+    })).toBe(true);
     expect(hasZeitkatFeeCatalog({
       '1': [{ id: 'bart7-z04-2026-01-01', zeitkatId: '04', monthlyAmount: 100 }],
     })).toBe(true);
   });
 
-  it('ergänzt automatisch importierte ZEITKAT-Sätze ohne bestehende Wochenstunden-Bänder zu löschen', () => {
+  it('ergänzt ADEBIS-Kategorien ohne vorhandene ZEITKAT-Sätze zu ersetzen', () => {
     const existing = {
       '1': [
-        { id: 'manual-20h', maxHours: 20, monthlyAmount: 100 },
-        { id: 'manual-30h', maxHours: 30, monthlyAmount: 150 },
+        { id: 'manual-12', zeitkatId: '12', monthlyAmount: 100 },
+        { id: 'manual-13', zeitkatId: '13', monthlyAmount: 150 },
       ],
     };
     const incoming = {

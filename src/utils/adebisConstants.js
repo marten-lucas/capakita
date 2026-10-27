@@ -108,6 +108,14 @@ export function getZeitkatFactor(zeitkatId) {
   return entry ? entry.faktor : null;
 }
 
+/** Mappt eine alte Beitragsobergrenze auf die passende ZEITKAT (offen/>12 h → 13). */
+export function getZeitkatIdForMaximumHours(maxHours) {
+  if (maxHours === '' || maxHours == null) return '13';
+  const hours = Number(maxHours);
+  if (!Number.isFinite(hours)) return '13';
+  return ZEITKAT_CATALOG.find((zone) => hours <= zone.maxHours)?.id || '13';
+}
+
 /** Liefert die tagesbezogenen Zonengrenzen { minHours, maxHours } (null = unbekannt). */
 export function getZeitkatZoneBounds(zeitkatId) {
   if (!zeitkatId) return null;
@@ -117,17 +125,21 @@ export function getZeitkatZoneBounds(zeitkatId) {
 }
 
 /**
- * ZEITKAT-Schlüssel eines Beitragssatzes. Frühere Capakita-Imports speicherten
- * BETRAGZn fälschlich als Wochenstundenband, ließen den Schlüssel aber im stabilen
- * Import-ID-Muster `bart<BARTNR>-z<ZEITKAT>-...` stehen; damit werden solche bereits
- * gespeicherten Kataloge ohne Neuimport sicher migriert.
+ * ZEITKAT-Schlüssel eines Beitragssatzes. Neben expliziten/alten ADEBIS-Schlüsseln
+ * werden frühere maxHours-Obergrenzen in die nächstpassende Tages-ZEITKAT migriert.
  */
 export function getFeeBandZeitkatId(entry) {
   const explicit = String(entry?.zeitkatId || '').trim();
   if (ZEITKAT_CATALOG.some((zone) => zone.id === explicit)) return explicit;
   const legacyImportId = /^bart[^-]*-z(\d{2})-/i.exec(String(entry?.id || ''));
   const inferred = legacyImportId?.[1] || '';
-  return ZEITKAT_CATALOG.some((zone) => zone.id === inferred) ? inferred : null;
+  if (ZEITKAT_CATALOG.some((zone) => zone.id === inferred)) return inferred;
+
+  const hasLegacyHours = ['maxHours', 'hoursTo', 'minHours', 'hoursFrom']
+    .some((key) => Object.hasOwn(entry || {}, key));
+  return hasLegacyHours
+    ? getZeitkatIdForMaximumHours(entry.maxHours ?? entry.hoursTo ?? entry.minHours ?? entry.hoursFrom)
+    : null;
 }
 
 /** Position einer Zeitkategorie im Katalog (für Zonensprünge; -1 = unbekannt). */

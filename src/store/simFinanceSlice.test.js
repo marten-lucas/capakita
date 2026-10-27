@@ -27,16 +27,23 @@ describe('simFinanceSlice', () => {
     });
   });
 
-  it('migrates existing automatic Adebis fee entries to ZEITKAT keys', () => {
+  it('migrates Adebis and legacy hour bands to ZEITKAT categories', () => {
     const state = simFinanceReducer(undefined, loadFinanceByScenario({
       'scenario-1': {
         groupFeeCatalogs: {
-          g1: [{
-            id: 'bart4-z05-2026-01-01',
-            label: 'Elternbeitrag (>4-5)',
-            maxHours: 5,
-            monthlyAmount: 120,
-          }],
+          g1: [
+            {
+              id: 'bart4-z05-2026-01-01',
+              label: 'Elternbeitrag (>4-5)',
+              maxHours: 5,
+              monthlyAmount: 120,
+            },
+            { id: 'legacy-max-10', label: 'Bis 10 Stunden', maxHours: 10, monthlyAmount: 240 },
+          ],
+          g2: [
+            { id: 'legacy-max-20', maxHours: 20, monthlyAmount: 200 },
+            { id: 'legacy-max-30', maxHours: 30, monthlyAmount: 300 },
+          ],
         },
       },
     }));
@@ -45,6 +52,13 @@ describe('simFinanceSlice', () => {
       zeitkatId: '05',
       monthlyAmount: 120,
     });
+    expect(state.financeByScenario['scenario-1'].groupFeeCatalogs.g1[1]).toMatchObject({
+      zeitkatId: '10',
+      monthlyAmount: 240,
+    });
+    expect(state.financeByScenario['scenario-1'].groupFeeCatalogs.g1[1]).not.toHaveProperty('maxHours');
+    expect(state.financeByScenario['scenario-1'].groupFeeCatalogs.g2).toHaveLength(1);
+    expect(state.financeByScenario['scenario-1'].groupFeeCatalogs.g2[0]).toMatchObject({ zeitkatId: '13', monthlyAmount: 300 });
   });
 });
 

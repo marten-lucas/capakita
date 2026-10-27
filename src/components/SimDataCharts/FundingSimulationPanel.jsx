@@ -273,8 +273,6 @@ function FundingSimulationPanel({ accent }) {
   const hasRule = Boolean(result?.rule && Number(result.rule.baseValue) > 0);
   const catalogEntries = Object.values(groupFeeCatalogs).flatMap((entries) => (Array.isArray(entries) ? entries : []));
   const hasAnyZeitkatEntries = catalogEntries.some((entry) => Boolean(getFeeBandZeitkatId(entry)));
-  const hasZeitkatRates = categoryPriceRows.some((row) => row.kind === 'zeitkat');
-  const hasWeeklyHourRates = categoryPriceRows.some((row) => row.kind === 'weeklyHours');
   const hasSimulationFeeRows = categoryPriceRows.length > 0;
 
   const kpis = [
@@ -292,9 +290,8 @@ function FundingSimulationPanel({ accent }) {
       <Stack gap={2}>
         <Text fw={700} size="sm" style={{ color: accent }}>Simulation von Beitragsänderungen</Text>
         <Text size="xs" c="dimmed">
-          Verwendet die im Capakita-Datenspeicher hinterlegten ZEITKAT-Sätze oder, falls diese fehlen, JSON-importierte Wochenstunden-Bänder.
-          Fehlende ZEITKAT werden aus den gespeicherten Buchungszeiten abgeleitet. Bei gleichem Preis wechselt die Ausschöpfungsquote anteilig in die nächste Staffel.
-          Simulationspreise bleiben lokal und verändern weder Optionen noch gespeicherte Buchungen.
+          Verwendet die im Capakita-Datenspeicher hinterlegten ZEITKAT-Sätze. Fehlende ZEITKAT werden aus den gespeicherten Buchungszeiten abgeleitet.
+          Bei gleichem Preis wechselt die Ausschöpfungsquote anteilig in die nächste ZEITKAT. Simulationswerte bleiben lokal und verändern weder Optionen noch gespeicherte Buchungen.
         </Text>
         {!hasRule ? (
           <Badge color="orange" variant="light" w="fit-content">
@@ -315,11 +312,7 @@ function FundingSimulationPanel({ accent }) {
                 : 'Der gespeicherte Katalog enthält keine verwendbaren Beitragsstaffeln für den ausgewählten Stichtag.'}
           </Badge>
         ) : null}
-        {!hasZeitkatRates && hasWeeklyHourRates ? (
-          <Badge color="blue" variant="light" w="fit-content">
-            ZEITKAT-Sätze fehlen; die JSON-importierten Wochenstunden-Bänder werden direkt verwendet. Fehlende ZEITKAT werden, soweit Buchungszeiten vorhanden sind, aus dem Capakita-Datenspeicher abgeleitet.
-          </Badge>
-        ) : null}
+
       </Stack>
 
       <Paper withBorder p="sm" radius="md" data-testid="temporary-category-prices">
@@ -327,7 +320,7 @@ function FundingSimulationPanel({ accent }) {
           <Group justify="space-between" align="center" wrap="wrap">
             <Stack gap={2}>
               <Text fw={600} size="sm">Beitragsstaffeln aus dem Capakita-Datenspeicher</Text>
-              <Text size="xs" c="dimmed">Die Treppenfläche zeigt Stundenbereich und Monatsbeitrag; darunter lassen sich Grenzen und Beträge direkt eingeben. Originalstaffeln bleiben im Hintergrund sichtbar. Änderungen gelten nur lokal für diese Simulation.</Text>
+              <Text size="xs" c="dimmed">Die Slider stellen Monatsbeiträge je ZEITKAT ein; die Originalbeiträge bleiben als Markierung sichtbar. Änderungen gelten nur lokal für diese Simulation.</Text>
             </Stack>
             {categoryPriceRows.length > 0 || Object.keys(temporaryCatalogEntries).length > 0 ? (
               <Button size="xs" variant="subtle" onClick={resetAllTemporaryCatalogs} data-testid="reset-all-temporary-prices">

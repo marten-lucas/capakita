@@ -589,8 +589,8 @@ export function useScenarioImport() {
           ...incomingScenarioFinance,
         };
       } else if (mergeMode === 'append' && isAdebisFeeImport) {
-        // ADEBIS rates are additive source data: don't let existing manual
-        // weekly-hour bands prevent the new per-ZEITKAT rates from loading.
+        // ADEBIS rates are additive source data; the finance reducer normalizes
+        // legacy hour-bound entries to ZEITKAT when loading the merged catalog.
         mergedScenarioFinance = {
           ...existingScenarioFinance,
           groupFeeCatalogs: mergeImportedZeitkatFeeCatalogs(

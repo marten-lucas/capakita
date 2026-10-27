@@ -89,7 +89,7 @@ function createTestStore() {
                 {
                   id: 'fee-1',
                   validFrom: '2025-01-01',
-                  maxHours: 6,
+                  zeitkatId: '06',
                   monthlyAmount: 200,
                 },
               ],
@@ -97,7 +97,7 @@ function createTestStore() {
                 {
                   id: 'fee-2',
                   validFrom: '2025-01-01',
-                  maxHours: 6,
+                  zeitkatId: '06',
                   monthlyAmount: 150,
                 },
               ],

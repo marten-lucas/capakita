@@ -1,6 +1,6 @@
 import { sumBookingHours } from './bookingUtils';
 import { minutesToTime, timeToMinutes } from './timeUtils';
-import { decodeBuchungsart, getFeeBandZeitkatId, getZeitkatFactor } from './adebisConstants';
+import { ZEITKAT_CATALOG, decodeBuchungsart, getFeeBandZeitkatId, getZeitkatFactor, getZeitkatZoneIndex } from './adebisConstants';
 
 function parseIsoDate(value) {
   if (!value || typeof value !== 'string') return null;
@@ -672,39 +672,8 @@ export function calculateMonthlyStaffCost({
 }
 
 /**
- * Wählt den passenden Beitragssatz-Band für Wochenstunden aus einem Gruppenkatalog
- * (Gültigkeit am Stichtag, engstes maxHours-Band).
- */
-export function findFeeEntryForHours(feeCatalog, weeklyHours, referenceDate) {
-  return (feeCatalog || [])
-    .filter((entry) => !getFeeBandZeitkatId(entry))
-    .filter((entry) => isDateWithinRange(referenceDate, entry.validFrom || '', entry.validUntil || ''))
-    .sort((left, right) => {
-      const leftStart = left.validFrom || '';
-      const rightStart = right.validFrom || '';
-      if (leftStart !== rightStart) return rightStart.localeCompare(leftStart);
-
-      const leftMax = left.maxHours === '' || left.maxHours == null ? Number.NaN : Number(left.maxHours);
-      const rightMax = right.maxHours === '' || right.maxHours == null ? Number.NaN : Number(right.maxHours);
-      const leftFinite = Number.isFinite(leftMax);
-      const rightFinite = Number.isFinite(rightMax);
-      if (leftFinite && rightFinite) return leftMax - rightMax;
-      if (leftFinite) return -1;
-      if (rightFinite) return 1;
-
-      return String(left.id).localeCompare(String(right.id));
-    })
-    .find((entry) => {
-      const maxHours = entry.maxHours === '' || entry.maxHours == null ? Number.NaN : Number(entry.maxHours);
-      return !Number.isFinite(maxHours) || weeklyHours <= maxHours;
-    }) || null;
-}
-
-
-/**
- * Wählt einen zeitkategoriegebundenen Beitragssatz (adebis BETRAGZ1..13).
- * Anders als manuelle maxHours-Bänder wird ZEITKAT direkt und tagesbezogen
- * abgeglichen – nicht gegen die aufsummierten Wochenstunden.
+ * Wählt einen zeitkategoriegebundenen Beitragssatz (ADEBIS BETRAGZ1..13).
+ * ZEITKAT wird direkt anhand der tagesbezogenen Buchungskategorie abgeglichen.
  */
 export function findFeeEntryForZeitkat(feeCatalog, zeitkatId, referenceDate) {
   const normalizedZeitkatId = String(zeitkatId || '').trim();
@@ -721,11 +690,27 @@ export function findFeeEntryForZeitkat(feeCatalog, zeitkatId, referenceDate) {
     })[0] || null;
 }
 
-/**
- * ZEITKAT der am Stichtag aktiven Basisbuchung eines Kindes.
- */
-export function resolveZeitkatIdForChild(bookings, referenceDate) {
-  const activeBasis = (bookings || [])
+/** Leitet eine Tages-ZEITKAT aus der mittleren täglichen Segmentdauer ab. */
+function deriveZeitkatIdFromBooking(booking) {
+  const dailyHours = (booking?.times || []).map((day) => {
+    const minutes = (day?.segments || []).reduce((total, segment) => {
+      const start = timeToMinutes(segment?.booking_start);
+      const end = timeToMinutes(segment?.booking_end);
+      if (start == null || end == null || end <= start) return total;
+      const allocation = Number(segment?.allocationSharePercent);
+      const share = Number.isFinite(allocation) ? Math.max(0, allocation) / 100 : 1;
+      return total + (end - start) * share;
+    }, 0);
+    return minutes > 0 ? minutes / 60 : null;
+  }).filter((hours) => hours != null);
+  if (dailyHours.length === 0) return null;
+  const meanDailyHours = dailyHours.reduce((sum, hours) => sum + hours, 0) / dailyHours.length;
+  return ZEITKAT_CATALOG.find((zone) => meanDailyHours > zone.minHours && meanDailyHours <= zone.maxHours)?.id
+    || (meanDailyHours > 12 ? '13' : null);
+}
+
+function getActiveBasisBookings(bookings, referenceDate) {
+  return (bookings || [])
     .filter((booking) => {
       const art = booking?.buchungsart || decodeBuchungsart(booking?.rawdata?.ART);
       if (art?.basis === false) return false;
@@ -734,10 +719,22 @@ export function resolveZeitkatIdForChild(bookings, referenceDate) {
       return (!start || start <= referenceDate) && (!end || end >= referenceDate);
     })
     .sort((left, right) => String(right?.startdate || '').localeCompare(String(left?.startdate || '')));
+}
 
-  return activeBasis
+/** ZEITKAT-Schlüssel der am Stichtag aktiven Basisbuchung (nur gespeicherter Wert). */
+export function resolveZeitkatIdForChild(bookings, referenceDate) {
+  return getActiveBasisBookings(bookings, referenceDate)
     .map((booking) => String(booking?.rawdata?.ZEITKAT || '').trim())
-    .find((zoneId) => getZeitkatFactor(zoneId) != null) || null;
+    .find((zoneId) => getZeitkatZoneIndex(zoneId) >= 0) || null;
+}
+
+function resolveFeeZeitkatIdForChild(bookings, referenceDate) {
+  return getActiveBasisBookings(bookings, referenceDate)
+    .map((booking) => {
+      const stored = String(booking?.rawdata?.ZEITKAT || '').trim();
+      return getZeitkatZoneIndex(stored) >= 0 ? stored : deriveZeitkatIdFromBooking(booking);
+    })
+    .find(Boolean) || null;
 }
 
 /**
@@ -796,12 +793,8 @@ export function calculateChildMonthlyRevenue({
   const groupId = resolveGroupIdAtDate(groupAssignments, referenceDate, item.groupId || null);
   const groupDef = (groupDefs || []).find((entry) => String(entry.id) === String(groupId));
   const feeCatalog = financeScenario?.groupFeeCatalogs?.[groupId] || [];
-  const zeitkatId = resolveZeitkatIdForChild(bookings, referenceDate);
-  const hasZeitkatRates = feeCatalog.some((entry) => Boolean(getFeeBandZeitkatId(entry)));
-  const feeEntry = hasZeitkatRates
-    ? (findFeeEntryForZeitkat(feeCatalog, zeitkatId, referenceDate)
-      || findFeeEntryForHours(feeCatalog, weeklyHours, referenceDate))
-    : findFeeEntryForHours(feeCatalog, weeklyHours, referenceDate);
+  const zeitkatId = resolveFeeZeitkatIdForChild(bookings, referenceDate);
+  const feeEntry = findFeeEntryForZeitkat(feeCatalog, zeitkatId, referenceDate);
   const bayKiBiGRule = pickApplicableValidityEntry(financeScenario?.bayKiBiGRules, referenceDate)
     || pickLatestValidityEntry(financeScenario?.bayKiBiGRules);
   const bayKiBiGWeight = getBayKiBiGWeightForChild(item, groupDef, referenceDate, bayKiBiGRule?.weightFactors);

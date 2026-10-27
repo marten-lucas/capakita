@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   calculateChildMonthlyRevenue,
-  findFeeEntryForHours,
   resolveZeitkatFactorForChild,
 } from './financeUtils';
 
@@ -88,24 +87,5 @@ describe('adebisFörder – calculateChildMonthlyRevenue mit Zeitfaktor (gated)'
     });
     expect(result.zeitkatFactor).toBe(1);
     expect(result.bayKiBiGAmount).toBe(11.0);
-  });
-});
-
-describe('adebisFörder – findFeeEntryForHours (Bandwahl)', () => {
-  const catalog = [
-    { id: 'band-1', maxHours: 5, monthlyAmount: 50 },
-    { id: 'band-2', maxHours: 12, monthlyAmount: 80 },
-    { id: 'band-open', maxHours: 999, monthlyAmount: 100 },
-  ];
-
-  it('wählt das engste Band ≤ Wochenstunden', () => {
-    expect(findFeeEntryForHours(catalog, 4, REF)?.id).toBe('band-1');
-    expect(findFeeEntryForHours(catalog, 8, REF)?.id).toBe('band-2');
-    expect(findFeeEntryForHours(catalog, 20, REF)?.id).toBe('band-open');
-  });
-
-  it('respektiert Gültigkeit am Stichtag', () => {
-    const expired = [{ id: 'old', maxHours: 12, monthlyAmount: 10, validFrom: '2025-01-01', validUntil: '2025-12-31' }];
-    expect(findFeeEntryForHours(expired, 4, REF)).toBeNull();
   });
 });
