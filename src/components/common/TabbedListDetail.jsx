@@ -8,7 +8,9 @@ import { IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand } from '@t
  *
  * @param {string} [listPosition='left'] - 'left' | 'right' (Desktop: Liste rechts vom Detail)
  * @param {ReactNode} [listHeader] - Kopf des Listen-Panels (Filter/Aktionen), über der Liste
- * @param {boolean} [collapsible=false] - Panel eingeklappt als schmale Leiste mit Aufklapper (nur Desktop)
+ * @param {ReactNode} [toolbarContent] - Eigenständiges Werkzeugpanel rechts vom Detailbereich
+ * @param {boolean} [collapsible=false] - Listenpanel einklappbar
+ * @param {boolean} [toolbarCollapsible=false] - Werkzeugpanel einklappbar (nur Desktop)
  */
 function TabbedListDetail({
   data = [],
@@ -23,10 +25,12 @@ function TabbedListDetail({
   listHeader = null,
   toolbarContent = null,
   collapsible = false,
+  toolbarCollapsible = false,
 }) {
   const isMobile = useMediaQuery('(max-width: 62em)');
   const [uncontrolledSelectedId, setUncontrolledSelectedId] = useState(data[0]?.id || null);
   const [collapsed, setCollapsed] = useState(false);
+  const [toolbarCollapsed, setToolbarCollapsed] = useState(false);
   const selectedId = controlledSelectedId ?? uncontrolledSelectedId;
 
   useEffect(() => {
@@ -124,23 +128,68 @@ function TabbedListDetail({
     </Paper>
   );
 
+  const isToolbarCollapsed = toolbarCollapsible && !isMobile && toolbarCollapsed;
   const toolbarPanel = toolbarContent ? (
-    <Paper
-      withBorder
-      shadow="xs"
-      data-testid="list-detail-toolbar-panel"
-      style={{
-        flex: isMobile ? 'none' : '0 0 240px',
-        minWidth: 0,
-        width: isMobile ? '100%' : 240,
-        maxWidth: '100%',
-        height: isMobile ? 'auto' : '100%',
-        overflow: 'auto',
-        boxSizing: 'border-box',
-      }}
-    >
-      <Box p="sm">{toolbarContent}</Box>
-    </Paper>
+    isToolbarCollapsed ? (
+      <Paper
+        withBorder
+        shadow="xs"
+        data-testid="list-detail-toolbar-collapsed"
+        h="100%"
+        p={4}
+        style={{ width: 44, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}
+      >
+        <Tooltip label="Datenbereinigung einblenden" position="left">
+          <ActionIcon
+            variant="subtle"
+            aria-label="Datenbereinigung einblenden"
+            onClick={() => setToolbarCollapsed(false)}
+          >
+            <IconLayoutSidebarRightExpand size={18} />
+          </ActionIcon>
+        </Tooltip>
+        <Text
+          size="xs"
+          c="dimmed"
+          style={{ writingMode: 'vertical-rl', textOrientation: 'mixed', userSelect: 'none' }}
+        >
+          Datenbereinigung
+        </Text>
+      </Paper>
+    ) : (
+      <Paper
+        withBorder
+        shadow="xs"
+        data-testid="list-detail-toolbar-panel"
+        style={{
+          flex: isMobile ? 'none' : '0 0 240px',
+          minWidth: 0,
+          width: isMobile ? '100%' : 240,
+          maxWidth: '100%',
+          height: isMobile ? 'auto' : '100%',
+          overflow: 'auto',
+          boxSizing: 'border-box',
+        }}
+      >
+        <Box p="sm">
+          {toolbarCollapsible && !isMobile ? (
+            <Group justify="flex-end" mb="xs">
+              <Tooltip label="Datenbereinigung ausblenden">
+                <ActionIcon
+                  variant="subtle"
+                  size="sm"
+                  aria-label="Datenbereinigung ausblenden"
+                  onClick={() => setToolbarCollapsed(true)}
+                >
+                  <IconLayoutSidebarRightCollapse size={16} />
+                </ActionIcon>
+              </Tooltip>
+            </Group>
+          ) : null}
+          {toolbarContent}
+        </Box>
+      </Paper>
+    )
   ) : null;
 
   const detailPanel = (

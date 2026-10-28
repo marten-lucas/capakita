@@ -58,6 +58,11 @@ test('data list is left of detail and cleanup controls are in the right toolbar'
   await page.getByRole('button', { name: 'Datenliste einblenden' }).click();
   await expect(listPanel).toBeVisible();
 
+  await toolbarPanel.getByRole('button', { name: 'Datenbereinigung ausblenden' }).click();
+  await expect(page.getByTestId('list-detail-toolbar-collapsed')).toBeVisible();
+  await page.getByRole('button', { name: 'Datenbereinigung einblenden' }).click();
+  await expect(toolbarPanel).toBeVisible();
+
   // Incomplete filters and archive visibility
   await page.getByRole('button', { name: 'Filter öffnen' }).click();
   await page.getByRole('menuitem', { name: 'Ohne Name' }).click();

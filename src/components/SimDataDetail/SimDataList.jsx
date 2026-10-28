@@ -684,6 +684,7 @@ function SimDataList() {
         collapsible
         listHeader={listHeader}
         toolbarContent={dataCaptureToolbar}
+        toolbarCollapsible
         renderItem={renderItem}
         detailTitle={(item) => (isMultiSelected ? `${selectedItemIds.length} Einträge ausgewählt` : (item?.name || 'Details'))}
         detailContent={() => (

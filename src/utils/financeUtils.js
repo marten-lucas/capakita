@@ -759,12 +759,15 @@ export function calculateZeitkatFeeAmount(feeCatalog, zeitkatId, referenceDate, 
  * Förderbetrag = Basiswert × Buchungszeitfaktor × Gewichtungsfaktor).
  *
  * Quelle: ZEITKAT der aktiven Basisbuchung (art 0/K bzw. buchungsart.basis);
- * Alternativ-/Ferienbuchungen tragen keinen eigenen Förderanspruch.
+ * Alternativ-/Ferienbuchungen tragen keinen eigenen Förderanspruch. Bei Bedarf
+ * kann eine fehlende ZEITKAT aus den Buchungssegmenten abgeleitet werden.
  * Mehrere aktive Basisbuchungen: die mit dem neuesten Startdatum gilt.
  * Rückgabe: Faktor (number) oder null, wenn keine verwertbare Zone vorliegt.
  */
-export function resolveZeitkatFactorForChild(bookings, referenceDate) {
-  const zeitkatId = resolveZeitkatIdForChild(bookings, referenceDate);
+export function resolveZeitkatFactorForChild(bookings, referenceDate, deriveFromBookingTimes = false) {
+  const zeitkatId = deriveFromBookingTimes
+    ? resolveFeeZeitkatIdForChild(bookings, referenceDate)
+    : resolveZeitkatIdForChild(bookings, referenceDate);
   return zeitkatId ? getZeitkatFactor(zeitkatId) : null;
 }
 
@@ -776,6 +779,7 @@ export function calculateChildMonthlyRevenue({
   financeScenario,
   referenceDate,
   applyZeitkatFactor = false,
+  deriveZeitkatFactor = false,
 }) {
   if (!item || item.type !== 'demand' || !isRecordActiveOnDate(item, referenceDate)) {
     return {
@@ -802,11 +806,11 @@ export function calculateChildMonthlyRevenue({
   const parentFeeAmount = Number(feeEntry?.monthlyAmount) || 0;
 
   // RE-Korrektur (adebisKITA 7.5): Förderbetrag = Basiswert × Buchungszeitfaktor ×
-  // Gewichtungsfaktor. Der Faktor ist gated (applyZeitkatFactor, Default off), damit
-  // bestehende Finanz-KPIs erst bei Aktivierung springen (Decision 26.10.2026:
-  // "springen aber später machen"); die Förder-Simulation rechnet immer mit Faktor.
+  // Gewichtungsfaktor. Der Faktor bleibt für bestehende Finanz-KPIs standardmäßig
+  // aus; der Reform-Modellwert kann ihn ausdrücklich aktivieren und fehlende ZEITKAT
+  // optional aus den Buchungssegmenten ableiten.
   const zeitkatFactor = applyZeitkatFactor
-    ? (resolveZeitkatFactorForChild(bookings, referenceDate) ?? 1)
+    ? (resolveZeitkatFactorForChild(bookings, referenceDate, deriveZeitkatFactor) ?? 1)
     : 1;
   const bayKiBiGAmount = (Number(bayKiBiGRule?.baseValue) || 0) * bayKiBiGWeight * zeitkatFactor;
 
@@ -841,6 +845,8 @@ export function calculateScenarioMonthlyFinance({
   effectiveGroupAssignmentsByItem,
   effectiveGroupDefs,
   financeScenario,
+  applyZeitkatFactor = false,
+  deriveZeitkatFactor = false,
 }) {
   const summary = createEmptyFinanceSummary();
   const childRows = [];
@@ -859,6 +865,8 @@ export function calculateScenarioMonthlyFinance({
         groupDefs: effectiveGroupDefs,
         financeScenario,
         referenceDate,
+        applyZeitkatFactor,
+        deriveZeitkatFactor,
       });
       if (childFinance.totalAmount > 0) {
         childRows.push({ itemId, item, ...childFinance });

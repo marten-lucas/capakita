@@ -295,6 +295,37 @@ describe('financeUtils', () => {
   });
 
   describe('child finance recalculation and assignment', () => {
+    it('derives the ZEITKAT factor from booking times for the reform model', () => {
+      const input = {
+        item: { id: 'child-factor', type: 'demand', dateofbirth: '2022-01-01', groupId: 'g1' },
+        bookings: [{
+          id: 'booking-factor',
+          startdate: '2026-01-01',
+          rawdata: { ART: '0' },
+          times: Array.from({ length: 5 }, (_, index) => ({
+            day_name: ['Mo', 'Di', 'Mi', 'Do', 'Fr'][index],
+            segments: [{ booking_start: '07:00', booking_end: '12:30' }],
+          })),
+        }],
+        groupAssignments: {},
+        groupDefs: [{ id: 'g1', type: 'Kindergarten', name: 'Sonnen' }],
+        financeScenario: {
+          bayKiBiGRules: [{ id: 'rule', baseValue: 100, validFrom: '2026-01-01', weightFactors: { regelkind_3to6: 1 } }],
+          groupFeeCatalogs: {},
+        },
+        referenceDate: '2026-03-01',
+      };
+
+      expect(calculateChildMonthlyRevenue(input).bayKiBiGAmount).toBe(100);
+      const derived = calculateChildMonthlyRevenue({
+        ...input,
+        applyZeitkatFactor: true,
+        deriveZeitkatFactor: true,
+      });
+      expect(derived.zeitkatFactor).toBe(1.5);
+      expect(derived.bayKiBiGAmount).toBe(150);
+    });
+
     it('recalculates child revenue when reference date changes and assigns the correct group/catalog', () => {
       const baseInput = {
         item: {

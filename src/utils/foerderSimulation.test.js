@@ -134,7 +134,7 @@ describe('simulateContributionChanges', () => {
     expect(result.totals.deltaParentFees).toBe(50);
   });
 
-  it('berechnet Elternanteil und Zuschuss getrennt und kappt den Zuschuss auf den Bruttobeitrag', () => {
+  it('ignoriert lokale Zuschuss-Overrides und verwendet den festgelegten Betrag', () => {
     const result = simulateContributionChanges({
       demandBookings: [makeBooking()],
       dataItems: CHILD,
@@ -152,22 +152,13 @@ describe('simulateContributionChanges', () => {
       referenceDate: REF,
     });
 
-    expect(result.perChild[0]).toMatchObject({
-      grossParentFeeBefore: 80,
-      parentFeeSubsidyBefore: 80,
-      parentFeeBefore: 0,
-      parentFeeSubsidyAfter: 50,
-      parentFeeAfter: 30,
-      deltaMonthlyParentFees: 30,
-      deltaMonthlyParentSubsidy: -30,
-      deltaMonthlyTotal: 0,
-    });
+    expect(result.perChild).toHaveLength(0);
     expect(result.totals).toMatchObject({
-      deltaParentFees: 30,
-      deltaParentFeeSubsidy: -30,
+      deltaParentFees: 0,
+      deltaParentFeeSubsidy: 0,
       deltaMonthlyTotal: 0,
-      childrenWithHigherFees: 1,
-      monthlyParentCostIncrease: 30,
+      childrenWithHigherFees: 0,
+      monthlyParentCostIncrease: 0,
     });
   });
 

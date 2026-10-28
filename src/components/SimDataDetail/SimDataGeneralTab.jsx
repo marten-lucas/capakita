@@ -1,5 +1,5 @@
 import React from 'react';
-import { Stack, TextInput, Radio, Group, Text, Paper, Button, ActionIcon, Select, Badge, SimpleGrid, Tabs } from '@mantine/core';
+import { Stack, TextInput, Radio, Group, Text, Paper, Button, ActionIcon, Select, Badge, SimpleGrid, Tabs, Checkbox } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import { useSelector, useDispatch } from 'react-redux';
 import { IconPlus, IconTrash } from '@tabler/icons-react';
@@ -189,6 +189,68 @@ function SimDataGeneralTab() {
             </SimpleGrid>
           </Paper>
 
+          {itemType === 'demand' && (
+            <Paper withBorder p="md" radius="md">
+              <Stack gap="sm">
+                <div>
+                  <Text fw={600} mb="xs">Fördermerkmale</Text>
+                  <Text size="xs" c="dimmed">Bestätigte Merkmale fließen in die modellierte BayKiBiG-Gewichtung und die Auswertung der Vorkurse ein.</Text>
+                </div>
+                <Checkbox
+                  label="Eltern nicht deutschsprachig"
+                  description="BayKiBiG-Gewichtungsmerkmal; nicht gleichbedeutend mit Vorkursteilnahme."
+                  checked={item.hasNonGermanSpeakingParents === true}
+                  onChange={(event) => handleUpdate({ hasNonGermanSpeakingParents: event.currentTarget.checked })}
+                />
+                <Checkbox
+                  label="Betreuung in Tagespflege"
+                  checked={item.isInDaycare === true}
+                  onChange={(event) => handleUpdate({ isInDaycare: event.currentTarget.checked })}
+                />
+                <Checkbox
+                  label="Anerkannte Behinderung (SGB IX)"
+                  checked={item.hasDisability === true}
+                  onChange={(event) => handleUpdate({ hasDisability: event.currentTarget.checked })}
+                />
+                <DatePickerInput
+                  label="Antragsdatum bei vorübergehender Behinderung"
+                  value={item.temporaryDisabilityDate ? new Date(item.temporaryDisabilityDate) : null}
+                  onChange={(date) => handleUpdate({ temporaryDisabilityDate: toDateStr(date) })}
+                  clearable
+                />
+                <Select
+                  label="Teilnahme am Vorkurs Deutsch"
+                  placeholder="Status auswählen"
+                  data={[
+                    { value: 'yes', label: 'Ja, Teilnahme bestätigt' },
+                    { value: 'no', label: 'Nein' },
+                  ]}
+                  value={item.vorkursParticipation === true ? 'yes' : item.vorkursParticipation === false ? 'no' : null}
+                  onChange={(value) => handleUpdate({
+                    vorkursParticipation: value === 'yes' ? true : value === 'no' ? false : null,
+                  })}
+                  clearable
+                />
+                {item.vorkursParticipation === true ? (
+                  <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
+                    <DatePickerInput
+                      label="Vorkurs gültig von"
+                      value={item.vorkursStartDate ? new Date(item.vorkursStartDate) : null}
+                      onChange={(date) => handleUpdate({ vorkursStartDate: toDateStr(date) })}
+                      clearable
+                    />
+                    <DatePickerInput
+                      label="Vorkurs gültig bis"
+                      value={item.vorkursEndDate ? new Date(item.vorkursEndDate) : null}
+                      onChange={(date) => handleUpdate({ vorkursEndDate: toDateStr(date) })}
+                      clearable
+                    />
+                  </SimpleGrid>
+                ) : null}
+              </Stack>
+            </Paper>
+          )}
+
           {itemType === 'capacity' && (
             <Paper withBorder p="md" radius="md">
               <Text fw={600} mb="xs">Qualifikation</Text>
@@ -199,7 +261,76 @@ function SimDataGeneralTab() {
             </Paper>
           )}
 
-          {itemType === 'demand' && <SimDataFamilySection item={item} />}
+          {itemType === 'demand' && (
+            <>
+              <Paper withBorder p="md" radius="md" data-testid="child-funding-characteristics">
+                <Stack gap="sm">
+                  <div>
+                    <Text fw={600} mb="xs">Fördermerkmale</Text>
+                    <Text size="xs" c="dimmed">Geburtsdatum und aktive Buchungen werden automatisch für U3-Kindermonate ausgewertet. Behinderungsangaben sind besonders schützenswert; nur bei Bedarf erfassen.</Text>
+                  </div>
+                  <Checkbox
+                    label="BayKiBiG-Gewichtungsmerkmale geprüft"
+                    description="Bestätigen, nachdem die folgenden Merkmale geprüft wurden."
+                    checked={item.bayKiBiGProfileConfirmed === true}
+                    onChange={(event) => handleUpdate({ bayKiBiGProfileConfirmed: event.currentTarget.checked })}
+                  />
+                  <Checkbox
+                    label="Eltern nicht deutschsprachig"
+                    description="BayKiBiG-Gewichtungsmerkmal; nicht gleichbedeutend mit Vorkursteilnahme."
+                    checked={item.hasNonGermanSpeakingParents === true}
+                    onChange={(event) => handleUpdate({ hasNonGermanSpeakingParents: event.currentTarget.checked })}
+                  />
+                  <Checkbox
+                    label="Betreuung in Tagespflege"
+                    checked={item.isInDaycare === true}
+                    onChange={(event) => handleUpdate({ isInDaycare: event.currentTarget.checked })}
+                  />
+                  <Checkbox
+                    label="Anerkannte Behinderung (SGB IX)"
+                    checked={item.hasDisability === true}
+                    onChange={(event) => handleUpdate({ hasDisability: event.currentTarget.checked })}
+                  />
+                  <DatePickerInput
+                    label="Antragsdatum bei vorübergehender Behinderung"
+                    value={item.temporaryDisabilityDate ? new Date(item.temporaryDisabilityDate) : null}
+                    onChange={(date) => handleUpdate({ temporaryDisabilityDate: toDateStr(date) })}
+                    clearable
+                  />
+                  <Select
+                    label="Teilnahme am Vorkurs Deutsch"
+                    placeholder="Status auswählen"
+                    data={[
+                      { value: 'yes', label: 'Ja, Teilnahme bestätigt' },
+                      { value: 'no', label: 'Nein' },
+                    ]}
+                    value={item.vorkursParticipation === true ? 'yes' : item.vorkursParticipation === false ? 'no' : null}
+                    onChange={(value) => handleUpdate({
+                      vorkursParticipation: value === 'yes' ? true : value === 'no' ? false : null,
+                    })}
+                    clearable
+                  />
+                  {item.vorkursParticipation === true ? (
+                    <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
+                      <DatePickerInput
+                        label="Vorkurs gültig von"
+                        value={item.vorkursStartDate ? new Date(item.vorkursStartDate) : null}
+                        onChange={(date) => handleUpdate({ vorkursStartDate: toDateStr(date) })}
+                        clearable
+                      />
+                      <DatePickerInput
+                        label="Vorkurs gültig bis"
+                        value={item.vorkursEndDate ? new Date(item.vorkursEndDate) : null}
+                        onChange={(date) => handleUpdate({ vorkursEndDate: toDateStr(date) })}
+                        clearable
+                      />
+                    </SimpleGrid>
+                  ) : null}
+                </Stack>
+              </Paper>
+              <SimDataFamilySection item={item} />
+            </>
+          )}
         </Stack>
       </Tabs.Panel>
 

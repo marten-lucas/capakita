@@ -16,6 +16,10 @@
  * @property {string} temporaryDisabilityDate - For BayKiBiG category 5 (6-month window = 4.5x)
  * @property {boolean} isInDaycare - For BayKiBiG categories 6 & 7 (day-care = 1.3x)
  * @property {boolean} hasNonGermanSpeakingParents - For BayKiBiG category 8 (both parents non-German = 1.3x)
+ * @property {boolean|null} vorkursParticipation - Confirmed German preparatory-course participation
+ * @property {string} vorkursStartDate
+ * @property {string} vorkursEndDate
+ * @property {boolean} bayKiBiGProfileConfirmed - Relevant weighting features have been checked
  * // ...add other properties as needed
  */
 
@@ -40,6 +44,10 @@ export class DataItem {
     temporaryDisabilityDate = '',
     isInDaycare = false,
     hasNonGermanSpeakingParents = false,
+    vorkursParticipation = null,
+    vorkursStartDate = '',
+    vorkursEndDate = '',
+    bayKiBiGProfileConfirmed = false,
     ...rest
   }) {
     this.id = String(id);
@@ -66,6 +74,10 @@ export class DataItem {
     this.temporaryDisabilityDate = temporaryDisabilityDate || '';
     this.isInDaycare = Boolean(isInDaycare);
     this.hasNonGermanSpeakingParents = Boolean(hasNonGermanSpeakingParents);
+    this.vorkursParticipation = typeof vorkursParticipation === 'boolean' ? vorkursParticipation : null;
+    this.vorkursStartDate = vorkursStartDate || '';
+    this.vorkursEndDate = vorkursEndDate || '';
+    this.bayKiBiGProfileConfirmed = Boolean(bayKiBiGProfileConfirmed);
     Object.assign(this, rest);
   }
 }

@@ -216,7 +216,6 @@ export function simulateContributionChanges({
   groupFeeCatalogs = {},
   originalGroupFeeCatalogs = null,
   parentFeeSubsidy = {},
-  temporaryParentFeeSubsidyAmount = null,
   temporaryPrices = {},
   utilizationPercent = 100,
   referenceDate,
@@ -231,9 +230,6 @@ export function simulateContributionChanges({
   const subsidyEndsBeforeReferenceDate = Boolean(parentFeeSubsidy?.endDate)
     && String(referenceDate || '').slice(0, 10) > String(parentFeeSubsidy.endDate).slice(0, 10);
   const policySubsidyAmount = subsidyEndsBeforeReferenceDate ? 0 : baselineSubsidyAmount;
-  const simulatedSubsidyAmount = temporaryParentFeeSubsidyAmount == null
-    ? policySubsidyAmount
-    : Math.max(0, Number(temporaryParentFeeSubsidyAmount) || 0);
   const baselineFeeCatalogs = originalGroupFeeCatalogs || groupFeeCatalogs;
   const groupNames = new Map((groupDefs || []).map((group) => [String(group.id), group.name]));
   const groupDefById = new Map((groupDefs || []).map((group) => [String(group.id), group]));
@@ -256,6 +252,8 @@ export function simulateContributionChanges({
   let totalDeltaMonthlyFunding = 0;
   let totalDeltaMonthlyParentFees = 0;
   let totalDeltaMonthlyParentSubsidy = 0;
+  let totalGrossParentFees = 0;
+  let totalPolicyParentFeeSubsidy = 0;
   let totalMigratedBookings = 0;
 
   bookingsByChild.forEach((childBookings, childKey) => {
@@ -371,7 +369,7 @@ export function simulateContributionChanges({
         nextAmount: canMigrate ? nextFee.amount : sourceFee.amount,
         migrationShare,
         eligible: subsidyEligible,
-        subsidyAmount: simulatedSubsidyAmount,
+        subsidyAmount: policySubsidyAmount,
       });
       grossParentFeeBefore = grossFeeBefore;
       grossParentFeeAfter = expectedAfter.grossFee;
@@ -390,6 +388,8 @@ export function simulateContributionChanges({
 
     totalDeltaMonthlyParentFees += parentFeeDelta;
     totalDeltaMonthlyParentSubsidy += parentFeeSubsidyDelta;
+    totalGrossParentFees += grossParentFeeBefore;
+    totalPolicyParentFeeSubsidy += parentFeeSubsidyAfter;
     childChanged = childChanged || Math.abs(parentFeeDelta) >= 0.005 || Math.abs(parentFeeSubsidyDelta) >= 0.005;
     if (primaryGroupId || Math.abs(parentChangedTotal(childFundingDelta, parentFeeDelta)) > 0.005 || childChanged) {
       if (!groups.has(primaryGroupId)) {
@@ -524,6 +524,8 @@ export function simulateContributionChanges({
       deltaYearlyBayKiBiG: roundMoney(totalDeltaMonthlyFunding * 12),
       deltaParentFees: roundMoney(totalDeltaMonthlyParentFees),
       deltaParentFeeSubsidy: roundMoney(totalDeltaMonthlyParentSubsidy),
+      grossParentFees: roundMoney(totalGrossParentFees),
+      policyParentFeeSubsidy: roundMoney(totalPolicyParentFeeSubsidy),
       deltaYearlyParentFeeSubsidy: roundMoney(totalDeltaMonthlyParentSubsidy * 12),
       deltaMonthlyTotal: roundMoney(totalDeltaMonthlyFunding + totalDeltaMonthlyParentFees + totalDeltaMonthlyParentSubsidy),
       deltaYearlyTotal: roundMoney((totalDeltaMonthlyFunding + totalDeltaMonthlyParentFees + totalDeltaMonthlyParentSubsidy) * 12),
@@ -589,6 +591,8 @@ export function simulateAnnualContributionChanges({ year, ...simulationOptions }
   const childrenWithLowerFees = new Set(months.flatMap(({ result }) => (result?.perChild || [])
     .filter((row) => row.deltaMonthlyParentFees < -0.005).map((row) => row.itemId)));
 
+  totals.annualGrossParentFees = roundMoney(months.reduce((sum, month) => sum + (month.result?.totals?.grossParentFees || 0), 0));
+  totals.annualParentFeeSubsidy = roundMoney(months.reduce((sum, month) => sum + (month.result?.totals?.policyParentFeeSubsidy || 0), 0));
   totals.deltaMonthlyBayKiBiG = roundMoney(totals.deltaYearlyBayKiBiG / 12);
   totals.deltaMonthlyParentFees = roundMoney(totals.deltaYearlyParentFees / 12);
   totals.deltaMonthlyParentSubsidy = roundMoney(totals.deltaYearlyParentSubsidy / 12);

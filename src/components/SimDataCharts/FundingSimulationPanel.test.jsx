@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { MantineProvider } from '@mantine/core';
@@ -10,7 +10,7 @@ import simBookingReducer from '../../store/simBookingSlice';
 import simGroupReducer from '../../store/simGroupSlice';
 import simQualificationReducer from '../../store/simQualificationSlice';
 import simOverlayReducer from '../../store/simOverlaySlice';
-import simFinanceReducer, { setGroupFeeCatalogs } from '../../store/simFinanceSlice';
+import simFinanceReducer, { setGroupFeeCatalogs, updateParentFeeSubsidy } from '../../store/simFinanceSlice';
 import chartReducer from '../../store/chartSlice';
 
 const REF = '2026-03-15';
@@ -192,6 +192,13 @@ describe('FundingSimulationPanel', () => {
 
     expect(screen.getByTestId('parent-fee-subsidy-end-date')).toBeTruthy();
     fireEvent.click(screen.getByText('BayKiBiG-Reform · Zusatzdaten für die Berechnung'));
+    expect(screen.getByTestId('reform-derived-bookingTime').textContent).toBe('330,00 €');
+    expect(screen.getByTestId('reform-derived-parent-fees').textContent).toBe('2.400,00 €');
+    expect(screen.getByTestId('reform-derived-parentFeeSubsidy').textContent).toBe('1.200,00 €');
+    expect(screen.getByTestId('reform-derived-u3-child-months').textContent).toBe('0 Kindermonate');
+    expect(screen.getByTestId('reform-derived-vorkurs-child-months').textContent).toBe('0 Kindermonate');
+    fireEvent.click(screen.getByTestId('reform-derived-adopt-bookingTime'));
+    expect(store.getState().simFinance.financeByScenario['scenario-1'].settings.reformForecast.actualFunding.bookingTime).toBe(330);
     const bookingTimeInput = screen.getByLabelText('Ist 2026 · Förderung nach Buchungszeiten');
     fireEvent.change(bookingTimeInput, { target: { value: '9000' } });
     fireEvent.blur(bookingTimeInput);
@@ -252,7 +259,7 @@ describe('FundingSimulationPanel', () => {
     expect(screen.getByTestId('fee-staircase-slider-01')).toBeTruthy();
   });
 
-  it('simuliert den 100-Euro-Elternbeitragszuschuss als lokalen Rabatt für berechtigte Kinder', () => {
+  it('steuert den festgelegten Elternbeitragszuschuss nur über das Enddatum', () => {
     const store = createTestStore();
     render(
       <Provider store={store}>
@@ -262,16 +269,17 @@ describe('FundingSimulationPanel', () => {
       </Provider>
     );
 
-    const subsidySlider = screen.getByRole('slider', { name: 'Simulierter Elternbeitragszuschuss pro Kind' });
-    expect(subsidySlider.getAttribute('aria-valuenow')).toBe('100');
-    for (let index = 0; index < 10; index += 1) {
-      fireEvent.keyDown(subsidySlider, { key: 'ArrowLeft', code: 'ArrowLeft' });
-    }
-
-    expect(subsidySlider.getAttribute('aria-valuenow')).toBe('50');
-    expect(screen.getByText('+50,00 € pro Monat')).toBeTruthy();
-    expect(screen.getAllByText('-50,00 €').length).toBeGreaterThan(0);
+    expect(screen.getByTestId('parent-fee-subsidy-end-date')).toBeTruthy();
+    expect(screen.getByTestId('parent-fee-subsidy-value').textContent).toBe('100,00 € / Monat');
+    expect(screen.queryByTestId('parent-fee-subsidy-slider')).toBeNull();
+    expect(screen.queryByTestId('parent-fee-subsidy-input')).toBeNull();
     expect(store.getState().simFinance.financeByScenario['scenario-1'].parentFeeSubsidy).toBeUndefined();
+
+    act(() => store.dispatch(updateParentFeeSubsidy({
+      scenarioId: 'scenario-1',
+      updates: { endDate: '2026-02-28' },
+    })));
+    expect(screen.getByTestId('parent-fee-subsidy-value').textContent).toBe('0,00 € / Monat');
   });
 
   it('setzt den temporären Einzelpreis zurück auf den geladenen Wert', () => {
