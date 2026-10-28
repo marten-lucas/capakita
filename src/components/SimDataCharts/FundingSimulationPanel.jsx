@@ -206,10 +206,12 @@ function FundingSimulationPanel({ accent }) {
     (groupDefs || []).map((group) => [String(group.id), group.name || String(group.id)])
   ), [groupDefs]);
 
-  const categoryPriceRows = React.useMemo(
-    () => getFeeCatalogSimulationRows(groupFeeCatalogs, groupLabels, referenceDate),
-    [groupFeeCatalogs, groupLabels, referenceDate]
-  );
+  const categoryPriceRows = React.useMemo(() => {
+    const rows = getFeeCatalogSimulationRows(groupFeeCatalogs, groupLabels, referenceDate);
+    if (selectedGroupIds.length === 0) return rows;
+    const selectedGroupIdSet = new Set(selectedGroupIds);
+    return rows.filter((row) => selectedGroupIdSet.has(row.groupId));
+  }, [groupFeeCatalogs, groupLabels, referenceDate, selectedGroupIds]);
   const simulationCatalogs = React.useMemo(() => ({
     ...groupFeeCatalogs,
     ...temporaryCatalogEntries,
@@ -233,6 +235,7 @@ function FundingSimulationPanel({ accent }) {
       ...Object.keys(groupFeeCatalogs || {}).map(String),
     ]);
     return Array.from(groupIds)
+      .filter((groupId) => selectedGroupIds.length === 0 || selectedGroupIds.includes(groupId))
       .filter((groupId) => (groupFeeCatalogs[groupId] || []).length > 0)
       .map((groupId) => ({
         id: groupId,
@@ -240,7 +243,7 @@ function FundingSimulationPanel({ accent }) {
         rows: Array.from({ length: rowCounts.get(groupId) || 0 }),
       }))
       .sort((left, right) => left.name.localeCompare(right.name, 'de'));
-  }, [categoryPriceRows, groupDefs, groupFeeCatalogs, groupLabels]);
+  }, [categoryPriceRows, groupDefs, groupFeeCatalogs, groupLabels, selectedGroupIds]);
 
   const setTemporaryCatalog = (groupId, nextEntries) => {
     const originalEntries = groupFeeCatalogs[groupId] || [];

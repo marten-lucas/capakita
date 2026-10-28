@@ -99,18 +99,19 @@ function OriginalMarker({ amount, maxAmount }) {
   );
 }
 
-function ContributionSlider({ zone, entry, originalEntry, priceMax, simulation, onChange, onActivate }) {
+function ContributionSlider({ zone, entry, originalEntry, priceMax, simulation, invalid, onChange, onActivate }) {
   const isActive = Boolean(entry && entry.enabled !== false && Number(entry.monthlyAmount) > 0);
   const amount = isActive ? Number(entry.monthlyAmount) : 0;
   return (
     <Stack gap={4} align="center" style={{ flex: '1 0 106px', minWidth: 106, padding: '0 6px' }}>
-      <Text size="xs" fw={700} ta="center" lh={1.2}>{zone.kurzbez}h</Text>
-      <Text size="10px" c="dimmed" ta="center" lh={1.1}>Kategorie {zone.kennz}</Text>
+      <Text size="xs" fw={700} c={invalid ? 'red' : undefined} ta="center" lh={1.2}>{zone.kurzbez}h</Text>
+      <Text size="10px" c={invalid ? 'red' : 'dimmed'} ta="center" lh={1.1}>Kategorie {zone.kennz}</Text>
       <Box style={{ position: 'relative', height: SLIDER_HEIGHT, width: 46, display: 'flex', justifyContent: 'center' }}>
         <OriginalMarker amount={simulation ? originalEntry?.monthlyAmount : null} maxAmount={priceMax} />
         <Slider
           orientation="vertical"
           disabled={!isActive}
+          color={invalid ? 'red' : undefined}
           min={0}
           max={priceMax}
           step={5}
@@ -119,19 +120,32 @@ function ContributionSlider({ zone, entry, originalEntry, priceMax, simulation, 
           aria-label={`${simulation ? 'Simulierter Beitrag' : 'Beitrag'} ZEITKAT ${zone.id}`}
           thumbLabel={`Beitrag ZEITKAT ${zone.id}`}
           data-testid={`fee-staircase-slider-${zone.id}`}
+          data-invalid={invalid ? 'true' : undefined}
           style={{ height: SLIDER_HEIGHT, width: 34, zIndex: 1 }}
         />
       </Box>
       {isActive ? (
-        <PriceField
-          value={amount}
-          label={`Betrag ZEITKAT ${zone.id}`}
-          onChange={onChange}
-          testId={`fee-staircase-price-${zone.id}`}
-        />
+        <Stack gap={0} w="100%" align="center">
+          <PriceField
+            value={amount}
+            label={`Betrag ZEITKAT ${zone.id}`}
+            onChange={onChange}
+            testId={`fee-staircase-price-${zone.id}`}
+          />
+          <Text
+            size="10px"
+            c="dimmed"
+            ta="center"
+            data-testid={`fee-staircase-hourly-${zone.id}`}
+            title={`Monatsbeitrag geteilt durch ${zone.maxHours} Stunden pro Tag (oberes Ende der Kategorie)`}
+          >
+            {(amount / zone.maxHours).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €/h
+          </Text>
+        </Stack>
       ) : (
         <Checkbox
           size="xs"
+          color={invalid ? 'red' : undefined}
           label="Aktivieren"
           aria-label={`Aktiviere Beitrag ZEITKAT ${zone.id}`}
           data-testid={`activate-fee-zeitkat-${zone.id}`}
@@ -184,6 +198,10 @@ export default function FeeStaircaseEditor({
   const periodEnd = activeEntries[0]?.validUntil || '';
   const priceMax = getPriceMax(activeEntries, originalEntriesForPeriod);
   const feeStaircaseValidation = validateFeeStaircase(activeEntries);
+  const invalidZeitkatIds = new Set([
+    ...feeStaircaseValidation.gaps.map((zone) => zone.id),
+    ...feeStaircaseValidation.stepViolations.flatMap(({ previousZone, zone }) => [previousZone.id, zone.id]),
+  ]);
 
   function replaceActiveEntries(nextActiveEntries) {
     const preserved = entries.filter((entry) => (
@@ -324,6 +342,7 @@ export default function FeeStaircaseEditor({
               originalEntry={originalByZone.get(zone.id)}
               priceMax={priceMax}
               simulation={simulation}
+              invalid={invalidZeitkatIds.has(zone.id)}
               onChange={(value) => updateZeitkatAmount(zone, Number(value) || 0)}
               onActivate={() => activateZeitkat(zone)}
             />

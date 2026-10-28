@@ -175,6 +175,8 @@ describe('FundingSimulationPanel', () => {
     fireEvent.click(screen.getByRole('option', { name: 'Ohne Gruppe' }));
 
     expect(screen.getByTestId('simulation-group-filter')).toBeTruthy();
+
+    expect(screen.queryByTestId('simulation-tariff-groups')).toBeNull();
     expect(screen.getByText(/Keine aktiven Basisbuchungen mit auswertbarer ZEITKAT/)).toBeTruthy();
   });
 

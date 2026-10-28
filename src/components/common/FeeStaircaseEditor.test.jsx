@@ -72,6 +72,7 @@ describe('FeeStaircaseEditor', () => {
     expect(screen.getByText('Kategorie 4')).toBeTruthy();
     expect(screen.queryByText('Direkte Eingabe')).toBeNull();
     expect(screen.getByLabelText('Betrag ZEITKAT 05').value).toBe('150 EUR');
+    expect(screen.getByTestId('fee-staircase-hourly-05').textContent).toBe('30,00 €/h');
     expect(screen.getByText('Original 100,00 €')).toBeTruthy();
   });
 
@@ -93,6 +94,31 @@ describe('FeeStaircaseEditor', () => {
     fireEvent.click(activationCheckbox);
 
     expect(screen.getByLabelText('Betrag ZEITKAT 04').value).toBe('150 EUR');
+    expect(screen.getByTestId('fee-staircase-hourly-04').textContent).toBe('37,50 €/h');
+    fireEvent.change(screen.getByLabelText('Betrag ZEITKAT 04'), { target: { value: '200' } });
+    fireEvent.blur(screen.getByLabelText('Betrag ZEITKAT 04'));
+    expect(screen.getByTestId('fee-staircase-hourly-04').textContent).toBe('50,00 €/h');
+  });
+
+  it('marks gap sliders and insufficient adjacent steps red', () => {
+    render(
+      <MantineProvider>
+        <FeeStaircaseEditor
+          entries={[
+            { id: 'fee-04', zeitkatId: '04', monthlyAmount: 100, validFrom: '2026-01-01' },
+            { id: 'fee-05', zeitkatId: '05', monthlyAmount: 105, validFrom: '2026-01-01' },
+            { id: 'fee-07', zeitkatId: '07', monthlyAmount: 150, validFrom: '2026-01-01' },
+          ]}
+          referenceDate={referenceDate}
+          onChangeEntries={() => {}}
+        />
+      </MantineProvider>
+    );
+
+    ['04', '05', '06'].forEach((zoneId) => {
+      expect(screen.getByTestId(`fee-staircase-slider-${zoneId}`).getAttribute('data-invalid')).toBe('true');
+    });
+    expect(screen.getByTestId('fee-staircase-slider-07').getAttribute('data-invalid')).toBeNull();
   });
 
   it('updates the selected ZEITKAT only when imported entries reuse an ID', () => {
