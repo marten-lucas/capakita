@@ -121,8 +121,9 @@ describe('financeUtils', () => {
     expect(result.parentFeeAmount).toBe(135);
     expect(findFeeEntryForZeitkat([
       { id: 'old', zeitkatId: '05', monthlyAmount: 50, validFrom: '2025-01-01', validUntil: '2025-12-31' },
-      { id: 'current', zeitkatId: '05', monthlyAmount: 135, validFrom: '2026-01-01' },
-    ], '05', '2026-04-15')?.id).toBe('current');
+      { id: 'a-disabled', zeitkatId: '05', monthlyAmount: 99, enabled: false, validFrom: '2026-01-01' },
+      { id: 'z-current', zeitkatId: '05', monthlyAmount: 135, validFrom: '2026-01-01' },
+    ], '05', '2026-04-15')?.id).toBe('z-current');
   });
 
 

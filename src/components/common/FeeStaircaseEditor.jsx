@@ -1,14 +1,14 @@
 import React from 'react';
-import { Alert, Box, Button, Group, NumberInput, Paper, Select, Slider, Stack, Text } from '@mantine/core';
+import { Alert, Anchor, Box, Button, Checkbox, Group, NumberInput, Select, Slider, Stack, Text } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
-import { IconPlus } from '@tabler/icons-react';
 import { createId } from '../../utils/idUtils';
 import { getFeeBandZeitkatId, ZEITKAT_CATALOG } from '../../utils/adebisConstants';
 import { isDateWithinRange } from '../../utils/financeUtils';
+import { getZeitkatLabel, validateFeeStaircase } from '../../utils/feeStaircaseValidation';
 
-const MAX_ZEITKAT_HOURS = 8;
 const SLIDER_HEIGHT = 166;
-const ZEITKAT_SLIDER_ZONES = ZEITKAT_CATALOG.filter((zone) => zone.maxHours <= MAX_ZEITKAT_HOURS);
+const ZEITKAT_SLIDER_ZONES = ZEITKAT_CATALOG;
+const STMAS_FEE_STAFFELUNG_URL = 'https://www.stmas.bayern.de/imperia/md/content/stmas/stmas_inet/service-kinder/newsletter/31_newsletter_eb-staffelung.pdf';
 
 function makePeriodKey(entry) {
   return `${entry?.validFrom || ''}|${entry?.validUntil || ''}`;
@@ -56,7 +56,7 @@ function getPriceMax(entries, baselineEntries) {
   return Math.max(300, Math.ceil((maxAmount * 1.5) / 100) * 100);
 }
 
-function PriceField({ value, label, onChange, testId }) {
+function PriceField({ value, label, onChange, testId, disabled = false }) {
   const [draft, setDraft] = React.useState(value ?? 0);
   React.useEffect(() => setDraft(value ?? 0), [value]);
   return (
@@ -66,6 +66,7 @@ function PriceField({ value, label, onChange, testId }) {
       max={100000}
       decimalScale={2}
       step={5}
+      disabled={disabled}
       value={draft}
       onChange={setDraft}
       onBlur={() => {
@@ -98,16 +99,17 @@ function OriginalMarker({ amount, maxAmount }) {
   );
 }
 
-function ContributionSlider({ zone, entry, originalEntry, priceMax, simulation, onChange }) {
+function ContributionSlider({ zone, entry, originalEntry, priceMax, simulation, disabled, onChange }) {
   const amount = Number(entry?.monthlyAmount) || 0;
   return (
     <Stack gap={4} align="center" style={{ flex: '1 0 106px', minWidth: 106, padding: '0 6px' }}>
-      <Text size="xs" fw={700} ta="center" lh={1.2}>ZEITKAT {zone.id}</Text>
-      <Text size="10px" c="dimmed" ta="center" lh={1.1}>{zone.kurzbez} h/Tag</Text>
+      <Text size="xs" fw={700} ta="center" lh={1.2}>{zone.kurzbez}h</Text>
+      <Text size="10px" c="dimmed" ta="center" lh={1.1}>Kategorie {zone.kennz}</Text>
       <Box style={{ position: 'relative', height: SLIDER_HEIGHT, width: 46, display: 'flex', justifyContent: 'center' }}>
         <OriginalMarker amount={simulation ? originalEntry?.monthlyAmount : null} maxAmount={priceMax} />
         <Slider
           orientation="vertical"
+          disabled={disabled}
           min={0}
           max={priceMax}
           step={5}
@@ -124,6 +126,7 @@ function ContributionSlider({ zone, entry, originalEntry, priceMax, simulation, 
         label={`Betrag ZEITKAT ${zone.id}`}
         onChange={onChange}
         testId={`fee-staircase-price-${zone.id}`}
+        disabled={disabled}
       />
       {simulation ? (
         <Text size="10px" c="dimmed" ta="center">
@@ -170,11 +173,10 @@ export default function FeeStaircaseEditor({
   const periodStart = activeEntries[0]?.validFrom || '';
   const periodEnd = activeEntries[0]?.validUntil || '';
   const priceMax = getPriceMax(activeEntries, originalEntriesForPeriod);
-  const missingZones = ZEITKAT_SLIDER_ZONES.filter((zone) => !activeByZone.has(zone.id));
-  const overEightEntries = sortZeitkatEntries(activeEntries.filter((entry) => {
-    const zone = ZEITKAT_CATALOG.find((item) => item.id === getFeeBandZeitkatId(entry));
-    return zone?.maxHours > MAX_ZEITKAT_HOURS;
-  }));
+  const enabledZones = activeEntries
+    .filter((entry) => entry.enabled !== false)
+    .map((entry) => getFeeBandZeitkatId(entry));
+  const feeStaircaseValidation = validateFeeStaircase(activeEntries);
 
   function replaceActiveEntries(nextActiveEntries) {
     const preserved = entries.filter((entry) => (
@@ -185,17 +187,39 @@ export default function FeeStaircaseEditor({
 
   function updateZeitkatAmount(zone, amount) {
     const existing = activeByZone.get(zone.id);
-    if (existing) {
-      replaceActiveEntries(activeEntries.map((entry) => (
-        entry.id === existing.id ? { ...entry, monthlyAmount: amount } : entry
-      )));
-      return;
-    }
-    const inheritedDate = activeEntries[0] || {};
-    replaceActiveEntries(sortZeitkatEntries([
-      ...activeEntries,
-      { ...inheritedDate, id: createId('fee'), zeitkatId: zone.id, label: '', monthlyAmount: amount },
-    ]));
+    if (!existing) return;
+    replaceActiveEntries(sortZeitkatEntries(activeEntries.map((entry) => (
+      getFeeBandZeitkatId(entry) === zone.id ? { ...entry, monthlyAmount: amount } : entry
+    ))));
+  }
+
+  function updateEnabledZones(selectedZoneIds) {
+    const selected = new Set(selectedZoneIds);
+    const nextEntries = activeEntries.map((entry) => ({
+      ...entry,
+      enabled: selected.has(getFeeBandZeitkatId(entry)),
+    }));
+    const existingZoneIds = new Set(activeEntries.map((entry) => getFeeBandZeitkatId(entry)));
+
+    ZEITKAT_SLIDER_ZONES.forEach((zone) => {
+      if (!selected.has(zone.id) || existingZoneIds.has(zone.id)) return;
+      const zoneIndex = ZEITKAT_SLIDER_ZONES.findIndex((candidate) => candidate.id === zone.id);
+      const priorEntry = [...activeEntries].reverse().find((entry) => (
+        ZEITKAT_SLIDER_ZONES.findIndex((candidate) => candidate.id === getFeeBandZeitkatId(entry)) < zoneIndex
+      )) || activeEntries[0] || {};
+      nextEntries.push({
+        ...priorEntry,
+        validFrom: priorEntry.validFrom || periodStart,
+        validUntil: priorEntry.validUntil || periodEnd,
+        id: createId('fee'),
+        zeitkatId: zone.id,
+        label: '',
+        monthlyAmount: Number(priorEntry.monthlyAmount) || 0,
+        enabled: true,
+      });
+    });
+
+    replaceActiveEntries(sortZeitkatEntries(nextEntries));
   }
 
   function updateValidity(field, value) {
@@ -209,19 +233,26 @@ export default function FeeStaircaseEditor({
   return (
     <Stack gap="sm" data-testid="fee-staircase-editor">
       <Group justify="space-between" align="flex-end" wrap="wrap">
-        <Text size="sm" fw={600}>ZEITKAT / Stunden pro Tag · Sliderbereich bis 8 Stunden</Text>
+        <Text size="sm" fw={600}>ZEITKAT / Stunden pro Tag · Slider</Text>
         <Group gap="xs">
-          <Select
-            size="xs"
-            placeholder="ZEITKAT ergänzen"
-            data={ZEITKAT_SLIDER_ZONES.filter((zone) => !activeByZone.has(zone.id)).map((zone) => ({ value: zone.id, label: `ZEITKAT ${zone.id} · ${zone.kurzbez} h/Tag` }))}
-            value={null}
-            onChange={(value) => {
-              const zone = ZEITKAT_SLIDER_ZONES.find((item) => item.id === value);
-              if (zone) updateZeitkatAmount(zone, Number(activeEntries.at(-1)?.monthlyAmount) || 0);
-            }}
-            data-testid="add-zeitkat-tier"
-          />
+          <Checkbox.Group
+            label="Slider je Kategorie aktivieren"
+            value={enabledZones}
+            onChange={updateEnabledZones}
+            data-testid="zeitkat-slider-toggles"
+          >
+            <Group gap="sm" wrap="wrap">
+              {ZEITKAT_SLIDER_ZONES.map((zone) => (
+                <Checkbox
+                  key={zone.id}
+                  value={zone.id}
+                  label={`ZEITKAT ${zone.id}`}
+                  size="xs"
+                  data-testid={`zeitkat-slider-toggle-${zone.id}`}
+                />
+              ))}
+            </Group>
+          </Checkbox.Group>
           {simulation && onResetAll ? <Button size="xs" variant="subtle" onClick={onResetAll}>Gruppe zurücksetzen</Button> : null}
         </Group>
       </Group>
@@ -271,42 +302,42 @@ export default function FeeStaircaseEditor({
               originalEntry={originalByZone.get(zone.id)}
               priceMax={priceMax}
               simulation={simulation}
+              disabled={!activeByZone.has(zone.id) || activeByZone.get(zone.id)?.enabled === false}
               onChange={(value) => updateZeitkatAmount(zone, Number(value) || 0)}
             />
           ))}
         </Box>
       </Box>
 
-      {missingZones.length > 0 ? (
-        <Alert color="yellow" variant="light" py="xs">{missingZones.length} ZEITKAT-Sätze bis einschließlich 8 Stunden fehlen. Die Sliderpositionen bleiben sichtbar und lassen sich direkt befüllen.</Alert>
-      ) : null}
-
-      {simulation && overEightEntries.length > 0 ? (
-        <Text size="xs" c="dimmed">ZEITKAT über 8 Stunden bleiben in dieser Simulation auf dem Originalwert; der Sliderbereich endet bei 8 Stunden.</Text>
-      ) : null}
-
-      {!simulation && overEightEntries.length > 0 ? (
-        <Paper withBorder p="xs" radius="sm">
-          <Text size="xs" fw={600} mb="xs">Weitere vorhandene ZEITKAT über 8 Stunden</Text>
+      {!feeStaircaseValidation.isCompliant ? (
+        <Alert
+          color="yellow"
+          variant="light"
+          title="Beitragsstaffelung prüfen"
+          data-testid="fee-staircase-compliance-warning"
+        >
           <Stack gap="xs">
-            {overEightEntries.map((entry) => {
-              const zone = ZEITKAT_CATALOG.find((item) => item.id === getFeeBandZeitkatId(entry));
-              return (
-                <Group key={entry.id} justify="space-between" wrap="wrap">
-                  <Text size="sm">ZEITKAT {zone.id} · {zone.kurzbez} h/Tag</Text>
-                  <PriceField
-                    value={entry.monthlyAmount}
-                    label={`Betrag ZEITKAT ${zone.id}`}
-                    onChange={(value) => replaceActiveEntries(activeEntries.map((current) => (
-                      current.id === entry.id ? { ...current, monthlyAmount: value } : current
-                    )))}
-                    testId={`fee-staircase-price-${entry.id}`}
-                  />
-                </Group>
-              );
-            })}
+            <Text size="sm">
+              Laut <Anchor href={STMAS_FEE_STAFFELUNG_URL} target="_blank" rel="noreferrer">STMAS-Newsletter 31</Anchor> braucht jede Buchungszeitkategorie einen eigenen Beitrag. Der Abstand zwischen benachbarten Kategorien muss mindestens 5 € und mindestens 10 % des Beitrags für mehr als 3 bis einschließlich 4 Stunden betragen.
+            </Text>
+            {feeStaircaseValidation.missingZones.length > 0 ? (
+              <Text size="sm">
+                Fehlende oder deaktivierte Kategorien: {feeStaircaseValidation.missingZones.map(getZeitkatLabel).join(', ')}.
+              </Text>
+            ) : null}
+            {feeStaircaseValidation.referenceAmount == null ? (
+              <Text size="sm">Kategorie 3 (mehr als 3 bis einschließlich 4 Stunden) fehlt; deshalb ist die 10%-Schwelle noch nicht bestimmbar.</Text>
+            ) : null}
+            {feeStaircaseValidation.stepViolations.map((violation) => (
+              <Text size="sm" key={`${violation.previousZone.id}-${violation.zone.id}`}>
+                {getZeitkatLabel(violation.previousZone)} → {getZeitkatLabel(violation.zone)}: {violation.currentAmount.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €; mindestens {violation.requiredAmount.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € erforderlich.
+              </Text>
+            ))}
           </Stack>
-        </Paper>
+        </Alert>
+      ) : null}
+      {enabledZones.length === 0 ? (
+        <Alert color="yellow" variant="light" py="xs">Keine ZEITKAT aktiviert. Wähle oben mindestens eine Kategorie aus, um ihren Beitrag zu pflegen und zu berechnen.</Alert>
       ) : null}
     </Stack>
   );

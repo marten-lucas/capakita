@@ -28,7 +28,6 @@ import {
   updateBayKiBiGRule,
   deleteBayKiBiGRule,
   setGroupFeeCatalogs,
-  updateParentFeeSubsidy,
   updateScenarioFinanceSettings,
 } from '../../store/simFinanceSlice';
 import {
@@ -451,18 +450,6 @@ function OrgaTabFinance({ section = 'all' }) {
               URL importieren
             </Button>
           </SimpleGrid>
-          <DatePickerInput
-            label="Elternbeitragszuschuss gilt bis einschließlich"
-            description="Danach wird in der Beitrags- und Jahressimulation kein Zuschuss mehr angesetzt. Feld leeren, wenn er unbegrenzt weiterläuft."
-            value={toDateValue(financeScenario.parentFeeSubsidy?.endDate)}
-            onChange={(value) => dispatch(updateParentFeeSubsidy({
-              scenarioId: selectedScenarioId,
-              updates: { endDate: toIsoDate(value) },
-            }))}
-            valueFormat="DD.MM.YYYY"
-            clearable
-            data-testid="parent-fee-subsidy-end-date"
-          />
         </Stack>
       </Paper>
       )}
@@ -547,7 +534,7 @@ function OrgaTabFinance({ section = 'all' }) {
             <Accordion variant="separated">
               {groupDefs.map((group) => {
                 const entries = financeScenario.groupFeeCatalogs?.[group.id] || [];
-                const zeitkatCount = entries.filter((entry) => Boolean(getFeeBandZeitkatId(entry))).length;
+                const zeitkatCount = entries.filter((entry) => Boolean(getFeeBandZeitkatId(entry)) && entry.enabled !== false).length;
                 const entrySummary = `${zeitkatCount} ZEITKAT-Sätze`;
                 return (
                   <Accordion.Item key={group.id} value={group.id}>

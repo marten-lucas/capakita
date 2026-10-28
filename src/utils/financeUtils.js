@@ -680,6 +680,7 @@ export function findFeeEntryForZeitkat(feeCatalog, zeitkatId, referenceDate) {
   if (!normalizedZeitkatId) return null;
 
   return (feeCatalog || [])
+    .filter((entry) => entry.enabled !== false)
     .filter((entry) => getFeeBandZeitkatId(entry) === normalizedZeitkatId)
     .filter((entry) => isDateWithinRange(referenceDate, entry.validFrom || '', entry.validUntil || ''))
     .sort((left, right) => {

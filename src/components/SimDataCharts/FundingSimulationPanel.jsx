@@ -1,9 +1,10 @@
 import React from 'react';
-import { Accordion, Alert, Badge, Box, Button, Group, NumberInput, Paper, Slider, Stack, Switch, Table, Tabs, Text, SimpleGrid } from '@mantine/core';
+import { Accordion, Alert, Badge, Box, Button, Group, MultiSelect, NumberInput, Paper, Slider, Stack, Switch, Table, Tabs, Text, SimpleGrid } from '@mantine/core';
+import { DatePickerInput } from '@mantine/dates';
 import { IconArrowRight, IconCoins, IconUsers } from '@tabler/icons-react';
 import { useDispatch, useSelector } from 'react-redux';
 import { setSelectedItem } from '../../store/simScenarioSlice';
-import { updateScenarioFinanceSettings } from '../../store/simFinanceSlice';
+import { updateParentFeeSubsidy, updateScenarioFinanceSettings } from '../../store/simFinanceSlice';
 import { useOverlayData } from '../../hooks/useOverlayData';
 import { filterBookings } from '../../utils/chartUtils/chartUtils';
 import { simulateAnnualContributionChanges, simulateContributionChanges } from '../../utils/foerderSimulation';
@@ -21,6 +22,19 @@ const formatAffectedCount = (children, families) => (
 );
 const EMPTY_FINANCE = {};
 const EMPTY_GROUP_FEE_CATALOGS = {};
+
+function toDateValue(value) {
+  if (!value) return null;
+  const [year, month, day] = String(value).slice(0, 10).split('-').map(Number);
+  return year && month && day ? new Date(year, month - 1, day) : null;
+}
+
+function toIsoDate(value) {
+  if (!value) return '';
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
 
 function ReformAmountInput({ value, onCommit, ...props }) {
   const [draft, setDraft] = React.useState(value ?? 0);
@@ -161,6 +175,7 @@ function FundingSimulationPanel({ accent }) {
   const [temporaryCatalogEntries, setTemporaryCatalogEntries] = React.useState({});
   const [temporaryPrices, setTemporaryPrices] = React.useState({});
   const [temporaryParentFeeSubsidyAmount, setTemporaryParentFeeSubsidyAmount] = React.useState(null);
+  const [selectedGroupIds, setSelectedGroupIds] = React.useState([]);
   const [activeTab, setActiveTab] = React.useState('groups');
   const groupTableRef = React.useRef(null);
   const childTableRef = React.useRef(null);
@@ -170,6 +185,7 @@ function FundingSimulationPanel({ accent }) {
     setTemporaryCatalogEntries({});
     setTemporaryPrices({});
     setTemporaryParentFeeSubsidyAmount(null);
+    setSelectedGroupIds([]);
   }, [selectedScenarioId]);
 
   const groupFeeCatalogs = financeScenario?.groupFeeCatalogs || EMPTY_GROUP_FEE_CATALOGS;
@@ -182,6 +198,10 @@ function FundingSimulationPanel({ accent }) {
   const policyParentFeeSubsidyAmount = subsidyEndsBeforeReferenceDate ? 0 : baselineParentFeeSubsidyAmount;
   const simulatedParentFeeSubsidyAmount = temporaryParentFeeSubsidyAmount ?? policyParentFeeSubsidyAmount;
   const groupDefs = getEffectiveGroupDefs();
+  const groupFilterOptions = React.useMemo(() => [
+    ...(groupDefs || []).map((group) => ({ value: String(group.id), label: group.name || String(group.id) })),
+    { value: '__NO_GROUP__', label: 'Ohne Gruppe' },
+  ], [groupDefs]);
   const groupLabels = React.useMemo(() => new Map(
     (groupDefs || []).map((group) => [String(group.id), group.name || String(group.id)])
   ), [groupDefs]);
@@ -317,7 +337,7 @@ function FundingSimulationPanel({ accent }) {
       overlaysByScenario: {},
       scenarioId: selectedScenarioId,
       referenceDate,
-      selectedGroups: [],
+      selectedGroups: selectedGroupIds,
       selectedQualifications: [],
       groupsByScenario: { [selectedScenarioId]: groupAssignmentsByItem },
     });
@@ -353,6 +373,7 @@ function FundingSimulationPanel({ accent }) {
     getEffectiveGroupAssignments,
     getEffectiveQualificationAssignments,
     selectedScenarioId,
+    selectedGroupIds,
     referenceDate,
     financeScenario,
     simulationCatalogs,
@@ -393,7 +414,7 @@ function FundingSimulationPanel({ accent }) {
   };
   const hasRule = Boolean(result?.rule && Number(result.rule.baseValue) > 0);
   const catalogEntries = Object.values(groupFeeCatalogs).flatMap((entries) => (Array.isArray(entries) ? entries : []));
-  const hasAnyZeitkatEntries = catalogEntries.some((entry) => Boolean(getFeeBandZeitkatId(entry)));
+  const hasAnyZeitkatEntries = catalogEntries.some((entry) => Boolean(getFeeBandZeitkatId(entry)) && entry.enabled !== false);
   const hasSimulationFeeRows = categoryPriceRows.length > 0;
 
   const kpis = [
@@ -414,6 +435,17 @@ function FundingSimulationPanel({ accent }) {
           Verwendet die im Capakita-Datenspeicher hinterlegten ZEITKAT-Sätze. Fehlende ZEITKAT werden aus den gespeicherten Buchungszeiten abgeleitet.
           Bei gleichem Preis wechselt die Ausschöpfungsquote anteilig in die nächste ZEITKAT. Simulationswerte bleiben lokal und verändern weder Optionen noch gespeicherte Buchungen.
         </Text>
+        <MultiSelect
+          label="Gruppen für die Simulation"
+          description="Keine Auswahl = alle Gruppen. Die Auswertung und Jahreswirkung werden auf die ausgewählten Gruppen beschränkt."
+          placeholder="Alle Gruppen"
+          data={groupFilterOptions}
+          value={selectedGroupIds}
+          onChange={setSelectedGroupIds}
+          searchable
+          clearable
+          data-testid="simulation-group-filter"
+        />
         {!hasRule ? (
           <Badge color="orange" variant="light" w="fit-content">
             Keine Förderregel mit Basiswert hinterlegt (Einstellungen → Förderregel) – Förderänderungen = 0.
@@ -460,7 +492,7 @@ function FundingSimulationPanel({ accent }) {
                   <Accordion.Control>
                     <Group justify="space-between" pr="md" wrap="wrap">
                       <Text fw={600}>{group.name}</Text>
-                      <Text size="xs" c="dimmed">{(effectiveFeeCatalogs[group.id] || []).length} Staffeln</Text>
+                      <Text size="xs" c="dimmed">{(effectiveFeeCatalogs[group.id] || []).filter((entry) => entry.enabled !== false).length} Staffeln</Text>
                     </Group>
                   </Accordion.Control>
                   <Accordion.Panel>
@@ -493,6 +525,18 @@ function FundingSimulationPanel({ accent }) {
             </Stack>
             <Text fw={700} size="sm" data-testid="parent-fee-subsidy-value">{formatEuro(simulatedParentFeeSubsidyAmount)} / Monat</Text>
           </Group>
+          <DatePickerInput
+            label="Elternbeitragszuschuss gilt bis einschließlich"
+            description="Danach wird kein Zuschuss mehr angesetzt. Feld leeren, wenn er unbegrenzt weiterläuft."
+            value={toDateValue(parentFeeSubsidy.endDate)}
+            onChange={(value) => dispatch(updateParentFeeSubsidy({
+              scenarioId: selectedScenarioId,
+              updates: { endDate: toIsoDate(value) },
+            }))}
+            valueFormat="DD.MM.YYYY"
+            clearable
+            data-testid="parent-fee-subsidy-end-date"
+          />
           <Group align="center" gap="sm" wrap="wrap">
             <Box style={{ flex: '1 1 260px', minWidth: 200 }}>
               <Slider

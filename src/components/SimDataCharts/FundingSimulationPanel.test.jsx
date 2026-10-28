@@ -161,6 +161,23 @@ describe('FundingSimulationPanel', () => {
     expect(screen.getByText('Buchungsstunden vorher')).toBeTruthy();
   });
 
+  it('filtert die Simulation nach ausgewählten Gruppen', () => {
+    render(
+      <Provider store={createTestStore()}>
+        <MantineProvider>
+          <FundingSimulationPanel accent="#0f766e" />
+        </MantineProvider>
+      </Provider>
+    );
+
+    const groupFilter = screen.getByRole('combobox', { name: 'Gruppen für die Simulation' });
+    fireEvent.click(groupFilter);
+    fireEvent.click(screen.getByRole('option', { name: 'Ohne Gruppe' }));
+
+    expect(screen.getByTestId('simulation-group-filter')).toBeTruthy();
+    expect(screen.getByText(/Keine aktiven Basisbuchungen mit auswertbarer ZEITKAT/)).toBeTruthy();
+  });
+
   it('zeigt die Reform-Zusatzdaten in der Simulation und speichert den 2026-Istwert', () => {
     const store = createTestStore();
     render(
@@ -171,6 +188,7 @@ describe('FundingSimulationPanel', () => {
       </Provider>
     );
 
+    expect(screen.getByTestId('parent-fee-subsidy-end-date')).toBeTruthy();
     fireEvent.click(screen.getByText('BayKiBiG-Reform · Zusatzdaten für die Berechnung'));
     const bookingTimeInput = screen.getByLabelText('Ist 2026 · Förderung nach Buchungszeiten');
     fireEvent.change(bookingTimeInput, { target: { value: '9000' } });
