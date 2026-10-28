@@ -11,26 +11,47 @@ function makeStaircase(step, referenceAmount = 100) {
   }));
 }
 
+function keepActiveZones(entries, activeIds) {
+  const activeIdSet = new Set(activeIds);
+  return entries.map((entry) => ({
+    ...entry,
+    monthlyAmount: activeIdSet.has(entry.zeitkatId) ? entry.monthlyAmount : 0,
+  }));
+}
+
 describe('validateFeeStaircase', () => {
-  it('accepts a complete staircase whose adjacent steps meet the 10% rule', () => {
-    const result = validateFeeStaircase(makeStaircase(10, 100));
+  it('allows unused categories outside the configured minimum and maximum', () => {
+    const entries = keepActiveZones(makeStaircase(10, 100), ['04', '05', '06']);
+    const result = validateFeeStaircase(entries);
 
     expect(result.isCompliant).toBe(true);
     expect(result.minimumDifference).toBe(10);
-    expect(result.missingZones).toEqual([]);
+    expect(result.firstActiveZone.id).toBe('04');
+    expect(result.lastActiveZone.id).toBe('06');
+    expect(result.gaps).toEqual([]);
     expect(result.stepViolations).toEqual([]);
   });
 
-  it('requires at least five euros even when ten percent is lower', () => {
-    const result = validateFeeStaircase(makeStaircase(5, 40));
+  it('requires at least five euros when ten percent is lower', () => {
+    const entries = keepActiveZones(makeStaircase(5, 40), ['01', '02', '04']);
+    const result = validateFeeStaircase(entries);
 
     expect(result.minimumDifference).toBe(5);
     expect(result.isCompliant).toBe(true);
   });
 
+  it('reports zero-value categories that leave a gap inside the active range', () => {
+    const entries = keepActiveZones(makeStaircase(10, 100), ['04', '05', '07']);
+    const result = validateFeeStaircase(entries);
+
+    expect(result.isCompliant).toBe(false);
+    expect(result.gaps.map((zone) => zone.id)).toEqual(['06']);
+  });
+
   it('reports adjacent prices that are too close', () => {
-    const entries = makeStaircase(10, 100);
-    entries[1].monthlyAmount = entries[0].monthlyAmount + 9;
+    const entries = keepActiveZones(makeStaircase(10, 100), ['01', '02', '04']);
+    const firstAmount = entries.find((entry) => entry.zeitkatId === '01').monthlyAmount;
+    entries.find((entry) => entry.zeitkatId === '02').monthlyAmount = firstAmount + 9;
 
     const result = validateFeeStaircase(entries);
 
@@ -39,19 +60,15 @@ describe('validateFeeStaircase', () => {
       previousZone: { id: '01' },
       zone: { id: '02' },
       difference: 9,
-      requiredAmount: entries[0].monthlyAmount + 10,
+      requiredAmount: entries.find((entry) => entry.zeitkatId === '01').monthlyAmount + 10,
     });
   });
 
-  it('treats disabled categories as missing and reports a missing reference category', () => {
-    const entries = makeStaircase(10, 100).filter((entry) => entry.zeitkatId !== '04');
-    entries.find((entry) => entry.zeitkatId === '08').enabled = false;
-
-    const result = validateFeeStaircase(entries);
+  it('reports when no positive category is activated', () => {
+    const result = validateFeeStaircase(makeStaircase(10).map((entry) => ({ ...entry, monthlyAmount: 0 })));
 
     expect(result.isCompliant).toBe(false);
-    expect(result.referenceAmount).toBeNull();
-    expect(result.missingZones.map((zone) => zone.id)).toContain('04');
-    expect(result.missingZones.map((zone) => zone.id)).toContain('08');
+    expect(result.noActiveZones).toBe(true);
+    expect(result.gaps).toEqual([]);
   });
 });

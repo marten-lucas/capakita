@@ -594,55 +594,30 @@ function SimDataList() {
         )}
       </Group>
 
-      <Stack gap={6}>
-        <Group gap={6} wrap="wrap">
-          <Button
-            size="xs"
-            variant={dataCaptureQueueMode ? 'filled' : 'light'}
-            onClick={() => dispatch(setDataCaptureQueueMode(!dataCaptureQueueMode))}
-          >
-            Erfassungs-Queue
-          </Button>
-          <Button
-            size="xs"
-            variant="light"
-            onClick={selectNextIncomplete}
-            disabled={incompleteIds.length === 0}
-          >
-            Nächster unvollständig
-          </Button>
-        </Group>
-        <Group gap={6} wrap="nowrap" justify="space-between">
-          <Switch
-            size="sm"
-            checked={showArchivedItems}
-            onChange={(event) => setShowArchivedItems(event.currentTarget.checked)}
-            label="Archivierte anzeigen"
-          />
-          <Menu shadow="md" width={220} position="bottom-end">
-            <Menu.Target>
-              <ActionIcon variant="subtle" aria-label="Filter öffnen">
-                <IconDotsVertical size={16} />
-              </ActionIcon>
-            </Menu.Target>
-            <Menu.Dropdown>
-              <Menu.Label>Filter</Menu.Label>
-              <Menu.Item onClick={() => dispatch(setDataListFilter('all'))}>Alle</Menu.Item>
-              <Menu.Item onClick={() => dispatch(setDataListFilter('incomplete'))}>Unvollständig</Menu.Item>
-              <Menu.Item onClick={() => dispatch(setDataListFilter('missing_booking'))}>Ohne Buchung</Menu.Item>
-              <Menu.Item onClick={() => dispatch(setDataListFilter('missing_group'))}>Ohne Gruppe</Menu.Item>
-              <Menu.Item onClick={() => dispatch(setDataListFilter('missing_birthdate'))}>Ohne Geburtsdatum</Menu.Item>
-              <Menu.Item onClick={() => dispatch(setDataListFilter('missing_name'))}>Ohne Name</Menu.Item>
-            </Menu.Dropdown>
-          </Menu>
-        </Group>
-      </Stack>
-
-      {dataCaptureQueueMode && (
-        <Text size="xs" c="dimmed">
-          Queue aktiv: {incompleteIds.length} unvollständige Einträge erkannt.
-        </Text>
-      )}
+      <Group gap={6} wrap="nowrap" justify="space-between">
+        <Switch
+          size="sm"
+          checked={showArchivedItems}
+          onChange={(event) => setShowArchivedItems(event.currentTarget.checked)}
+          label="Archivierte anzeigen"
+        />
+        <Menu shadow="md" width={220} position="bottom-end">
+          <Menu.Target>
+            <ActionIcon variant="subtle" aria-label="Filter öffnen">
+              <IconDotsVertical size={16} />
+            </ActionIcon>
+          </Menu.Target>
+          <Menu.Dropdown>
+            <Menu.Label>Filter</Menu.Label>
+            <Menu.Item onClick={() => dispatch(setDataListFilter('all'))}>Alle</Menu.Item>
+            <Menu.Item onClick={() => dispatch(setDataListFilter('incomplete'))}>Unvollständig</Menu.Item>
+            <Menu.Item onClick={() => dispatch(setDataListFilter('missing_booking'))}>Ohne Buchung</Menu.Item>
+            <Menu.Item onClick={() => dispatch(setDataListFilter('missing_group'))}>Ohne Gruppe</Menu.Item>
+            <Menu.Item onClick={() => dispatch(setDataListFilter('missing_birthdate'))}>Ohne Geburtsdatum</Menu.Item>
+            <Menu.Item onClick={() => dispatch(setDataListFilter('missing_name'))}>Ohne Name</Menu.Item>
+          </Menu.Dropdown>
+        </Menu>
+      </Group>
 
       {selectedItemIds.length > 0 && (
         <Paper withBorder p="xs" radius="md" bg="gray.0">
@@ -670,15 +645,45 @@ function SimDataList() {
     </Stack>
   );
 
+  const dataCaptureToolbar = (
+    <Stack gap="sm" data-testid="data-capture-toolbar">
+      <div>
+        <Text size="sm" fw={600}>Datenbereinigung</Text>
+        <Text size="xs" c="dimmed">Unvollständige Datensätze schnell nacheinander erfassen.</Text>
+      </div>
+      <Button
+        fullWidth
+        variant={dataCaptureQueueMode ? 'filled' : 'light'}
+        onClick={() => dispatch(setDataCaptureQueueMode(!dataCaptureQueueMode))}
+      >
+        Erfassungs-Queue
+      </Button>
+      <Button
+        fullWidth
+        variant="light"
+        onClick={selectNextIncomplete}
+        disabled={incompleteIds.length === 0}
+      >
+        Nächster unvollständig
+      </Button>
+      {dataCaptureQueueMode ? (
+        <Paper withBorder p="xs" radius="sm">
+          <Text size="xs" c="dimmed">Queue aktiv: {incompleteIds.length} unvollständige Einträge erkannt.</Text>
+        </Paper>
+      ) : null}
+    </Stack>
+  );
+
   return (
     <Stack gap="sm">
       <TabbedListDetail
         data={submenuData}
         selectedId={selectedSubmenuItemId}
         onSelect={(id) => dispatch(setSelectedItem(id))}
-        listPosition="right"
+        listPosition="left"
         collapsible
         listHeader={listHeader}
+        toolbarContent={dataCaptureToolbar}
         renderItem={renderItem}
         detailTitle={(item) => (isMultiSelected ? `${selectedItemIds.length} Einträge ausgewählt` : (item?.name || 'Details'))}
         detailContent={() => (

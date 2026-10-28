@@ -40,14 +40,18 @@ async function seedDataList(page) {
   await expect(page.getByTestId('data-list-item-staff-1')).toBeVisible();
 }
 
-test('data panel is on the right, collapses, and filter/archive/queue actions work', async ({ page }) => {
+test('data list is left of detail and cleanup controls are in the right toolbar', async ({ page }) => {
   await seedDataList(page);
 
   const listPanel = page.getByTestId('list-detail-list-panel');
   const detailPanel = page.getByTestId('list-detail-detail-panel');
+  const toolbarPanel = page.getByTestId('list-detail-toolbar-panel');
   const listBox = await listPanel.boundingBox();
   const detailBox = await detailPanel.boundingBox();
-  expect(listBox.x).toBeGreaterThan(detailBox.x);
+  const toolbarBox = await toolbarPanel.boundingBox();
+  expect(listBox.x).toBeLessThan(detailBox.x);
+  expect(detailBox.x).toBeLessThan(toolbarBox.x);
+  await expect(toolbarPanel.getByTestId('data-capture-toolbar')).toBeVisible();
 
   await page.getByRole('button', { name: 'Datenliste ausblenden' }).click();
   await expect(page.getByTestId('list-detail-list-collapsed')).toBeVisible();
@@ -68,10 +72,10 @@ test('data panel is on the right, collapses, and filter/archive/queue actions wo
   await expect(page.getByTestId('data-list-item-staff-archived')).toHaveCount(0);
 
   // Queue mode switches to incomplete records, the next button selects one.
-  await page.getByRole('button', { name: 'Erfassungs-Queue' }).click();
+  await toolbarPanel.getByRole('button', { name: 'Erfassungs-Queue' }).click();
   await expect(page.getByText(/Queue aktiv/)).toBeVisible();
   await expect(page.getByTestId('data-list-item-staff-2')).toBeVisible();
-  await page.getByRole('button', { name: 'Nächster unvollständig' }).click();
+  await toolbarPanel.getByRole('button', { name: 'Nächster unvollständig' }).click();
   const selectedIds = await page.evaluate(() => window.__APP_STORE.getState().simScenario.selectedItems['data-panel-e2e']);
   expect(selectedIds).toHaveLength(1);
   const selectedItem = await page.evaluate((id) => window.__APP_STORE.getState().simData.dataByScenario['data-panel-e2e'][id], selectedIds[0]);

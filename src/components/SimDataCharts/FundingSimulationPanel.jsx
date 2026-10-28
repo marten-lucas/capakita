@@ -414,7 +414,7 @@ function FundingSimulationPanel({ accent }) {
   };
   const hasRule = Boolean(result?.rule && Number(result.rule.baseValue) > 0);
   const catalogEntries = Object.values(groupFeeCatalogs).flatMap((entries) => (Array.isArray(entries) ? entries : []));
-  const hasAnyZeitkatEntries = catalogEntries.some((entry) => Boolean(getFeeBandZeitkatId(entry)) && entry.enabled !== false);
+  const hasAnyZeitkatEntries = catalogEntries.some((entry) => Boolean(getFeeBandZeitkatId(entry)) && entry.enabled !== false && Number(entry.monthlyAmount) > 0);
   const hasSimulationFeeRows = categoryPriceRows.length > 0;
 
   const kpis = [
@@ -492,7 +492,7 @@ function FundingSimulationPanel({ accent }) {
                   <Accordion.Control>
                     <Group justify="space-between" pr="md" wrap="wrap">
                       <Text fw={600}>{group.name}</Text>
-                      <Text size="xs" c="dimmed">{(effectiveFeeCatalogs[group.id] || []).filter((entry) => entry.enabled !== false).length} Staffeln</Text>
+                      <Text size="xs" c="dimmed">{(effectiveFeeCatalogs[group.id] || []).filter((entry) => entry.enabled !== false && Number(entry.monthlyAmount) > 0).length} Staffeln</Text>
                     </Group>
                   </Accordion.Control>
                   <Accordion.Panel>

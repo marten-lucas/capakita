@@ -99,8 +99,9 @@ function OriginalMarker({ amount, maxAmount }) {
   );
 }
 
-function ContributionSlider({ zone, entry, originalEntry, priceMax, simulation, disabled, onChange }) {
-  const amount = Number(entry?.monthlyAmount) || 0;
+function ContributionSlider({ zone, entry, originalEntry, priceMax, simulation, onChange, onActivate }) {
+  const isActive = Boolean(entry && entry.enabled !== false && Number(entry.monthlyAmount) > 0);
+  const amount = isActive ? Number(entry.monthlyAmount) : 0;
   return (
     <Stack gap={4} align="center" style={{ flex: '1 0 106px', minWidth: 106, padding: '0 6px' }}>
       <Text size="xs" fw={700} ta="center" lh={1.2}>{zone.kurzbez}h</Text>
@@ -109,7 +110,7 @@ function ContributionSlider({ zone, entry, originalEntry, priceMax, simulation, 
         <OriginalMarker amount={simulation ? originalEntry?.monthlyAmount : null} maxAmount={priceMax} />
         <Slider
           orientation="vertical"
-          disabled={disabled}
+          disabled={!isActive}
           min={0}
           max={priceMax}
           step={5}
@@ -121,13 +122,22 @@ function ContributionSlider({ zone, entry, originalEntry, priceMax, simulation, 
           style={{ height: SLIDER_HEIGHT, width: 34, zIndex: 1 }}
         />
       </Box>
-      <PriceField
-        value={amount}
-        label={`Betrag ZEITKAT ${zone.id}`}
-        onChange={onChange}
-        testId={`fee-staircase-price-${zone.id}`}
-        disabled={disabled}
-      />
+      {isActive ? (
+        <PriceField
+          value={amount}
+          label={`Betrag ZEITKAT ${zone.id}`}
+          onChange={onChange}
+          testId={`fee-staircase-price-${zone.id}`}
+        />
+      ) : (
+        <Checkbox
+          size="xs"
+          label="Aktivieren"
+          aria-label={`Aktiviere Beitrag ZEITKAT ${zone.id}`}
+          data-testid={`activate-fee-zeitkat-${zone.id}`}
+          onChange={onActivate}
+        />
+      )}
       {simulation ? (
         <Text size="10px" c="dimmed" ta="center">
           Original {originalEntry ? `${Number(originalEntry.monthlyAmount || 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €` : '–'}
@@ -173,9 +183,6 @@ export default function FeeStaircaseEditor({
   const periodStart = activeEntries[0]?.validFrom || '';
   const periodEnd = activeEntries[0]?.validUntil || '';
   const priceMax = getPriceMax(activeEntries, originalEntriesForPeriod);
-  const enabledZones = activeEntries
-    .filter((entry) => entry.enabled !== false)
-    .map((entry) => getFeeBandZeitkatId(entry));
   const feeStaircaseValidation = validateFeeStaircase(activeEntries);
 
   function replaceActiveEntries(nextActiveEntries) {
@@ -188,38 +195,73 @@ export default function FeeStaircaseEditor({
   function updateZeitkatAmount(zone, amount) {
     const existing = activeByZone.get(zone.id);
     if (!existing) return;
-    replaceActiveEntries(sortZeitkatEntries(activeEntries.map((entry) => (
-      getFeeBandZeitkatId(entry) === zone.id ? { ...entry, monthlyAmount: amount } : entry
-    ))));
+    const nextAmount = Math.max(0, Number(amount) || 0);
+    replaceActiveEntries(sortZeitkatEntries(activeEntries.map((entry) => {
+      if (getFeeBandZeitkatId(entry) !== zone.id) return entry;
+      const previousAmount = Number(entry.monthlyAmount) || 0;
+      return {
+        ...entry,
+        monthlyAmount: nextAmount,
+        enabled: nextAmount > 0,
+        ...(nextAmount === 0 && previousAmount > 0 ? { lastNonZeroAmount: previousAmount } : {}),
+      };
+    })));
   }
 
-  function updateEnabledZones(selectedZoneIds) {
-    const selected = new Set(selectedZoneIds);
-    const nextEntries = activeEntries.map((entry) => ({
-      ...entry,
-      enabled: selected.has(getFeeBandZeitkatId(entry)),
-    }));
-    const existingZoneIds = new Set(activeEntries.map((entry) => getFeeBandZeitkatId(entry)));
+  function getActivationAmount(zone, existing) {
+    const rememberedAmount = Number(existing?.lastNonZeroAmount) || Number(existing?.monthlyAmount) || 0;
+    if (rememberedAmount > 0) return rememberedAmount;
 
-    ZEITKAT_SLIDER_ZONES.forEach((zone) => {
-      if (!selected.has(zone.id) || existingZoneIds.has(zone.id)) return;
-      const zoneIndex = ZEITKAT_SLIDER_ZONES.findIndex((candidate) => candidate.id === zone.id);
-      const priorEntry = [...activeEntries].reverse().find((entry) => (
-        ZEITKAT_SLIDER_ZONES.findIndex((candidate) => candidate.id === getFeeBandZeitkatId(entry)) < zoneIndex
-      )) || activeEntries[0] || {};
-      nextEntries.push({
-        ...priorEntry,
-        validFrom: priorEntry.validFrom || periodStart,
-        validUntil: priorEntry.validUntil || periodEnd,
+    const zoneIndex = ZEITKAT_SLIDER_ZONES.findIndex((candidate) => candidate.id === zone.id);
+    const activeEntriesByPrice = activeEntries.filter((entry) => (
+      entry.enabled !== false && Number(entry.monthlyAmount) > 0
+    ));
+    const previousEntry = [...activeEntriesByPrice].reverse().find((entry) => (
+      ZEITKAT_SLIDER_ZONES.findIndex((candidate) => candidate.id === getFeeBandZeitkatId(entry)) < zoneIndex
+    ));
+    const nextEntry = activeEntriesByPrice.find((entry) => (
+      ZEITKAT_SLIDER_ZONES.findIndex((candidate) => candidate.id === getFeeBandZeitkatId(entry)) > zoneIndex
+    ));
+    const referenceAmount = Number(activeByZone.get('04')?.monthlyAmount) || 0;
+    const minimumDifference = Math.max(5, referenceAmount * 0.1);
+
+    if (zone.id === '04' && previousEntry) {
+      const previousAmount = Number(previousEntry.monthlyAmount) || 0;
+      return Math.ceil(Math.max(previousAmount + 5, previousAmount / 0.9) * 100) / 100;
+    }
+    if (zone.id === '04' && nextEntry) {
+      const nextAmount = Number(nextEntry.monthlyAmount) || 0;
+      return Math.max(0.01, Math.floor(Math.min(nextAmount - 5, nextAmount / 1.1) * 100) / 100);
+    }
+    if (previousEntry) return Math.round((Number(previousEntry.monthlyAmount) + minimumDifference) * 100) / 100;
+    if (nextEntry) return Math.max(0.01, Math.round((Number(nextEntry.monthlyAmount) - minimumDifference) * 100) / 100);
+    return 5;
+  }
+
+  function activateZeitkat(zone) {
+    const existing = activeByZone.get(zone.id);
+    const monthlyAmount = getActivationAmount(zone, existing);
+    if (existing) {
+      replaceActiveEntries(sortZeitkatEntries(activeEntries.map((entry) => (
+        getFeeBandZeitkatId(entry) === zone.id
+          ? { ...entry, monthlyAmount, enabled: true }
+          : entry
+      ))));
+      return;
+    }
+
+    replaceActiveEntries(sortZeitkatEntries([
+      ...activeEntries,
+      {
         id: createId('fee'),
         zeitkatId: zone.id,
         label: '',
-        monthlyAmount: Number(priorEntry.monthlyAmount) || 0,
+        validFrom: periodStart,
+        validUntil: periodEnd,
+        monthlyAmount,
         enabled: true,
-      });
-    });
-
-    replaceActiveEntries(sortZeitkatEntries(nextEntries));
+      },
+    ]));
   }
 
   function updateValidity(field, value) {
@@ -234,27 +276,7 @@ export default function FeeStaircaseEditor({
     <Stack gap="sm" data-testid="fee-staircase-editor">
       <Group justify="space-between" align="flex-end" wrap="wrap">
         <Text size="sm" fw={600}>ZEITKAT / Stunden pro Tag · Slider</Text>
-        <Group gap="xs">
-          <Checkbox.Group
-            label="Slider je Kategorie aktivieren"
-            value={enabledZones}
-            onChange={updateEnabledZones}
-            data-testid="zeitkat-slider-toggles"
-          >
-            <Group gap="sm" wrap="wrap">
-              {ZEITKAT_SLIDER_ZONES.map((zone) => (
-                <Checkbox
-                  key={zone.id}
-                  value={zone.id}
-                  label={`ZEITKAT ${zone.id}`}
-                  size="xs"
-                  data-testid={`zeitkat-slider-toggle-${zone.id}`}
-                />
-              ))}
-            </Group>
-          </Checkbox.Group>
-          {simulation && onResetAll ? <Button size="xs" variant="subtle" onClick={onResetAll}>Gruppe zurücksetzen</Button> : null}
-        </Group>
+        {simulation && onResetAll ? <Button size="xs" variant="subtle" onClick={onResetAll}>Gruppe zurücksetzen</Button> : null}
       </Group>
 
       {periodOptions.length > 1 ? (
@@ -289,7 +311,7 @@ export default function FeeStaircaseEditor({
           w={190}
           aria-label="Tarif gültig bis"
         />
-        <Text size="xs" c="dimmed">Der Monatsbetrag lässt sich am Slider oder im Zahlenfeld direkt darunter ändern.</Text>
+        <Text size="xs" c="dimmed">Beitrag über Slider oder Zahlenfeld ändern. Bei 0 erscheint unter dem Slider die Checkbox zum Reaktivieren.</Text>
       </Group>
 
       <Box style={{ overflowX: 'auto', border: '1px solid var(--mantine-color-gray-3)', borderRadius: 8, padding: 10 }}>
@@ -302,8 +324,8 @@ export default function FeeStaircaseEditor({
               originalEntry={originalByZone.get(zone.id)}
               priceMax={priceMax}
               simulation={simulation}
-              disabled={!activeByZone.has(zone.id) || activeByZone.get(zone.id)?.enabled === false}
               onChange={(value) => updateZeitkatAmount(zone, Number(value) || 0)}
+              onActivate={() => activateZeitkat(zone)}
             />
           ))}
         </Box>
@@ -318,15 +340,15 @@ export default function FeeStaircaseEditor({
         >
           <Stack gap="xs">
             <Text size="sm">
-              Laut <Anchor href={STMAS_FEE_STAFFELUNG_URL} target="_blank" rel="noreferrer">STMAS-Newsletter 31</Anchor> braucht jede Buchungszeitkategorie einen eigenen Beitrag. Der Abstand zwischen benachbarten Kategorien muss mindestens 5 € und mindestens 10 % des Beitrags für mehr als 3 bis einschließlich 4 Stunden betragen.
+              Laut <Anchor href={STMAS_FEE_STAFFELUNG_URL} target="_blank" rel="noreferrer">STMAS-Newsletter 31</Anchor> dürfen außerhalb des aktiven Bereichs Kategorien leer bleiben. Zwischen der niedrigsten und höchsten aktivierten Kategorie darf es jedoch keine Lücken geben. Benachbarte Beiträge müssen sich mindestens um 5 € beziehungsweise 10 % des Beitrags für mehr als 3 bis einschließlich 4 Stunden unterscheiden.
             </Text>
-            {feeStaircaseValidation.missingZones.length > 0 ? (
-              <Text size="sm">
-                Fehlende oder deaktivierte Kategorien: {feeStaircaseValidation.missingZones.map(getZeitkatLabel).join(', ')}.
-              </Text>
+            {feeStaircaseValidation.noActiveZones ? (
+              <Text size="sm">Aktiviere mindestens eine Kategorie über die Checkbox unter ihrem Slider.</Text>
             ) : null}
-            {feeStaircaseValidation.referenceAmount == null ? (
-              <Text size="sm">Kategorie 3 (mehr als 3 bis einschließlich 4 Stunden) fehlt; deshalb ist die 10%-Schwelle noch nicht bestimmbar.</Text>
+            {feeStaircaseValidation.gaps.length > 0 ? (
+              <Text size="sm">
+                Lücken zwischen {getZeitkatLabel(feeStaircaseValidation.firstActiveZone)} und {getZeitkatLabel(feeStaircaseValidation.lastActiveZone)}: {feeStaircaseValidation.gaps.map(getZeitkatLabel).join(', ')}.
+              </Text>
             ) : null}
             {feeStaircaseValidation.stepViolations.map((violation) => (
               <Text size="sm" key={`${violation.previousZone.id}-${violation.zone.id}`}>
@@ -335,9 +357,6 @@ export default function FeeStaircaseEditor({
             ))}
           </Stack>
         </Alert>
-      ) : null}
-      {enabledZones.length === 0 ? (
-        <Alert color="yellow" variant="light" py="xs">Keine ZEITKAT aktiviert. Wähle oben mindestens eine Kategorie aus, um ihren Beitrag zu pflegen und zu berechnen.</Alert>
       ) : null}
     </Stack>
   );

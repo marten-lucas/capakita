@@ -1,9 +1,21 @@
+import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MantineProvider } from '@mantine/core';
 import FeeStaircaseEditor from './FeeStaircaseEditor';
 
 const referenceDate = '2026-03-15';
+
+function StatefulFeeStaircaseEditor({ initialEntries }) {
+  const [entries, setEntries] = React.useState(initialEntries);
+  return (
+    <FeeStaircaseEditor
+      entries={entries}
+      referenceDate={referenceDate}
+      onChangeEntries={setEntries}
+    />
+  );
+}
 
 describe('FeeStaircaseEditor', () => {
   it('activates a missing ZEITKAT from its checkbox and preserves category order', () => {
@@ -24,11 +36,11 @@ describe('FeeStaircaseEditor', () => {
     expect(screen.getByTestId('fee-staircase-zeitkat')).toBeTruthy();
     expect(screen.getByTestId('fee-staircase-compliance-warning')).toBeTruthy();
     expect(screen.getByTestId('fee-staircase-slider-02')).toBeTruthy();
-    expect(screen.getByLabelText('ZEITKAT 02').checked).toBe(false);
-    fireEvent.click(screen.getByLabelText('ZEITKAT 02'));
+    expect(screen.getByLabelText('Aktiviere Beitrag ZEITKAT 02').checked).toBe(false);
+    fireEvent.click(screen.getByLabelText('Aktiviere Beitrag ZEITKAT 02'));
     const changedEntries = onChangeEntries.mock.calls.at(-1)[0];
     expect(changedEntries.map((entry) => entry.zeitkatId)).toEqual(['01', '02', '04']);
-    expect(changedEntries[1]).toMatchObject({ zeitkatId: '02', monthlyAmount: 100, enabled: true });
+    expect(changedEntries[1]).toMatchObject({ zeitkatId: '02', monthlyAmount: 115, enabled: true });
     expect(changedEntries.every((entry) => !Object.hasOwn(entry, 'maxHours'))).toBe(true);
   });
 
@@ -53,13 +65,34 @@ describe('FeeStaircaseEditor', () => {
     expect(screen.getByTestId('fee-staircase-compliance-warning')).toBeTruthy();
     expect(screen.getByTestId('fee-staircase-slider-09')).toBeTruthy();
     expect(screen.getByTestId('fee-staircase-slider-10')).toBeTruthy();
-    expect(screen.getByLabelText('ZEITKAT 09').checked).toBe(true);
-    expect(screen.getByLabelText('ZEITKAT 10').checked).toBe(true);
+    expect(screen.queryByTestId('zeitkat-slider-toggles')).toBeNull();
+    expect(screen.queryByLabelText('Aktiviere Beitrag ZEITKAT 09')).toBeNull();
+    expect(screen.queryByLabelText('Aktiviere Beitrag ZEITKAT 10')).toBeNull();
     expect(screen.getByText('>4-5h')).toBeTruthy();
     expect(screen.getByText('Kategorie 4')).toBeTruthy();
     expect(screen.queryByText('Direkte Eingabe')).toBeNull();
     expect(screen.getByLabelText('Betrag ZEITKAT 05').value).toBe('150 EUR');
     expect(screen.getByText('Original 100,00 €')).toBeTruthy();
+  });
+
+  it('deactivates a category at zero and restores its previous amount with the checkbox', () => {
+    render(
+      <MantineProvider>
+        <StatefulFeeStaircaseEditor
+          initialEntries={[{ id: 'fee-04', zeitkatId: '04', monthlyAmount: 150, validFrom: '2026-01-01' }]}
+        />
+      </MantineProvider>
+    );
+
+    const amountInput = screen.getByLabelText('Betrag ZEITKAT 04');
+    fireEvent.change(amountInput, { target: { value: '0' } });
+    fireEvent.blur(amountInput);
+
+    const activationCheckbox = screen.getByLabelText('Aktiviere Beitrag ZEITKAT 04');
+    expect(activationCheckbox.checked).toBe(false);
+    fireEvent.click(activationCheckbox);
+
+    expect(screen.getByLabelText('Betrag ZEITKAT 04').value).toBe('150 EUR');
   });
 
   it('updates the selected ZEITKAT only when imported entries reuse an ID', () => {

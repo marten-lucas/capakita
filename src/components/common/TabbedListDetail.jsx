@@ -21,6 +21,7 @@ function TabbedListDetail({
   emptyText = 'Keine Einträge vorhanden.',
   listPosition = 'left',
   listHeader = null,
+  toolbarContent = null,
   collapsible = false,
 }) {
   const isMobile = useMediaQuery('(max-width: 62em)');
@@ -123,6 +124,25 @@ function TabbedListDetail({
     </Paper>
   );
 
+  const toolbarPanel = toolbarContent ? (
+    <Paper
+      withBorder
+      shadow="xs"
+      data-testid="list-detail-toolbar-panel"
+      style={{
+        flex: isMobile ? 'none' : '0 0 240px',
+        minWidth: 0,
+        width: isMobile ? '100%' : 240,
+        maxWidth: '100%',
+        height: isMobile ? 'auto' : '100%',
+        overflow: 'auto',
+        boxSizing: 'border-box',
+      }}
+    >
+      <Box p="sm">{toolbarContent}</Box>
+    </Paper>
+  ) : null;
+
   const detailPanel = (
     <Paper
       withBorder
@@ -205,6 +225,7 @@ function TabbedListDetail({
       ) : listPanel}
 
       {detailPanel}
+      {toolbarPanel}
     </Group>
   );
 }

@@ -534,7 +534,7 @@ function OrgaTabFinance({ section = 'all' }) {
             <Accordion variant="separated">
               {groupDefs.map((group) => {
                 const entries = financeScenario.groupFeeCatalogs?.[group.id] || [];
-                const zeitkatCount = entries.filter((entry) => Boolean(getFeeBandZeitkatId(entry)) && entry.enabled !== false).length;
+                const zeitkatCount = entries.filter((entry) => Boolean(getFeeBandZeitkatId(entry)) && entry.enabled !== false && Number(entry.monthlyAmount) > 0).length;
                 const entrySummary = `${zeitkatCount} ZEITKAT-Sätze`;
                 return (
                   <Accordion.Item key={group.id} value={group.id}>

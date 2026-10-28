@@ -8,31 +8,51 @@ function amount(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function isActiveEntry(entry) {
+  return entry?.enabled !== false && amount(entry?.monthlyAmount) > 0;
+}
+
 export function getZeitkatLabel(zone) {
   return `Kategorie ${zone.kennz} (ZEITKAT ${zone.id}, ${zone.kurzbez}h)`;
 }
 
 /**
- * STMAS Newsletter 31 requires an individual parent fee for every booking-time
- * category and a step of at least max(5 EUR, 10% of the >3–4 hour category fee).
+ * Checks the selected contiguous range of booking-time categories against
+ * STMAS Newsletter 31. Categories outside the active min/max range are optional.
  */
 export function validateFeeStaircase(entries = []) {
+  const feeEntries = Array.isArray(entries) ? entries : [];
   const activeEntriesByZone = new Map(
-    (Array.isArray(entries) ? entries : [])
-      .filter((entry) => entry?.enabled !== false)
+    feeEntries
+      .filter(isActiveEntry)
       .map((entry) => [getFeeBandZeitkatId(entry), entry])
       .filter(([zoneId]) => Boolean(zoneId))
   );
-  const missingZones = ZEITKAT_CATALOG.filter((zone) => !activeEntriesByZone.has(zone.id));
-  const referenceEntry = activeEntriesByZone.get(REFERENCE_ZEITKAT_ID);
-  const referenceAmount = referenceEntry ? amount(referenceEntry.monthlyAmount) : null;
+  const activeZones = ZEITKAT_CATALOG.filter((zone) => activeEntriesByZone.has(zone.id));
+  const firstActiveIndex = activeZones.length > 0
+    ? ZEITKAT_CATALOG.findIndex((zone) => zone.id === activeZones[0].id)
+    : -1;
+  const lastActiveIndex = activeZones.length > 0
+    ? ZEITKAT_CATALOG.findIndex((zone) => zone.id === activeZones.at(-1).id)
+    : -1;
+  const gaps = firstActiveIndex < 0
+    ? []
+    : ZEITKAT_CATALOG.slice(firstActiveIndex, lastActiveIndex + 1)
+      .filter((zone) => !activeEntriesByZone.has(zone.id));
+
+  const referenceEntry = activeEntriesByZone.get(REFERENCE_ZEITKAT_ID)
+    || feeEntries.find((entry) => getFeeBandZeitkatId(entry) === REFERENCE_ZEITKAT_ID);
+  const referenceValue = referenceEntry
+    ? amount(referenceEntry.monthlyAmount) || amount(referenceEntry.lastNonZeroAmount)
+    : 0;
+  const referenceAmount = referenceValue > 0 ? referenceValue : null;
   const minimumDifference = Math.round(Math.max(
     MINIMUM_DIFFERENCE_EURO,
     (referenceAmount ?? 0) * 0.1
   ) * 100) / 100;
   const stepViolations = [];
 
-  for (let index = 1; index < ZEITKAT_CATALOG.length; index += 1) {
+  for (let index = firstActiveIndex + 1; index <= lastActiveIndex; index += 1) {
     const previousZone = ZEITKAT_CATALOG[index - 1];
     const zone = ZEITKAT_CATALOG[index];
     const previousEntry = activeEntriesByZone.get(previousZone.id);
@@ -55,8 +75,12 @@ export function validateFeeStaircase(entries = []) {
   }
 
   return {
-    isCompliant: missingZones.length === 0 && stepViolations.length === 0,
-    missingZones,
+    isCompliant: activeZones.length > 0 && gaps.length === 0 && stepViolations.length === 0,
+    noActiveZones: activeZones.length === 0,
+    activeZones,
+    firstActiveZone: activeZones[0] || null,
+    lastActiveZone: activeZones.at(-1) || null,
+    gaps,
     referenceAmount,
     minimumDifference,
     stepViolations,
