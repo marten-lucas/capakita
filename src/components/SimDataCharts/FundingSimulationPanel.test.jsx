@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { MantineProvider } from '@mantine/core';
@@ -140,7 +140,7 @@ function setFeeAmount(label, value) {
 }
 
 describe('FundingSimulationPanel', () => {
-  it('zeigt Tarif-Ausgangswerte, Gruppenergebnisse und Gesamtwerte', () => {
+  it('zeigt Tarif-Konfigurationen und Jahresergebnisse in getrennten Bereichen', () => {
     const store = createTestStore();
     render(
       <Provider store={store}>
@@ -150,15 +150,32 @@ describe('FundingSimulationPanel', () => {
       </Provider>
     );
 
-    expect(screen.getByText('Simulation von Beitragsänderungen')).toBeTruthy();
+    expect(screen.queryByText('Simulation von Beitragsänderungen')).toBeNull();
+    expect(screen.queryByText('Verwendet die im Capakita-Datenspeicher hinterlegten ZEITKAT-Sätze.')).toBeNull();
+    expect(screen.queryByText(/Die Slider stellen Monatsbeiträge je ZEITKAT ein/)).toBeNull();
+    const resetAllButton = screen.getByTestId('reset-all-temporary-prices');
+    expect(resetAllButton.querySelector('svg')).toBeTruthy();
+    expect(resetAllButton.parentElement).toBe(screen.getByTestId('temporary-category-prices-header'));
+    expect(screen.getByRole('combobox', { name: 'Gruppen für Tarif-Einstellungen' })).toBeTruthy();
+    expect(screen.getByTestId('simulation-settings-panel')).toBeTruthy();
+    const resultsPanel = screen.getByTestId('simulation-results-panel');
+    expect(within(resultsPanel).getByRole('heading', { name: 'Ergebnis' })).toBeTruthy();
+    const comparisonRow = within(resultsPanel).getByTestId('annual-income-row-2026');
+    expect(within(resultsPanel).getByTestId('annual-income-row-2027')).toBeTruthy();
+    expect(within(resultsPanel).getByTestId('annual-income-row-2028')).toBeTruthy();
+    expect(within(resultsPanel).getByTestId('annual-income-row-2029')).toBeTruthy();
+    expect(comparisonRow.textContent).toContain('22,00 €');
+    expect(within(resultsPanel).getByTestId('family-potential-budget')).toBeTruthy();
+    expect(within(resultsPanel).getByTestId('no-affected-families')).toBeTruthy();
     openFuchsTariffGroup();
     expect(screen.getByTestId('fee-staircase-zeitkat')).toBeTruthy();
     openFuchsTariffTable();
     expect(screen.getByLabelText('Betrag ZEITKAT 05')).toBeTruthy();
     expect(screen.getByLabelText('Betrag ZEITKAT 06')).toBeTruthy();
-    expect(screen.getByText('Gruppen & Gesamt')).toBeTruthy();
-    expect(screen.getByTestId('simulation-total-row')).toBeTruthy();
-    expect(screen.getByText('Buchungsstunden vorher')).toBeTruthy();
+    expect(screen.queryByTestId('simulation-total-row')).toBeNull();
+    expect(screen.queryByTestId('annual-contribution-impact')).toBeNull();
+    expect(screen.queryByTestId('simulation-parent-cost-impact')).toBeNull();
+    expect(screen.queryByTestId('reform-forecast-results')).toBeNull();
   });
 
   it('filtert die Simulation nach ausgewählten Gruppen', () => {
@@ -170,17 +187,23 @@ describe('FundingSimulationPanel', () => {
       </Provider>
     );
 
-    const groupFilter = screen.getByRole('combobox', { name: 'Gruppen für die Simulation' });
+    openFuchsTariffGroup();
+    setFeeAmount('Betrag ZEITKAT 05', 150);
+    const comparisonBeforeFilter = screen.getByTestId('annual-income-row-2026').textContent;
+    const familyBeforeFilter = screen.getByTestId('affected-family-fam-1').textContent;
+    const groupFilter = screen.getByRole('combobox', { name: 'Gruppen für Tarif-Einstellungen' });
     fireEvent.click(groupFilter);
     fireEvent.click(screen.getByRole('option', { name: 'Ohne Gruppe' }));
 
     expect(screen.getByTestId('simulation-group-filter')).toBeTruthy();
+    expect(screen.getByTestId('annual-income-row-2026').textContent).toBe(comparisonBeforeFilter);
+    expect(screen.getByTestId('affected-family-fam-1').textContent).toBe(familyBeforeFilter);
 
     expect(screen.queryByTestId('simulation-tariff-groups')).toBeNull();
-    expect(screen.getByText(/Keine aktiven Basisbuchungen mit auswertbarer ZEITKAT/)).toBeTruthy();
+    expect(screen.queryByTestId('simulation-group-results')).toBeNull();
   });
 
-  it('zeigt die Reform-Zusatzdaten in der Simulation und speichert den 2026-Istwert', () => {
+  it('zeigt die manuellen Reform-Zusatzdaten ohne Modellvorschau und speichert den 2026-Istwert', () => {
     const store = createTestStore();
     render(
       <Provider store={store}>
@@ -191,15 +214,14 @@ describe('FundingSimulationPanel', () => {
     );
 
     expect(screen.getByTestId('parent-fee-subsidy-end-date')).toBeTruthy();
-    fireEvent.click(screen.getByText('BayKiBiG-Reform · Zusatzdaten für die Berechnung'));
-    expect(screen.getByTestId('reform-derived-bookingTime').textContent).toBe('330,00 €');
-    expect(screen.getByTestId('reform-derived-parent-fees').textContent).toBe('2.400,00 €');
-    expect(screen.getByTestId('reform-derived-parentFeeSubsidy').textContent).toBe('1.200,00 €');
-    expect(screen.getByTestId('reform-derived-u3-child-months').textContent).toBe('0 Kindermonate');
-    expect(screen.getByTestId('reform-derived-vorkurs-child-months').textContent).toBe('0 Kindermonate');
-    fireEvent.click(screen.getByTestId('reform-derived-adopt-bookingTime'));
-    expect(store.getState().simFinance.financeByScenario['scenario-1'].settings.reformForecast.actualFunding.bookingTime).toBe(330);
+    fireEvent.click(screen.getByText('BayKiBiG-Reform · Zusatzdaten'));
+    expect(screen.queryByTestId('reform-derived-values')).toBeNull();
+    expect(screen.queryByTestId('reform-forecast-results')).toBeNull();
+    expect(store.getState().simFinance.financeByScenario['scenario-1'].settings.reformForecast?.actualFunding?.bookingTime).toBeUndefined();
     const bookingTimeInput = screen.getByLabelText('Ist 2026 · Förderung nach Buchungszeiten');
+    const subsidyInput = screen.getByLabelText('Ist 2026 · Elternbeitragszuschuss (durchlaufend)');
+    expect(bookingTimeInput.value).toBe('22 EUR');
+    expect(subsidyInput.value).toBe('1.200 EUR');
     fireEvent.change(bookingTimeInput, { target: { value: '9000' } });
     fireEvent.blur(bookingTimeInput);
 
@@ -207,7 +229,7 @@ describe('FundingSimulationPanel', () => {
     expect(screen.getByTestId('reform-team-grant-eligible')).toBeTruthy();
   });
 
-  it('simuliert absolute Preise und lässt die gespeicherten Optionen unverändert', () => {
+  it('ändert Beitragssätze nur lokal und lässt gespeicherte Optionen unverändert', () => {
     const store = createTestStore();
     render(
       <Provider store={store}>
@@ -222,12 +244,16 @@ describe('FundingSimulationPanel', () => {
     setFeeAmount('Betrag ZEITKAT 05', 150);
 
     expect(screen.getByLabelText('Betrag ZEITKAT 05').value).toBe('150 EUR');
-    expect(screen.getAllByText('5,50 €').length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/100,00 €/).length).toBeGreaterThan(0);
-    expect(within(screen.getByTestId('simulation-more-hours-impact')).getByText('+8,00 h pro Woche')).toBeTruthy();
-    expect(within(screen.getByTestId('simulation-more-hours-impact')).getByText(/2 Kinder in 1 Familie/)).toBeTruthy();
-    expect(within(screen.getByTestId('simulation-parent-cost-impact')).getByText('+100,00 € pro Monat')).toBeTruthy();
-    expect(within(screen.getByTestId('simulation-parent-cost-impact')).getByText(/2 Kinder in 1 Familie/)).toBeTruthy();
+    expect(screen.queryByText(/Konfigurierter Zuschuss/)).toBeNull();
+    expect(screen.queryByTestId('simulation-parent-cost-impact')).toBeNull();
+    expect(screen.queryByTestId('simulation-group-results')).toBeNull();
+    const familyRow = screen.getByTestId('affected-family-fam-1');
+    expect(familyRow.textContent).toContain('200,00 €');
+    expect(familyRow.textContent).toContain('+100,00 €');
+    expect(familyRow.textContent).toContain('100,0 %');
+    expect(familyRow.textContent).toContain('+8,0 h/Woche');
+    expect(screen.getByTestId('annual-income-row-2026').textContent).toContain('3.600,00 €');
+    expect(screen.getByTestId('annual-income-row-2026').textContent).toContain('+1.200,00 €');
     expect(store.getState().simFinance.financeByScenario['scenario-1'].groupFeeCatalogs.g1[0].monthlyAmount).toBe(100);
     expect(store.getState().simFinance.financeByScenario['scenario-1'].groupFeeCatalogs.g1[1].monthlyAmount).toBe(150);
   });
@@ -256,7 +282,8 @@ describe('FundingSimulationPanel', () => {
     expect(store.getState().simFinance.financeByScenario['scenario-1'].groupFeeCatalogs.g1.every((entry) => !Object.hasOwn(entry, 'maxHours'))).toBe(true);
     openFuchsTariffGroup();
     expect(screen.getByTestId('fee-staircase-zeitkat')).toBeTruthy();
-    expect(screen.getByTestId('fee-staircase-slider-01')).toBeTruthy();
+    expect(screen.getByTestId('fee-staircase-slider-10')).toBeTruthy();
+    expect(screen.getByTestId('fee-staircase-slider-13')).toBeTruthy();
   });
 
   it('steuert den festgelegten Elternbeitragszuschuss nur über das Enddatum', () => {
@@ -269,8 +296,14 @@ describe('FundingSimulationPanel', () => {
       </Provider>
     );
 
-    expect(screen.getByTestId('parent-fee-subsidy-end-date')).toBeTruthy();
-    expect(screen.getByTestId('parent-fee-subsidy-value').textContent).toBe('100,00 € / Monat');
+    const subsidyPanel = screen.getByTestId('parent-fee-subsidy-control');
+    const subsidyHeader = screen.getByTestId('parent-fee-subsidy-header');
+    const subsidyDateInput = screen.getByTestId('parent-fee-subsidy-end-date');
+    expect(within(subsidyHeader).getByText('Elternbeitragszuschuss / Rabatt')).toBeTruthy();
+    expect(within(subsidyHeader).getByLabelText('Gilt bis')).toBeTruthy();
+    expect(within(subsidyPanel).queryByText(/Konfigurierter Zuschuss/)).toBeNull();
+    expect(within(subsidyPanel).queryByText(/Anwendbar für Kinder/)).toBeNull();
+    expect(screen.queryByTestId('parent-fee-subsidy-value')).toBeNull();
     expect(screen.queryByTestId('parent-fee-subsidy-slider')).toBeNull();
     expect(screen.queryByTestId('parent-fee-subsidy-input')).toBeNull();
     expect(store.getState().simFinance.financeByScenario['scenario-1'].parentFeeSubsidy).toBeUndefined();
@@ -279,7 +312,8 @@ describe('FundingSimulationPanel', () => {
       scenarioId: 'scenario-1',
       updates: { endDate: '2026-02-28' },
     })));
-    expect(screen.getByTestId('parent-fee-subsidy-value').textContent).toBe('0,00 € / Monat');
+    expect(screen.queryByTestId('parent-fee-subsidy-value')).toBeNull();
+    expect(subsidyDateInput.textContent).toContain('28.02.2026');
   });
 
   it('setzt den temporären Einzelpreis zurück auf den geladenen Wert', () => {
@@ -296,44 +330,5 @@ describe('FundingSimulationPanel', () => {
     expect(screen.getByLabelText('Betrag ZEITKAT 05').value).toBe('175 EUR');
     fireEvent.click(screen.getByRole('button', { name: 'Gruppe zurücksetzen' }));
     expect(screen.getByLabelText('Betrag ZEITKAT 05').value).toBe('100 EUR');
-  });
-
-  it('kopiert die aktive Tabelle als tab-getrennte Daten', async () => {
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    Object.defineProperty(navigator, 'clipboard', {
-      configurable: true,
-      value: { writeText },
-    });
-    render(
-      <Provider store={createTestStore()}>
-        <MantineProvider>
-          <FundingSimulationPanel accent="#0f766e" />
-        </MantineProvider>
-      </Provider>
-    );
-
-    fireEvent.click(screen.getByTestId('copy-simulation-groups'));
-    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
-    expect(writeText.mock.calls[0][0]).toContain('Gruppe\tBuchungen / Wechsel');
-    expect(writeText.mock.calls[0][0]).toContain('Gesamt');
-  });
-
-  it('springt per Klick in der Kinder-Tabelle zum Kind-Datensatz', () => {
-    const store = createTestStore();
-    render(
-      <Provider store={store}>
-        <MantineProvider>
-          <FundingSimulationPanel accent="#0f766e" />
-        </MantineProvider>
-      </Provider>
-    );
-
-    openFuchsTariffTable();
-    setFeeAmount('Betrag ZEITKAT 05', 150);
-    fireEvent.click(screen.getByRole('tab', { name: /Kinder/ }));
-    fireEvent.click(screen.getByTestId('funding-child-child-2'));
-    expect(store.getState().simScenario.selectedItems['scenario-1']).toEqual(['child-2']);
-    fireEvent.click(screen.getByRole('tab', { name: /Familien/ }));
-    expect(screen.getByText('Familie Reuter')).toBeTruthy();
   });
 });

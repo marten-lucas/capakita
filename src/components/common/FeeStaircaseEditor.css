@@ -1,0 +1,71 @@
+.fee-staircase-slider-scroll {
+  min-width: 0;
+}
+
+.fee-staircase-slider-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(42px, 1fr));
+  gap: 6px 2px;
+  grid-auto-rows: minmax(176px, auto);
+  align-items: stretch;
+  min-width: 0;
+}
+
+.fee-staircase-zone {
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+  container-type: inline-size;
+}
+
+.fee-staircase-zone-label-compact {
+  display: block;
+}
+
+.fee-staircase-zone-label-full,
+.fee-staircase-zone-category {
+  display: none;
+}
+
+.fee-staircase-activation {
+  margin-top: auto;
+  padding-bottom: 2px;
+}
+
+.fee-staircase-slider-track {
+  max-width: 100%;
+}
+
+.fee-staircase-price-field {
+  width: 100%;
+}
+
+.fee-staircase-hourly,
+.fee-staircase-original {
+  overflow-wrap: anywhere;
+}
+
+@container (min-width: 105px) {
+  .fee-staircase-zone-label-compact {
+    display: none;
+  }
+
+  .fee-staircase-zone-label-full,
+  .fee-staircase-zone-category {
+    display: block;
+  }
+}
+
+@container (max-width: 104px) {
+  .fee-staircase-price-field,
+  .fee-staircase-original {
+    display: none;
+  }
+
+  .fee-staircase-hourly {
+    display: block;
+    --text-fz: 9px;
+    white-space: nowrap;
+    overflow-wrap: normal;
+  }
+}

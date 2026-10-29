@@ -25,6 +25,7 @@ import AccordionListDetail from '../common/AccordionListDetail';
 import { useOverlayData } from '../../hooks/useOverlayData';
 import {
   addBayKiBiGRule,
+  seedDefaultBayKiBiGRules,
   updateBayKiBiGRule,
   deleteBayKiBiGRule,
   setGroupFeeCatalogs,
@@ -261,6 +262,9 @@ function OrgaTabFinance({ section = 'all' }) {
   const financeScenario = useSelector(
     (state) => state.simFinance.financeByScenario[selectedScenarioId] || EMPTY_FINANCE_SCENARIO
   );
+  React.useEffect(() => {
+    if (selectedScenarioId) dispatch(seedDefaultBayKiBiGRules({ scenarioId: selectedScenarioId }));
+  }, [dispatch, selectedScenarioId]);
   const { getEffectiveGroupDefs } = useOverlayData();
   const groupDefs = getEffectiveGroupDefs();
   const [excelFile, setExcelFile] = React.useState(null);

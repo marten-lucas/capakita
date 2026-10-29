@@ -20,7 +20,7 @@ describe('calculateReformForecast', () => {
     });
   });
 
-  it('uses the fixed base-value increase and quality-bonus benchmark progression', () => {
+  it('uses the applicable BayKiBiG base value and quality-bonus benchmark progression', () => {
     const result = calculateReformForecast({
       approvedPlaces: 51,
       teamGrantEligible: true,
@@ -35,28 +35,29 @@ describe('calculateReformForecast', () => {
         personnelBonus: 20,
         languageSpecialists: 30,
       },
-      baseValueIncreasePercentByYear: { 2027: 2, 2028: 0, 2029: 0 },
-      qualityBonusByYear: { 2027: 1, 2028: 1, 2029: 1 },
-      teamRatesByYear: { 2027: { first50: 1, remaining100: 1 } },
-    });
+    }, {}, [
+      { id: 'rule-2026', validFrom: '2026-01-01', validUntil: '2026-12-31', baseValue: 100 },
+      { id: 'rule-2027', validFrom: '2027-01-01', baseValue: 120 },
+      { id: 'rule-2028', validFrom: '2028-01-01', baseValue: 125 },
+    ]);
     const row2026 = result.results[0];
     const row2027 = result.results[1];
 
     expect(row2026.result).toBe(1398.01);
     expect(row2026.parentFeeSubsidyPassThrough).toBe(1200);
-    expect(row2027.components.bookingTime).toBeCloseTo(1027.8);
-    expect(row2027.components.preparatoryCourses).toBeCloseTo(102.78);
+    expect(row2027.components.bookingTime).toBe(1200);
+    expect(row2027.components.preparatoryCourses).toBe(100);
     expect(row2027.components.qualityBonus).toBeCloseTo(693.28);
     expect(row2027.teamGrant).toBe(25167.61);
     expect(row2027.priorGuidelineFunding).toBe(60);
     expect(row2027.teamGrantNet).toBe(25107.61);
     expect(row2027.parentFeeSubsidyPassThrough).toBe(0);
-    expect(row2027.result).toBeCloseTo(26931.47);
-    expect(row2027.changeFromPreviousYear).toBeCloseTo(25533.46);
+    expect(row2027.result).toBeCloseTo(27100.89);
+    expect(row2027.changeFromPreviousYear).toBeCloseTo(25702.88);
     expect(result.results[2].components.qualityBonus).toBeCloseTo(852.36);
     expect(result.results[3].components.qualityBonus).toBeCloseTo(857.87);
     expect(result.assumptions.parentFeeSubsidyIncludedInResult).toBe(false);
-    expect(result.assumptions.baseValueIncreasePercent).toBe(2.78);
+    expect(Object.hasOwn(result.assumptions, 'baseValueIncreasePercent')).toBe(false);
   });
 
   it('combines each year of slider-derived changes with the reform result', () => {
@@ -70,9 +71,9 @@ describe('calculateReformForecast', () => {
     expect(result.results[0].components.bookingTime).toBe(1100);
     expect(result.results[0].simulationFundingDelta).toBe(100);
     expect(result.results[0].combinedResult).toBe(1413.01);
-    expect(result.results[1].components.bookingTime).toBeCloseTo(1052.8);
+    expect(result.results[1].components.bookingTime).toBe(1025);
     expect(result.results[1].simulationParentFeesDelta).toBe(30);
-    expect(result.results[1].combinedResult).toBeCloseTo(1776.08);
+    expect(result.results[1].combinedResult).toBeCloseTo(1748.28);
   });
 
   it('does not apply new grant deductions when there is no out-of-key staff', () => {
@@ -82,7 +83,7 @@ describe('calculateReformForecast', () => {
       teamGrantEligible: false,
     });
 
-    expect(result.results[1].components.bookingTime).toBeCloseTo(1607.355864);
+    expect(result.results[1].components.bookingTime).toBe(1563.88);
     expect(result.results[1].teamGrant).toBe(0);
     expect(result.results[1].priorGuidelineFunding).toBe(0);
     expect(result.results[1].result).toBeCloseTo(result.results[1].components.childRelatedFunding, 2);

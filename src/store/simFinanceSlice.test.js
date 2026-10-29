@@ -3,6 +3,7 @@ import simFinanceReducer, {
   addPersonnelCostEntry,
   deletePersonnelCostEntry,
   loadFinanceByScenario,
+  seedDefaultBayKiBiGRules,
   updatePersonnelCostEntry,
 } from './simFinanceSlice';
 
@@ -25,6 +26,59 @@ describe('simFinanceSlice', () => {
       minimumAgeYears: 3,
       maximumAgeYears: 6,
     });
+  });
+
+  it('seeds future BayKiBiG years by default and inherits the 2026 weighting factors', () => {
+    const weightFactors = {
+      regelkind_3to6: 1.1,
+      schulkind: 1.25,
+      migration: 1.4,
+      under3: 2.1,
+      disabled: 4.6,
+    };
+    const state = simFinanceReducer(undefined, loadFinanceByScenario({
+      'scenario-1': {
+        bayKiBiGRules: [{
+          id: 'rule-2026',
+          label: 'BayKiBiG 2026',
+          validFrom: '2026-01-01',
+          validUntil: '2026-12-31',
+          baseValue: 1563.88,
+          weightFactors,
+        }],
+      },
+      'scenario-empty': {},
+      'scenario-placeholder': {
+        bayKiBiGRules: [{ label: 'Unvollständige Regel', validFrom: '', validUntil: '', baseValue: '' }],
+      },
+    }));
+
+    const rules = state.financeByScenario['scenario-1'].bayKiBiGRules;
+    expect(rules.filter((rule) => rule.validFrom.startsWith('2027'))).toHaveLength(1);
+    expect(rules.filter((rule) => rule.validFrom.startsWith('2028'))).toHaveLength(1);
+    expect(rules.filter((rule) => rule.validFrom.startsWith('2029'))).toHaveLength(1);
+    expect(rules.find((rule) => rule.validFrom === '2027-01-01')).toMatchObject({
+      baseValue: 1563.88,
+      weightFactors,
+    });
+    expect(state.financeByScenario['scenario-empty'].bayKiBiGRules).toHaveLength(4);
+    expect(state.financeByScenario['scenario-empty'].bayKiBiGRules[0]).toMatchObject({
+      label: 'BayKiBiG 2026',
+      validFrom: '2026-01-01',
+      validUntil: '2026-12-31',
+      baseValue: 1563.88,
+    });
+    expect(state.financeByScenario['scenario-placeholder'].bayKiBiGRules).toHaveLength(5);
+  });
+
+  it('seeds missing defaults for an already-loaded scenario', () => {
+    const state = simFinanceReducer(undefined, seedDefaultBayKiBiGRules({ scenarioIds: ['scenario-1'] }));
+    expect(state.financeByScenario['scenario-1'].bayKiBiGRules.map((rule) => rule.validFrom)).toEqual([
+      '2026-01-01',
+      '2027-01-01',
+      '2028-01-01',
+      '2029-01-01',
+    ]);
   });
 
   it('migrates Adebis and legacy hour bands to ZEITKAT categories', () => {

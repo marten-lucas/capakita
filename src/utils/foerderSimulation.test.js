@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { simulateAnnualContributionChanges, simulateContributionChanges } from './foerderSimulation';
+import {
+  calculateFamilyFeePotentials,
+  simulateAnnualContributionChanges,
+  simulateContributionChanges,
+} from './foerderSimulation';
 
 const REF = '2026-03-15';
 const RULES = [{
@@ -108,6 +112,37 @@ describe('simulateContributionChanges', () => {
       deltaMonthlyParentSubsidy: 0,
       deltaWeeklyHours: 1,
     });
+  });
+
+  it('berechnet Upgrade- und Downgrade-Stunden innerhalb des monatlichen Familienbudgets', () => {
+    const result = calculateFamilyFeePotentials({
+      demandBookings: [
+        makeBooking({ itemId: 'child-1', zone: '05', dailyHours: 5 }),
+        makeBooking({ itemId: 'child-2', zone: '05', dailyHours: 5 }),
+      ],
+      dataItems: {
+        'child-1': { ...CHILD['child-1'], familyId: 'fam-1' },
+        'child-2': { id: 'child-2', name: 'Kind B', dateofbirth: '2022-01-01', familyId: 'fam-1', familyLabel: 'Familie A', groupId: 'g1' },
+      },
+      groupDefs: [{ id: 'g1', name: 'Sonnengruppe' }],
+      groupFeeCatalogs: {
+        g1: [
+          { id: 'zone-04', zeitkatId: '04', monthlyAmount: 80, validFrom: '2026-01-01' },
+          { id: 'zone-05', zeitkatId: '05', monthlyAmount: 100, validFrom: '2026-01-01' },
+          { id: 'zone-06', zeitkatId: '06', monthlyAmount: 150, validFrom: '2026-01-01' },
+        ],
+      },
+      parentFeeSubsidy: { enabled: false },
+      referenceDate: REF,
+      monthlyBudget: 50,
+    });
+
+    expect(result).toEqual([{
+      id: 'fam-1',
+      label: 'Familie A',
+      potentialUpgradeWeeklyHours: 1,
+      potentialDowngradeWeeklyHours: 2,
+    }]);
   });
 
   it('wechselt nicht, wenn die absoluten Simulationspreise benachbarter Staffeln verschieden sind', () => {

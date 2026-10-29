@@ -1,13 +1,10 @@
+import { pickApplicableValidityEntry, pickLatestValidityEntry } from './financeUtils';
+import DEFAULT_ADEBIS_BAYKIBIG_TABLES from '../data/adebis-baykibig-foerdertabellen-2026-2029.json';
+
 export const REFORM_YEARS = [2026, 2027, 2028, 2029];
 
 export const REFORM_FIXED_ASSUMPTIONS = {
-  baseValueIncreasePercent: 2.78,
-  qualityBonusBenchmarkByYear: {
-    2026: 268.01,
-    2027: 693.28,
-    2028: 852.36,
-    2029: 857.87,
-  },
+  qualityBonusBenchmarkByYear: DEFAULT_ADEBIS_BAYKIBIG_TABLES.qualityBonusBenchmarkByYear,
   teamRatesByYear: {
     2027: { first50: 500, remaining100: 167.61 },
     2028: { first50: 700, remaining100: 242.37 },
@@ -40,6 +37,18 @@ function roundMoney(value) {
   return Math.round((amount(value) + Number.EPSILON) * 100) / 100;
 }
 
+function getBayKiBiGBaseValueForYear(rules, year) {
+  const date = `${year}-01-01`;
+  const hasBaseValue = (rule) => Number(rule?.baseValue) > 0;
+  const applicableRule = pickApplicableValidityEntry(rules, date, hasBaseValue);
+  if (applicableRule) return Number(applicableRule.baseValue);
+
+  const previousRule = pickLatestValidityEntry(rules, (rule) => (
+    hasBaseValue(rule) && (!rule.validFrom || rule.validFrom <= date)
+  ));
+  return previousRule ? Number(previousRule.baseValue) : null;
+}
+
 function getTeamGrant(year, approvedPlaces, teamGrantEligible) {
   if (year < 2027 || !teamGrantEligible) return 0;
   const ratesForYear = REFORM_FIXED_ASSUMPTIONS.teamRatesByYear[year];
@@ -57,23 +66,23 @@ function getTeamGrant(year, approvedPlaces, teamGrantEligible) {
  * remain separate in the returned breakdown. The parent-fee subsidy is a
  * pass-through and is excluded from the reform result.
  */
-export function calculateReformForecast(input = {}, simulatedChangesByYear = {}) {
+export function calculateReformForecast(input = {}, simulatedChangesByYear = {}, bayKiBiGRules = []) {
   const settings = {
     ...DEFAULT_REFORM_FORECAST,
     ...input,
     actualFunding: { ...DEFAULT_REFORM_FORECAST.actualFunding, ...(input.actualFunding || {}) },
   };
   const results = [];
-  let bookingTime = amount(settings.actualFunding.bookingTime);
-  let preparatoryCourses = amount(settings.actualFunding.preparatoryCourses);
+  const baseValue2026 = getBayKiBiGBaseValueForYear(bayKiBiGRules, 2026);
+  const bookingTime2026 = amount(settings.actualFunding.bookingTime);
+  const preparatoryCourses = amount(settings.actualFunding.preparatoryCourses);
   let previousResult = null;
 
-  REFORM_YEARS.forEach((year, index) => {
-    if (index > 0) {
-      bookingTime *= 1 + REFORM_FIXED_ASSUMPTIONS.baseValueIncreasePercent / 100;
-      preparatoryCourses *= 1 + REFORM_FIXED_ASSUMPTIONS.baseValueIncreasePercent / 100;
-    }
-
+  REFORM_YEARS.forEach((year) => {
+    const baseValueForYear = getBayKiBiGBaseValueForYear(bayKiBiGRules, year);
+    const bookingTime = baseValue2026 > 0 && baseValueForYear > 0
+      ? bookingTime2026 * baseValueForYear / baseValue2026
+      : bookingTime2026;
     const simulatedChanges = simulatedChangesByYear[year] || simulatedChangesByYear[String(year)] || {};
     const simulationFundingDelta = amount(simulatedChanges.deltaYearlyBayKiBiG);
     const components = {
@@ -121,7 +130,6 @@ export function calculateReformForecast(input = {}, simulatedChangesByYear = {})
     assumptions: {
       approvedPlaces: Math.max(0, Math.floor(amount(settings.approvedPlaces))),
       teamGrantEligible: settings.teamGrantEligible === true,
-      baseValueIncreasePercent: REFORM_FIXED_ASSUMPTIONS.baseValueIncreasePercent,
       qualityBonusBenchmarkByYear: REFORM_FIXED_ASSUMPTIONS.qualityBonusBenchmarkByYear,
       hasActualBaseline: Object.values(settings.actualFunding).some((value) => amount(value) !== 0),
       parentFeeSubsidyIncludedInResult: false,

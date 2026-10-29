@@ -4971,7 +4971,9 @@ function VisuView() {
   }, [bookingsByScenario, dataByScenario, getEffectiveGroupAssignments, groupDefs, groupDefsByScenario, groupsByScenario, qualityReferenceDate, selectedScenarioId, trendStatistics]);
 
   const stageRecommendations =
-    activeStory.id === 'quality'
+    activeStory.id === 'options'
+      ? []
+      : activeStory.id === 'quality'
       ? [
           {
             key: 'kpi-children',
@@ -5305,8 +5307,9 @@ function VisuView() {
       </Box>
 
       <Paper className="analysis-stage-shell" p="xs" withBorder>
-        <Group grow align="stretch" gap="xs" className="analysis-stage-recommendations" data-testid="analysis-stage-recommendations">
-          {stageRecommendations.map((item) => (
+        {stageRecommendations.length > 0 ? (
+          <Group grow align="stretch" gap="xs" className="analysis-stage-recommendations" data-testid="analysis-stage-recommendations">
+            {stageRecommendations.map((item) => (
             <Paper key={`${activeStory.id}-${item.key || item.title}`} className="analysis-stage-recommendation-box" withBorder p="xs" data-tone={item.tone}>
               <Group justify="space-between" align="center" gap="xs" wrap="nowrap">
                 <Text size="xs" fw={700} className="analysis-stage-recommendation-title">
@@ -5371,8 +5374,9 @@ function VisuView() {
                 </Stack>
               )}
             </Paper>
-          ))}
-        </Group>
+            ))}
+          </Group>
+        ) : null}
 
         <Box className="analysis-stage-content" data-testid="analysis-stage-content">
           {settledStep !== activeStep ? (

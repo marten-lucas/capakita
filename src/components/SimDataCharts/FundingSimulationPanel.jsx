@@ -1,27 +1,29 @@
 import React from 'react';
-import { Accordion, Alert, Badge, Box, Button, Group, MultiSelect, NumberInput, Paper, Slider, Stack, Switch, Table, Tabs, Text, SimpleGrid } from '@mantine/core';
+import { Accordion, Alert, Badge, Button, Group, MultiSelect, NumberInput, Paper, Stack, Switch, Table, Text, Title, SimpleGrid } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
-import { IconArrowRight, IconCoins, IconUsers } from '@tabler/icons-react';
+import { IconRefresh } from '@tabler/icons-react';
 import { useDispatch, useSelector } from 'react-redux';
-import { setSelectedItem } from '../../store/simScenarioSlice';
-import { updateParentFeeSubsidy, updateScenarioFinanceSettings } from '../../store/simFinanceSlice';
+import { seedDefaultBayKiBiGRules, updateParentFeeSubsidy, updateScenarioFinanceSettings } from '../../store/simFinanceSlice';
 import { useOverlayData } from '../../hooks/useOverlayData';
 import { filterBookings } from '../../utils/chartUtils/chartUtils';
-import { simulateAnnualContributionChanges, simulateContributionChanges } from '../../utils/foerderSimulation';
 import { getFeeBandZeitkatId } from '../../utils/adebisConstants';
-import { getFeeBandSimulationPriceKey, getFeeCatalogSimulationRows } from '../../utils/foerderSimulation';
-import FeeStaircaseEditor from '../common/FeeStaircaseEditor';
-import { calculateReformForecast, REFORM_FIXED_ASSUMPTIONS, REFORM_YEARS } from '../../utils/reformSimulation';
+import {
+  calculateFamilyFeePotentials,
+  getFeeBandSimulationPriceKey,
+  getFeeCatalogSimulationRows,
+  simulateContributionChanges,
+} from '../../utils/foerderSimulation';
 import { calculateScenarioMonthlyFinance } from '../../utils/financeUtils';
-import { CopyTableButton } from '../common/CopyToClipboardButton';
+import FeeStaircaseEditor from '../common/FeeStaircaseEditor';
+import { REFORM_FIXED_ASSUMPTIONS, REFORM_YEARS } from '../../utils/reformSimulation';
 
-const formatEuro = (value) => `${Number(value || 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
-const formatHours = (value) => `${Number(value || 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} h`;
-const formatAffectedCount = (children, families) => (
-  `${children} ${children === 1 ? 'Kind' : 'Kinder'} in ${families} ${families === 1 ? 'Familie' : 'Familien'}.`
-);
+
 const EMPTY_FINANCE = {};
 const EMPTY_GROUP_FEE_CATALOGS = {};
+const formatEuro = (value) => `${Number(value || 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+const formatSignedEuro = (value) => `${Number(value) > 0 ? '+' : ''}${formatEuro(value)}`;
+const formatWeeklyHours = (value) => `${Number(value || 0).toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} h/Woche`;
+const formatPercent = (value) => `${Number(value || 0).toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} %`;
 
 function toDateValue(value) {
   if (!value) return null;
@@ -62,6 +64,125 @@ const REFORM_ACTUAL_FIELDS = [
   ['languageSpecialists', 'Fördersumme Sprachfachkräfte'],
 ];
 
+function calculateReformPrefill2026({
+  scenarioId,
+  referenceDate,
+  dataItems,
+  bookingsByItem,
+  groupAssignmentsByItem,
+  qualificationAssignmentsByItem,
+  groupDefs,
+  financeScenario,
+  groupFeeCatalogs,
+  parentFeeSubsidy,
+}) {
+  const normalizedScenarioId = String(scenarioId);
+  const referenceDate2026 = String(referenceDate || '').startsWith('2026-')
+    ? referenceDate
+    : '2026-12-01';
+  const financeForModel = {
+    ...financeScenario,
+    groupFeeCatalogs,
+    settings: {
+      partialAbsenceThresholdDays: financeScenario?.settings?.partialAbsenceThresholdDays ?? 42,
+      partialAbsenceEmployerSharePercent: financeScenario?.settings?.partialAbsenceEmployerSharePercent ?? 0,
+    },
+  };
+  const bookingTime = calculateScenarioMonthlyFinance({
+    referenceDate: referenceDate2026,
+    effectiveDataItems: dataItems,
+    effectiveBookingsByItem: bookingsByItem,
+    effectiveGroupAssignmentsByItem: groupAssignmentsByItem,
+    effectiveGroupDefs: groupDefs,
+    financeScenario: financeForModel,
+  }).summary.incomeBayKiBiG;
+  let parentFeeSubsidyAmount = 0;
+
+  Array.from({ length: 12 }, (_, monthIndex) => {
+    const monthReferenceDate = `2026-${String(monthIndex + 1).padStart(2, '0')}-01`;
+    const { demand } = filterBookings({
+      bookingsByScenario: { [normalizedScenarioId]: bookingsByItem },
+      dataByScenario: { [normalizedScenarioId]: dataItems },
+      qualificationAssignmentsByScenario: { [normalizedScenarioId]: qualificationAssignmentsByItem },
+      overlaysByScenario: {},
+      scenarioId: normalizedScenarioId,
+      referenceDate: monthReferenceDate,
+      selectedGroups: [],
+      selectedQualifications: [],
+      groupsByScenario: { [normalizedScenarioId]: groupAssignmentsByItem },
+    });
+    parentFeeSubsidyAmount += simulateContributionChanges({
+      demandBookings: demand,
+      dataItems,
+      groupDefs,
+      bayKiBiGRules: financeScenario?.bayKiBiGRules || [],
+      groupFeeCatalogs,
+      originalGroupFeeCatalogs: groupFeeCatalogs,
+      parentFeeSubsidy,
+      temporaryPrices: {},
+      utilizationPercent: 0,
+      referenceDate: monthReferenceDate,
+    }).totals.policyParentFeeSubsidy;
+  });
+
+  return {
+    bookingTime: Math.round(bookingTime * 100) / 100,
+    parentFeeSubsidy: Math.round(parentFeeSubsidyAmount * 100) / 100,
+  };
+}
+
+function getConfiguredFundingYears(rules, currentYear) {
+  const years = new Set();
+  (rules || []).forEach((rule) => {
+    if (!(Number(rule?.baseValue) > 0)) return;
+    const startYear = /^\d{4}/.test(String(rule.validFrom || ''))
+      ? Number(String(rule.validFrom).slice(0, 4))
+      : currentYear;
+    const endYear = /^\d{4}/.test(String(rule.validUntil || ''))
+      ? Number(String(rule.validUntil).slice(0, 4))
+      : startYear;
+    if (!Number.isInteger(startYear) || !Number.isInteger(endYear) || endYear < currentYear) return;
+    for (let year = Math.max(currentYear, startYear); year <= endYear; year += 1) years.add(year);
+  });
+  return Array.from(years).sort((left, right) => left - right);
+}
+
+function getComparisonDateForYear(referenceDate, year) {
+  const [, monthString, dayString] = String(referenceDate).slice(0, 10).split('-');
+  const month = Number(monthString) || 1;
+  const day = Number(dayString) || 1;
+  const lastDayOfMonth = new Date(Number(year), month, 0).getDate();
+  return `${year}-${String(month).padStart(2, '0')}-${String(Math.min(day, lastDayOfMonth)).padStart(2, '0')}`;
+}
+
+function getSimulationDemandForDate({ scenarioId, referenceDate, selectedGroupIds, simulationData }) {
+  const normalizedScenarioId = String(scenarioId);
+  const filtered = filterBookings({
+    bookingsByScenario: { [normalizedScenarioId]: simulationData.bookingsByItem },
+    dataByScenario: { [normalizedScenarioId]: simulationData.dataItems },
+    qualificationAssignmentsByScenario: { [normalizedScenarioId]: simulationData.qualificationAssignmentsByItem },
+    overlaysByScenario: {},
+    scenarioId: normalizedScenarioId,
+    referenceDate,
+    selectedGroups: selectedGroupIds,
+    selectedQualifications: [],
+    groupsByScenario: { [normalizedScenarioId]: simulationData.groupAssignmentsByItem },
+  });
+  const bookingsByItem = {};
+  filtered.demand.forEach((booking) => {
+    const itemId = String(booking.itemId);
+    if (!bookingsByItem[itemId]) bookingsByItem[itemId] = {};
+    bookingsByItem[itemId][String(booking.id)] = booking;
+  });
+  const selectedItemIds = new Set(Object.keys(bookingsByItem));
+  return {
+    demand: filtered.demand,
+    effectiveDataItems: Object.fromEntries(Object.entries(simulationData.dataItems || {}).filter(([itemId]) => selectedItemIds.has(itemId))),
+    effectiveBookingsByItem: bookingsByItem,
+    effectiveGroupAssignmentsByItem: simulationData.groupAssignmentsByItem,
+  };
+}
+
 function ReformForecastInputs({ settings, scenarioId, dispatch, calculatedValues }) {
   const forecast = settings?.reformForecast || {};
   const actual = forecast.actualFunding || {};
@@ -94,69 +215,16 @@ function ReformForecastInputs({ settings, scenarioId, dispatch, calculatedValues
       <Accordion.Item value="reform-inputs">
         <Accordion.Control>
           <Stack gap={2}>
-            <Text fw={600}>BayKiBiG-Reform · Zusatzdaten für die Berechnung</Text>
-            <Text size="xs" c="dimmed">2026-Istwerte aus KiBiG.web, genehmigte Plätze und Personalangabe</Text>
+            <Text fw={600}>BayKiBiG-Reform · Zusatzdaten</Text>
+            <Text size="xs" c="dimmed">2026-Istwerte, genehmigte Plätze und Personalangabe</Text>
           </Stack>
         </Accordion.Control>
         <Accordion.Panel>
           <Stack gap="md">
-            <Text size="sm" c="dimmed">
-              Die Eingaben werden mit den simulierten ZEITKAT-Beitragsänderungen und der offiziellen Förderregel kombiniert.
-            </Text>
-            <Paper withBorder p="sm" radius="sm" data-testid="reform-derived-values">
-              <Stack gap="sm">
-                <div>
-                  <Text fw={600} size="sm">Automatisch aus Kinder-, Buchungs- und Finanzdaten berechnet · 2026</Text>
-                  <Text size="xs" c="dimmed">Modellwerte dienen zum Abgleich. KiBiG.web- und Bescheid-Istwerte bleiben maßgeblich.</Text>
-                </div>
-                {!calculatedValues.hasBayKiBiGRule ? (
-                  <Badge color="orange" variant="light" w="fit-content">Für die Förderhochrechnung fehlt eine gültige BayKiBiG-Förderregel.</Badge>
-                ) : null}
-                {calculatedValues.childrenMissingFundingProfile > 0 ? (
-                  <Alert color="yellow" variant="light" title="Fördermerkmale noch nicht bestätigt">
-                    Bei {calculatedValues.childrenMissingFundingProfile} Kind{calculatedValues.childrenMissingFundingProfile === 1 ? '' : 'ern'} sind die BayKiBiG-Gewichtungsmerkmale noch nicht als geprüft markiert. Die Buchungszeiten-Hochrechnung kann deshalb unvollständig sein.
-                  </Alert>
-                ) : null}
-                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xs">
-                  {[
-                    ['bookingTime', 'Förderung nach Buchungszeiten', calculatedValues.capakitaModeledAnnualFunding],
-                    ['parentFeeSubsidy', 'Elternbeitragszuschuss', calculatedValues.capakitaModeledAnnualParentFeeSubsidy],
-                  ].map(([field, label, value]) => (
-                    <Paper key={field} withBorder p="xs" radius="sm">
-                      <Text size="xs" c="dimmed">{label}</Text>
-                      <Group justify="space-between" align="center" gap="xs" wrap="wrap">
-                        <Text fw={700} data-testid={`reform-derived-${field}`}>{formatEuro(value)}</Text>
-                        <Button
-                          size="compact-xs"
-                          variant="light"
-                          data-testid={`reform-derived-adopt-${field}`}
-                          onClick={() => update(field, value)}
-                        >
-                          Modellwert übernehmen
-                        </Button>
-                      </Group>
-                    </Paper>
-                  ))}
-                  <Paper withBorder p="xs" radius="sm">
-                    <Text size="xs" c="dimmed">Elternbeiträge vor Zuschuss</Text>
-                    <Text fw={700} data-testid="reform-derived-parent-fees">{formatEuro(calculatedValues.capakitaModeledAnnualParentFees)}</Text>
-                  </Paper>
-                  <Paper withBorder p="xs" radius="sm">
-                    <Text size="xs" c="dimmed">Kinder unter 3 mit aktiver Buchung</Text>
-                    <Text fw={700} data-testid="reform-derived-u3-child-months">{calculatedValues.u3ChildMonths} Kindermonate</Text>
-                  </Paper>
-                  <Paper withBorder p="xs" radius="sm">
-                    <Text size="xs" c="dimmed">Bestätigte Vorkursteilnahmen</Text>
-                    <Text fw={700} data-testid="reform-derived-vorkurs-child-months">{calculatedValues.vorkursChildMonths} Kindermonate</Text>
-                  </Paper>
-
-                </SimpleGrid>
-              </Stack>
-            </Paper>
             <div>
               <Text fw={600} size="sm">2026-Istwerte aus KiBiG.web und Förderbescheiden</Text>
               <Text size="xs" c="dimmed">
-                Buchungszeitenförderung und Elternbeitragszuschuss können mit den Modellwerten oben vorbelegt werden. Qualitätsbonus sowie bewilligte Vorkurs- und U3-Fördersummen bitte anhand der Abrechnung bzw. Bescheide eintragen.
+                Buchungszeitenförderung und Elternbeitragszuschuss werden aus Capakita-Daten vorbelegt; übrige Beträge bitte anhand von Bescheiden eintragen.
               </Text>
             </div>
             <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="sm">
@@ -164,7 +232,7 @@ function ReformForecastInputs({ settings, scenarioId, dispatch, calculatedValues
                 <ReformAmountInput
                   key={key}
                   label={`Ist 2026 · ${label}`}
-                  value={actual[key] ?? 0}
+                  value={actual[key] ?? calculatedValues[key] ?? 0}
                   onCommit={(value) => update(key, value)}
                   min={0}
                   decimalScale={2}
@@ -193,8 +261,8 @@ function ReformForecastInputs({ settings, scenarioId, dispatch, calculatedValues
                 data-testid="reform-team-grant-eligible"
               />
             </SimpleGrid>
-            <Alert color="blue" variant="light" title="Fixe Berechnungsannahmen">
-              Basiswert-Erhöhung jährlich: {REFORM_FIXED_ASSUMPTIONS.baseValueIncreasePercent.toLocaleString('de-DE')} %. Qualitätsbonus-Benchmark 2026–2029: {REFORM_YEARS.map((year) => REFORM_FIXED_ASSUMPTIONS.qualityBonusBenchmarkByYear[year].toLocaleString('de-DE', { minimumFractionDigits: 2 })).join(' · ')} €. Die Benchmarkwerte bestimmen die jährliche Fortschreibung des eingegebenen Qualitätsbonus 2026.
+            <Alert color="blue" variant="light" title="Qualitätsbonus-Benchmark">
+              2026–2029: {REFORM_YEARS.map((year) => REFORM_FIXED_ASSUMPTIONS.qualityBonusBenchmarkByYear[year].toLocaleString('de-DE', { minimumFractionDigits: 2 })).join(' · ')} €. Der BayKiBiG-Basiswert wird pro Jahr aus der passenden Regel in den Optionen übernommen.
             </Alert>
           </Stack>
         </Accordion.Panel>
@@ -203,119 +271,9 @@ function ReformForecastInputs({ settings, scenarioId, dispatch, calculatedValues
   );
 }
 
-const DEFAULT_PARENT_FEE_SUBSIDY = {
-  enabled: true,
-  monthlyAmount: 100,
-  minimumAgeYears: 3,
-  maximumAgeYears: 7,
-  excludeSchoolChildren: true,
-  endDate: '2026-12-31',
-};
+const DEFAULT_PARENT_FEE_SUBSIDY = { endDate: '2026-12-31' };
 
-function isUnderThreeAtDate(item, referenceDate) {
-  const birthDate = String(item?.dateofbirth || '').slice(0, 10);
-  if (birthDate.length !== 10 || birthDate[4] !== '-' || birthDate[7] !== '-') return false;
-  const [year, month, day] = birthDate.split('-').map(Number);
-  const bornAt = Date.UTC(year, month - 1, day);
-  const referenceTime = Date.parse(`${referenceDate}T00:00:00Z`);
-  const thirdBirthday = Date.UTC(year + 3, month - 1, day);
-  return Number.isFinite(referenceTime) && bornAt <= referenceTime && referenceTime < thirdBirthday;
-}
-
-function isVorkursParticipantAtDate(item, referenceDate) {
-  if (item?.vorkursParticipation !== true) return false;
-  return (!item.vorkursStartDate || item.vorkursStartDate <= referenceDate)
-    && (!item.vorkursEndDate || item.vorkursEndDate >= referenceDate);
-}
-
-function calculateReformDerived2026({
-  scenarioId,
-  dataItems,
-  bookingsByItem,
-  groupAssignmentsByItem,
-  qualificationAssignmentsByItem,
-  groupDefs,
-  financeScenario,
-  groupFeeCatalogs,
-  parentFeeSubsidy,
-}) {
-  let capakitaModeledAnnualFunding = 0;
-  let capakitaModeledAnnualParentFees = 0;
-  let capakitaModeledAnnualParentFeeSubsidy = 0;
-  let u3ChildMonths = 0;
-  let vorkursChildMonths = 0;
-  const childrenMissingFundingProfile = new Set();
-
-  const financeForHistoricalComparison = {
-    ...financeScenario,
-    groupFeeCatalogs,
-    settings: {
-      partialAbsenceThresholdDays: financeScenario?.settings?.partialAbsenceThresholdDays ?? 42,
-      partialAbsenceEmployerSharePercent: financeScenario?.settings?.partialAbsenceEmployerSharePercent ?? 0,
-    },
-  };
-
-  Array.from({ length: 12 }, (_, monthIndex) => {
-    const monthReferenceDate = `2026-${String(monthIndex + 1).padStart(2, '0')}-01`;
-    capakitaModeledAnnualFunding += calculateScenarioMonthlyFinance({
-      referenceDate: monthReferenceDate,
-      effectiveDataItems: dataItems,
-      effectiveBookingsByItem: bookingsByItem,
-      effectiveGroupAssignmentsByItem: groupAssignmentsByItem,
-      effectiveGroupDefs: groupDefs,
-      financeScenario: financeForHistoricalComparison,
-      applyZeitkatFactor: true,
-      deriveZeitkatFactor: true,
-    }).summary.incomeBayKiBiG;
-
-    const { demand } = filterBookings({
-      bookingsByScenario: { [scenarioId]: bookingsByItem },
-      dataByScenario: { [scenarioId]: dataItems },
-      qualificationAssignmentsByScenario: { [scenarioId]: qualificationAssignmentsByItem },
-      overlaysByScenario: {},
-      scenarioId,
-      referenceDate: monthReferenceDate,
-      selectedGroups: [],
-      selectedQualifications: [],
-      groupsByScenario: { [scenarioId]: groupAssignmentsByItem },
-    });
-    const monthContribution = simulateContributionChanges({
-      demandBookings: demand,
-      dataItems,
-      groupDefs,
-      bayKiBiGRules: financeScenario?.bayKiBiGRules || [],
-      groupFeeCatalogs,
-      originalGroupFeeCatalogs: groupFeeCatalogs,
-      parentFeeSubsidy,
-      temporaryPrices: {},
-      utilizationPercent: 0,
-      referenceDate: monthReferenceDate,
-    });
-    capakitaModeledAnnualParentFees += monthContribution.totals.grossParentFees;
-    capakitaModeledAnnualParentFeeSubsidy += monthContribution.totals.policyParentFeeSubsidy;
-    const activeChildren = new Set(demand.map((booking) => String(booking.itemId)));
-    u3ChildMonths += Array.from(activeChildren)
-      .filter((itemId) => isUnderThreeAtDate(dataItems?.[itemId], monthReferenceDate)).length;
-    vorkursChildMonths += Array.from(activeChildren)
-      .filter((itemId) => isVorkursParticipantAtDate(dataItems?.[itemId], monthReferenceDate)).length;
-    activeChildren.forEach((itemId) => {
-      if (dataItems?.[itemId]?.bayKiBiGProfileConfirmed !== true) childrenMissingFundingProfile.add(itemId);
-    });
-  });
-
-  return {
-    year: 2026,
-    hasBayKiBiGRule: (financeScenario?.bayKiBiGRules || []).length > 0,
-    capakitaModeledAnnualFunding: Math.round(capakitaModeledAnnualFunding * 100) / 100,
-    capakitaModeledAnnualParentFees: Math.round(capakitaModeledAnnualParentFees * 100) / 100,
-    capakitaModeledAnnualParentFeeSubsidy: Math.round(capakitaModeledAnnualParentFeeSubsidy * 100) / 100,
-    u3ChildMonths,
-    vorkursChildMonths,
-    childrenMissingFundingProfile: childrenMissingFundingProfile.size,
-  };
-}
-
-function FundingSimulationPanel({ accent }) {
+function FundingSimulationPanel() {
   const dispatch = useDispatch();
   const selectedScenarioId = useSelector((state) => state.simScenario.selectedScenarioId);
   const financeByScenario = useSelector((state) => state.simFinance?.financeByScenario || {});
@@ -329,31 +287,49 @@ function FundingSimulationPanel({ accent }) {
     getEffectiveGroupAssignments,
     getEffectiveQualificationAssignments,
   } = useOverlayData();
-
-  const [utilizationPercent, setUtilizationPercent] = React.useState(100);
   const [temporaryCatalogEntries, setTemporaryCatalogEntries] = React.useState({});
   const [temporaryPrices, setTemporaryPrices] = React.useState({});
   const [selectedGroupIds, setSelectedGroupIds] = React.useState([]);
-  const [activeTab, setActiveTab] = React.useState('groups');
-  const groupTableRef = React.useRef(null);
-  const childTableRef = React.useRef(null);
-  const familyTableRef = React.useRef(null);
+  const [potentialMonthlyBudget, setPotentialMonthlyBudget] = React.useState(50);
 
   React.useEffect(() => {
     setTemporaryCatalogEntries({});
     setTemporaryPrices({});
     setSelectedGroupIds([]);
-  }, [selectedScenarioId]);
+    if (selectedScenarioId) dispatch(seedDefaultBayKiBiGRules({ scenarioId: selectedScenarioId }));
+  }, [selectedScenarioId, dispatch]);
 
   const groupFeeCatalogs = financeScenario?.groupFeeCatalogs || EMPTY_GROUP_FEE_CATALOGS;
   const parentFeeSubsidy = financeScenario?.parentFeeSubsidy || DEFAULT_PARENT_FEE_SUBSIDY;
-  const baselineParentFeeSubsidyAmount = parentFeeSubsidy.enabled === false
-    ? 0
-    : Math.max(0, Number(parentFeeSubsidy.monthlyAmount ?? 100) || 0);
-  const subsidyEndsBeforeReferenceDate = Boolean(parentFeeSubsidy.endDate)
-    && referenceDate > String(parentFeeSubsidy.endDate).slice(0, 10);
-  const policyParentFeeSubsidyAmount = subsidyEndsBeforeReferenceDate ? 0 : baselineParentFeeSubsidyAmount;
   const groupDefs = getEffectiveGroupDefs();
+  const simulationData = React.useMemo(() => {
+    const dataItems = getEffectiveDataItems();
+    const bookingsByItem = {};
+    const groupAssignmentsByItem = {};
+    const qualificationAssignmentsByItem = {};
+    Object.keys(dataItems || {}).forEach((itemId) => {
+      bookingsByItem[itemId] = getEffectiveBookings(itemId);
+      groupAssignmentsByItem[itemId] = getEffectiveGroupAssignments(itemId);
+      qualificationAssignmentsByItem[itemId] = Object.fromEntries(
+        (getEffectiveQualificationAssignments(itemId) || []).map((assignment, index) => [String(index), assignment])
+      );
+    });
+    return { dataItems, bookingsByItem, groupAssignmentsByItem, qualificationAssignmentsByItem };
+  }, [
+    getEffectiveDataItems,
+    getEffectiveBookings,
+    getEffectiveGroupAssignments,
+    getEffectiveQualificationAssignments,
+  ]);
+  const calculatedReformValues = React.useMemo(() => calculateReformPrefill2026({
+    scenarioId: selectedScenarioId,
+    referenceDate,
+    ...simulationData,
+    groupDefs,
+    financeScenario,
+    groupFeeCatalogs,
+    parentFeeSubsidy,
+  }), [selectedScenarioId, referenceDate, simulationData, groupDefs, financeScenario, groupFeeCatalogs, parentFeeSubsidy]);
   const groupFilterOptions = React.useMemo(() => [
     ...(groupDefs || []).map((group) => ({ value: String(group.id), label: group.name || String(group.id) })),
     { value: '__NO_GROUP__', label: 'Ohne Gruppe' },
@@ -384,8 +360,6 @@ function FundingSimulationPanel({ accent }) {
     ])
   ), [simulationCatalogs, temporaryPrices]);
   const tariffGroups = React.useMemo(() => {
-    const rowCounts = new Map();
-    categoryPriceRows.forEach((row) => rowCounts.set(row.groupId, (rowCounts.get(row.groupId) || 0) + 1));
     const groupIds = new Set([
       ...(groupDefs || []).map((group) => String(group.id)),
       ...Object.keys(groupFeeCatalogs || {}).map(String),
@@ -396,10 +370,134 @@ function FundingSimulationPanel({ accent }) {
       .map((groupId) => ({
         id: groupId,
         name: groupLabels.get(groupId) || groupId,
-        rows: Array.from({ length: rowCounts.get(groupId) || 0 }),
       }))
       .sort((left, right) => left.name.localeCompare(right.name, 'de'));
-  }, [categoryPriceRows, groupDefs, groupFeeCatalogs, groupLabels, selectedGroupIds]);
+  }, [groupDefs, groupFeeCatalogs, groupLabels, selectedGroupIds]);
+
+  const currentYear = Number(referenceDate.slice(0, 4));
+  const fundingYears = React.useMemo(
+    () => getConfiguredFundingYears(financeScenario?.bayKiBiGRules, currentYear),
+    [financeScenario?.bayKiBiGRules, currentYear]
+  );
+  const annualIncomeRows = React.useMemo(() => {
+    const financeForModel = { ...financeScenario, groupFeeCatalogs };
+    return fundingYears.map((year) => {
+      const comparisonDate = getComparisonDateForYear(referenceDate, year);
+      const demandData = getSimulationDemandForDate({
+        scenarioId: selectedScenarioId,
+        referenceDate: comparisonDate,
+        selectedGroupIds: [],
+        simulationData,
+      });
+      const monthlyFinance = calculateScenarioMonthlyFinance({
+        referenceDate: comparisonDate,
+        ...demandData,
+        effectiveGroupDefs: groupDefs,
+        financeScenario: financeForModel,
+      });
+      const monthlySimulation = simulateContributionChanges({
+        demandBookings: demandData.demand,
+        dataItems: simulationData.dataItems,
+        groupDefs,
+        bayKiBiGRules: financeScenario?.bayKiBiGRules || [],
+        groupFeeCatalogs: simulationCatalogs,
+        originalGroupFeeCatalogs: groupFeeCatalogs,
+        parentFeeSubsidy,
+        temporaryPrices,
+        utilizationPercent: 0,
+        referenceDate: comparisonDate,
+      });
+      const fundingChange = Math.round(monthlySimulation.totals.deltaMonthlyBayKiBiG * 100) / 100;
+      const contributionsChange = Math.round((monthlySimulation.totals.deltaParentFees
+        + monthlySimulation.totals.deltaParentFeeSubsidy) * 12 * 100) / 100;
+      const funding = Math.round((monthlyFinance.summary.incomeBayKiBiG + fundingChange) * 100) / 100;
+      const contributions = Math.round((monthlyFinance.summary.incomeParents * 12 + contributionsChange) * 100) / 100;
+      return {
+        year,
+        funding,
+        fundingChange,
+        contributions,
+        contributionsChange,
+        totalIncome: Math.round((funding + contributions) * 100) / 100,
+        totalIncomeChange: Math.round((fundingChange + contributionsChange) * 100) / 100,
+      };
+    });
+  }, [
+    referenceDate,
+    fundingYears,
+    financeScenario,
+    groupFeeCatalogs,
+    selectedScenarioId,
+    simulationData,
+    groupDefs,
+    simulationCatalogs,
+    parentFeeSubsidy,
+    temporaryPrices,
+  ]);
+  const currentDemandData = React.useMemo(() => getSimulationDemandForDate({
+    scenarioId: selectedScenarioId,
+    referenceDate,
+    selectedGroupIds: [],
+    simulationData,
+  }), [selectedScenarioId, referenceDate, simulationData]);
+  const currentSimulation = React.useMemo(() => simulateContributionChanges({
+    demandBookings: currentDemandData.demand,
+    dataItems: simulationData.dataItems,
+    groupDefs,
+    bayKiBiGRules: financeScenario?.bayKiBiGRules || [],
+    groupFeeCatalogs: simulationCatalogs,
+    originalGroupFeeCatalogs: groupFeeCatalogs,
+    parentFeeSubsidy,
+    temporaryPrices,
+    utilizationPercent: 0,
+    referenceDate,
+  }), [
+    currentDemandData,
+    simulationData,
+    groupDefs,
+    financeScenario?.bayKiBiGRules,
+    simulationCatalogs,
+    groupFeeCatalogs,
+    parentFeeSubsidy,
+    temporaryPrices,
+    referenceDate,
+  ]);
+  const familyPotentials = React.useMemo(() => calculateFamilyFeePotentials({
+    demandBookings: currentDemandData.demand,
+    dataItems: simulationData.dataItems,
+    groupDefs,
+    groupFeeCatalogs: simulationCatalogs,
+    parentFeeSubsidy,
+    temporaryPrices,
+    referenceDate,
+    monthlyBudget: potentialMonthlyBudget,
+  }), [
+    currentDemandData,
+    simulationData,
+    groupDefs,
+    simulationCatalogs,
+    parentFeeSubsidy,
+    temporaryPrices,
+    referenceDate,
+    potentialMonthlyBudget,
+  ]);
+  const familyPotentialById = React.useMemo(() => new Map(
+    familyPotentials.map((family) => [family.id, family])
+  ), [familyPotentials]);
+  const affectedFamilyRows = React.useMemo(() => currentSimulation.familyContributions
+    .filter((family) => Math.abs(family.deltaMonthlyParentFees) >= 0.005)
+    .map((family) => ({
+      ...family,
+      changePercent: family.monthlyParentFeesBefore > 0
+        ? family.deltaMonthlyParentFees / family.monthlyParentFeesBefore * 100
+        : null,
+      potential: familyPotentialById.get(family.id) || {
+        potentialUpgradeWeeklyHours: 0,
+        potentialDowngradeWeeklyHours: 0,
+      },
+    }))
+    .sort((left, right) => Math.abs(right.deltaMonthlyParentFees) - Math.abs(left.deltaMonthlyParentFees)),
+  [currentSimulation.familyContributions, familyPotentialById]);
 
   const setTemporaryCatalog = (groupId, nextEntries) => {
     const originalEntries = groupFeeCatalogs[groupId] || [];
@@ -433,203 +531,69 @@ function FundingSimulationPanel({ accent }) {
     setTemporaryPrices({});
   };
 
-  const reformBaseline = React.useMemo(() => {
-    const dataItems = getEffectiveDataItems();
-    const effectiveGroupDefs = getEffectiveGroupDefs();
-    const bookingsByItem = {};
-    const groupAssignmentsByItem = {};
-    const qualificationAssignmentsByItem = {};
-    Object.keys(dataItems || {}).forEach((itemId) => {
-      bookingsByItem[itemId] = getEffectiveBookings(itemId);
-      groupAssignmentsByItem[itemId] = getEffectiveGroupAssignments(itemId);
-      qualificationAssignmentsByItem[itemId] = Object.fromEntries(
-        (getEffectiveQualificationAssignments(itemId) || []).map((assignment, index) => [String(index), assignment])
-      );
-    });
-
-    return calculateReformDerived2026({
-      scenarioId: selectedScenarioId,
-      dataItems,
-      bookingsByItem,
-      groupAssignmentsByItem,
-      qualificationAssignmentsByItem,
-      groupDefs: effectiveGroupDefs,
-      financeScenario,
-      groupFeeCatalogs,
-      parentFeeSubsidy,
-    });
-  }, [
-    selectedScenarioId,
-    getEffectiveDataItems,
-    getEffectiveBookings,
-    getEffectiveGroupDefs,
-    getEffectiveGroupAssignments,
-    getEffectiveQualificationAssignments,
-    financeScenario,
-    groupFeeCatalogs,
-    parentFeeSubsidy,
-  ]);
-
-  const simulation = React.useMemo(() => {
-    const dataItems = getEffectiveDataItems();
-    const effectiveGroupDefs = getEffectiveGroupDefs();
-    const bookingsByItem = {};
-    const groupAssignmentsByItem = {};
-    const qualificationAssignmentsByItem = {};
-    Object.keys(dataItems || {}).forEach((itemId) => {
-      bookingsByItem[itemId] = getEffectiveBookings(itemId);
-      groupAssignmentsByItem[itemId] = getEffectiveGroupAssignments(itemId);
-      qualificationAssignmentsByItem[itemId] = Object.fromEntries(
-        (getEffectiveQualificationAssignments(itemId) || []).map((assignment, index) => [String(index), assignment])
-      );
-    });
-
-    const { demand } = filterBookings({
-      bookingsByScenario: { [selectedScenarioId]: bookingsByItem },
-      dataByScenario: { [selectedScenarioId]: dataItems },
-      qualificationAssignmentsByScenario: { [selectedScenarioId]: qualificationAssignmentsByItem },
-      overlaysByScenario: {},
-      scenarioId: selectedScenarioId,
-      referenceDate,
-      selectedGroups: selectedGroupIds,
-      selectedQualifications: [],
-      groupsByScenario: { [selectedScenarioId]: groupAssignmentsByItem },
-    });
-
-    const options = {
-      demandBookings: demand,
-      dataItems,
-      groupDefs: effectiveGroupDefs,
-      bayKiBiGRules: financeScenario?.bayKiBiGRules || [],
-      groupFeeCatalogs: simulationCatalogs,
-      originalGroupFeeCatalogs: groupFeeCatalogs,
-      parentFeeSubsidy,
-      temporaryPrices,
-      utilizationPercent,
-    };
-    const reformYears = Object.fromEntries(REFORM_YEARS.map((year) => [
-      year,
-      simulateAnnualContributionChanges({ ...options, year }),
-    ]));
-    const currentYear = Number(referenceDate.slice(0, 4));
-
-    return {
-      current: simulateContributionChanges({ ...options, referenceDate }),
-      annual: reformYears[currentYear]
-        || simulateAnnualContributionChanges({ ...options, year: currentYear }),
-      reformYears,
-    };
-  }, [
-    getEffectiveDataItems,
-    getEffectiveBookings,
-    getEffectiveGroupDefs,
-    getEffectiveGroupAssignments,
-    getEffectiveQualificationAssignments,
-    selectedScenarioId,
-    selectedGroupIds,
-    referenceDate,
-    financeScenario,
-    simulationCatalogs,
-    groupFeeCatalogs,
-    parentFeeSubsidy,
-    temporaryPrices,
-    utilizationPercent,
-  ]);
-
-  const result = simulation.current;
-  const annualResult = simulation.annual;
-  const reformChangesByYear = simulation.reformYears;
-  const reformForecast = React.useMemo(
-    () => calculateReformForecast(financeScenario?.settings?.reformForecast || {}, reformChangesByYear),
-    [financeScenario?.settings?.reformForecast, reformChangesByYear]
-  );
-  const totals = result?.totals || {
-    bookingHoursBefore: 0,
-    bookingHoursAfter: 0,
-    deltaMonthlyBayKiBiG: 0,
-    deltaParentFees: 0,
-    deltaParentFeeSubsidy: 0,
-    deltaMonthlyTotal: 0,
-    deltaYearlyTotal: 0,
-    migratedBookings: 0,
-    affectedChildren: 0,
-    affectedFamilies: 0,
-    childrenWithMoreHours: 0,
-    familiesWithMoreHours: 0,
-    weeklyHoursAdded: 0,
-    childrenWithHigherFees: 0,
-    familiesWithHigherFees: 0,
-    monthlyParentCostIncrease: 0,
-    childrenWithLowerFees: 0,
-    familiesWithLowerFees: 0,
-    monthlyParentCostReduction: 0,
-  };
-  const hasRule = Boolean(result?.rule && Number(result.rule.baseValue) > 0);
+  const hasRule = (financeScenario?.bayKiBiGRules || []).some((rule) => Number(rule.baseValue) > 0);
   const catalogEntries = Object.values(groupFeeCatalogs).flatMap((entries) => (Array.isArray(entries) ? entries : []));
   const hasAnyZeitkatEntries = catalogEntries.some((entry) => Boolean(getFeeBandZeitkatId(entry)) && entry.enabled !== false && Number(entry.monthlyAmount) > 0);
   const hasSimulationFeeRows = categoryPriceRows.length > 0;
 
-  const kpis = [
-    { label: 'Buchungsstunden vorher', value: formatHours(totals.bookingHoursBefore), icon: IconUsers },
-    { label: 'Buchungsstunden Simulation', value: formatHours(totals.bookingHoursAfter), icon: IconUsers },
-    { label: 'Δ Förderung / Monat', value: formatEuro(totals.deltaMonthlyBayKiBiG), icon: IconCoins },
-    { label: 'Δ Elternanteil / Monat', value: formatEuro(totals.deltaParentFees), icon: IconCoins },
-    { label: 'Δ Elternbeitragszuschuss / Monat', value: formatEuro(totals.deltaParentFeeSubsidy), icon: IconCoins },
-    { label: 'Δ Gesamteinnahmen / Monat', value: formatEuro(totals.deltaMonthlyTotal), icon: IconCoins },
-    { label: 'Δ Gesamteinnahmen / Jahr', value: formatEuro(annualResult?.totals?.deltaYearlyTotal || 0), icon: IconCoins },
-  ];
-
   return (
-    <Stack gap="md" h="100%" p="md" style={{ overflow: 'auto' }} data-testid="funding-simulation-panel">
-      <Stack gap={2}>
-        <Text fw={700} size="sm" style={{ color: accent }}>Simulation von Beitragsänderungen</Text>
-        <Text size="xs" c="dimmed">
-          Verwendet die im Capakita-Datenspeicher hinterlegten ZEITKAT-Sätze. Fehlende ZEITKAT werden aus den gespeicherten Buchungszeiten abgeleitet.
-          Bei gleichem Preis wechselt die Ausschöpfungsquote anteilig in die nächste ZEITKAT. Simulationswerte bleiben lokal und verändern weder Optionen noch gespeicherte Buchungen.
-        </Text>
+    <SimpleGrid
+      cols={2}
+      spacing="md"
+      h="100%"
+      style={{ minHeight: 0, gridTemplateRows: 'minmax(0, 1fr)' }}
+      data-testid="funding-simulation-panel"
+    >
+      <Stack
+        gap="md"
+        h="100%"
+        p="sm"
+        style={{ minWidth: 0, overflowY: 'auto', overflowX: 'hidden' }}
+        data-testid="simulation-settings-panel"
+      >
+      <Group gap="sm" align="flex-end" wrap="nowrap">
+        <Text size="sm" fw={600} style={{ whiteSpace: 'nowrap', paddingBottom: 8 }}>Tarifgruppen</Text>
         <MultiSelect
-          label="Gruppen für die Simulation"
-          description="Keine Auswahl = alle Gruppen. Die Auswertung und Jahreswirkung werden auf die ausgewählten Gruppen beschränkt."
+          aria-label="Gruppen für Tarif-Einstellungen"
           placeholder="Alle Gruppen"
           data={groupFilterOptions}
           value={selectedGroupIds}
           onChange={setSelectedGroupIds}
           searchable
           clearable
+          style={{ flex: 1, minWidth: 0 }}
           data-testid="simulation-group-filter"
         />
-        {!hasRule ? (
-          <Badge color="orange" variant="light" w="fit-content">
-            Keine Förderregel mit Basiswert hinterlegt (Einstellungen → Förderregel) – Förderänderungen = 0.
-          </Badge>
-        ) : null}
-        {result?.skippedNoZone > 0 ? (
-          <Badge color="orange" variant="light" w="fit-content">
-            Für {result.skippedNoZone} Buchung{result.skippedNoZone === 1 ? '' : 'en'} fehlen sowohl ZEITKAT als auch auswertbare Buchungszeiten; dafür kann keine Förderänderung berechnet werden.
-          </Badge>
-        ) : null}
-        {!hasSimulationFeeRows ? (
-          <Badge color="orange" variant="light" w="fit-content">
-            {!catalogEntries.length
-              ? 'Keine Beitragsstaffeln im Capakita-Datenspeicher gefunden. JSON-Katalog unter Optionen → Beiträge importieren.'
-              : hasAnyZeitkatEntries
-                ? `ZEITKAT-Beitragssätze sind vorhanden, aber am Stichtag ${referenceDate} nicht gültig. Bitte die Gültigkeitszeiträume in Optionen → Beiträge prüfen.`
-                : 'Der gespeicherte Katalog enthält keine verwendbaren Beitragsstaffeln für den ausgewählten Stichtag.'}
-          </Badge>
-        ) : null}
-
-      </Stack>
+      </Group>
+      {!hasRule ? (
+        <Badge color="orange" variant="light" w="fit-content" data-testid="simulation-missing-funding-rule">
+          Keine BayKiBiG-Förderregel mit positivem Basiswert konfiguriert (Optionen → Förderregel).
+        </Badge>
+      ) : null}
+      {!hasSimulationFeeRows ? (
+        <Badge color="orange" variant="light" w="fit-content">
+          {!catalogEntries.length
+            ? 'Keine Beitragsstaffeln im Capakita-Datenspeicher gefunden. JSON-Katalog unter Optionen → Beiträge importieren.'
+            : hasAnyZeitkatEntries
+              ? `ZEITKAT-Beitragssätze sind vorhanden, aber am Stichtag ${referenceDate} nicht gültig. Bitte die Gültigkeitszeiträume in Optionen → Beiträge prüfen.`
+              : 'Der gespeicherte Katalog enthält keine verwendbaren Beitragsstaffeln für den ausgewählten Stichtag.'}
+        </Badge>
+      ) : null}
 
       <Paper withBorder p="sm" radius="md" data-testid="temporary-category-prices">
         <Stack gap="sm">
-          <Group justify="space-between" align="center" wrap="wrap">
-            <Stack gap={2}>
-              <Text fw={600} size="sm">Beitragsstaffeln aus dem Capakita-Datenspeicher</Text>
-              <Text size="xs" c="dimmed">Die Slider stellen Monatsbeiträge je ZEITKAT ein; die Originalbeiträge bleiben als Markierung sichtbar. Änderungen gelten nur lokal für diese Simulation.</Text>
-            </Stack>
+          <Group justify="space-between" align="center" wrap="nowrap" data-testid="temporary-category-prices-header">
+            <Text fw={600} size="sm">Beitragsstaffeln aus dem Capakita-Datenspeicher</Text>
             {categoryPriceRows.length > 0 || Object.keys(temporaryCatalogEntries).length > 0 ? (
-              <Button size="xs" variant="subtle" onClick={resetAllTemporaryCatalogs} data-testid="reset-all-temporary-prices">
-                Alle auf Ausgangswerte zurücksetzen
+              <Button
+                size="xs"
+                variant="subtle"
+                leftSection={<IconRefresh size={14} />}
+                onClick={resetAllTemporaryCatalogs}
+                title="Alle simulierten Beitragsstaffeln auf Ausgangswerte zurücksetzen"
+                data-testid="reset-all-temporary-prices"
+              >
+                Alle zurücksetzen
               </Button>
             ) : null}
           </Group>
@@ -667,19 +631,10 @@ function FundingSimulationPanel({ accent }) {
       </Paper>
 
       <Paper withBorder p="sm" radius="md" data-testid="parent-fee-subsidy-control">
-        <Stack gap="xs">
-          <Group justify="space-between" align="flex-start" wrap="wrap">
-            <Stack gap={2}>
-              <Text fw={600} size="sm">Elternbeitragszuschuss / Rabatt</Text>
-              <Text size="xs" c="dimmed">
-                Der festgelegte Zuschuss beträgt {formatEuro(baselineParentFeeSubsidyAmount)} je berechtigtem Kind und Monat. Er wird bis einschließlich {parentFeeSubsidy.endDate || 'unbegrenzt'} angesetzt, höchstens bis zur Höhe des Beitrags.
-              </Text>
-            </Stack>
-            <Text fw={700} size="sm" data-testid="parent-fee-subsidy-value">{formatEuro(policyParentFeeSubsidyAmount)} / Monat</Text>
-          </Group>
+        <Group justify="space-between" align="flex-end" wrap="nowrap" data-testid="parent-fee-subsidy-header">
+          <Text fw={600} size="sm" style={{ minWidth: 0 }}>Elternbeitragszuschuss / Rabatt</Text>
           <DatePickerInput
-            label="Elternbeitragszuschuss gilt bis einschließlich"
-            description="Danach wird kein Zuschuss mehr angesetzt. Feld leeren, wenn er unbegrenzt weiterläuft."
+            label="Gilt bis"
             value={toDateValue(parentFeeSubsidy.endDate)}
             onChange={(value) => dispatch(updateParentFeeSubsidy({
               scenarioId: selectedScenarioId,
@@ -687,279 +642,129 @@ function FundingSimulationPanel({ accent }) {
             }))}
             valueFormat="DD.MM.YYYY"
             clearable
+            w={220}
             data-testid="parent-fee-subsidy-end-date"
           />
-          <Text size="xs" c="dimmed">
-            Angerechnet für Kinder ab {parentFeeSubsidy.minimumAgeYears ?? 3} bis vor das {parentFeeSubsidy.maximumAgeYears ?? 7}. Lebensjahr; Schulkindgruppen sind ausgeschlossen. Der hinterlegte Betrag wird ausschließlich bis zum eingestellten Enddatum angesetzt. Die Jahresansicht berücksichtigt den Zuschuss monatsgenau.
-          </Text>
-        </Stack>
+        </Group>
       </Paper>
-
-      <Paper withBorder p="sm" radius="md">
-        <Stack gap="xs">
-          <Group justify="space-between" align="center" wrap="wrap">
-            <Stack gap={2}>
-              <Text fw={600} size="sm">Ausschöpfungsquote Mehrstunden</Text>
-              <Text size="xs" c="dimmed">
-                Anteil der passenden Buchungen, die bei gleichem Beitrag in die nächste ZEITKAT- oder Wochenstunden-Staffel wechseln.
-              </Text>
-            </Stack>
-            <Text fw={700} size="sm" data-testid="utilization-value">{utilizationPercent} %</Text>
-          </Group>
-          <Slider
-            min={0}
-            max={100}
-            step={5}
-            value={utilizationPercent}
-            onChange={setUtilizationPercent}
-            marks={[{ value: 0, label: '0 %' }, { value: 50, label: '50 %' }, { value: 100, label: '100 %' }]}
-            aria-label="Ausschöpfungsquote Mehrstunden"
-            thumbLabel="Ausschöpfungsquote Mehrstunden"
-            data-testid="utilization-slider"
-          />
-          <Text size="xs" c="dimmed">
-            Beispiel: Bei 50 % wechseln rechnerisch die Hälfte der passenden Buchungen; Stunden und Förderwirkung werden soweit aus den Buchungszeiten berechenbar anteilig ermittelt.
-          </Text>
-        </Stack>
-      </Paper>
-
-      <SimpleGrid cols={{ base: 2, sm: 3, lg: 7 }} spacing="xs">
-        {kpis.map((kpi) => (
-          <Paper key={kpi.label} withBorder p="xs" radius="md" miw={130}>
-            <Group gap={4} wrap="nowrap"><kpi.icon size={14} /><Text size="xs" c="dimmed">{kpi.label}</Text></Group>
-            <Text fw={700}>{kpi.value}</Text>
-          </Paper>
-        ))}
-      </SimpleGrid>
-
-      {annualResult?.totals ? (
-        <Paper withBorder p="sm" radius="md" data-testid="annual-contribution-impact">
-          <Stack gap="sm">
-            <div>
-              <Text fw={600} size="sm">Jahreswirkung {annualResult.year} · Summe der zwölf Monatsberechnungen</Text>
-              <Text size="xs" c="dimmed">Die Rechnung berücksichtigt gültige Staffeln, Buchungen, Förderregeln und den Wegfall des Elternbeitragszuschusses ab {parentFeeSubsidy.endDate ? `${parentFeeSubsidy.endDate} (danach)` : 'dem eingerichteten Gültigkeitsende'}.</Text>
-            </div>
-            <SimpleGrid cols={{ base: 2, md: 4 }} spacing="xs">
-              {[
-                ['Δ Förderung im Jahr', annualResult.totals.deltaYearlyBayKiBiG],
-                ['Δ Elternanteil im Jahr', annualResult.totals.deltaYearlyParentFees],
-                ['Δ Zuschuss im Jahr', annualResult.totals.deltaYearlyParentSubsidy],
-                ['Δ Gesamteinnahmen im Jahr', annualResult.totals.deltaYearlyTotal],
-              ].map(([label, value]) => (
-                <Paper key={label} withBorder p="xs" radius="sm">
-                  <Text size="xs" c="dimmed">{label}</Text>
-                  <Text fw={700}>{formatEuro(value)}</Text>
-                </Paper>
-              ))}
-            </SimpleGrid>
-            <Text size="xs" c="dimmed">
-              Betroffene Kinder: {annualResult.totals.affectedChildren} · Familien: {annualResult.totals.affectedFamilies} · durchschnittliche monatliche Eltern-Mehrbelastung: {formatEuro(annualResult.totals.monthlyParentCostIncrease / 12)}.
-            </Text>
-          </Stack>
-        </Paper>
-      ) : null}
 
       <ReformForecastInputs
         settings={financeScenario.settings}
         scenarioId={selectedScenarioId}
         dispatch={dispatch}
-        calculatedValues={reformBaseline}
+        calculatedValues={calculatedReformValues}
       />
+      </Stack>
+      <Paper
+        withBorder
+        p="md"
+        radius="md"
+        h="100%"
+        style={{ minWidth: 0, overflow: 'auto' }}
+        data-testid="simulation-results-panel"
+      >
+        <Stack gap="lg">
+          <Title order={2}>Ergebnis</Title>
+          <Stack gap="xs">
+            <Text fw={700}>Einnahmen im Jahresvergleich · Jahreswerte zum gewählten Stichtag</Text>
+            {annualIncomeRows.length === 0 ? (
+              <Text size="sm" c="dimmed" data-testid="no-funding-years">
+                Für das aktuelle oder kommende Jahr ist keine BayKiBiG-Förderregel mit positivem Basiswert hinterlegt.
+              </Text>
+            ) : (
+              <Paper withBorder radius="sm" style={{ overflowX: 'auto' }}>
+                <Table striped highlightOnHover withTableBorder fz="xs" miw={720} data-testid="annual-income-results">
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th>Jahr</Table.Th>
+                      <Table.Th ta="right">Förderung / Jahr</Table.Th>
+                      <Table.Th ta="right">Δ Förderung</Table.Th>
+                      <Table.Th ta="right">Beiträge / Jahr</Table.Th>
+                      <Table.Th ta="right">Δ Beiträge</Table.Th>
+                      <Table.Th ta="right">Einnahmen gesamt / Jahr</Table.Th>
+                      <Table.Th ta="right">Δ gesamt</Table.Th>
+                    </Table.Tr>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {annualIncomeRows.map((row) => (
+                      <Table.Tr key={row.year} data-testid={`annual-income-row-${row.year}`}>
+                        <Table.Td>{row.year}</Table.Td>
+                        <Table.Td ta="right">{formatEuro(row.funding)}</Table.Td>
+                        <Table.Td ta="right">{formatSignedEuro(row.fundingChange)}</Table.Td>
+                        <Table.Td ta="right">{formatEuro(row.contributions)}</Table.Td>
+                        <Table.Td ta="right">{formatSignedEuro(row.contributionsChange)}</Table.Td>
+                        <Table.Td ta="right" fw={700}>{formatEuro(row.totalIncome)}</Table.Td>
+                        <Table.Td ta="right" fw={700}>{formatSignedEuro(row.totalIncomeChange)}</Table.Td>
+                      </Table.Tr>
+                    ))}
+                  </Table.Tbody>
+                </Table>
+              </Paper>
+            )}
+          </Stack>
 
-      <Paper withBorder p="sm" radius="md" data-testid="reform-forecast-results">
-        <Stack gap="sm">
-          <div>
-            <Text fw={600} size="sm">BayKiBiG-Reformrechnung · Jahreswerte</Text>
-            <Text size="xs" c="dimmed">Formellogik der Berechnungsvorlage 2027, kombiniert mit den jährlichen Förder- und Elternbeitragsänderungen aus den simulierten ZEITKAT-Sätzen. Der Elternbeitragszuschuss wird separat als Durchlaufposten ausgewiesen.</Text>
-          </div>
-          {!reformForecast.assumptions.hasActualBaseline ? (
-            <Badge color="orange" variant="light" w="fit-content">Ist-Jahressummen 2026 fehlen noch. Trage sie im Bereich „BayKiBiG-Reform · Zusatzdaten“ ein, um belastbare Ergebnisse zu erhalten.</Badge>
-          ) : null}
-          <Paper withBorder radius="sm" style={{ overflowX: 'auto' }}>
-            <Table highlightOnHover withTableBorder={false} miw={1240} fz="xs">
-              <Table.Thead><Table.Tr>
-                <Table.Th>Jahr</Table.Th><Table.Th style={{ textAlign: 'right' }}>Kindbezogene Förderung</Table.Th>
-                <Table.Th style={{ textAlign: 'right' }}>Teamkräfte brutto</Table.Th><Table.Th style={{ textAlign: 'right' }}>Bisherige Richtlinienförderung</Table.Th>
-                <Table.Th style={{ textAlign: 'right' }}>Teamkräfte netto</Table.Th><Table.Th style={{ textAlign: 'right' }}>Reformergebnis</Table.Th>
-                <Table.Th style={{ textAlign: 'right' }}>Δ Beitragsänderung Förderung</Table.Th><Table.Th style={{ textAlign: 'right' }}>Δ Elternbeiträge / Zuschuss</Table.Th>
-                <Table.Th style={{ textAlign: 'right' }}>Reformergebnis inkl. Δ Simulation</Table.Th><Table.Th style={{ textAlign: 'right' }}>Δ zum Vorjahr</Table.Th>
-                <Table.Th style={{ textAlign: 'right' }}>Zuschuss 2026 (durchlaufend)</Table.Th>
-              </Table.Tr></Table.Thead>
-              <Table.Tbody>
-                {reformForecast.results.map((row) => (
-                  <Table.Tr key={row.year}>
-                    <Table.Td>{row.year}</Table.Td>
-                    <Table.Td style={{ textAlign: 'right' }}>{formatEuro(row.components.childRelatedFunding)}</Table.Td>
-                    <Table.Td style={{ textAlign: 'right' }}>{formatEuro(row.teamGrant)}</Table.Td>
-                    <Table.Td style={{ textAlign: 'right' }}>−{formatEuro(row.priorGuidelineFunding)}</Table.Td>
-                    <Table.Td style={{ textAlign: 'right' }}>{formatEuro(row.teamGrantNet)}</Table.Td>
-                    <Table.Td style={{ textAlign: 'right', fontWeight: 700 }}>{formatEuro(row.result)}</Table.Td>
-                    <Table.Td style={{ textAlign: 'right' }}>{formatEuro(row.simulationFundingDelta)}</Table.Td>
-                    <Table.Td style={{ textAlign: 'right' }}>{formatEuro(row.simulationParentFeesDelta + row.simulationParentSubsidyDelta)}</Table.Td>
-                    <Table.Td style={{ textAlign: 'right', fontWeight: 700 }}>{formatEuro(row.combinedResult)}</Table.Td>
-                    <Table.Td style={{ textAlign: 'right' }}>{row.changeFromPreviousYear == null ? '–' : formatEuro(row.changeFromPreviousYear)}</Table.Td>
-                    <Table.Td style={{ textAlign: 'right' }}>{formatEuro(row.parentFeeSubsidyPassThrough)}</Table.Td>
-                  </Table.Tr>
-                ))}
-              </Table.Tbody>
-            </Table>
-          </Paper>
-          <Alert color="gray" variant="light" title="Abstimmung mit dem kindbezogenen Capakita-Modell">
-            2026 Ist nach Eingabe: {formatEuro(financeScenario.settings?.reformForecast?.actualFunding?.bookingTime || 0)} · Capakita-Modellhochrechnung aus aktiven Buchungen und den vorhandenen BayKiBiG-Regeln: {formatEuro(reformBaseline.capakitaModeledAnnualFunding)} · Differenz (Modell − Ist): {formatEuro(reformBaseline.capakitaModeledAnnualFunding - (Number(financeScenario.settings?.reformForecast?.actualFunding?.bookingTime) || 0))}. Der simulierte Förderdelta wird zusätzlich je Jahr in der Tabelle ausgewiesen.
-          </Alert>
-          <Text size="xs" c="dimmed">
-            Teamkräfte: {reformForecast.assumptions.approvedPlaces} genehmigte Plätze · {reformForecast.assumptions.teamGrantEligible ? 'Förderung aktiviert' : 'Förderung nicht aktiviert'}. Basiswert: jährlich {reformForecast.assumptions.baseValueIncreasePercent.toLocaleString('de-DE')} %; Qualitätsbonus wird anhand der festen Benchmarkreihe fortgeschrieben. Die Slider-Auswirkungen beruhen auf den jeweiligen Jahresstaffeln.
-          </Text>
+          <Stack gap="xs">
+            <Group justify="space-between" align="flex-end" wrap="wrap">
+              <Text fw={700}>Von Beitragsänderungen betroffene Familien</Text>
+              <NumberInput
+                label="Budgetänderung pro Familie / Monat"
+                value={potentialMonthlyBudget}
+                onChange={(value) => setPotentialMonthlyBudget(Math.max(0, Number(value) || 0))}
+                min={0}
+                max={500}
+                step={5}
+                decimalScale={2}
+                thousandSeparator="."
+                decimalSeparator=","
+                suffix=" EUR"
+                w={230}
+                data-testid="family-potential-budget"
+              />
+            </Group>
+            {affectedFamilyRows.length === 0 ? (
+              <Text size="sm" c="dimmed" data-testid="no-affected-families">
+                Für die aktuellen Beitragssätze sind keine Familien von einer Beitragsänderung betroffen.
+              </Text>
+            ) : (
+              <Paper withBorder radius="sm" style={{ overflowX: 'auto' }}>
+                <Table striped highlightOnHover withTableBorder fz="xs" miw={680} data-testid="affected-families-table">
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th>Familie</Table.Th>
+                      <Table.Th ta="right">Beiträge / Monat</Table.Th>
+                      <Table.Th ta="right">Veränderung</Table.Th>
+                      <Table.Th ta="right">Veränderung %</Table.Th>
+                      <Table.Th ta="right">Potential Upgrade</Table.Th>
+                      <Table.Th ta="right">Potential Downgrade</Table.Th>
+                    </Table.Tr>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {affectedFamilyRows.map((family) => (
+                      <Table.Tr key={family.id} data-testid={`affected-family-${family.id}`}>
+                        <Table.Td>{family.label}</Table.Td>
+                        <Table.Td ta="right">{formatEuro(family.monthlyParentFeesAfter)}</Table.Td>
+                        <Table.Td ta="right">{formatSignedEuro(family.deltaMonthlyParentFees)}</Table.Td>
+                        <Table.Td ta="right">{family.changePercent == null ? '–' : formatPercent(family.changePercent)}</Table.Td>
+                        <Table.Td ta="right">
+                          {family.potential.potentialUpgradeWeeklyHours > 0
+                            ? `+${formatWeeklyHours(family.potential.potentialUpgradeWeeklyHours)}`
+                            : '–'}
+                        </Table.Td>
+                        <Table.Td ta="right">
+                          {family.potential.potentialDowngradeWeeklyHours > 0
+                            ? `−${formatWeeklyHours(family.potential.potentialDowngradeWeeklyHours)}`
+                            : '–'}
+                        </Table.Td>
+                      </Table.Tr>
+                    ))}
+                  </Table.Tbody>
+                </Table>
+              </Paper>
+            )}
+          </Stack>
         </Stack>
       </Paper>
-
-      <SimpleGrid cols={{ base: 1, md: 2 }} spacing="xs" data-testid="simulation-impact-summary">
-        <Paper withBorder p="sm" radius="md" data-testid="simulation-more-hours-impact">
-          <Group gap="xs" align="flex-start" wrap="nowrap">
-            <IconUsers size={18} />
-            <Stack gap={2}>
-              <Text fw={600} size="sm">Zusätzliche Betreuungsstunden verfügbar</Text>
-              <Text size="sm">+{formatHours(totals.weeklyHoursAdded)} pro Woche</Text>
-              <Text size="xs" c="dimmed">Betrifft {formatAffectedCount(totals.childrenWithMoreHours, totals.familiesWithMoreHours)}</Text>
-            </Stack>
-          </Group>
-        </Paper>
-        <Paper withBorder p="sm" radius="md" data-testid="simulation-parent-cost-impact">
-          <Group gap="xs" align="flex-start" wrap="nowrap">
-            <IconCoins size={18} />
-            <Stack gap={2}>
-              <Text fw={600} size="sm">Zusätzliche Elternkosten</Text>
-              <Text size="sm">+{formatEuro(totals.monthlyParentCostIncrease)} pro Monat</Text>
-              <Text size="xs" c="dimmed">Betrifft {formatAffectedCount(totals.childrenWithHigherFees, totals.familiesWithHigherFees)} Nettoänderung Elternbeiträge: {formatEuro(totals.deltaParentFees)} / Monat.</Text>
-              {totals.monthlyParentCostReduction > 0 ? (
-                <Text size="xs" c="dimmed">Kosten sinken bei {formatAffectedCount(totals.childrenWithLowerFees, totals.familiesWithLowerFees)} insgesamt um {formatEuro(totals.monthlyParentCostReduction)} / Monat.</Text>
-              ) : null}
-            </Stack>
-          </Group>
-        </Paper>
-      </SimpleGrid>
-
-      <Tabs value={activeTab} onChange={(value) => setActiveTab(value || 'groups')}>
-        <Tabs.List>
-          <Tabs.Tab value="groups">Gruppen & Gesamt</Tabs.Tab>
-          <Tabs.Tab value="children" leftSection={<IconUsers size={14} />}>Kinder ({totals.affectedChildren})</Tabs.Tab>
-          <Tabs.Tab value="families" leftSection={<IconUsers size={14} />}>Familien ({totals.affectedFamilies})</Tabs.Tab>
-        </Tabs.List>
-      </Tabs>
-
-      {activeTab === 'groups' ? (
-        <Paper withBorder radius="md" style={{ overflow: 'auto' }}>
-          <Group justify="flex-end" p="xs"><CopyTableButton tableRef={groupTableRef} testId="copy-simulation-groups" /></Group>
-          <Table ref={groupTableRef} highlightOnHover verticalSpacing="xs" fz="xs" data-testid="simulation-group-results">
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>Gruppe</Table.Th>
-                <Table.Th style={{ textAlign: 'right' }}>Buchungen / Wechsel</Table.Th>
-                <Table.Th style={{ textAlign: 'right' }}>Buchungsstunden vorher → Simulation</Table.Th>
-                <Table.Th style={{ textAlign: 'right' }}>Δ Förderung / Monat</Table.Th>
-                <Table.Th style={{ textAlign: 'right' }}>Δ Elternanteil / Monat</Table.Th>
-                <Table.Th style={{ textAlign: 'right' }}>Δ Elternbeitragszuschuss / Monat</Table.Th>
-                <Table.Th style={{ textAlign: 'right' }}>Δ Gesamteinnahmen / Monat</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {(result?.groups || []).map((group) => (
-                <Table.Tr key={group.id || 'no-group'}>
-                  <Table.Td>{group.name}</Table.Td>
-                  <Table.Td style={{ textAlign: 'right' }}>{group.bookings} / {group.migratedBookings}</Table.Td>
-                  <Table.Td style={{ textAlign: 'right' }}>{formatHours(group.bookingHoursBefore)} → {formatHours(group.bookingHoursAfter)}</Table.Td>
-                  <Table.Td style={{ textAlign: 'right' }}>{formatEuro(group.deltaMonthlyFunding)}</Table.Td>
-                  <Table.Td style={{ textAlign: 'right' }}>{formatEuro(group.deltaMonthlyParentFees)}</Table.Td>
-                  <Table.Td style={{ textAlign: 'right' }}>{formatEuro(group.deltaMonthlyParentSubsidy)}</Table.Td>
-                  <Table.Td style={{ textAlign: 'right' }}>{formatEuro(group.deltaMonthlyTotal)}</Table.Td>
-                </Table.Tr>
-              ))}
-              <Table.Tr fw={700} data-testid="simulation-total-row">
-                <Table.Td>Gesamt</Table.Td>
-                <Table.Td style={{ textAlign: 'right' }}>{(result?.groups || []).reduce((sum, group) => sum + group.bookings, 0)} / {totals.migratedBookings}</Table.Td>
-                <Table.Td style={{ textAlign: 'right' }}>{formatHours(totals.bookingHoursBefore)} → {formatHours(totals.bookingHoursAfter)}</Table.Td>
-                <Table.Td style={{ textAlign: 'right' }}>{formatEuro(totals.deltaMonthlyBayKiBiG)}</Table.Td>
-                <Table.Td style={{ textAlign: 'right' }}>{formatEuro(totals.deltaParentFees)}</Table.Td>
-                <Table.Td style={{ textAlign: 'right' }}>{formatEuro(totals.deltaParentFeeSubsidy)}</Table.Td>
-                <Table.Td style={{ textAlign: 'right' }}>{formatEuro(totals.deltaMonthlyTotal)}</Table.Td>
-              </Table.Tr>
-              {(result?.groups || []).length === 0 ? (
-                <Table.Tr><Table.Td colSpan={7}><Text size="xs" c="dimmed">Keine aktiven Basisbuchungen mit auswertbarer ZEITKAT oder Wochenstunden gefunden.</Text></Table.Td></Table.Tr>
-              ) : null}
-            </Table.Tbody>
-          </Table>
-        </Paper>
-      ) : null}
-
-      {activeTab === 'children' ? (
-        <Paper withBorder radius="md" style={{ overflow: 'auto' }}>
-          <Group justify="flex-end" p="xs"><CopyTableButton tableRef={childTableRef} testId="copy-simulation-children" /></Group>
-          <Table ref={childTableRef} highlightOnHover verticalSpacing="xs" fz="xs">
-            <Table.Thead><Table.Tr>
-              <Table.Th>Kind</Table.Th><Table.Th>Gruppe</Table.Th><Table.Th>ZEITKAT</Table.Th>
-              <Table.Th style={{ textAlign: 'right' }}>Δ Förderung / Monat</Table.Th>
-              <Table.Th style={{ textAlign: 'right' }}>Δ Elternanteil / Monat</Table.Th>
-              <Table.Th style={{ textAlign: 'right' }}>Δ Zuschuss / Monat</Table.Th>
-              <Table.Th style={{ textAlign: 'right' }}>Δ Gesamt / Monat</Table.Th>
-              <Table.Th style={{ textAlign: 'right' }}>Buchungsstunden vorher → Simulation</Table.Th><Table.Th />
-            </Table.Tr></Table.Thead>
-            <Table.Tbody>
-              {(result?.perChild || []).map((row) => (
-                <Table.Tr key={row.itemId} onClick={() => dispatch(setSelectedItem(row.itemId))} style={{ cursor: 'pointer' }} data-testid={`funding-child-${row.itemId}`}>
-                  <Table.Td>{row.name}</Table.Td><Table.Td>{row.groupName || '–'}</Table.Td><Table.Td>{row.fromZone} → {row.toZone}</Table.Td>
-                  <Table.Td style={{ textAlign: 'right' }}>{formatEuro(row.deltaMonthly)}</Table.Td>
-                  <Table.Td style={{ textAlign: 'right' }}>{formatEuro(row.deltaMonthlyParentFees)}</Table.Td>
-                  <Table.Td style={{ textAlign: 'right' }}>{formatEuro(row.deltaMonthlyParentSubsidy)}</Table.Td>
-                  <Table.Td style={{ textAlign: 'right' }}>{formatEuro(row.deltaMonthlyTotal)}</Table.Td>
-                  <Table.Td style={{ textAlign: 'right' }}>{formatHours(row.weeklyHoursBefore)} → {formatHours(row.weeklyHoursAfter)}</Table.Td>
-                  <Table.Td><IconArrowRight size={14} /></Table.Td>
-                </Table.Tr>
-              ))}
-              {(result?.perChild || []).length === 0 ? <Table.Tr><Table.Td colSpan={9}><Text size="xs" c="dimmed">Keine betroffenen Kinder – Preise und/oder Ausschöpfungsquote unverändert.</Text></Table.Td></Table.Tr> : null}
-            </Table.Tbody>
-          </Table>
-        </Paper>
-      ) : null}
-
-      {activeTab === 'families' ? (
-        <Paper withBorder radius="md" style={{ overflow: 'auto' }}>
-          <Group justify="flex-end" p="xs"><CopyTableButton tableRef={familyTableRef} testId="copy-simulation-families" /></Group>
-          <Table ref={familyTableRef} highlightOnHover verticalSpacing="xs" fz="xs">
-            <Table.Thead><Table.Tr>
-              <Table.Th>Familie</Table.Th>
-              <Table.Th style={{ textAlign: 'right' }}>Betroffene Kinder</Table.Th>
-              <Table.Th style={{ textAlign: 'right' }}>Kinder mit Mehrstunden</Table.Th>
-              <Table.Th style={{ textAlign: 'right' }}>Zusatzstunden / Woche</Table.Th>
-              <Table.Th style={{ textAlign: 'right' }}>Kinder mit Mehrkosten</Table.Th>
-              <Table.Th style={{ textAlign: 'right' }}>Mehrkosten / Monat</Table.Th>
-              <Table.Th style={{ textAlign: 'right' }}>Δ Förderung / Monat</Table.Th>
-              <Table.Th style={{ textAlign: 'right' }}>Δ Elternanteil / Monat</Table.Th>
-              <Table.Th style={{ textAlign: 'right' }}>Δ Zuschuss / Monat</Table.Th>
-            </Table.Tr></Table.Thead>
-            <Table.Tbody>
-              {(result?.families || []).map((family) => (
-                <Table.Tr key={family.id}>
-                  <Table.Td>{family.label}</Table.Td>
-                  <Table.Td style={{ textAlign: 'right' }}>{family.affectedChildren}</Table.Td>
-                  <Table.Td style={{ textAlign: 'right' }}>{family.childrenWithMoreHours}</Table.Td>
-                  <Table.Td style={{ textAlign: 'right' }}>+{formatHours(family.weeklyHoursAdded)}</Table.Td>
-                  <Table.Td style={{ textAlign: 'right' }}>{family.childrenWithHigherFees}</Table.Td>
-                  <Table.Td style={{ textAlign: 'right' }}>{formatEuro(family.monthlyParentCostIncrease)}</Table.Td>
-                  <Table.Td style={{ textAlign: 'right' }}>{formatEuro(family.deltaMonthlyFunding)}</Table.Td>
-                  <Table.Td style={{ textAlign: 'right' }}>{formatEuro(family.deltaMonthlyParentFees)}</Table.Td>
-                  <Table.Td style={{ textAlign: 'right' }}>{formatEuro(family.deltaMonthlyParentSubsidy)}</Table.Td>
-                </Table.Tr>
-              ))}
-              {(result?.families || []).length === 0 ? <Table.Tr><Table.Td colSpan={9}><Text size="xs" c="dimmed">Keine Familienzuordnung gefunden (erzber-Daten oder Haushalts-Fallback fehlen).</Text></Table.Td></Table.Tr> : null}
-            </Table.Tbody>
-          </Table>
-        </Paper>
-      ) : null}
-
-      <Text size="xs" c="dimmed">
-        Elternanteil = Bruttobeitrag abzüglich des anwendbaren Elternbeitragszuschusses (maximal bis zum Beitrag); der Zuschuss wird als eigene Einnahme ausgewiesen. Förderänderung = Basiswert × ZEITKAT-Faktor × Gewichtung (§ 21 BayKiBiG).
-      </Text>
-    </Stack>
+    </SimpleGrid>
   );
 }
 

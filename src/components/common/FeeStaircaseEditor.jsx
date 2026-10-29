@@ -5,8 +5,9 @@ import { createId } from '../../utils/idUtils';
 import { getFeeBandZeitkatId, ZEITKAT_CATALOG } from '../../utils/adebisConstants';
 import { isDateWithinRange } from '../../utils/financeUtils';
 import { getZeitkatLabel, validateFeeStaircase } from '../../utils/feeStaircaseValidation';
+import './FeeStaircaseEditor.css';
 
-const SLIDER_HEIGHT = 166;
+const SLIDER_HEIGHT = 122;
 const ZEITKAT_SLIDER_ZONES = ZEITKAT_CATALOG;
 const STMAS_FEE_STAFFELUNG_URL = 'https://www.stmas.bayern.de/imperia/md/content/stmas/stmas_inet/service-kinder/newsletter/31_newsletter_eb-staffelung.pdf';
 
@@ -62,6 +63,7 @@ function PriceField({ value, label, onChange, testId, disabled = false }) {
   return (
     <NumberInput
       size="xs"
+      w="100%"
       min={0}
       max={100000}
       decimalScale={2}
@@ -103,60 +105,81 @@ function ContributionSlider({ zone, entry, originalEntry, priceMax, simulation, 
   const isActive = Boolean(entry && entry.enabled !== false && Number(entry.monthlyAmount) > 0);
   const amount = isActive ? Number(entry.monthlyAmount) : 0;
   return (
-    <Stack gap={4} align="center" style={{ flex: '1 0 106px', minWidth: 106, padding: '0 6px' }}>
-      <Text size="xs" fw={700} c={invalid ? 'red' : undefined} ta="center" lh={1.2}>{zone.kurzbez}h</Text>
-      <Text size="10px" c={invalid ? 'red' : 'dimmed'} ta="center" lh={1.1}>Kategorie {zone.kennz}</Text>
-      <Box style={{ position: 'relative', height: SLIDER_HEIGHT, width: 46, display: 'flex', justifyContent: 'center' }}>
-        <OriginalMarker amount={simulation ? originalEntry?.monthlyAmount : null} maxAmount={priceMax} />
-        <Slider
-          orientation="vertical"
-          disabled={!isActive}
-          color={invalid ? 'red' : undefined}
-          min={0}
-          max={priceMax}
-          step={5}
-          value={Math.max(0, Math.min(priceMax, amount))}
-          onChange={onChange}
-          aria-label={`${simulation ? 'Simulierter Beitrag' : 'Beitrag'} ZEITKAT ${zone.id}`}
-          thumbLabel={`Beitrag ZEITKAT ${zone.id}`}
-          data-testid={`fee-staircase-slider-${zone.id}`}
-          data-invalid={invalid ? 'true' : undefined}
-          style={{ height: SLIDER_HEIGHT, width: 34, zIndex: 1 }}
-        />
-      </Box>
+    <Stack gap={3} align="center" className="fee-staircase-zone" data-testid={`fee-staircase-zone-${zone.id}`}>
+      <Text
+        size="xs"
+        fw={700}
+        c={invalid ? 'red' : undefined}
+        ta="center"
+        lh={1.1}
+        className="fee-staircase-zone-label-compact"
+        title={zone.bez}
+        aria-label={`${zone.kurzbez} Stunden, Kategorie ${zone.kennz}: ${zone.bez}`}
+      >
+        {zone.kurzbez.includes('-') ? `${zone.kurzbez.split('-')[1]}h` : `${zone.kurzbez}h`}
+      </Text>
+      <Text size="xs" fw={700} c={invalid ? 'red' : undefined} ta="center" lh={1.1} className="fee-staircase-zone-label-full">
+        {zone.kurzbez}h
+      </Text>
+      <Text size="10px" c={invalid ? 'red' : 'dimmed'} ta="center" lh={1.1} className="fee-staircase-zone-category" title={zone.bez}>
+        Kat. {zone.kennz}
+      </Text>
       {isActive ? (
-        <Stack gap={0} w="100%" align="center">
-          <PriceField
-            value={amount}
-            label={`Betrag ZEITKAT ${zone.id}`}
-            onChange={onChange}
-            testId={`fee-staircase-price-${zone.id}`}
-          />
+        <>
+          <Box className="fee-staircase-slider-track" style={{ position: 'relative', height: SLIDER_HEIGHT, width: 38, display: 'flex', justifyContent: 'center' }}>
+            <OriginalMarker amount={simulation ? originalEntry?.monthlyAmount : null} maxAmount={priceMax} />
+            <Slider
+              orientation="vertical"
+              color={invalid ? 'red' : undefined}
+              min={0}
+              max={priceMax}
+              step={5}
+              value={Math.max(0, Math.min(priceMax, amount))}
+              onChange={onChange}
+              aria-label={`${simulation ? 'Simulierter Beitrag' : 'Beitrag'} ZEITKAT ${zone.id}`}
+              thumbLabel={`Beitrag ZEITKAT ${zone.id}`}
+              data-testid={`fee-staircase-slider-${zone.id}`}
+              data-invalid={invalid ? 'true' : undefined}
+              style={{ height: SLIDER_HEIGHT, width: 30, zIndex: 1 }}
+            />
+          </Box>
+          <Box className="fee-staircase-price-field">
+            <PriceField
+              value={amount}
+              label={`Betrag ZEITKAT ${zone.id}`}
+              onChange={onChange}
+              testId={`fee-staircase-price-${zone.id}`}
+            />
+          </Box>
           <Text
             size="10px"
             c="dimmed"
             ta="center"
+            lh={1.3}
+            className="fee-staircase-hourly"
             data-testid={`fee-staircase-hourly-${zone.id}`}
             title={`Monatsbeitrag geteilt durch ${zone.maxHours} Stunden pro Tag (oberes Ende der Kategorie)`}
           >
             {(amount / zone.maxHours).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €/h
           </Text>
-        </Stack>
+          {simulation ? (
+            <Text size="10px" c="dimmed" ta="center" className="fee-staircase-original">
+              Original {originalEntry ? `${Number(originalEntry.monthlyAmount || 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €` : '–'}
+            </Text>
+          ) : null}
+        </>
       ) : (
         <Checkbox
           size="xs"
           color={invalid ? 'red' : undefined}
-          label="Aktivieren"
+          className="fee-staircase-activation"
           aria-label={`Aktiviere Beitrag ZEITKAT ${zone.id}`}
+          title={`ZEITKAT ${zone.id} aktivieren`}
           data-testid={`activate-fee-zeitkat-${zone.id}`}
+          data-invalid={invalid ? 'true' : undefined}
           onChange={onActivate}
         />
       )}
-      {simulation ? (
-        <Text size="10px" c="dimmed" ta="center">
-          Original {originalEntry ? `${Number(originalEntry.monthlyAmount || 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €` : '–'}
-        </Text>
-      ) : null}
     </Stack>
   );
 }
@@ -297,7 +320,7 @@ export default function FeeStaircaseEditor({
         {simulation && onResetAll ? <Button size="xs" variant="subtle" onClick={onResetAll}>Gruppe zurücksetzen</Button> : null}
       </Group>
 
-      {periodOptions.length > 1 ? (
+      {!simulation && periodOptions.length > 1 ? (
         <Select
           label="Gültigkeitsversion"
           value={periodKey || null}
@@ -308,32 +331,34 @@ export default function FeeStaircaseEditor({
         />
       ) : null}
 
-      <Group align="flex-end" wrap="wrap">
-        <DatePickerInput
-          label="Tarif gültig von"
-          value={toDate(periodStart)}
-          onChange={(value) => updateValidity('validFrom', toIsoDate(value))}
-          valueFormat="DD.MM.YYYY"
-          clearable
-          size="xs"
-          w={190}
-          aria-label="Tarif gültig von"
-        />
-        <DatePickerInput
-          label="Tarif gültig bis"
-          value={toDate(periodEnd)}
-          onChange={(value) => updateValidity('validUntil', toIsoDate(value))}
-          valueFormat="DD.MM.YYYY"
-          clearable
-          size="xs"
-          w={190}
-          aria-label="Tarif gültig bis"
-        />
-        <Text size="xs" c="dimmed">Beitrag über Slider oder Zahlenfeld ändern. Bei 0 erscheint unter dem Slider die Checkbox zum Reaktivieren.</Text>
-      </Group>
+      {!simulation ? (
+        <Group align="flex-end" wrap="wrap">
+          <DatePickerInput
+            label="Tarif gültig von"
+            value={toDate(periodStart)}
+            onChange={(value) => updateValidity('validFrom', toIsoDate(value))}
+            valueFormat="DD.MM.YYYY"
+            clearable
+            size="xs"
+            w={190}
+            aria-label="Tarif gültig von"
+          />
+          <DatePickerInput
+            label="Tarif gültig bis"
+            value={toDate(periodEnd)}
+            onChange={(value) => updateValidity('validUntil', toIsoDate(value))}
+            valueFormat="DD.MM.YYYY"
+            clearable
+            size="xs"
+            w={190}
+            aria-label="Tarif gültig bis"
+          />
+          <Text size="xs" c="dimmed">Beitrag über Slider ändern; Zahlenfeld nur bei ausreichend Platz. Inaktive Kategorien lassen sich per Checkbox aktivieren.</Text>
+        </Group>
+      ) : null}
 
-      <Box style={{ overflowX: 'auto', border: '1px solid var(--mantine-color-gray-3)', borderRadius: 8, padding: 10 }}>
-        <Box data-testid="fee-staircase-zeitkat" style={{ display: 'flex', gap: 6, minWidth: `${ZEITKAT_SLIDER_ZONES.length * 112}px`, alignItems: 'stretch' }}>
+      <Box className="fee-staircase-slider-scroll" style={{ overflowX: 'auto', border: '1px solid var(--mantine-color-gray-3)', borderRadius: 8, padding: 6 }}>
+        <Box className="fee-staircase-slider-grid" data-testid="fee-staircase-zeitkat">
           {ZEITKAT_SLIDER_ZONES.map((zone) => (
             <ContributionSlider
               key={zone.id}

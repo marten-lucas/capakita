@@ -1,6 +1,7 @@
 import { createSlice } from '@reduxjs/toolkit';
 import { createId } from '../utils/idUtils';
 import { getFeeBandZeitkatId, getZeitkatIdForMaximumHours } from '../utils/adebisConstants';
+import DEFAULT_ADEBIS_BAYKIBIG_TABLES from '../data/adebis-baykibig-foerdertabellen-2026-2029.json';
 
 const DEFAULT_PARENT_FEE_SUBSIDY = {
   enabled: true,
@@ -28,6 +29,41 @@ function normalizeParentFeeSubsidy(subsidy = {}) {
   };
 }
 
+function getRuleYear(value) {
+  const year = Number(String(value || '').slice(0, 4));
+  return Number.isInteger(year) && year > 0 ? year : null;
+}
+
+function ruleCoversYear(rule, year) {
+  if (!(Number(rule?.baseValue) > 0)) return false;
+  const startYear = getRuleYear(rule?.validFrom);
+  const endYear = getRuleYear(rule?.validUntil);
+  if (!startYear && !endYear) return true;
+  if (startYear === year) return true;
+  if (!startYear) return endYear >= year;
+  return endYear != null && startYear < year && endYear >= year;
+}
+
+function mergeDefaultBayKiBiGRules(rules = []) {
+  const mergedRules = Array.isArray(rules) ? [...rules] : [];
+  const base2026Rule = mergedRules.find((rule) => getRuleYear(rule.validFrom) === 2026)
+    || mergedRules.find((rule) => ruleCoversYear(rule, 2026));
+  const defaultWeights = DEFAULT_ADEBIS_BAYKIBIG_TABLES.rules[0].weightFactors;
+  const inheritedWeights = base2026Rule?.weightFactors || defaultWeights;
+
+  DEFAULT_ADEBIS_BAYKIBIG_TABLES.rules.forEach((defaultRule) => {
+    const year = getRuleYear(defaultRule.validFrom);
+    const alreadyConfigured = mergedRules.some((rule) => ruleCoversYear(rule, year));
+    if (alreadyConfigured) return;
+    mergedRules.push({
+      ...defaultRule,
+      weightFactors: { ...inheritedWeights },
+    });
+  });
+
+  return mergedRules;
+}
+
 function createEmptyScenarioFinance() {
   return {
     parentFeeSubsidy: normalizeParentFeeSubsidy(),
@@ -35,7 +71,7 @@ function createEmptyScenarioFinance() {
       partialAbsenceThresholdDays: 42,
       partialAbsenceEmployerSharePercent: 0,
     },
-    bayKiBiGRules: [],
+    bayKiBiGRules: mergeDefaultBayKiBiGRules(),
     groupFeeCatalogs: {},
     itemFinances: {},
   };
@@ -189,9 +225,8 @@ function normalizeScenarioFinance(finance = {}) {
   return {
     parentFeeSubsidy: normalizeParentFeeSubsidy(finance.parentFeeSubsidy),
     settings,
-    bayKiBiGRules: Array.isArray(finance.bayKiBiGRules)
-      ? finance.bayKiBiGRules.map((rule) => normalizeBayKiBiGRule(rule))
-      : [],
+    bayKiBiGRules: mergeDefaultBayKiBiGRules(finance.bayKiBiGRules)
+      .map((rule) => normalizeBayKiBiGRule(rule)),
     groupFeeCatalogs: Object.fromEntries(
       Object.entries(finance.groupFeeCatalogs || {}).map(([groupId, entries]) => [
         String(groupId),
@@ -252,6 +287,16 @@ const simFinanceSlice = createSlice({
       const { scenarioId, rule } = action.payload;
       const scenarioFinance = ensureScenarioFinanceState(state, scenarioId);
       scenarioFinance.bayKiBiGRules.push(normalizeBayKiBiGRule(rule));
+    },
+    seedDefaultBayKiBiGRules(state, action) {
+      const scenarioIds = Array.isArray(action.payload?.scenarioIds)
+        ? action.payload.scenarioIds
+        : [action.payload?.scenarioId];
+      scenarioIds.filter(Boolean).forEach((scenarioId) => {
+        const scenarioFinance = ensureScenarioFinanceState(state, scenarioId);
+        scenarioFinance.bayKiBiGRules = mergeDefaultBayKiBiGRules(scenarioFinance.bayKiBiGRules)
+          .map((rule) => normalizeBayKiBiGRule(rule));
+      });
     },
     updateBayKiBiGRule(state, action) {
       const { scenarioId, ruleId, updates } = action.payload;
@@ -411,6 +456,7 @@ export const {
   updateScenarioFinanceSettings,
   updateParentFeeSubsidy,
   addBayKiBiGRule,
+  seedDefaultBayKiBiGRules,
   updateBayKiBiGRule,
   deleteBayKiBiGRule,
   addGroupFeeEntry,

@@ -131,6 +131,10 @@ describe('OrgaTabFinance', () => {
     expect(screen.getByText('Teilweise Bezahlte Abwesenheit')).toBeTruthy();
     expect(screen.getByText('Beitragskataloge pro Gruppe')).toBeTruthy();
     expect(screen.getByText('BayKiBiG 2025')).toBeTruthy();
+    expect(screen.getByText('BayKiBiG 2026')).toBeTruthy();
+    expect(screen.getByText('BayKiBiG 2027')).toBeTruthy();
+    expect(screen.getByText('BayKiBiG 2028')).toBeTruthy();
+    expect(screen.getByText('BayKiBiG 2029')).toBeTruthy();
     expect(screen.getByText('Krippe Sonnen')).toBeTruthy();
     expect(screen.getByText('Kindergarten Wald')).toBeTruthy();
   });
@@ -166,6 +170,14 @@ describe('OrgaTabFinance', () => {
     fireEvent.click(addButton);
 
     const rules = store.getState().simFinance.financeByScenario['scenario-1'].bayKiBiGRules;
-    expect(rules).toHaveLength(2);
+    expect(rules).toHaveLength(6);
+    expect(rules.map((rule) => rule.validFrom)).toEqual([
+      '2025-01-01',
+      '2026-01-01',
+      '2027-01-01',
+      '2028-01-01',
+      '2029-01-01',
+      '',
+    ]);
   });
 });

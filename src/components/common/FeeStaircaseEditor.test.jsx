@@ -35,7 +35,10 @@ describe('FeeStaircaseEditor', () => {
 
     expect(screen.getByTestId('fee-staircase-zeitkat')).toBeTruthy();
     expect(screen.getByTestId('fee-staircase-compliance-warning')).toBeTruthy();
-    expect(screen.getByTestId('fee-staircase-slider-02')).toBeTruthy();
+    expect(screen.queryByTestId('fee-staircase-slider-02')).toBeNull();
+    expect(screen.queryByLabelText('Betrag ZEITKAT 02')).toBeNull();
+    expect(screen.getByLabelText('Tarif gültig von')).toBeTruthy();
+    expect(screen.getByLabelText('Tarif gültig bis')).toBeTruthy();
     expect(screen.getByLabelText('Aktiviere Beitrag ZEITKAT 02').checked).toBe(false);
     fireEvent.click(screen.getByLabelText('Aktiviere Beitrag ZEITKAT 02'));
     const changedEntries = onChangeEntries.mock.calls.at(-1)[0];
@@ -44,7 +47,7 @@ describe('FeeStaircaseEditor', () => {
     expect(changedEntries.every((entry) => !Object.hasOwn(entry, 'maxHours'))).toBe(true);
   });
 
-  it('places the direct amount input below each slider and shows the original marker in simulation', () => {
+  it('shows direct amount inputs and original markers for active categories in simulation', () => {
     render(
       <MantineProvider>
         <FeeStaircaseEditor
@@ -66,10 +69,13 @@ describe('FeeStaircaseEditor', () => {
     expect(screen.getByTestId('fee-staircase-slider-09')).toBeTruthy();
     expect(screen.getByTestId('fee-staircase-slider-10')).toBeTruthy();
     expect(screen.queryByTestId('zeitkat-slider-toggles')).toBeNull();
+    expect(screen.queryByLabelText('Tarif gültig von')).toBeNull();
+    expect(screen.queryByLabelText('Tarif gültig bis')).toBeNull();
+    expect(screen.queryByTestId('fee-staircase-period')).toBeNull();
     expect(screen.queryByLabelText('Aktiviere Beitrag ZEITKAT 09')).toBeNull();
     expect(screen.queryByLabelText('Aktiviere Beitrag ZEITKAT 10')).toBeNull();
-    expect(screen.getByText('>4-5h')).toBeTruthy();
-    expect(screen.getByText('Kategorie 4')).toBeTruthy();
+    expect(screen.getByText('5h')).toBeTruthy();
+    expect(screen.getByText('Kat. 4')).toBeTruthy();
     expect(screen.queryByText('Direkte Eingabe')).toBeNull();
     expect(screen.getByLabelText('Betrag ZEITKAT 05').value).toBe('150 EUR');
     expect(screen.getByTestId('fee-staircase-hourly-05').textContent).toBe('30,00 €/h');
@@ -115,10 +121,12 @@ describe('FeeStaircaseEditor', () => {
       </MantineProvider>
     );
 
-    ['04', '05', '06'].forEach((zoneId) => {
+    ['04', '05'].forEach((zoneId) => {
       expect(screen.getByTestId(`fee-staircase-slider-${zoneId}`).getAttribute('data-invalid')).toBe('true');
     });
+    expect(screen.getByTestId('activate-fee-zeitkat-06').getAttribute('data-invalid')).toBe('true');
     expect(screen.getByTestId('fee-staircase-slider-07').getAttribute('data-invalid')).toBeNull();
+    expect(screen.queryByTestId('fee-staircase-slider-06')).toBeNull();
   });
 
   it('updates the selected ZEITKAT only when imported entries reuse an ID', () => {
