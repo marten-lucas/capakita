@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Readable } from 'node:stream';
 import { createGzip } from 'node:zlib';
+import { createBackendService } from './server/backend.mjs';
 
 const ROOT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_DIST_DIR = path.join(ROOT_DIR, 'dist');
@@ -126,21 +127,47 @@ async function proxyStmas(request, response, parsedUrl, fetchImpl) {
   Readable.fromWeb(upstream.body).on('error', () => response.destroy()).pipe(response);
 }
 
-export function createAppServer({ distDir = DEFAULT_DIST_DIR, fetchImpl = globalThis.fetch } = {}) {
+export function createAppServer({ distDir = DEFAULT_DIST_DIR, fetchImpl = globalThis.fetch, backendOptions = {} } = {}) {
   const absoluteDistDir = path.resolve(distDir);
-
-  return http.createServer(async (request, response) => {
-    if (request.method !== 'GET' && request.method !== 'HEAD') {
-      response.setHeader('Allow', 'GET, HEAD');
-      sendText(response, 405, 'Method not allowed');
-      return;
-    }
-
+  let backendService;
+  const getBackendService = () => {
+    backendService ||= createBackendService({ ...backendOptions, fetchImpl });
+    return backendService;
+  };
+  const server = http.createServer(async (request, response) => {
     let parsedUrl;
     try {
       parsedUrl = new URL(request.url || '/', 'http://localhost');
     } catch {
       sendText(response, 400, 'Bad request');
+      return;
+    }
+
+    if (parsedUrl.pathname.startsWith('/api/')) {
+      try {
+        const handled = await getBackendService().handle(request, response, parsedUrl);
+        if (!handled && !response.writableEnded) {
+          response.setHeader('Allow', 'GET, POST, PUT');
+          response.writeHead(405, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+          response.end(JSON.stringify({ error: 'method_not_allowed' }));
+        }
+      } catch (error) {
+        if (response.writableEnded) return;
+        const statusCode = Number.isInteger(error.statusCode) ? error.statusCode : 500;
+        if (statusCode >= 500) console.error('Backend request failed:', error);
+        response.writeHead(statusCode, {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': 'no-store',
+          'X-Content-Type-Options': 'nosniff',
+        });
+        response.end(JSON.stringify({ error: statusCode === 500 ? 'internal_server_error' : error.message }));
+      }
+      return;
+    }
+
+    if (request.method !== 'GET' && request.method !== 'HEAD') {
+      response.setHeader('Allow', 'GET, HEAD');
+      sendText(response, 405, 'Method not allowed');
       return;
     }
 
@@ -201,6 +228,9 @@ export function createAppServer({ distDir = DEFAULT_DIST_DIR, fetchImpl = global
     }
     sendStaticFile(request, response, resolvedPath, metadata, parsedUrl.pathname);
   });
+
+  server.on('close', () => backendService?.close());
+  return server;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {

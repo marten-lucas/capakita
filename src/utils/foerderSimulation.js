@@ -5,6 +5,7 @@ import {
   getZeitkatFactor,
   getZeitkatZoneBounds,
   getZeitkatZoneIndex,
+  isAdebisTrue,
 } from './adebisConstants';
 import { sumWeightedBookingHours } from './chartUtils/chartUtils';
 import {
@@ -101,7 +102,9 @@ function getEditedFeeEntryPrice(entry, groupId, temporaryPrices) {
   return {
     entry,
     originalAmount,
-    amount: Number.isFinite(Number(override)) ? roundMoney(override) : roundMoney(originalAmount),
+    amount: entry.enabled === false
+      ? 0
+      : Number.isFinite(Number(override)) ? roundMoney(override) : roundMoney(originalAmount),
   };
 }
 
@@ -114,39 +117,26 @@ function chooseRule(rules, referenceDate) {
   return pickApplicableValidityEntry(rules, referenceDate) || pickLatestValidityEntry(rules) || null;
 }
 
-function parseBirthDate(child) {
-  const raw = String(child?.dateofbirth || child?.rawdata?.GEBDAT || '').trim();
-  const isoDate = /^\d{4}-\d{2}-\d{2}$/.test(raw)
-    ? raw
-    : (raw.match(/^(\d{2})\.(\d{2})\.(\d{4})$/)
-      ? `${raw.slice(6, 10)}-${raw.slice(3, 5)}-${raw.slice(0, 2)}`
-      : '');
-  if (!isoDate) return null;
-  const date = new Date(`${isoDate}T00:00:00Z`);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
 
-function isEligibleForParentFeeSubsidy(child, groupDef, subsidyRule, referenceDate) {
-  if (typeof child?.parentFeeSubsidyEligible === 'boolean') return child.parentFeeSubsidyEligible;
-
-  const groupDescription = `${groupDef?.type || ''} ${groupDef?.name || ''} ${child?.groupType || ''}`.toLowerCase();
-  if (subsidyRule?.excludeSchoolChildren !== false && /(schul|hort)/.test(groupDescription)) return false;
-
-  const birthDate = parseBirthDate(child);
-  const currentDate = new Date(`${String(referenceDate || '').slice(0, 10)}T00:00:00Z`);
-  if (!birthDate || Number.isNaN(currentDate.getTime())) return false;
-
-  const ageInMonths = (currentDate.getUTCFullYear() - birthDate.getUTCFullYear()) * 12
-    + currentDate.getUTCMonth() - birthDate.getUTCMonth();
-  const minimumAgeMonths = Math.max(0, Number(subsidyRule?.minimumAgeYears ?? 3) || 0) * 12;
-  const maximumAgeMonths = Math.max(0, Number(subsidyRule?.maximumAgeYears ?? 7) || 0) * 12;
-  return ageInMonths >= minimumAgeMonths
-    && (maximumAgeMonths === 0 || ageInMonths < maximumAgeMonths);
-}
-
-function calculateAppliedParentFeeSubsidy(grossFee, isEligible, monthlyAmount) {
+function calculateAppliedParentFeeSubsidy(isEligible, monthlyAmount) {
   if (!isEligible) return 0;
-  return Math.min(Math.max(0, Number(grossFee) || 0), Math.max(0, Number(monthlyAmount) || 0));
+  return Math.max(0, Number(monthlyAmount) || 0);
+}
+
+function isParentFeeSubsidyEligible(child, group, bookings, referenceDate) {
+  if (String(group?.type || '').toLowerCase() === 'schulkindgruppe') return false;
+  if ((bookings || []).some((booking) => isAdebisTrue(booking?.rawdata?.SCHULKIND))) return false;
+
+  const birthDate = String(child?.dateofbirth || child?.rawdata?.GEBDATUM || '').slice(0, 10);
+  const dateParts = birthDate.match(/^(\d{4})-(\d{2})-\d{2}$/);
+  const referenceParts = String(referenceDate || '').slice(0, 7).match(/^(\d{4})-(\d{2})$/);
+  if (!dateParts || !referenceParts) return false;
+
+  const thirdBirthdayYear = Number(dateParts[1]) + 3;
+  const referenceYear = Number(referenceParts[1]);
+  const referenceMonth = Number(referenceParts[2]);
+  return referenceYear > thirdBirthdayYear
+    || (referenceYear === thirdBirthdayYear && referenceMonth >= 9);
 }
 
 function calculateExpectedFeeAfterMigration({ sourceAmount, nextAmount, migrationShare, eligible, subsidyAmount }) {
@@ -154,8 +144,7 @@ function calculateExpectedFeeAfterMigration({ sourceAmount, nextAmount, migratio
   const source = Math.max(0, Number(sourceAmount) || 0);
   const next = Math.max(0, Number(nextAmount ?? sourceAmount) || 0);
   const grossFee = source * (1 - share) + next * share;
-  const subsidy = calculateAppliedParentFeeSubsidy(source, eligible, subsidyAmount) * (1 - share)
-    + calculateAppliedParentFeeSubsidy(next, eligible, subsidyAmount) * share;
+  const subsidy = calculateAppliedParentFeeSubsidy(eligible, subsidyAmount);
   return { grossFee, subsidy, parentFee: Math.max(0, grossFee - subsidy) };
 }
 
@@ -218,6 +207,10 @@ export function simulateContributionChanges({
   groupFeeCatalogs = {},
   originalGroupFeeCatalogs = null,
   parentFeeSubsidy = {},
+  parentFeeSubsidiesByGroup = {},
+  baselineParentFeeSubsidy = null,
+  baselineParentFeeSubsidiesByGroup = null,
+  parentFeeSubsidyChildren = null,
   temporaryPrices = {},
   utilizationPercent = 100,
   referenceDate,
@@ -226,12 +219,6 @@ export function simulateContributionChanges({
   const baseValue = Number(rule?.baseValue) || 0;
   const weightFactors = rule?.weightFactors || null;
   const utilization = Math.max(0, Math.min(100, Number(utilizationPercent) || 0)) / 100;
-  const baselineSubsidyAmount = parentFeeSubsidy?.enabled === false
-    ? 0
-    : Math.max(0, Number(parentFeeSubsidy?.monthlyAmount ?? 100) || 0);
-  const subsidyEndsBeforeReferenceDate = Boolean(parentFeeSubsidy?.endDate)
-    && String(referenceDate || '').slice(0, 10) > String(parentFeeSubsidy.endDate).slice(0, 10);
-  const policySubsidyAmount = subsidyEndsBeforeReferenceDate ? 0 : baselineSubsidyAmount;
   const baselineFeeCatalogs = originalGroupFeeCatalogs || groupFeeCatalogs;
   const groupNames = new Map((groupDefs || []).map((group) => [String(group.id), group.name]));
   const groupDefById = new Map((groupDefs || []).map((group) => [String(group.id), group]));
@@ -257,7 +244,48 @@ export function simulateContributionChanges({
   let totalDeltaMonthlyParentSubsidy = 0;
   let totalGrossParentFees = 0;
   let totalPolicyParentFeeSubsidy = 0;
+  let eligibleParentFeeSubsidyChildren = 0;
   let totalMigratedBookings = 0;
+  const getConfiguredSubsidyAmount = (subsidyRule, respectEndDate) => {
+    if (subsidyRule?.enabled === false) return 0;
+    const isExpired = respectEndDate && Boolean(subsidyRule?.endDate)
+      && String(referenceDate || '').slice(0, 10) > String(subsidyRule.endDate).slice(0, 10);
+    return isExpired ? 0 : Math.max(0, Number(subsidyRule?.monthlyAmount ?? 100) || 0);
+  };
+  const subsidyChildren = Array.isArray(parentFeeSubsidyChildren)
+    ? parentFeeSubsidyChildren
+    : Array.from(bookingsByChild, ([itemId, bookings]) => ({ itemId, bookings }));
+  const subsidyStateByChild = new Map();
+
+  subsidyChildren.forEach((subsidyChild) => {
+    const childId = String(subsidyChild?.itemId ?? subsidyChild?.id ?? '');
+    if (!childId) return;
+    const child = subsidyChild.item || dataItems?.[childId] || null;
+    const bookings = Array.isArray(subsidyChild.bookings)
+      ? subsidyChild.bookings
+      : bookingsByChild.get(childId) || [];
+    const latestBooking = bookings.slice().sort((left, right) => (
+      String(right?.startdate || '').localeCompare(String(left?.startdate || ''))
+    ))[0];
+    const groupId = String(subsidyChild.groupId || bookingGroupId(latestBooking, child));
+    const group = groupDefById.get(groupId) || null;
+    if (subsidyChild.isSchoolChild || !isParentFeeSubsidyEligible(child, group, bookings, referenceDate)) return;
+
+    const childSubsidyRule = parentFeeSubsidiesByGroup?.[groupId] || parentFeeSubsidy;
+    const baselineChildSubsidyRule = baselineParentFeeSubsidiesByGroup?.[groupId]
+      || baselineParentFeeSubsidy
+      || childSubsidyRule;
+    const hasExplicitBaseline = baselineParentFeeSubsidy != null
+      || baselineParentFeeSubsidiesByGroup != null;
+    const baselineAmount = getConfiguredSubsidyAmount(baselineChildSubsidyRule, hasExplicitBaseline);
+    const policyAmount = getConfiguredSubsidyAmount(childSubsidyRule, true);
+    const delta = policyAmount - baselineAmount;
+
+    if (baselineAmount > 0 || policyAmount > 0) eligibleParentFeeSubsidyChildren += 1;
+    totalPolicyParentFeeSubsidy += policyAmount;
+    totalDeltaMonthlyParentSubsidy += delta;
+    subsidyStateByChild.set(childId, { eligible: true, baselineAmount, policyAmount, delta, groupId });
+  });
 
   bookingsByChild.forEach((childBookings, childKey) => {
     const bookings = childBookings.slice().sort((a, b) => String(b?.startdate || '').localeCompare(String(a?.startdate || '')));
@@ -266,7 +294,10 @@ export function simulateContributionChanges({
     const primaryGroupId = bookingGroupId(firstBooking, child);
     const primaryGroup = groupDefById.get(primaryGroupId) || null;
     const weight = getBayKiBiGWeightForChild(child, primaryGroup, referenceDate, weightFactors);
-    const subsidyEligible = isEligibleForParentFeeSubsidy(child, primaryGroup, parentFeeSubsidy, referenceDate);
+    const subsidyState = subsidyStateByChild.get(childKey);
+    const subsidyEligible = Boolean(subsidyState);
+    const baselineSubsidyAmount = subsidyState?.baselineAmount || 0;
+    const policySubsidyAmount = subsidyState?.policyAmount || 0;
     const childHoursBefore = bookings.reduce((sum, booking) => sum + sumWeightedBookingHours(booking), 0);
     let childHoursAfter = 0;
     let childFundingDelta = 0;
@@ -348,12 +379,22 @@ export function simulateContributionChanges({
     let parentFeeSubsidyBefore = 0;
     let parentFeeSubsidyAfter = 0;
     let parentFeeSubsidyDelta = 0;
-    const directFeeEntry = primaryZone
+    const activeDirectFeeEntry = primaryZone
       ? findFeeEntryForZeitkat(primaryFeeCatalog, primaryZone, referenceDate)
       : null;
     const baselineDirectFeeEntry = primaryZone
       ? findFeeEntryForZeitkat(baselinePrimaryFeeCatalog, primaryZone, referenceDate)
       : null;
+    const disabledDirectFeeEntry = baselineDirectFeeEntry
+      ? primaryFeeCatalog.find((entry) => (
+        String(entry.id) === String(baselineDirectFeeEntry.id)
+        && getFeeBandZeitkatId(entry) === primaryZone
+        && entry.validFrom === baselineDirectFeeEntry.validFrom
+        && entry.validUntil === baselineDirectFeeEntry.validUntil
+        && entry.enabled === false
+      )) || null
+      : null;
+    const directFeeEntry = activeDirectFeeEntry || disabledDirectFeeEntry;
 
     if (directFeeEntry) {
       const sourceFee = getEditedFeeEntryPrice(directFeeEntry, primaryGroupId, temporaryPrices);
@@ -377,7 +418,6 @@ export function simulateContributionChanges({
       grossParentFeeBefore = grossFeeBefore;
       grossParentFeeAfter = expectedAfter.grossFee;
       parentFeeSubsidyBefore = calculateAppliedParentFeeSubsidy(
-        grossFeeBefore,
         subsidyEligible,
         baselineSubsidyAmount
       );
@@ -387,6 +427,16 @@ export function simulateContributionChanges({
       parentFeeDelta = parentFeeAfter - parentFeeBefore;
       parentFeeSubsidyDelta = parentFeeSubsidyAfter - parentFeeSubsidyBefore;
       childChanged = childChanged || sourceFee.amount !== sourceFee.originalAmount;
+    } else {
+      parentFeeSubsidyBefore = calculateAppliedParentFeeSubsidy(
+        subsidyEligible,
+        baselineSubsidyAmount
+      );
+      parentFeeSubsidyAfter = calculateAppliedParentFeeSubsidy(
+        subsidyEligible,
+        policySubsidyAmount
+      );
+      parentFeeSubsidyDelta = parentFeeSubsidyAfter - parentFeeSubsidyBefore;
     }
 
     const familyId = String(child?.familyId || child?.familyLabel || `child:${childKey}`);
@@ -396,30 +446,28 @@ export function simulateContributionChanges({
         label: child?.familyLabel || child?.familyId || child?.name || familyId,
         monthlyParentFeesBefore: 0,
         monthlyParentFeesAfter: 0,
+        childIds: [],
       });
     }
     const familyContribution = familyContributionTotals.get(familyId);
+    familyContribution.childIds.push(childKey);
     familyContribution.monthlyParentFeesBefore += Math.max(
       0,
       grossParentFeeBefore - calculateAppliedParentFeeSubsidy(
-        grossParentFeeBefore,
         subsidyEligible,
-        policySubsidyAmount
+        baselineSubsidyAmount
       )
     );
     familyContribution.monthlyParentFeesAfter += parentFeeAfter;
 
     totalDeltaMonthlyParentFees += parentFeeDelta;
-    totalDeltaMonthlyParentSubsidy += parentFeeSubsidyDelta;
     totalGrossParentFees += grossParentFeeBefore;
-    totalPolicyParentFeeSubsidy += parentFeeSubsidyAfter;
     childChanged = childChanged || Math.abs(parentFeeDelta) >= 0.005 || Math.abs(parentFeeSubsidyDelta) >= 0.005;
     if (primaryGroupId || Math.abs(parentChangedTotal(childFundingDelta, parentFeeDelta)) > 0.005 || childChanged) {
       if (!groups.has(primaryGroupId)) {
         groups.set(primaryGroupId, makeGroupTotals(primaryGroupId, groupNames.get(primaryGroupId)));
       }
       groups.get(primaryGroupId).deltaMonthlyParentFees += parentFeeDelta;
-      groups.get(primaryGroupId).deltaMonthlyParentSubsidy += parentFeeSubsidyDelta;
     }
 
     simulatedBookings.push(...childSimulatedBookings);
@@ -455,6 +503,16 @@ export function simulateContributionChanges({
       migratedBookings: roundHours(childMigratedBookings),
       parentFeeChanged: Math.abs(parentFeeDelta) >= 0.005,
     });
+  });
+
+  subsidyStateByChild.forEach((subsidyState) => {
+    if (!groups.has(subsidyState.groupId)) {
+      groups.set(subsidyState.groupId, makeGroupTotals(
+        subsidyState.groupId,
+        groupNames.get(subsidyState.groupId)
+      ));
+    }
+    groups.get(subsidyState.groupId).deltaMonthlyParentSubsidy += subsidyState.delta;
   });
 
   const roundedGroups = Array.from(groups.values()).map((group) => ({
@@ -555,6 +613,7 @@ export function simulateContributionChanges({
       deltaParentFeeSubsidy: roundMoney(totalDeltaMonthlyParentSubsidy),
       grossParentFees: roundMoney(totalGrossParentFees),
       policyParentFeeSubsidy: roundMoney(totalPolicyParentFeeSubsidy),
+      eligibleParentFeeSubsidyChildren,
       deltaYearlyParentFeeSubsidy: roundMoney(totalDeltaMonthlyParentSubsidy * 12),
       deltaMonthlyTotal: roundMoney(totalDeltaMonthlyFunding + totalDeltaMonthlyParentFees + totalDeltaMonthlyParentSubsidy),
       deltaYearlyTotal: roundMoney((totalDeltaMonthlyFunding + totalDeltaMonthlyParentFees + totalDeltaMonthlyParentSubsidy) * 12),
@@ -580,32 +639,61 @@ function parentChangedTotal(fundingDelta, parentFeeDelta) {
   return fundingDelta + parentFeeDelta;
 }
 
-function maximumHoursWithinBudget(options, budget) {
+function maximumPotentialWithinBudget(options, budget) {
   const capacity = Math.max(0, Math.floor((Number(budget) || 0) * 100 + 0.000001));
   let freeHours = 0;
+  let freeWeightedHours = 0;
   const choices = [];
-  options.forEach(({ cost, hours }) => {
+  options.forEach(({ cost, hours, weightedHours }) => {
     if (!(hours > 0)) return;
     const costInCents = Math.max(0, Math.round(cost * 100));
-    if (costInCents === 0) freeHours += hours;
-    else if (costInCents <= capacity) choices.push({ cost: costInCents, hours });
-  });
-
-  const bestHours = Array(capacity + 1).fill(0);
-  choices.forEach(({ cost, hours }) => {
-    for (let remaining = capacity; remaining >= cost; remaining -= 1) {
-      bestHours[remaining] = Math.max(bestHours[remaining], bestHours[remaining - cost] + hours);
+    if (costInCents === 0) {
+      freeHours += hours;
+      freeWeightedHours += weightedHours;
+    } else if (costInCents <= capacity) {
+      choices.push({ cost: costInCents, hours, weightedHours });
     }
   });
-  return roundHours(freeHours + Math.max(...bestHours));
+
+  const best = Array(capacity + 1).fill(null);
+  best[0] = { hours: 0, weightedHours: 0 };
+  choices.forEach((choice) => {
+    for (let remaining = capacity; remaining >= choice.cost; remaining -= 1) {
+      const previous = best[remaining - choice.cost];
+      if (!previous) continue;
+      const candidate = {
+        hours: previous.hours + choice.hours,
+        weightedHours: previous.weightedHours + choice.weightedHours,
+      };
+      const current = best[remaining];
+      if (!current || candidate.hours > current.hours + 0.005
+        || (Math.abs(candidate.hours - current.hours) <= 0.005
+          && candidate.weightedHours > current.weightedHours)) best[remaining] = candidate;
+    }
+  });
+
+  const selected = best.reduce((current, candidate) => {
+    if (!candidate) return current;
+    if (!current || candidate.hours > current.hours + 0.005
+      || (Math.abs(candidate.hours - current.hours) <= 0.005
+        && candidate.weightedHours > current.weightedHours)) return candidate;
+    return current;
+  }, null) || { hours: 0, weightedHours: 0 };
+  return {
+    weeklyHours: roundHours(freeHours + selected.hours),
+    weightedDailyHours: roundHours((freeWeightedHours + selected.weightedHours) / 5),
+  };
 }
 
 export function calculateFamilyFeePotentials({
   demandBookings = [],
   dataItems = {},
+  familyGroupIds = {},
   groupDefs = [],
+  bayKiBiGRules = [],
   groupFeeCatalogs = {},
   parentFeeSubsidy = {},
+  parentFeeSubsidiesByGroup = {},
   temporaryPrices = {},
   referenceDate,
   monthlyBudget = 0,
@@ -622,15 +710,17 @@ export function calculateFamilyFeePotentials({
   const families = new Map();
   bookingsByChild.forEach((bookings, childId) => {
     const child = dataItems?.[childId] || {};
-    const familyId = String(child.familyId || child.familyLabel || `child:${childId}`);
+    const familyId = String(familyGroupIds[childId] || child.familyId || child.familyLabel || `child:${childId}`);
     if (!families.has(familyId)) {
       families.set(familyId, {
         id: familyId,
         label: child.familyLabel || child.familyId || child.name || familyId,
         upgrades: [],
         downgrades: [],
+        childIds: [],
       });
     }
+    families.get(familyId).childIds.push(childId);
 
     const orderedBookings = bookings.slice().sort((left, right) => (
       String(right?.startdate || '').localeCompare(String(left?.startdate || ''))
@@ -645,18 +735,26 @@ export function calculateFamilyFeePotentials({
     const currentPrice = getEditedZeitkatPrice(catalog, groupId, primaryZone, referenceDate, temporaryPrices);
     if (!currentPrice.entry) return;
     const groupDef = (groupDefs || []).find((entry) => String(entry.id) === groupId) || null;
-    const subsidyBaseAmount = parentFeeSubsidy?.enabled === false
+    const childSubsidyRule = parentFeeSubsidiesByGroup?.[String(groupId)] || parentFeeSubsidy;
+    const subsidyBaseAmount = childSubsidyRule?.enabled === false
       ? 0
-      : Math.max(0, Number(parentFeeSubsidy?.monthlyAmount ?? 100) || 0);
-    const subsidyEnded = Boolean(parentFeeSubsidy?.endDate)
-      && String(referenceDate || '').slice(0, 10) > String(parentFeeSubsidy.endDate).slice(0, 10);
+      : Math.max(0, Number(childSubsidyRule?.monthlyAmount ?? 100) || 0);
+    const subsidyEnded = Boolean(childSubsidyRule?.endDate)
+      && String(referenceDate || '').slice(0, 10) > String(childSubsidyRule.endDate).slice(0, 10);
     const effectiveSubsidyAmount = subsidyEnded ? 0 : subsidyBaseAmount;
-    const subsidyEligible = isEligibleForParentFeeSubsidy(child, groupDef, parentFeeSubsidy, referenceDate);
+    const subsidyEligible = isParentFeeSubsidyEligible(
+      child,
+      groupDef,
+      orderedBookings,
+      referenceDate
+    );
     const parentContribution = (grossFee) => Math.max(
       0,
-      grossFee - calculateAppliedParentFeeSubsidy(grossFee, subsidyEligible, effectiveSubsidyAmount)
+      grossFee - calculateAppliedParentFeeSubsidy(subsidyEligible, effectiveSubsidyAmount)
     );
+
     const currentParentContribution = parentContribution(currentPrice.amount);
+    const activeRule = chooseRule(bayKiBiGRules, referenceDate);
 
     const resizeForDirection = (direction) => orderedBookings.reduce((sum, booking) => {
       const zoneId = resolveBookingZeitkat(booking);
@@ -667,6 +765,22 @@ export function calculateFamilyFeePotentials({
         : booking;
       return sum + sumWeightedBookingHours(adjustedBooking);
     }, 0);
+    const weightedResizeChangeForDirection = (direction) => orderedBookings.reduce((sum, booking) => {
+      const zoneId = resolveBookingZeitkat(booking);
+      const zoneIndex = getZeitkatZoneIndex(zoneId);
+      const targetZone = zoneIndex < 0 ? null : ZEITKAT_CATALOG[zoneIndex + direction];
+      const adjustedBooking = targetZone
+        ? resizeBookingToZeitkat(booking, targetZone.id, direction < 0)
+        : booking;
+      const weight = getBayKiBiGWeightForChild(
+        child,
+        groupDef,
+        referenceDate,
+        activeRule?.weightFactors,
+        booking
+      );
+      return sum + (sumWeightedBookingHours(adjustedBooking) - sumWeightedBookingHours(booking)) * weight;
+    }, 0);
     const currentWeeklyHours = orderedBookings.reduce((sum, booking) => sum + sumWeightedBookingHours(booking), 0);
     const family = families.get(familyId);
     const nextZone = ZEITKAT_CATALOG[primaryZoneIndex + 1];
@@ -676,6 +790,7 @@ export function calculateFamilyFeePotentials({
         family.upgrades.push({
           cost: Math.max(0, roundMoney(parentContribution(nextPrice.amount) - currentParentContribution)),
           hours: Math.max(0, resizeForDirection(1) - currentWeeklyHours),
+          weightedHours: Math.max(0, weightedResizeChangeForDirection(1)),
         });
       }
     }
@@ -689,18 +804,26 @@ export function calculateFamilyFeePotentials({
           family.downgrades.push({
             cost: monthlySaving,
             hours: Math.max(0, currentWeeklyHours - resizeForDirection(-1)),
+            weightedHours: Math.max(0, -weightedResizeChangeForDirection(-1)),
           });
         }
       }
     }
   });
 
-  return Array.from(families.values()).map((family) => ({
-    id: family.id,
-    label: family.label,
-    potentialUpgradeWeeklyHours: maximumHoursWithinBudget(family.upgrades, monthlyBudget),
-    potentialDowngradeWeeklyHours: maximumHoursWithinBudget(family.downgrades, monthlyBudget),
-  }));
+  return Array.from(families.values()).map((family) => {
+    const upgrade = maximumPotentialWithinBudget(family.upgrades, monthlyBudget);
+    const downgrade = maximumPotentialWithinBudget(family.downgrades, monthlyBudget);
+    return {
+      id: family.id,
+      label: family.label,
+      childIds: family.childIds,
+      potentialUpgradeWeeklyHours: upgrade.weeklyHours,
+      potentialDowngradeWeeklyHours: downgrade.weeklyHours,
+      potentialUpgradeWeightedDailyHours: upgrade.weightedDailyHours,
+      potentialDowngradeWeightedDailyHours: downgrade.weightedDailyHours,
+    };
+  });
 }
 
 // Kept as an alias for callers from older local branches; simulation semantics are now tariff-based.
@@ -745,6 +868,10 @@ export function simulateAnnualContributionChanges({ year, ...simulationOptions }
 
   totals.annualGrossParentFees = roundMoney(months.reduce((sum, month) => sum + (month.result?.totals?.grossParentFees || 0), 0));
   totals.annualParentFeeSubsidy = roundMoney(months.reduce((sum, month) => sum + (month.result?.totals?.policyParentFeeSubsidy || 0), 0));
+  totals.eligibleParentFeeSubsidyChildMonths = months.reduce(
+    (sum, month) => sum + (month.result?.totals?.eligibleParentFeeSubsidyChildren || 0),
+    0
+  );
   totals.deltaMonthlyBayKiBiG = roundMoney(totals.deltaYearlyBayKiBiG / 12);
   totals.deltaMonthlyParentFees = roundMoney(totals.deltaYearlyParentFees / 12);
   totals.deltaMonthlyParentSubsidy = roundMoney(totals.deltaYearlyParentSubsidy / 12);

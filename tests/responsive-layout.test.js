@@ -247,6 +247,17 @@ test('welcome and legal pages stay usable across viewports', async ({ page }) =>
   await expectLayoutScreenshot(page, 'responsive-legal-view.png');
 });
 
+test('analysis stepper remains navigable without viewport overflow', async ({ page }) => {
+  await seedResponsiveScenario(page);
+  await openMainPage(page, 'Analyse');
+
+  const navigation = page.getByTestId('analysis-story-navigation');
+  await expect(navigation.locator('[data-testid^="story-step-"]')).toHaveCount(7);
+  await page.getByTestId('story-step-options').click();
+  await expect(page.getByTestId('analysis-stage-content')).toHaveClass(/analysis-stage-content--options/);
+  await expectNoHorizontalOverflow(page, 'analysis view');
+});
+
 test('all main app pages remain usable without horizontal overflow', async ({ page }) => {
   await seedResponsiveScenario(page);
 
@@ -263,8 +274,10 @@ test('all main app pages remain usable without horizontal overflow', async ({ pa
 
   await openMainPage(page, 'Analyse');
   await expect(page.getByTestId('analysis-clean-sheet')).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Datenqualität' })).toBeVisible();
-  await expect(page.locator('[data-testid^="story-card-"][data-active="true"]')).toHaveCount(1);
+
+  await expect(page.getByTestId('analysis-story-navigation').getByTestId('story-step-quality')).toBeVisible();
+  await expect(page.getByTestId('analysis-story-navigation').locator('[data-testid^="story-step-"]')).toHaveCount(7);
+
   await expectNoHorizontalOverflow(page, 'analysis view');
   await expectLayoutScreenshot(page, 'responsive-analysis-view.png');
 

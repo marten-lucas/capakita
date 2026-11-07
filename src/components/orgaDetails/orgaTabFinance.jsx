@@ -3,6 +3,7 @@ import dayjs from 'dayjs';
 import {
   Accordion,
   Alert,
+  Checkbox,
   Modal,
   Button,
   Group,
@@ -21,6 +22,7 @@ import { useMediaQuery } from '@mantine/hooks';
 import { DatePickerInput } from '@mantine/dates';
 import { IconPlus, IconUpload, IconDownload } from '@tabler/icons-react';
 import { useDispatch, useSelector } from 'react-redux';
+import { notifications } from '@mantine/notifications';
 import AccordionListDetail from '../common/AccordionListDetail';
 import { useOverlayData } from '../../hooks/useOverlayData';
 import {
@@ -29,6 +31,8 @@ import {
   updateBayKiBiGRule,
   deleteBayKiBiGRule,
   setGroupFeeCatalogs,
+  setGroupParentFeeSubsidies,
+  updateGroupParentFeeSubsidy,
   updateScenarioFinanceSettings,
 } from '../../store/simFinanceSlice';
 import {
@@ -43,6 +47,7 @@ import {
   extractFeeCatalogImportData,
   proposeFeeCatalogMappings,
   applyFeeCatalogMappings,
+  applyParentFeeSubsidyMappings,
 } from '../../utils/feeCatalogTransfer';
 
 const STMAS_BAYKIBIG_URL = 'https://www.stmas.bayern.de/imperia/md/content/stmas/stmas_inet/kinderbetreuung/3.7.2.2_kfa-131118.xls';
@@ -181,7 +186,50 @@ function BayKiBiGDetail({ item, scenarioId, dispatch }) {
         decimalSeparator=","
         suffix=" EUR"
       />
-      
+      <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md">
+        <BufferedNumberInput
+          label="Qualitätsbonus-Basiswert"
+          description="ADEBIS-Bonus = BuStdGew × Basiswert ÷ 48"
+          value={item.qualityBonusBenchmark ?? 0}
+          onCommit={(value) => dispatch(updateBayKiBiGRule({
+            scenarioId,
+            ruleId: item.id,
+            updates: { qualityBonusBenchmark: Number(value) || 0 },
+          }))}
+          decimalScale={2}
+          min={0}
+          thousandSeparator="."
+          decimalSeparator=","
+          suffix=" EUR"
+        />
+        <BufferedNumberInput
+          label="U3-Zusatzförderungsfaktor je Kind"
+          description="Anteil des Basiswerts je aktivem U3-Kind und Monat"
+          value={item.under3AdditionalFactor ?? 0.025}
+          onCommit={(value) => dispatch(updateBayKiBiGRule({
+            scenarioId,
+            ruleId: item.id,
+            updates: { under3AdditionalFactor: Number(value) || 0 },
+          }))}
+          decimalScale={4}
+          min={0}
+          step={0.0025}
+        />
+        <BufferedNumberInput
+          label="Vorkursförderung je Kind/Jahr"
+          value={item.preparatoryCoursePerChild ?? 0}
+          onCommit={(value) => dispatch(updateBayKiBiGRule({
+            scenarioId,
+            ruleId: item.id,
+            updates: { preparatoryCoursePerChild: Number(value) || 0 },
+          }))}
+          decimalScale={2}
+          min={0}
+          thousandSeparator="."
+          decimalSeparator=","
+          suffix=" EUR"
+        />
+      </SimpleGrid>
       <div>
         <Text fw={500} mb="sm">Gewichtungsfaktoren</Text>
         <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md">
@@ -272,9 +320,11 @@ function OrgaTabFinance({ section = 'all' }) {
   const [feeCatalogFile, setFeeCatalogFile] = React.useState(null);
   const [feeCatalogImportOpen, setFeeCatalogImportOpen] = React.useState(false);
   const [feeCatalogSourceByKey, setFeeCatalogSourceByKey] = React.useState({});
+  const [feeCatalogParentSubsidyByKey, setFeeCatalogParentSubsidyByKey] = React.useState({});
   const [feeCatalogSources, setFeeCatalogSources] = React.useState([]);
   const [feeCatalogMappingByGroup, setFeeCatalogMappingByGroup] = React.useState({});
   const [feeCatalogUnmatchedSourceKeys, setFeeCatalogUnmatchedSourceKeys] = React.useState([]);
+  const [feeCatalogAutoMappedGroupCount, setFeeCatalogAutoMappedGroupCount] = React.useState(0);
 
   const handleImportBayKiBiG = async (file) => {
     if (file) {
@@ -315,9 +365,30 @@ function OrgaTabFinance({ section = 'all' }) {
       scenarioId: selectedScenarioId,
       groupDefs,
       groupFeeCatalogs: financeScenario.groupFeeCatalogs || {},
+      parentFeeSubsidiesByGroup: financeScenario.parentFeeSubsidiesByGroup || {},
     });
 
     downloadJsonFile(`beitragskataloge-${selectedScenarioId || 'scenario'}.json`, payload);
+  };
+
+  const commitFeeCatalogImport = (mappingsByGroupId, catalogsByKey, parentFeeSubsidiesByKey) => {
+    const normalizedMappings = Object.fromEntries(Object.entries(mappingsByGroupId || {}).map(([groupId, mapping]) => [
+      String(groupId),
+      typeof mapping === 'string' ? { sourceKey: mapping || null } : mapping,
+    ]));
+    const finalCatalogs = applyFeeCatalogMappings({ mappingsByGroupId: normalizedMappings, catalogsByKey });
+    dispatch(setGroupFeeCatalogs({ scenarioId: selectedScenarioId, catalogs: finalCatalogs }));
+    const mappedSubsidies = applyParentFeeSubsidyMappings({ mappingsByGroupId: normalizedMappings, parentFeeSubsidiesByKey });
+    if (Object.keys(mappedSubsidies).length > 0) {
+      dispatch(setGroupParentFeeSubsidies({
+        scenarioId: selectedScenarioId,
+        subsidies: {
+          ...(financeScenario.parentFeeSubsidiesByGroup || {}),
+          ...mappedSubsidies,
+        },
+      }));
+    }
+    return finalCatalogs;
   };
 
   const handleImportFeeCatalogs = async (file) => {
@@ -332,6 +403,10 @@ function OrgaTabFinance({ section = 'all' }) {
           scenarioId: selectedScenarioId,
           catalogs: extracted.catalogsByKey,
         }));
+        dispatch(setGroupParentFeeSubsidies({
+          scenarioId: selectedScenarioId,
+          subsidies: extracted.parentFeeSubsidiesByKey,
+        }));
         setFeeCatalogFile(null);
         return;
       }
@@ -340,16 +415,33 @@ function OrgaTabFinance({ section = 'all' }) {
         groupDefs,
         catalogDescriptors: extracted.catalogDescriptors,
       });
-
+      const mappingsByGroupId = proposal.mappingsByGroupId || {};
+      const autoMappedGroupCount = groupDefs.filter((group) => {
+        const mapping = mappingsByGroupId[String(group.id)];
+        return Boolean(mapping?.sourceKey) && Number(mapping.score) >= 85;
+      }).length;
       const nextMapping = {};
       groupDefs.forEach((group) => {
-        nextMapping[String(group.id)] = proposal.mappingsByGroupId?.[String(group.id)]?.sourceKey || null;
+        nextMapping[String(group.id)] = mappingsByGroupId[String(group.id)]?.sourceKey || null;
       });
 
+      if (groupDefs.length > 0 && autoMappedGroupCount === groupDefs.length) {
+        commitFeeCatalogImport(mappingsByGroupId, extracted.catalogsByKey || {}, extracted.parentFeeSubsidiesByKey || {});
+        setFeeCatalogFile(null);
+        notifications.show({
+          title: 'Beitragskataloge importiert',
+          message: `${autoMappedGroupCount} Gruppen wurden anhand ihrer Bezeichnung/Betreuungsart zugeordnet.`,
+          color: 'teal',
+        });
+        return;
+      }
+
       setFeeCatalogSourceByKey(extracted.catalogsByKey || {});
+      setFeeCatalogParentSubsidyByKey(extracted.parentFeeSubsidiesByKey || {});
       setFeeCatalogSources(extracted.catalogDescriptors || []);
       setFeeCatalogMappingByGroup(nextMapping);
       setFeeCatalogUnmatchedSourceKeys(proposal.unmatchedSourceKeys || []);
+      setFeeCatalogAutoMappedGroupCount(autoMappedGroupCount);
       setFeeCatalogImportOpen(true);
     } catch (error) {
       console.error('Error importing fee catalogs:', error);
@@ -358,23 +450,10 @@ function OrgaTabFinance({ section = 'all' }) {
   };
 
   const handleApplyFeeCatalogImport = () => {
-    const finalCatalogs = applyFeeCatalogMappings({
-      mappingsByGroupId: Object.fromEntries(
-        Object.entries(feeCatalogMappingByGroup || {}).map(([groupId, sourceKey]) => [
-          String(groupId),
-          { sourceKey: sourceKey || null },
-        ])
-      ),
-      catalogsByKey: feeCatalogSourceByKey,
-    });
-
-    dispatch(setGroupFeeCatalogs({
-      scenarioId: selectedScenarioId,
-      catalogs: finalCatalogs,
-    }));
-
+    commitFeeCatalogImport(feeCatalogMappingByGroup, feeCatalogSourceByKey, feeCatalogParentSubsidyByKey);
     setFeeCatalogImportOpen(false);
     setFeeCatalogFile(null);
+    notifications.show({ title: 'Beitragskataloge importiert', message: 'Die ausgewählten Zuordnungen wurden angewendet.', color: 'teal' });
   };
 
   const hasUnmappedGroups = Array.isArray(groupDefs)
@@ -500,7 +579,7 @@ function OrgaTabFinance({ section = 'all' }) {
           <div>
             <Text fw={600}>Beitragskataloge pro Gruppe</Text>
             <Text size="sm" c="dimmed">
-              Beitragssätze werden je Gruppe und ZEITKAT (Stunden pro Tag) gepflegt. Alte Stundenobergrenzen werden beim Import in die passende ZEITKAT-Kategorie überführt.
+              Beitragssätze werden je Gruppe und ZEITKAT (Stunden pro Tag) gepflegt. Alte Stundenobergrenzen werden beim Import in die passende ZEITKAT-Kategorie überführt. JSON-Kataloge werden anhand von Gruppenname und Betreuungsart vorbefüllt; eindeutige Zuordnungen werden direkt importiert.
             </Text>
           </div>
 
@@ -538,6 +617,9 @@ function OrgaTabFinance({ section = 'all' }) {
             <Accordion variant="separated">
               {groupDefs.map((group) => {
                 const entries = financeScenario.groupFeeCatalogs?.[group.id] || [];
+                const parentFeeSubsidy = financeScenario.parentFeeSubsidiesByGroup?.[String(group.id)]
+                  || financeScenario.parentFeeSubsidy
+                  || { enabled: true, monthlyAmount: 100, endDate: '2026-12-31' };
                 const zeitkatCount = entries.filter((entry) => Boolean(getFeeBandZeitkatId(entry)) && entry.enabled !== false && Number(entry.monthlyAmount) > 0).length;
                 const entrySummary = `${zeitkatCount} ZEITKAT-Sätze`;
                 return (
@@ -551,17 +633,66 @@ function OrgaTabFinance({ section = 'all' }) {
                       </Group>
                     </Accordion.Control>
                     <Accordion.Panel>
-                      <FeeStaircaseEditor
-                        entries={entries}
-                        referenceDate={referenceDate}
-                        onChangeEntries={(nextEntries) => dispatch(setGroupFeeCatalogs({
-                          scenarioId: selectedScenarioId,
-                          catalogs: {
-                            ...(financeScenario.groupFeeCatalogs || {}),
-                            [String(group.id)]: nextEntries,
-                          },
-                        }))}
-                      />
+                      <Stack gap="md">
+                        <FeeStaircaseEditor
+                          entries={entries}
+                          referenceDate={referenceDate}
+                          onChangeEntries={(nextEntries) => dispatch(setGroupFeeCatalogs({
+                            scenarioId: selectedScenarioId,
+                            catalogs: {
+                              ...(financeScenario.groupFeeCatalogs || {}),
+                              [String(group.id)]: nextEntries,
+                            },
+                          }))}
+                        />
+                        <Paper withBorder p="sm" radius="sm" data-testid={`fee-catalog-parent-subsidy-${group.id}`}>
+                          <Stack gap="sm">
+                            <Text fw={600} size="sm">Elternbeitragszuschuss dieser Beitragsordnung</Text>
+                            <Text size="sm" c="dimmed">Monatsbetrag für jedes aktive Kind dieser Gruppe; gilt höchstens bis zum Enddatum.</Text>
+                            <Checkbox
+                              label="Elternbeitragszuschuss für diese Beitragsordnung aktiv"
+                              checked={parentFeeSubsidy.enabled !== false}
+                              onChange={(event) => {
+                                const enabled = event.currentTarget.checked;
+                                dispatch(updateGroupParentFeeSubsidy({
+                                  scenarioId: selectedScenarioId,
+                                  groupId: group.id,
+                                  updates: { enabled },
+                                }));
+                              }}
+                              data-testid={`fee-catalog-parent-subsidy-enabled-${group.id}`}
+                            />
+                            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+                              <BufferedNumberInput
+                                label="Zuschuss pro Monat (EUR)"
+                                value={parentFeeSubsidy.monthlyAmount ?? 100}
+                                min={0}
+                                decimalScale={2}
+                                thousandSeparator="."
+                                decimalSeparator=","
+                                onCommit={(value) => dispatch(updateGroupParentFeeSubsidy({
+                                  scenarioId: selectedScenarioId,
+                                  groupId: group.id,
+                                  updates: { monthlyAmount: Number(value) || 0 },
+                                }))}
+                                data-testid={`fee-catalog-parent-subsidy-amount-${group.id}`}
+                              />
+                              <DatePickerInput
+                                label="Zuschuss gilt bis einschließlich"
+                                value={toDateValue(parentFeeSubsidy.endDate)}
+                                onChange={(value) => dispatch(updateGroupParentFeeSubsidy({
+                                  scenarioId: selectedScenarioId,
+                                  groupId: group.id,
+                                  updates: { endDate: toIsoDate(value) },
+                                }))}
+                                valueFormat="DD.MM.YYYY"
+                                clearable
+                                data-testid={`fee-catalog-parent-subsidy-end-${group.id}`}
+                              />
+                            </SimpleGrid>
+                          </Stack>
+                        </Paper>
+                      </Stack>
                     </Accordion.Panel>
                   </Accordion.Item>
                 );
@@ -581,8 +712,7 @@ function OrgaTabFinance({ section = 'all' }) {
       >
         <Stack gap="md">
           <Text size="sm" c="dimmed">
-            Ordne jede Zielgruppe einer importierten Quelle zu. So bleiben die Beiträge auch dann korrekt,
-            wenn Gruppen-IDs zwischen Datei und Szenario nicht identisch sind.
+            Vorbelegung: {feeCatalogAutoMappedGroupCount} von {groupDefs.length} Gruppen wurden anhand von Gruppenname und Betreuungsart zugeordnet. Prüfe die Vorschläge und ergänze nur unklare Zuordnungen.
           </Text>
 
           {feeCatalogUnmatchedSourceKeys.length > 0 ? (

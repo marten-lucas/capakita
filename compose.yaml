@@ -1,0 +1,40 @@
+services:
+  capakita:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3000
+      SQLITE_PATH: /data/capakita.sqlite
+      APP_ORIGIN: ${APP_ORIGIN:?Set the public HTTPS URL for CapaKita}
+      SESSION_SECRET: ${SESSION_SECRET:?Set a random secret with at least 32 characters}
+      AUTHENTIK_ISSUER_URL: ${AUTHENTIK_ISSUER_URL:?Set the Authentik OIDC issuer URL}
+      AUTHENTIK_CLIENT_ID: ${AUTHENTIK_CLIENT_ID:?Set the Authentik OIDC client ID}
+      AUTHENTIK_CLIENT_SECRET: ${AUTHENTIK_CLIENT_SECRET:?Set the Authentik OIDC client secret}
+      AUTHENTIK_REDIRECT_URI: ${AUTHENTIK_REDIRECT_URI:-}
+      AUTHENTIK_ALLOWED_GROUP: ${AUTHENTIK_ALLOWED_GROUP:?Set the Authentik group allowed to use CapaKita}
+      AUTHENTIK_GROUPS_CLAIM: ${AUTHENTIK_GROUPS_CLAIM:-groups}
+      AUTHENTIK_SCOPES: ${AUTHENTIK_SCOPES:-openid profile email}
+      AUTHENTIK_ADMIN_GROUP: ${AUTHENTIK_ADMIN_GROUP:-}
+      ALLOW_UNANONYMIZED_IMPORTS: ${ALLOW_UNANONYMIZED_IMPORTS:-false}
+      MAX_API_BODY_BYTES: ${MAX_API_BODY_BYTES:-26214400}
+    volumes:
+      - capakita_data:/data
+    expose:
+      - "3000"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:' + (process.env.PORT || 3000) + '/api/v1/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+volumes:
+  capakita_data:

@@ -2,7 +2,7 @@
   "metadata": {
     "source": "Kiga Gramschatz - https://www.kiga-gramschatz.de/",
     "validFrom": "2025-01-01",
-    "validUntil": "2025-12-31",
+    "validUntil": "2026-12-31",
     "currency": "EUR",
     "description": "Real-world test data extracted from Gramschatz kindergarten fee schedule"
   },
@@ -10,6 +10,14 @@
     "childrenUnder3": {
       "ageRange": "0-2 Jahre",
       "description": "Beiträge für Kinder unter 3 Jahren",
+      "parentFeeSubsidy": {
+        "enabled": false,
+        "monthlyAmount": 100,
+        "minimumAgeYears": 3,
+        "maximumAgeYears": 7,
+        "excludeSchoolChildren": true,
+        "endDate": "2026-12-31"
+      },
       "bands": [
         {
           "maxHours": 4,
@@ -51,6 +59,14 @@
     "childrenOver3": {
       "ageRange": "3-5 Jahre",
       "description": "Beiträge für Kinder über 3 Jahren (vor Schuleintritt)",
+      "parentFeeSubsidy": {
+        "enabled": true,
+        "monthlyAmount": 100,
+        "minimumAgeYears": 3,
+        "maximumAgeYears": 7,
+        "excludeSchoolChildren": true,
+        "endDate": "2026-12-31"
+      },
       "bands": [
         {
           "maxHours": 4,
@@ -92,6 +108,14 @@
     "schoolChildren": {
       "ageRange": "Schulkinder",
       "description": "Beiträge für die Mittagsbetreuung / Ferienbetreuung der Schulkinder",
+      "parentFeeSubsidy": {
+        "enabled": false,
+        "monthlyAmount": 100,
+        "minimumAgeYears": 3,
+        "maximumAgeYears": 7,
+        "excludeSchoolChildren": true,
+        "endDate": "2026-12-31"
+      },
       "bands": [
         {
           "maxHours": 2,
@@ -119,7 +143,8 @@
           "groupId": "group-krippe",
           "groupType": "Krippe",
           "validFrom": "2025-01-01",
-          "validUntil": "2025-12-31",
+          "validUntil": "2026-12-31",
+          "parentFeeSubsidy": { "enabled": true, "monthlyAmount": 100, "minimumAgeYears": 3, "maximumAgeYears": 7, "excludeSchoolChildren": true, "endDate": "2025-12-31" },
           "feeBands": [
             {
               "id": "f1",
@@ -169,7 +194,8 @@
           "groupId": "group-kiga",
           "groupType": "Kindergarten",
           "validFrom": "2025-01-01",
-          "validUntil": "2025-12-31",
+          "validUntil": "2026-12-31",
+          "parentFeeSubsidy": { "enabled": true, "monthlyAmount": 100, "minimumAgeYears": 3, "maximumAgeYears": 7, "excludeSchoolChildren": true, "endDate": "2025-12-31" },
           "feeBands": [
             {
               "id": "f8",
@@ -219,7 +245,8 @@
           "groupId": "group-schulkind",
           "groupType": "Schulkind",
           "validFrom": "2025-01-01",
-          "validUntil": "2025-12-31",
+          "validUntil": "2026-12-31",
+          "parentFeeSubsidy": { "enabled": false, "monthlyAmount": 100, "minimumAgeYears": 3, "maximumAgeYears": 7, "excludeSchoolChildren": true, "endDate": "2025-12-31" },
           "feeBands": [
             {
               "id": "f15",

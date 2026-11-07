@@ -13,6 +13,9 @@
       "validFrom": "2026-01-01",
       "validUntil": "2026-12-31",
       "baseValue": 1563.88,
+      "qualityBonusBenchmark": 268.01,
+      "under3AdditionalFactor": 0.025,
+      "preparatoryCoursePerChild": 0,
       "weightFactors": {
         "regelkind_3to6": 1.0,
         "schulkind": 1.2,
@@ -27,6 +30,9 @@
       "validFrom": "2027-01-01",
       "validUntil": "2027-12-31",
       "baseValue": 1563.88,
+      "qualityBonusBenchmark": 693.28,
+      "under3AdditionalFactor": 0.025,
+      "preparatoryCoursePerChild": 0,
       "weightFactors": {
         "regelkind_3to6": 1.0,
         "schulkind": 1.2,
@@ -41,6 +47,9 @@
       "validFrom": "2028-01-01",
       "validUntil": "2028-12-31",
       "baseValue": 1563.88,
+      "qualityBonusBenchmark": 852.36,
+      "under3AdditionalFactor": 0.025,
+      "preparatoryCoursePerChild": 0,
       "weightFactors": {
         "regelkind_3to6": 1.0,
         "schulkind": 1.2,
@@ -55,6 +64,9 @@
       "validFrom": "2029-01-01",
       "validUntil": "2029-12-31",
       "baseValue": 1563.88,
+      "qualityBonusBenchmark": 857.87,
+      "under3AdditionalFactor": 0.025,
+      "preparatoryCoursePerChild": 0,
       "weightFactors": {
         "regelkind_3to6": 1.0,
         "schulkind": 1.2,

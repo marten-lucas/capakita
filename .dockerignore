@@ -4,6 +4,16 @@ node_modules
 coverage
 dist
 dist-ssr
+data
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.db
+*.zip
+*.capakita
+.env
+.env.*
+!.env.example
 playwright-report
 test-results
 test-results.json

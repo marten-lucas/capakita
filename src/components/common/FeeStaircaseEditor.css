@@ -11,6 +11,12 @@
   min-width: 0;
 }
 
+.fee-staircase-slider-grid--simulation {
+  grid-template-columns: repeat(12, minmax(110px, 1fr));
+  grid-auto-rows: minmax(146px, auto);
+  min-width: 1320px;
+}
+
 .fee-staircase-zone {
   min-width: 0;
   width: 100%;
@@ -28,8 +34,27 @@
 }
 
 .fee-staircase-activation {
-  margin-top: auto;
+  min-height: 18px;
   padding-bottom: 2px;
+}
+
+.fee-staircase-zone[data-focused='true'] {
+  border: 1px solid var(--mantine-color-blue-3);
+  border-radius: var(--mantine-radius-sm);
+  background: var(--mantine-color-blue-0);
+}
+
+.fee-staircase-zone[data-focused='true'] .fee-staircase-slider-track {
+  outline: 1px solid color-mix(in srgb, var(--mantine-color-blue-4) 45%, transparent);
+  border-radius: var(--mantine-radius-sm);
+}
+
+.fee-staircase-zone[data-disabled='true'] > :not(.fee-staircase-activation) {
+  opacity: 0.4;
+}
+
+.fee-staircase-zone :disabled {
+  opacity: 0.45;
 }
 
 .fee-staircase-slider-track {
@@ -40,12 +65,22 @@
   width: 100%;
 }
 
+.fee-staircase-amount,
 .fee-staircase-hourly,
 .fee-staircase-original {
   overflow-wrap: anywhere;
 }
 
+.fee-staircase-hourly-equivalent {
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+
 @container (min-width: 105px) {
+  .fee-staircase-slider-grid--simulation .fee-staircase-amount {
+    display: none;
+  }
+
   .fee-staircase-zone-label-compact {
     display: none;
   }
@@ -62,7 +97,8 @@
     display: none;
   }
 
-  .fee-staircase-hourly {
+  .fee-staircase-hourly,
+  .fee-staircase-amount {
     display: block;
     --text-fz: 9px;
     white-space: nowrap;

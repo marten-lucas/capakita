@@ -1,6 +1,14 @@
 import { sumBookingHours } from './bookingUtils';
 import { minutesToTime, timeToMinutes } from './timeUtils';
-import { ZEITKAT_CATALOG, decodeBuchungsart, getFeeBandZeitkatId, getZeitkatFactor, getZeitkatZoneIndex } from './adebisConstants';
+import {
+  GEWKAT_CATALOG,
+  ZEITKAT_CATALOG,
+  decodeBuchungsart,
+  getFeeBandZeitkatId,
+  getZeitkatFactor,
+  getZeitkatZoneIndex,
+  isAdebisTrue,
+} from './adebisConstants';
 
 function parseIsoDate(value) {
   if (!value || typeof value !== 'string') return null;
@@ -493,10 +501,9 @@ function getAgeInYearsAtDate(dateOfBirth, referenceDate) {
  * @param {Object} weightFactors - Optional weight factors from BayKiBiG rule {regelkind_3to6, schulkind, migration, under3, disabled}
  * @returns {number} Calculated weight for BayKiBiG subsidy
  */
-export function getBayKiBiGWeightForChild(child, groupDef, referenceDate, weightFactors = null) {
+export function getBayKiBiGWeightForChild(child, groupDef, referenceDate, weightFactors = null, booking = null) {
   if (!child) return 1;
 
-  // Use provided weight factors as defaults (from official table import)
   const factors = {
     regelkind_3to6: weightFactors?.regelkind_3to6 ?? 1.0,
     schulkind: weightFactors?.schulkind ?? 1.2,
@@ -504,26 +511,21 @@ export function getBayKiBiGWeightForChild(child, groupDef, referenceDate, weight
     under3: weightFactors?.under3 ?? 2.0,
     disabled: weightFactors?.disabled ?? 4.5,
   };
-
-  // Category 3: School-age children
-  if (groupDef?.type === 'Schulkindgruppe') return factors.schulkind;
+  const bookingRaw = booking?.rawdata || {};
+  const gewkatId = String(bookingRaw.GEWKAT || bookingRaw.gewkat || '').trim().toUpperCase();
+  if (GEWKAT_CATALOG.some((entry) => entry.id === gewkatId)) {
+    if (['B', 'DB', 'KB', 'SB'].includes(gewkatId)) return factors.disabled;
+    if (['D', 'DA'].includes(gewkatId)) return factors.under3;
+    if (['A', 'KA', 'SA'].includes(gewkatId)) return factors.migration;
+    if (['K', 'S'].includes(gewkatId)) return factors.schulkind;
+    return factors.regelkind_3to6;
+  }
 
   const derivedAge = getAgeInYearsAtDate(child.dateofbirth, referenceDate);
   const age = Number.isFinite(derivedAge) ? derivedAge : Number(child.age || child.rawdata?.ALTER || 3);
+  const isDisabled = child.hasDisability === true || isAdebisTrue(bookingRaw.BEHINDERT);
+  if (isDisabled) return factors.disabled;
 
-  let weight = factors.regelkind_3to6; // Default weight for category 2 (3–school)
-
-  // Category 1: Children < 3 years
-  if (Number.isFinite(age) && age < 3) {
-    weight = factors.under3;
-  }
-
-  // Category 4: Permanent disability with SGB IX agreement - overrides base weight
-  if (child.hasDisability === true) {
-    return factors.disabled;
-  }
-
-  // Category 5: Temporary disability (6-month application period)
   if (child.temporaryDisabilityDate) {
     const tempDisabilityDate = parseIsoDate(child.temporaryDisabilityDate);
     const currentDate = parseIsoDate(referenceDate);
@@ -538,17 +540,18 @@ export function getBayKiBiGWeightForChild(child, groupDef, referenceDate, weight
     }
   }
 
-  // Category 6: Children in day-care (Tagespflege)
-  if (child.isInDaycare === true) {
-    return factors.migration; // Day-care uses same factor as migration (1.3)
-  }
+  const isUnder3 = isAdebisTrue(bookingRaw.KRIPPENK) || (Number.isFinite(age) && age < 3);
+  if (isUnder3) return factors.under3;
 
-  // Category 8: Children of non-German-speaking parents
-  if (child.hasNonGermanSpeakingParents === true) {
-    return factors.migration;
-  }
+  const isMigration = child.isInDaycare === true
+    || child.hasNonGermanSpeakingParents === true
+    || isAdebisTrue(bookingRaw.MIGRATION);
+  if (isMigration) return factors.migration;
 
-  return weight;
+  const isSchoolAge = groupDef?.type === 'Schulkindgruppe' || isAdebisTrue(bookingRaw.SCHULKIND);
+  if (isSchoolAge) return factors.schulkind;
+
+  return factors.regelkind_3to6;
 }
 
 export function calculateAverageWeeklyHoursForDate(bookings, date) {
@@ -788,6 +791,7 @@ export function calculateChildMonthlyRevenue({
       bayKiBiGAmount: 0,
       totalAmount: 0,
       groupId: null,
+      zeitkatId: null,
       feeEntry: null,
       bayKiBiGRule: null,
       bayKiBiGWeight: 0,
@@ -798,11 +802,18 @@ export function calculateChildMonthlyRevenue({
   const groupId = resolveGroupIdAtDate(groupAssignments, referenceDate, item.groupId || null);
   const groupDef = (groupDefs || []).find((entry) => String(entry.id) === String(groupId));
   const feeCatalog = financeScenario?.groupFeeCatalogs?.[groupId] || [];
+  const activeBasisBooking = getActiveBasisBookings(bookings, referenceDate)[0] || null;
   const zeitkatId = resolveFeeZeitkatIdForChild(bookings, referenceDate);
   const feeEntry = findFeeEntryForZeitkat(feeCatalog, zeitkatId, referenceDate);
   const bayKiBiGRule = pickApplicableValidityEntry(financeScenario?.bayKiBiGRules, referenceDate)
     || pickLatestValidityEntry(financeScenario?.bayKiBiGRules);
-  const bayKiBiGWeight = getBayKiBiGWeightForChild(item, groupDef, referenceDate, bayKiBiGRule?.weightFactors);
+  const bayKiBiGWeight = getBayKiBiGWeightForChild(
+    item,
+    groupDef,
+    referenceDate,
+    bayKiBiGRule?.weightFactors,
+    activeBasisBooking
+  );
   const parentFeeAmount = Number(feeEntry?.monthlyAmount) || 0;
 
   // RE-Korrektur (adebisKITA 7.5): Förderbetrag = Basiswert × Buchungszeitfaktor ×
@@ -820,6 +831,7 @@ export function calculateChildMonthlyRevenue({
     bayKiBiGAmount,
     totalAmount: parentFeeAmount + bayKiBiGAmount,
     groupId,
+    zeitkatId,
     feeEntry,
     bayKiBiGRule,
     bayKiBiGWeight,

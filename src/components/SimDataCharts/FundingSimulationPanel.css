@@ -1,0 +1,53 @@
+.funding-simulation-panel {
+  gap: 0.55rem;
+}
+
+.funding-simulation-settings {
+  border-color: var(--mantine-color-gray-3);
+  background: var(--mantine-color-body);
+}
+
+.funding-simulation-modeler {
+  min-width: 0;
+  border-color: var(--mantine-color-gray-3);
+  background: var(--mantine-color-body);
+}
+
+.funding-simulation-modeler .mantine-Carousel-slide {
+  min-width: 0;
+}
+
+.funding-simulation-filter {
+  padding-bottom: var(--mantine-spacing-sm);
+  border-bottom: 1px solid var(--mantine-color-gray-3);
+}
+
+.funding-simulation-warning {
+  max-width: 100%;
+  height: auto;
+  white-space: normal;
+  text-align: left;
+  line-height: 1.35;
+}
+
+.funding-simulation-results {
+  border-color: var(--mantine-color-gray-3);
+  background: var(--mantine-color-body);
+}
+
+.funding-simulation-results-heading {
+  padding-bottom: var(--mantine-spacing-xs);
+  border-bottom: 1px solid var(--mantine-color-gray-3);
+}
+
+.funding-simulation-section + .funding-simulation-section {
+  padding-top: var(--mantine-spacing-sm);
+  border-top: 1px solid var(--mantine-color-gray-3);
+}
+
+.funding-simulation-table-scroll {
+  max-width: 100%;
+  border-color: var(--mantine-color-gray-3);
+}
+
+

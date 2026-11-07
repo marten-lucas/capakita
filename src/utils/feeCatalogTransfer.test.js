@@ -23,13 +23,21 @@ describe('feeCatalogTransfer roundtrip with PDF data', () => {
       [scenario.groupFeeCatalog.kindergarten.groupId]: scenario.groupFeeCatalog.kindergarten.feeBands,
       [scenario.groupFeeCatalog.schulkind.groupId]: scenario.groupFeeCatalog.schulkind.feeBands,
     };
+    const parentFeeSubsidiesByGroup = {
+      [scenario.groupFeeCatalog.krippe.groupId]: scenario.groupFeeCatalog.krippe.parentFeeSubsidy,
+      [scenario.groupFeeCatalog.kindergarten.groupId]: scenario.groupFeeCatalog.kindergarten.parentFeeSubsidy,
+      [scenario.groupFeeCatalog.schulkind.groupId]: scenario.groupFeeCatalog.schulkind.parentFeeSubsidy,
+    };
 
     const exported = buildFeeCatalogExportPayload({
       scenarioId: 'scenario-roundtrip',
       groupDefs,
       groupFeeCatalogs,
+      parentFeeSubsidiesByGroup,
     });
 
+    const importedMetadata = extractFeeCatalogImportData(exported);
+    expect(importedMetadata.parentFeeSubsidiesByKey).toEqual(parentFeeSubsidiesByGroup);
     const importedFromMainShape = parseFeeCatalogImportPayload(exported);
     expect(importedFromMainShape).toEqual(groupFeeCatalogs);
 
@@ -100,6 +108,69 @@ describe('feeCatalogTransfer roundtrip with PDF data', () => {
     expect(mapped['g-target-3']).toBeTruthy();
   });
 
+  it('pre-fills generic Gramschatz age-band catalogs from group type and reuses class-wide tariffs', () => {
+    const extracted = extractFeeCatalogImportData(gramschatzData, { preferNonMember: true });
+    const groupDefs = [
+      { id: 'g-blue-krippe', name: 'Bärchengruppe', type: 'Krippe' },
+      { id: 'g-yellow-krippe', name: 'Sonnengruppe', type: 'Krippe' },
+      { id: 'g-kindergarten', name: 'Waldgruppe', type: 'Kindergarten' },
+      { id: 'g-hort', name: 'Hort Rot', type: 'Schulkind' },
+    ];
+
+    const proposal = proposeFeeCatalogMappings({
+      groupDefs,
+      catalogDescriptors: extracted.catalogDescriptors,
+    });
+
+    expect(proposal.mappingsByGroupId['g-blue-krippe']).toMatchObject({ sourceKey: 'childrenUnder3', score: expect.any(Number) });
+    expect(proposal.mappingsByGroupId['g-yellow-krippe'].sourceKey).toBe('childrenUnder3');
+    expect(proposal.mappingsByGroupId['g-kindergarten'].sourceKey).toBe('childrenOver3');
+    expect(proposal.mappingsByGroupId['g-hort'].sourceKey).toBe('schoolChildren');
+
+    const mapped = applyFeeCatalogMappings({
+      mappingsByGroupId: proposal.mappingsByGroupId,
+      catalogsByKey: extracted.catalogsByKey,
+    });
+    expect(mapped['g-yellow-krippe']).toEqual(mapped['g-blue-krippe']);
+    expect(mapped['g-kindergarten'][0]).toMatchObject({ zeitkatId: '04', monthlyAmount: 150 });
+    expect(mapped['g-hort'][0]).toMatchObject({ zeitkatId: '01', monthlyAmount: 110 });
+  });
+
+  it('pre-fills Gramschatz fee structures from group type and reuses class-wide catalogs', () => {
+    const extracted = extractFeeCatalogImportData(gramschatzData, { preferNonMember: true });
+    const groupDefs = [
+      { id: 'g-blue-krippe', name: 'Bärchengruppe', type: 'Krippe' },
+      { id: 'g-yellow-krippe', name: 'Sonnengruppe', type: 'Krippe' },
+      { id: 'g-kindergarten', name: 'Waldgruppe', type: 'Kindergarten' },
+      { id: 'g-hort', name: 'Hort Rot', type: 'Schulkind' },
+    ];
+    const proposal = proposeFeeCatalogMappings({ groupDefs, catalogDescriptors: extracted.catalogDescriptors });
+
+    expect(proposal.mappingsByGroupId['g-blue-krippe']).toMatchObject({ sourceKey: 'childrenUnder3', score: 90 });
+    expect(proposal.mappingsByGroupId['g-yellow-krippe'].sourceKey).toBe('childrenUnder3');
+    expect(proposal.mappingsByGroupId['g-kindergarten'].sourceKey).toBe('childrenOver3');
+    expect(proposal.mappingsByGroupId['g-hort'].sourceKey).toBe('schoolChildren');
+
+    const mapped = applyFeeCatalogMappings({ mappingsByGroupId: proposal.mappingsByGroupId, catalogsByKey: extracted.catalogsByKey });
+    expect(mapped['g-yellow-krippe']).toEqual(mapped['g-blue-krippe']);
+    expect(mapped['g-kindergarten'][0]).toMatchObject({ zeitkatId: '04', monthlyAmount: 150 });
+    expect(mapped['g-hort'][0]).toMatchObject({ zeitkatId: '01', monthlyAmount: 110 });
+  });
+
+  it('imports the Gramschatz monthly parent-fee subsidy with the tariff schedule', () => {
+    const scenario = gramschatzData.testScenarios.baykibig_weights_gramschatz_2025;
+    const extracted = extractFeeCatalogImportData({ groupFeeCatalog: scenario.groupFeeCatalog });
+
+    expect(extracted.parentFeeSubsidiesByKey.kindergarten).toMatchObject({
+      enabled: true,
+      monthlyAmount: 100,
+      minimumAgeYears: 3,
+      maximumAgeYears: 7,
+      endDate: '2025-12-31',
+    });
+    expect(extracted.parentFeeSubsidiesByKey.schulkind.enabled).toBe(false);
+  });
+
   it('imports Gramschatz hour bands as ZEITKAT categories and prefers non-member amounts', () => {
     const extracted = extractFeeCatalogImportData(gramschatzData, { preferNonMember: true });
     const under3Catalog = extracted.catalogsByKey.childrenUnder3;
@@ -111,5 +182,6 @@ describe('feeCatalogTransfer roundtrip with PDF data', () => {
     expect(under3Catalog.every((entry) => !Object.hasOwn(entry, 'maxHours'))).toBe(true);
     expect(extracted.catalogsByKey.childrenOver3[0]).toMatchObject({ zeitkatId: '04', monthlyAmount: 150 });
     expect(extracted.catalogsByKey.schoolChildren[0]).toMatchObject({ zeitkatId: '01', monthlyAmount: 110 });
+    expect(extracted.parentFeeSubsidiesByKey.childrenOver3).toMatchObject({ monthlyAmount: 100, endDate: '2026-12-31' });
   });
 });

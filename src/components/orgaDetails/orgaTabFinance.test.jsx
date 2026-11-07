@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { MantineProvider } from '@mantine/core';
@@ -139,7 +139,7 @@ describe('OrgaTabFinance', () => {
     expect(screen.getByText('Kindergarten Wald')).toBeTruthy();
   });
 
-  it('keeps reform and subsidy-end-date inputs out of the finance options', () => {
+  it('edits the monthly parent-fee subsidy as part of each fee catalog', () => {
     const store = createTestStore();
 
     render(
@@ -150,9 +150,22 @@ describe('OrgaTabFinance', () => {
       </MantineProvider>
     );
 
-    expect(screen.queryByTestId('reform-forecast-settings')).toBeNull();
-    expect(screen.queryByTestId('reform-actual-bookingTime')).toBeNull();
-    expect(screen.queryByTestId('parent-fee-subsidy-end-date')).toBeNull();
+    fireEvent.click(screen.getByText('Krippe Sonnen'));
+    const subsidyPanel = screen.getByTestId('fee-catalog-parent-subsidy-group-1');
+    expect(within(subsidyPanel).getByText('Elternbeitragszuschuss dieser Beitragsordnung')).toBeTruthy();
+    expect(within(subsidyPanel).getByLabelText('Zuschuss gilt bis einschließlich')).toBeTruthy();
+    const enabledCheckbox = within(subsidyPanel).getByTestId('fee-catalog-parent-subsidy-enabled-group-1');
+    const checkboxInput = enabledCheckbox.tagName === 'INPUT' ? enabledCheckbox : enabledCheckbox.querySelector('input');
+    expect(checkboxInput.checked).toBe(true);
+    fireEvent.click(checkboxInput);
+    expect(store.getState().simFinance.financeByScenario['scenario-1'].parentFeeSubsidiesByGroup['group-1'].enabled).toBe(false);
+    fireEvent.click(checkboxInput);
+    const amountInput = within(subsidyPanel).getByTestId('fee-catalog-parent-subsidy-amount-group-1');
+    fireEvent.change(amountInput, { target: { value: '125' } });
+    fireEvent.blur(amountInput);
+
+    expect(store.getState().simFinance.financeByScenario['scenario-1'].parentFeeSubsidiesByGroup['group-1'].monthlyAmount).toBe(125);
+    expect(store.getState().simFinance.financeByScenario['scenario-1'].parentFeeSubsidiesByGroup['group-2']).toBeUndefined();
   });
 
   it('adds a new BayKiBiG rule via the add button', () => {

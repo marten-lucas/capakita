@@ -125,6 +125,7 @@ describe('simulateContributionChanges', () => {
         'child-2': { id: 'child-2', name: 'Kind B', dateofbirth: '2022-01-01', familyId: 'fam-1', familyLabel: 'Familie A', groupId: 'g1' },
       },
       groupDefs: [{ id: 'g1', name: 'Sonnengruppe' }],
+      bayKiBiGRules: RULES,
       groupFeeCatalogs: {
         g1: [
           { id: 'zone-04', zeitkatId: '04', monthlyAmount: 80, validFrom: '2026-01-01' },
@@ -140,9 +141,103 @@ describe('simulateContributionChanges', () => {
     expect(result).toEqual([{
       id: 'fam-1',
       label: 'Familie A',
+      childIds: ['child-1', 'child-2'],
       potentialUpgradeWeeklyHours: 1,
       potentialDowngradeWeeklyHours: 2,
+      potentialUpgradeWeightedDailyHours: 0.2,
+      potentialDowngradeWeightedDailyHours: 0.4,
     }]);
+  });
+
+  it('berechnet das Upgrade-Potenzial mit einem festen Monatszuschuss je Kind', () => {
+    const result = calculateFamilyFeePotentials({
+      demandBookings: [makeBooking({ zone: '05', dailyHours: 5 })],
+      dataItems: CHILD,
+      groupDefs: [{ id: 'g1', name: 'Sonnengruppe' }],
+      bayKiBiGRules: RULES,
+      groupFeeCatalogs: {
+        g1: [
+          { id: 'zone-05', zeitkatId: '05', monthlyAmount: 100, validFrom: '2026-01-01' },
+          { id: 'zone-06', zeitkatId: '06', monthlyAmount: 150, validFrom: '2026-01-01' },
+        ],
+      },
+      parentFeeSubsidy: { enabled: true, monthlyAmount: 150 },
+      referenceDate: REF,
+      monthlyBudget: 0,
+    });
+
+    expect(result[0]).toMatchObject({
+      potentialUpgradeWeeklyHours: 1,
+      potentialUpgradeWeightedDailyHours: 0.2,
+    });
+  });
+
+  it('zählt den festen Monatszuschuss für jedes berechtigte Kind, auch ohne passenden Tarif oder bei niedrigerem Beitrag', () => {
+    const result = simulateContributionChanges({
+      demandBookings: [
+        makeBooking({ itemId: 'child-1', zone: '05' }),
+        makeBooking({ itemId: 'child-2', zone: '06' }),
+      ],
+      dataItems: {
+        'child-1': CHILD['child-1'],
+        'child-2': { ...CHILD['child-1'], id: 'child-2', groupId: 'g1' },
+      },
+      groupDefs: [{ id: 'g1', name: 'Sonnengruppe' }],
+      bayKiBiGRules: RULES,
+      groupFeeCatalogs: {
+        g1: [{ id: 'zone-05', zeitkatId: '05', monthlyAmount: 50, validFrom: '2026-01-01' }],
+      },
+      parentFeeSubsidy: { enabled: true, monthlyAmount: 100 },
+      referenceDate: REF,
+    });
+
+    expect(result.totals.policyParentFeeSubsidy).toBe(200);
+    expect(result.totals.eligibleParentFeeSubsidyChildren).toBe(2);
+  });
+
+  it('summiert den Zuschuss für alle berechtigten Kinder über alle Monate des Jahres', () => {
+    const result = simulateAnnualContributionChanges({
+      year: 2026,
+      demandBookings: [
+        makeBooking({ itemId: 'child-1' }),
+        makeBooking({ itemId: 'child-2' }),
+      ],
+      dataItems: {
+        'child-1': CHILD['child-1'],
+        'child-2': { ...CHILD['child-1'], id: 'child-2', groupId: 'g1' },
+      },
+      groupDefs: [{ id: 'g1', name: 'Sonnengruppe' }],
+      bayKiBiGRules: RULES,
+      groupFeeCatalogs: { g1: [] },
+      parentFeeSubsidy: { enabled: true, monthlyAmount: 100 },
+      parentFeeSubsidiesByGroup: { g1: { enabled: false, monthlyAmount: 100 } },
+      baselineParentFeeSubsidy: { enabled: true, monthlyAmount: 100 },
+      baselineParentFeeSubsidiesByGroup: { g1: { enabled: true, monthlyAmount: 100 } },
+    });
+
+    expect(result.totals.deltaYearlyParentSubsidy).toBe(-2400);
+    expect(result.totals.eligibleParentFeeSubsidyChildMonths).toBe(24);
+  });
+
+  it('verschiebt beim temporären Deaktivieren des Zuschusses den Betrag von Förderungen zu Elternbeiträgen', () => {
+    const result = simulateContributionChanges({
+      demandBookings: [makeBooking()],
+      dataItems: CHILD,
+      groupDefs: [{ id: 'g1', name: 'Sonnengruppe' }],
+      bayKiBiGRules: RULES,
+      groupFeeCatalogs: makeCatalog(),
+      parentFeeSubsidy: { enabled: true, monthlyAmount: 100 },
+      parentFeeSubsidiesByGroup: { g1: { enabled: false, monthlyAmount: 100 } },
+      baselineParentFeeSubsidy: { enabled: true, monthlyAmount: 100 },
+      baselineParentFeeSubsidiesByGroup: { g1: { enabled: true, monthlyAmount: 100 } },
+      referenceDate: REF,
+    });
+
+    expect(result.totals).toMatchObject({
+      deltaParentFees: 100,
+      deltaParentFeeSubsidy: -100,
+      policyParentFeeSubsidy: 0,
+    });
   });
 
   it('wechselt nicht, wenn die absoluten Simulationspreise benachbarter Staffeln verschieden sind', () => {
@@ -195,6 +290,98 @@ describe('simulateContributionChanges', () => {
       childrenWithHigherFees: 0,
       monthlyParentCostIncrease: 0,
     });
+  });
+
+  it('schließt Schulkind-markierte Kinder vom Zuschuss aus', () => {
+    const schoolChildBooking = {
+      ...makeBooking(),
+      rawdata: { ...makeBooking().rawdata, SCHULKIND: '.T.' },
+    };
+    const result = simulateContributionChanges({
+      demandBookings: [schoolChildBooking, makeBooking({ itemId: 'child-2' })],
+      dataItems: {
+        ...CHILD,
+        'child-2': { ...CHILD['child-1'], id: 'child-2', groupId: 'g1' },
+      },
+      groupDefs: [{ id: 'g1', name: 'Sonnengruppe' }],
+      bayKiBiGRules: RULES,
+      groupFeeCatalogs: { g1: [{ id: 'fee-04', zeitkatId: '04', monthlyAmount: 150, validFrom: '2026-01-01' }] },
+      parentFeeSubsidy: { monthlyAmount: 100 },
+      referenceDate: REF,
+    });
+
+    expect(result.totals.policyParentFeeSubsidy).toBe(100);
+    expect(result.totals.eligibleParentFeeSubsidyChildren).toBe(1);
+  });
+
+  it('gewährt den Zuschuss im Jahr des dritten Geburtstags erst ab September', () => {
+    const child = { ...CHILD['child-1'], dateofbirth: '2023-04-15' };
+    const common = {
+      demandBookings: [makeBooking()],
+      dataItems: { 'child-1': child },
+      groupDefs: [{ id: 'g1', name: 'Sonnengruppe' }],
+      groupFeeCatalogs: { g1: [] },
+      parentFeeSubsidy: { monthlyAmount: 100 },
+    };
+
+    expect(simulateContributionChanges({ ...common, referenceDate: '2026-08-01' }).totals.policyParentFeeSubsidy).toBe(0);
+    expect(simulateContributionChanges({ ...common, referenceDate: '2026-09-01' }).totals.policyParentFeeSubsidy).toBe(100);
+  });
+
+  it('zählt aktive berechtigte Kinder auch ohne auswertbare Buchungsstunden', () => {
+    const result = simulateContributionChanges({
+      demandBookings: [],
+      dataItems: CHILD,
+      parentFeeSubsidyChildren: [{
+        itemId: 'child-1',
+        item: CHILD['child-1'],
+        groupId: 'g1',
+        bookings: [makeBooking()],
+      }],
+      groupDefs: [{ id: 'g1', name: 'Sonnengruppe' }],
+      groupFeeCatalogs: { g1: [] },
+      parentFeeSubsidy: { monthlyAmount: 100 },
+      referenceDate: REF,
+    });
+
+    expect(result.totals.policyParentFeeSubsidy).toBe(100);
+    expect(result.totals.eligibleParentFeeSubsidyChildren).toBe(1);
+  });
+
+  it('gewährt ohne Geburtsdatum keinen altersabhängigen Zuschuss', () => {
+    const result = simulateContributionChanges({
+      demandBookings: [makeBooking()],
+      dataItems: { 'child-1': { id: 'child-1', type: 'demand', groupId: 'g1' } },
+      groupDefs: [{ id: 'g1', name: 'Sonnengruppe' }],
+      groupFeeCatalogs: { g1: [] },
+      parentFeeSubsidy: { monthlyAmount: 100 },
+      referenceDate: REF,
+    });
+
+    expect(result.totals.policyParentFeeSubsidy).toBe(0);
+  });
+
+  it('uses the parent-fee subsidy configured for each fee catalog', () => {
+    const result = simulateContributionChanges({
+      demandBookings: [makeBooking({ itemId: 'child-1', groupId: 'g1' }), makeBooking({ itemId: 'child-2', groupId: 'g2' })],
+      dataItems: {
+        'child-1': { ...CHILD['child-1'], groupId: 'g1' },
+        'child-2': { ...CHILD['child-1'], id: 'child-2', groupId: 'g2' },
+      },
+      groupDefs: [{ id: 'g1', name: 'Kindergarten' }, { id: 'g2', name: 'Krippe' }],
+      bayKiBiGRules: RULES,
+      groupFeeCatalogs: {
+        g1: [{ id: 'fee-1', zeitkatId: '04', monthlyAmount: 150, validFrom: '2026-01-01' }],
+        g2: [{ id: 'fee-2', zeitkatId: '04', monthlyAmount: 150, validFrom: '2026-01-01' }],
+      },
+      parentFeeSubsidiesByGroup: {
+        g1: { enabled: true, monthlyAmount: 100, endDate: '2026-12-31' },
+        g2: { enabled: true, monthlyAmount: 40, endDate: '2026-12-31' },
+      },
+      referenceDate: REF,
+    });
+
+    expect(result.totals.policyParentFeeSubsidy).toBe(140);
   });
 
   it('bildet den Wegfall des Elternbeitragszuschusses ab 2027 als Elternmehrbelastung ab, nicht als Mehreinnahme', () => {

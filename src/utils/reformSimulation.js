@@ -49,9 +49,12 @@ function getBayKiBiGBaseValueForYear(rules, year) {
   return previousRule ? Number(previousRule.baseValue) : null;
 }
 
-function getTeamGrant(year, approvedPlaces, teamGrantEligible) {
+function getTeamGrant(year, approvedPlaces, teamGrantEligible, teamRatesByYear = {}) {
   if (year < 2027 || !teamGrantEligible) return 0;
-  const ratesForYear = REFORM_FIXED_ASSUMPTIONS.teamRatesByYear[year];
+  const ratesForYear = {
+    ...REFORM_FIXED_ASSUMPTIONS.teamRatesByYear[year],
+    ...(teamRatesByYear?.[year] || teamRatesByYear?.[String(year)] || {}),
+  };
   if (!ratesForYear) return 0;
   const places = Math.max(0, Math.floor(amount(approvedPlaces)));
   const first50Places = Math.min(places, 50);
@@ -97,7 +100,12 @@ export function calculateReformForecast(input = {}, simulatedChangesByYear = {},
       under3Federal: year === 2026 ? amount(settings.actualFunding.under3Federal) : 0,
     };
     const childRelatedFunding = Object.values(components).reduce((sum, value) => sum + value, 0);
-    const teamGrant = getTeamGrant(year, settings.approvedPlaces, settings.teamGrantEligible === true);
+    const teamGrant = getTeamGrant(
+      year,
+      settings.approvedPlaces,
+      settings.teamGrantEligible === true,
+      settings.teamRatesByYear
+    );
     const priorGuidelineFunding = year >= 2027 && settings.teamGrantEligible === true
       ? amount(settings.actualFunding.assistance)
         + amount(settings.actualFunding.personnelBonus)
@@ -130,6 +138,10 @@ export function calculateReformForecast(input = {}, simulatedChangesByYear = {},
     assumptions: {
       approvedPlaces: Math.max(0, Math.floor(amount(settings.approvedPlaces))),
       teamGrantEligible: settings.teamGrantEligible === true,
+      teamRatesByYear: {
+        ...REFORM_FIXED_ASSUMPTIONS.teamRatesByYear,
+        ...(settings.teamRatesByYear || {}),
+      },
       qualityBonusBenchmarkByYear: REFORM_FIXED_ASSUMPTIONS.qualityBonusBenchmarkByYear,
       hasActualBaseline: Object.values(settings.actualFunding).some((value) => amount(value) !== 0),
       parentFeeSubsidyIncludedInResult: false,

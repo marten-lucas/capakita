@@ -1,16 +1,18 @@
 import { getFeeBandZeitkatId, getZeitkatIdForMaximumHours } from './adebisConstants';
 
-export function buildFeeCatalogExportPayload({ scenarioId, groupDefs, groupFeeCatalogs }) {
+export function buildFeeCatalogExportPayload({ scenarioId, groupDefs, groupFeeCatalogs, parentFeeSubsidiesByGroup = {} }) {
   return {
     type: 'kiga-simulator.groupFeeCatalogs',
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
     scenarioId,
     groupFeeCatalogs: groupFeeCatalogs || {},
+    parentFeeSubsidiesByGroup: parentFeeSubsidiesByGroup || {},
     catalogs: (groupDefs || []).map((group) => ({
       groupId: group.id,
       groupName: group.name || '',
       entries: groupFeeCatalogs?.[group.id] || [],
+      parentFeeSubsidy: parentFeeSubsidiesByGroup?.[group.id] || null,
     })),
   };
 }
@@ -24,6 +26,14 @@ function normalizeString(value) {
     .replace(/ß/g, 'ss')
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
+}
+
+function classifyFeeCatalogKind(value) {
+  const label = normalizeString(value);
+  if (/(childrenunder\s*3|under\s*3|unter\s*3|\bu3\b|krippe|0\s*2)/.test(label)) return 'under3';
+  if (/(childrenover\s*3|over\s*3|ueber\s*3|uber\s*3|3\s*5|kindergarten|\bkiga\b)/.test(label)) return 'over3';
+  if (/(schoolchildren|school|schul|hort|mittagsbetreuung|ferienbetreuung)/.test(label)) return 'school';
+  return null;
 }
 
 function normalizeImportedFeeBand(entry = {}, { preferNonMember = true } = {}) {
@@ -46,7 +56,7 @@ function normalizeImportedFeeBand(entry = {}, { preferNonMember = true } = {}) {
   };
 }
 
-function toCatalogDescriptor({ key, groupId, groupName, entries = [] }, options) {
+function toCatalogDescriptor({ key, groupId, groupName, entries = [], parentFeeSubsidy = null }, options) {
   const normalizeEntries = options?.normalizeEntries !== false;
   return {
     key: String(key),
@@ -57,6 +67,9 @@ function toCatalogDescriptor({ key, groupId, groupName, entries = [] }, options)
         ? entries.map((entry) => normalizeImportedFeeBand(entry, options))
         : entries)
       : [],
+    parentFeeSubsidy: parentFeeSubsidy && typeof parentFeeSubsidy === 'object'
+      ? { ...parentFeeSubsidy }
+      : null,
   };
 }
 
@@ -69,6 +82,7 @@ function extractCatalogDescriptors(obj, options = {}) {
       groupId: key,
       groupName: '',
       entries,
+      parentFeeSubsidy: obj.parentFeeSubsidiesByGroup?.[key] || null,
     }, options));
   }
 
@@ -78,6 +92,7 @@ function extractCatalogDescriptors(obj, options = {}) {
       groupId: val?.groupId ?? null,
       groupName: val?.groupName || val?.groupType || key,
       entries: Array.isArray(val?.feeBands) ? val.feeBands : (Array.isArray(val?.entries) ? val.entries : []),
+      parentFeeSubsidy: val?.parentFeeSubsidy,
     }, options));
   }
 
@@ -89,6 +104,7 @@ function extractCatalogDescriptors(obj, options = {}) {
         groupId: entry.groupId,
         groupName: entry.groupName || '',
         entries: Array.isArray(entry.entries) ? entry.entries : [],
+        parentFeeSubsidy: entry.parentFeeSubsidy,
       }, options));
   }
 
@@ -98,6 +114,7 @@ function extractCatalogDescriptors(obj, options = {}) {
       groupId: null,
       groupName: val?.description || val?.ageRange || key,
       entries: Array.isArray(val?.bands) ? val.bands : [],
+      parentFeeSubsidy: val?.parentFeeSubsidy,
     }, options));
   }
 
@@ -111,15 +128,18 @@ export function extractFeeCatalogImportData(parsed, options = {}) {
 
   const descriptorsToMap = (descriptors) => {
     const byKey = {};
+    const parentFeeSubsidiesByKey = {};
     descriptors.forEach((descriptor) => {
       byKey[descriptor.key] = descriptor.entries;
       if (descriptor.groupId && !(descriptor.groupId in byKey)) {
         byKey[descriptor.groupId] = descriptor.entries;
       }
+      if (descriptor.parentFeeSubsidy) parentFeeSubsidiesByKey[descriptor.key] = descriptor.parentFeeSubsidy;
     });
     return {
       catalogsByKey: byKey,
       catalogDescriptors: descriptors,
+      parentFeeSubsidiesByKey,
     };
   };
 
@@ -191,6 +211,7 @@ export function proposeFeeCatalogMappings({ groupDefs, catalogDescriptors }) {
       keyNorm: normalizeString(sourceKey),
       groupIdNorm: normalizeString(sourceGroupId),
       nameNorm: normalizeString(sourceName),
+      feeKind: classifyFeeCatalogKind(`${sourceKey} ${sourceName}`),
     };
   });
 
@@ -199,11 +220,13 @@ export function proposeFeeCatalogMappings({ groupDefs, catalogDescriptors }) {
     const groupName = String(group.name || '');
     const gidNorm = normalizeString(groupId);
     const gnameNorm = normalizeString(groupName);
+    const groupKind = classifyFeeCatalogKind(`${group.type || ''} ${groupName}`);
 
     if (candidate.sourceKey === groupId || candidate.sourceGroupId === groupId) return 100;
     if (gnameNorm && candidate.nameNorm && candidate.nameNorm === gnameNorm) return 95;
     if (gnameNorm && candidate.keyNorm && candidate.keyNorm === gnameNorm) return 90;
     if (gidNorm && candidate.groupIdNorm && candidate.groupIdNorm === gidNorm) return 85;
+    if (groupKind && candidate.feeKind === groupKind) return candidate.sourceGroupId ? 88 : 90;
     if (gnameNorm && candidate.nameNorm && (candidate.nameNorm.includes(gnameNorm) || gnameNorm.includes(candidate.nameNorm))) return 70;
     if (gnameNorm && candidate.keyNorm && (candidate.keyNorm.includes(gnameNorm) || gnameNorm.includes(candidate.keyNorm))) return 65;
     return 0;
@@ -212,7 +235,7 @@ export function proposeFeeCatalogMappings({ groupDefs, catalogDescriptors }) {
   groups.forEach((group) => {
     let best = null;
     sourceCandidates.forEach((candidate) => {
-      if (usedSourceKeys.has(candidate.sourceKey)) return;
+      if (usedSourceKeys.has(candidate.sourceKey) && candidate.sourceGroupId) return;
       const score = scoreCandidate(group, candidate);
       if (!best || score > best.score) {
         best = { ...candidate, score };
@@ -250,6 +273,16 @@ export function applyFeeCatalogMappings({ mappingsByGroupId, catalogsByKey }) {
     result[String(groupId)] = Array.isArray(catalogsByKey[sourceKey])
       ? catalogsByKey[sourceKey]
       : [];
+  });
+  return result;
+}
+
+export function applyParentFeeSubsidyMappings({ mappingsByGroupId, parentFeeSubsidiesByKey }) {
+  const result = {};
+  Object.entries(mappingsByGroupId || {}).forEach(([groupId, sourceKey]) => {
+    const key = typeof sourceKey === 'object' ? sourceKey?.sourceKey : sourceKey;
+    const subsidy = parentFeeSubsidiesByKey?.[key];
+    if (key && subsidy) result[String(groupId)] = { ...subsidy };
   });
   return result;
 }

@@ -295,6 +295,30 @@ describe('financeUtils', () => {
   });
 
   describe('child finance recalculation and assignment', () => {
+    it('uses the ADEBIS GEWKAT from the active booking with the configured annual weight factor', () => {
+      const result = calculateChildMonthlyRevenue({
+        item: { id: 'child-gewkat', type: 'demand', dateofbirth: '2021-01-01', groupId: 'g1' },
+        bookings: [{
+          id: 'booking-gewkat',
+          startdate: '2026-01-01',
+          rawdata: { ART: '0', GEWKAT: 'D', ZEITKAT: '06' },
+          times: [{ day_name: 'Mo', segments: [{ booking_start: '07:00', booking_end: '12:30' }] }],
+        }],
+        groupAssignments: {},
+        groupDefs: [{ id: 'g1', type: 'Kindergarten', name: 'Sonnen' }],
+        financeScenario: {
+          bayKiBiGRules: [{ id: 'rule', baseValue: 100, validFrom: '2026-01-01', weightFactors: { regelkind_3to6: 1, under3: 2.2 } }],
+          groupFeeCatalogs: {},
+        },
+        referenceDate: '2026-03-15',
+        applyZeitkatFactor: true,
+      });
+
+      expect(result.bayKiBiGWeight).toBe(2.2);
+      expect(result.zeitkatFactor).toBe(1.5);
+      expect(result.bayKiBiGAmount).toBeCloseTo(330, 8);
+    });
+
     it('derives the ZEITKAT factor from booking times for the reform model', () => {
       const input = {
         item: { id: 'child-factor', type: 'demand', dateofbirth: '2022-01-01', groupId: 'g1' },

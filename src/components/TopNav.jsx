@@ -78,6 +78,7 @@ function NavigationItem({ item, active, compact = false, collapsed = false, onCl
 function ActionMenu({
   browserAutoSaveEnabled,
   canSave,
+  showBrowserAutoSave,
   handleAutoSaveToggle,
   onImport,
   onSave,
@@ -94,23 +95,25 @@ function ActionMenu({
 
       <Menu.Dropdown>
         <Menu.Label>Aktionen</Menu.Label>
-        <Menu.Item
-          leftSection={<IconInfoCircle size={16} />}
-          disabled={!canSave && !browserAutoSaveEnabled}
-          onClick={() => handleAutoSaveToggle(!browserAutoSaveEnabled)}
-        >
-          <Group justify="space-between" w="100%" wrap="nowrap" gap="md">
-            <Stack gap={0} miw={0}>
-              <Text size="sm">Auto-Save im Browser</Text>
-              {!canSave && (
-                <Text size="xs" c="dimmed">
-                  Nur für anonymisierte Imports
-                </Text>
-              )}
-            </Stack>
-            <Switch checked={browserAutoSaveEnabled} readOnly size="xs" />
-          </Group>
-        </Menu.Item>
+        {showBrowserAutoSave && (
+          <Menu.Item
+            leftSection={<IconInfoCircle size={16} />}
+            disabled={!canSave && !browserAutoSaveEnabled}
+            onClick={() => handleAutoSaveToggle(!browserAutoSaveEnabled)}
+          >
+            <Group justify="space-between" w="100%" wrap="nowrap" gap="md">
+              <Stack gap={0} miw={0}>
+                <Text size="sm">Auto-Save im Browser</Text>
+                {!canSave && (
+                  <Text size="xs" c="dimmed">
+                    Nur für anonymisierte Imports
+                  </Text>
+                )}
+              </Stack>
+              <Switch checked={browserAutoSaveEnabled} readOnly size="xs" />
+            </Group>
+          </Menu.Item>
+        )}
         <Menu.Item leftSection={<IconUpload size={16} />} onClick={onImport}>
           Adebis Import
         </Menu.Item>
@@ -301,6 +304,7 @@ function TopNav({ variant = 'sidebar', sidebarCollapsed = false, onToggleSidebar
     <ActionMenu
       browserAutoSaveEnabled={browserAutoSaveEnabled}
       canSave={canSave}
+      showBrowserAutoSave={import.meta.env.MODE !== 'coolify'}
       handleAutoSaveToggle={handleAutoSaveToggle}
       onImport={() => setImportModalOpen(true)}
       onSave={() => dispatch(setSaveDialogOpen(true))}

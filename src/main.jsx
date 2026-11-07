@@ -11,7 +11,13 @@ import '@mantine/notifications/styles.css'
 import './index.css'
 import App from './App.jsx'
 import { Provider } from 'react-redux'
-import store from './store/store'
+import store, { createAppStore } from './store/store'
+import BackendShell from './backend/BackendShell'
+import {
+  createSharedStoragePersistence,
+  loadSharedWorkspace,
+  workspaceSnapshotToReduxState,
+} from './backend/sharedStorage'
 import Highcharts from 'highcharts'
 import 'highcharts/modules/stock'
 import 'highcharts/modules/timeline'
@@ -41,23 +47,71 @@ Highcharts.Series.prototype.update = function(options, redraw) {
   }
 };
 
-createRoot(document.getElementById('root')).render(
-  <StrictMode>
-    <Provider store={store}>
-      <MantineProvider>
-        <DatesProvider settings={{ locale: 'de' }}>
-          <App />
-        </DatesProvider>
-      </MantineProvider>
-    </Provider>
-  </StrictMode>,
-)
+const root = createRoot(document.getElementById('root'))
+const isCoolifyBuild = import.meta.env.MODE === 'coolify'
 
-// Expose the redux store on window for integration tests (dev only)
-try {
-  if (typeof window !== 'undefined') window.__APP_STORE = store
-} catch {
-  // ignore
+function renderApplication(applicationStore, backendState = null) {
+  root.render(
+    <StrictMode>
+      <Provider store={applicationStore}>
+        <MantineProvider>
+          <DatesProvider settings={{ locale: 'de' }}>
+            {backendState ? (
+              <BackendShell {...backendState}>
+                <App />
+              </BackendShell>
+            ) : <App />}
+          </DatesProvider>
+        </MantineProvider>
+      </Provider>
+    </StrictMode>,
+  )
+
+  try {
+    if (typeof window !== 'undefined') window.__APP_STORE = applicationStore
+  } catch {
+    // ignore
+  }
+}
+
+if (isCoolifyBuild) {
+  const showBackendState = (backendState) => {
+    root.render(
+      <StrictMode>
+        <MantineProvider>
+          <DatesProvider settings={{ locale: 'de' }}>
+            <BackendShell {...backendState} onRetry={startBackendApp}>
+              {backendState.status === 'ready' && backendState.applicationStore ? (
+                <Provider store={backendState.applicationStore}><App /></Provider>
+              ) : null}
+            </BackendShell>
+          </DatesProvider>
+        </MantineProvider>
+      </StrictMode>,
+    )
+  }
+
+  async function startBackendApp() {
+    showBackendState({ status: 'loading' })
+    try {
+      const result = await loadSharedWorkspace()
+      if (!result.authenticated) {
+        showBackendState({ status: 'unauthenticated' })
+        return
+      }
+      const applicationStore = createAppStore({
+        preloadedState: workspaceSnapshotToReduxState(result.workspace.data),
+        sharedPersistence: createSharedStoragePersistence(),
+      })
+      showBackendState({ status: 'ready', session: result.session, applicationStore })
+    } catch (error) {
+      showBackendState({ status: 'error', error: error.message })
+    }
+  }
+
+  startBackendApp()
+} else {
+  renderApplication(store)
 }
 
 try {

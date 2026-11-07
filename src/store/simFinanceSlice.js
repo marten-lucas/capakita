@@ -67,6 +67,7 @@ function mergeDefaultBayKiBiGRules(rules = []) {
 function createEmptyScenarioFinance() {
   return {
     parentFeeSubsidy: normalizeParentFeeSubsidy(),
+    parentFeeSubsidiesByGroup: {},
     settings: {
       partialAbsenceThresholdDays: 42,
       partialAbsenceEmployerSharePercent: 0,
@@ -88,9 +89,14 @@ function normalizeValidityEntry(entry = {}, defaultValues = {}) {
 }
 
 function normalizeBayKiBiGRule(rule = {}) {
+  const year = Number(String(rule.validFrom || '').slice(0, 4));
+  const defaultQualityBonusBenchmark = DEFAULT_ADEBIS_BAYKIBIG_TABLES.qualityBonusBenchmarkByYear[year] ?? 0;
   return normalizeValidityEntry(rule, {
     label: rule.label || '',
     baseValue: rule.baseValue ?? '',
+    qualityBonusBenchmark: rule.qualityBonusBenchmark ?? defaultQualityBonusBenchmark,
+    under3AdditionalFactor: rule.under3AdditionalFactor ?? 0.025,
+    preparatoryCoursePerChild: rule.preparatoryCoursePerChild ?? 0,
     weightFactors: {
       regelkind_3to6: rule.weightFactors?.regelkind_3to6 ?? 1.0,
       schulkind: rule.weightFactors?.schulkind ?? 1.2,
@@ -221,18 +227,32 @@ function normalizeScenarioFinance(finance = {}) {
     ...createEmptyScenarioFinance().settings,
     ...(finance.settings || {}),
   };
+  const groupFeeCatalogs = Object.fromEntries(
+    Object.entries(finance.groupFeeCatalogs || {}).map(([groupId, entries]) => [
+      String(groupId),
+      normalizeFeeCatalog(entries),
+    ])
+  );
+  const parentFeeSubsidiesByGroup = Object.fromEntries(
+    Object.entries(finance.parentFeeSubsidiesByGroup || {}).map(([groupId, subsidy]) => [
+      String(groupId),
+      normalizeParentFeeSubsidy(subsidy),
+    ])
+  );
+  const legacyParentFeeSubsidy = normalizeParentFeeSubsidy(finance.parentFeeSubsidy);
+  if (Object.keys(parentFeeSubsidiesByGroup).length === 0 && finance.parentFeeSubsidy) {
+    Object.keys(groupFeeCatalogs).forEach((groupId) => {
+      parentFeeSubsidiesByGroup[groupId] = { ...legacyParentFeeSubsidy };
+    });
+  }
 
   return {
-    parentFeeSubsidy: normalizeParentFeeSubsidy(finance.parentFeeSubsidy),
+    parentFeeSubsidy: legacyParentFeeSubsidy,
+    parentFeeSubsidiesByGroup,
     settings,
     bayKiBiGRules: mergeDefaultBayKiBiGRules(finance.bayKiBiGRules)
       .map((rule) => normalizeBayKiBiGRule(rule)),
-    groupFeeCatalogs: Object.fromEntries(
-      Object.entries(finance.groupFeeCatalogs || {}).map(([groupId, entries]) => [
-        String(groupId),
-        normalizeFeeCatalog(entries),
-      ])
-    ),
+    groupFeeCatalogs,
     itemFinances: Object.fromEntries(
       Object.entries(finance.itemFinances || {}).map(([itemId, itemFinance]) => [
         String(itemId),
@@ -282,6 +302,28 @@ const simFinanceSlice = createSlice({
         ...scenarioFinance.parentFeeSubsidy,
         ...updates,
       });
+    },
+    updateGroupParentFeeSubsidy(state, action) {
+      const { scenarioId, groupId, updates } = action.payload;
+      const scenarioFinance = ensureScenarioFinanceState(state, scenarioId);
+      scenarioFinance.parentFeeSubsidiesByGroup ||= {};
+      const normalizedGroupId = String(groupId);
+      const current = scenarioFinance.parentFeeSubsidiesByGroup[normalizedGroupId]
+        || scenarioFinance.parentFeeSubsidy;
+      scenarioFinance.parentFeeSubsidiesByGroup[normalizedGroupId] = normalizeParentFeeSubsidy({
+        ...current,
+        ...updates,
+      });
+    },
+    setGroupParentFeeSubsidies(state, action) {
+      const { scenarioId, subsidies } = action.payload;
+      const scenarioFinance = ensureScenarioFinanceState(state, scenarioId);
+      scenarioFinance.parentFeeSubsidiesByGroup = Object.fromEntries(
+        Object.entries(subsidies || {}).map(([groupId, subsidy]) => [
+          String(groupId),
+          normalizeParentFeeSubsidy(subsidy),
+        ])
+      );
     },
     addBayKiBiGRule(state, action) {
       const { scenarioId, rule } = action.payload;
@@ -455,6 +497,8 @@ const simFinanceSlice = createSlice({
 export const {
   updateScenarioFinanceSettings,
   updateParentFeeSubsidy,
+  updateGroupParentFeeSubsidy,
+  setGroupParentFeeSubsidies,
   addBayKiBiGRule,
   seedDefaultBayKiBiGRules,
   updateBayKiBiGRule,

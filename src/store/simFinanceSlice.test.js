@@ -4,6 +4,7 @@ import simFinanceReducer, {
   deletePersonnelCostEntry,
   loadFinanceByScenario,
   seedDefaultBayKiBiGRules,
+  updateGroupParentFeeSubsidy,
   updatePersonnelCostEntry,
 } from './simFinanceSlice';
 
@@ -26,6 +27,28 @@ describe('simFinanceSlice', () => {
       minimumAgeYears: 3,
       maximumAgeYears: 6,
     });
+  });
+
+  it('migrates the legacy subsidy into fee catalogs and updates one catalog independently', () => {
+    let state = simFinanceReducer(undefined, loadFinanceByScenario({
+      'scenario-1': {
+        parentFeeSubsidy: { monthlyAmount: 85, endDate: '2025-12-31' },
+        groupFeeCatalogs: { g1: [], g2: [] },
+      },
+    }));
+
+    expect(state.financeByScenario['scenario-1'].parentFeeSubsidiesByGroup.g1.monthlyAmount).toBe(85);
+    state = simFinanceReducer(state, updateGroupParentFeeSubsidy({
+      scenarioId: 'scenario-1',
+      groupId: 'g1',
+      updates: { monthlyAmount: 100 },
+    }));
+
+    expect(state.financeByScenario['scenario-1'].parentFeeSubsidiesByGroup.g1).toMatchObject({
+      monthlyAmount: 100,
+      endDate: '2025-12-31',
+    });
+    expect(state.financeByScenario['scenario-1'].parentFeeSubsidiesByGroup.g2.monthlyAmount).toBe(85);
   });
 
   it('seeds future BayKiBiG years by default and inherits the 2026 weighting factors', () => {

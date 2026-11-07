@@ -57,7 +57,7 @@ function getPriceMax(entries, baselineEntries) {
   return Math.max(300, Math.ceil((maxAmount * 1.5) / 100) * 100);
 }
 
-function PriceField({ value, label, onChange, testId, disabled = false }) {
+function PriceField({ value, label, onChange, onFocus, testId, disabled = false }) {
   const [draft, setDraft] = React.useState(value ?? 0);
   React.useEffect(() => setDraft(value ?? 0), [value]);
   return (
@@ -71,10 +71,11 @@ function PriceField({ value, label, onChange, testId, disabled = false }) {
       disabled={disabled}
       value={draft}
       onChange={setDraft}
+      onFocus={onFocus}
       onBlur={() => {
         if (draft === '' || Number.isFinite(Number(draft))) onChange(draft === '' ? 0 : Number(draft));
       }}
-      suffix=" EUR"
+      suffix=" €"
       aria-label={label}
       data-testid={testId}
     />
@@ -101,11 +102,31 @@ function OriginalMarker({ amount, maxAmount }) {
   );
 }
 
-function ContributionSlider({ zone, entry, originalEntry, priceMax, simulation, invalid, onChange, onActivate }) {
+function ContributionSlider({ zone, entry, originalEntry, priceMax, simulation, invalid, focused, onChange, onActivate, onDeactivate, onFocus }) {
   const isActive = Boolean(entry && entry.enabled !== false && Number(entry.monthlyAmount) > 0);
-  const amount = isActive ? Number(entry.monthlyAmount) : 0;
+  const amount = Number(entry?.monthlyAmount) || Number(entry?.lastNonZeroAmount) || 0;
+  const sliderHeight = simulation ? 120 : SLIDER_HEIGHT;
   return (
-    <Stack gap={3} align="center" className="fee-staircase-zone" data-testid={`fee-staircase-zone-${zone.id}`}>
+    <Stack
+      gap={3}
+      align="center"
+      className="fee-staircase-zone"
+      data-focused={focused ? 'true' : undefined}
+      data-disabled={!isActive ? 'true' : undefined}
+      data-testid={`fee-staircase-zone-${zone.id}`}
+    >
+      <Checkbox
+        size="xs"
+        color={invalid ? 'red' : undefined}
+        className="fee-staircase-activation"
+        checked={isActive}
+        aria-label={`${isActive ? 'Deaktiviere' : 'Aktiviere'} Beitrag ZEITKAT ${zone.id}`}
+        title={`ZEITKAT ${zone.id} ${isActive ? 'deaktivieren' : 'aktivieren'}`}
+        data-testid={`${isActive ? 'deactivate' : 'activate'}-fee-zeitkat-${zone.id}`}
+        data-invalid={invalid ? 'true' : undefined}
+        onFocus={onFocus}
+        onChange={() => (isActive ? onDeactivate() : onActivate())}
+      />
       <Text
         size="xs"
         fw={700}
@@ -124,62 +145,69 @@ function ContributionSlider({ zone, entry, originalEntry, priceMax, simulation, 
       <Text size="10px" c={invalid ? 'red' : 'dimmed'} ta="center" lh={1.1} className="fee-staircase-zone-category" title={zone.bez}>
         Kat. {zone.kennz}
       </Text>
-      {isActive ? (
-        <>
-          <Box className="fee-staircase-slider-track" style={{ position: 'relative', height: SLIDER_HEIGHT, width: 38, display: 'flex', justifyContent: 'center' }}>
-            <OriginalMarker amount={simulation ? originalEntry?.monthlyAmount : null} maxAmount={priceMax} />
-            <Slider
-              orientation="vertical"
-              color={invalid ? 'red' : undefined}
-              min={0}
-              max={priceMax}
-              step={5}
-              value={Math.max(0, Math.min(priceMax, amount))}
-              onChange={onChange}
-              aria-label={`${simulation ? 'Simulierter Beitrag' : 'Beitrag'} ZEITKAT ${zone.id}`}
-              thumbLabel={`Beitrag ZEITKAT ${zone.id}`}
-              data-testid={`fee-staircase-slider-${zone.id}`}
-              data-invalid={invalid ? 'true' : undefined}
-              style={{ height: SLIDER_HEIGHT, width: 30, zIndex: 1 }}
-            />
-          </Box>
-          <Box className="fee-staircase-price-field">
-            <PriceField
-              value={amount}
-              label={`Betrag ZEITKAT ${zone.id}`}
-              onChange={onChange}
-              testId={`fee-staircase-price-${zone.id}`}
-            />
-          </Box>
-          <Text
-            size="10px"
-            c="dimmed"
-            ta="center"
-            lh={1.3}
-            className="fee-staircase-hourly"
-            data-testid={`fee-staircase-hourly-${zone.id}`}
-            title={`Monatsbeitrag geteilt durch ${zone.maxHours} Stunden pro Tag (oberes Ende der Kategorie)`}
-          >
-            {(amount / zone.maxHours).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €/h
-          </Text>
-          {simulation ? (
-            <Text size="10px" c="dimmed" ta="center" className="fee-staircase-original">
-              Original {originalEntry ? `${Number(originalEntry.monthlyAmount || 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €` : '–'}
+      <>
+        <Box className="fee-staircase-slider-track" style={{ position: 'relative', height: sliderHeight, width: 38, display: 'flex', justifyContent: 'center' }}>
+          <OriginalMarker amount={simulation ? originalEntry?.monthlyAmount : null} maxAmount={priceMax} />
+          <Slider
+            orientation="vertical"
+            color={invalid ? 'red' : undefined}
+            min={0}
+            max={priceMax}
+            step={5}
+            value={Math.max(0, Math.min(priceMax, amount))}
+            onChange={onChange}
+            onFocus={onFocus}
+            disabled={!isActive}
+            aria-label={`${simulation ? 'Simulierter Beitrag' : 'Beitrag'} ZEITKAT ${zone.id}`}
+            thumbLabel={`Beitrag ZEITKAT ${zone.id}`}
+            data-testid={`fee-staircase-slider-${zone.id}`}
+            data-invalid={invalid ? 'true' : undefined}
+            style={{ height: sliderHeight, width: 30, zIndex: 1 }}
+          />
+        </Box>
+        <Box className="fee-staircase-price-field">
+          <PriceField
+            value={amount}
+            label={`Betrag ZEITKAT ${zone.id}`}
+            onChange={onChange}
+            onFocus={onFocus}
+            disabled={!isActive}
+            testId={`fee-staircase-price-${zone.id}`}
+          />
+        </Box>
+        <Text
+          size="10px"
+          c="dimmed"
+          ta="center"
+          lh={1.3}
+          className={simulation ? 'fee-staircase-amount' : 'fee-staircase-hourly'}
+          data-testid={`${simulation ? 'fee-staircase-amount' : 'fee-staircase-hourly'}-${zone.id}`}
+          title={simulation ? 'Monatlicher Beitragsbetrag' : `Monatsbeitrag geteilt durch ${zone.maxHours} Stunden pro Tag (oberes Ende der Kategorie)`}
+        >
+          {simulation
+            ? `${amount.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`
+            : `${(amount / zone.maxHours).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €/h`}
+        </Text>
+        {simulation ? (
+          <>
+            <Text
+              size="10px"
+              c="dimmed"
+              ta="center"
+              className="fee-staircase-hourly-equivalent"
+              data-testid={`fee-staircase-hourly-equivalent-${zone.id}`}
+              title={`Monatsbeitrag geteilt durch die Obergrenze der Kategorie: ${zone.maxHours} Stunden pro Tag.`}
+            >
+              {(amount / zone.maxHours).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €/h
             </Text>
-          ) : null}
-        </>
-      ) : (
-        <Checkbox
-          size="xs"
-          color={invalid ? 'red' : undefined}
-          className="fee-staircase-activation"
-          aria-label={`Aktiviere Beitrag ZEITKAT ${zone.id}`}
-          title={`ZEITKAT ${zone.id} aktivieren`}
-          data-testid={`activate-fee-zeitkat-${zone.id}`}
-          data-invalid={invalid ? 'true' : undefined}
-          onChange={onActivate}
-        />
-      )}
+            <Text size="10px" c="dimmed" ta="center" className="fee-staircase-original" data-testid={`fee-staircase-original-${zone.id}`}>
+              Original {originalEntry
+                ? `${Number(originalEntry.monthlyAmount || 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € · ${(Number(originalEntry.monthlyAmount || 0) / zone.maxHours).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €/h`
+                : '–'}
+            </Text>
+          </>
+        ) : null}
+      </>
     </Stack>
   );
 }
@@ -225,6 +253,7 @@ export default function FeeStaircaseEditor({
     ...feeStaircaseValidation.gaps.map((zone) => zone.id),
     ...feeStaircaseValidation.stepViolations.flatMap(({ previousZone, zone }) => [previousZone.id, zone.id]),
   ]);
+  const [focusedZeitkatId, setFocusedZeitkatId] = React.useState(null);
 
   function replaceActiveEntries(nextActiveEntries) {
     const preserved = entries.filter((entry) => (
@@ -277,6 +306,17 @@ export default function FeeStaircaseEditor({
     if (previousEntry) return Math.round((Number(previousEntry.monthlyAmount) + minimumDifference) * 100) / 100;
     if (nextEntry) return Math.max(0.01, Math.round((Number(nextEntry.monthlyAmount) - minimumDifference) * 100) / 100);
     return 5;
+  }
+
+  function deactivateZeitkat(zone) {
+    const existing = activeByZone.get(zone.id);
+    if (!existing) return;
+    const amount = Number(existing.monthlyAmount) || Number(existing.lastNonZeroAmount) || 0;
+    replaceActiveEntries(activeEntries.map((entry) => (
+      getFeeBandZeitkatId(entry) === zone.id
+        ? { ...entry, monthlyAmount: amount, enabled: false, lastNonZeroAmount: amount || entry.lastNonZeroAmount }
+        : entry
+    )));
   }
 
   function activateZeitkat(zone) {
@@ -358,7 +398,7 @@ export default function FeeStaircaseEditor({
       ) : null}
 
       <Box className="fee-staircase-slider-scroll" style={{ overflowX: 'auto', border: '1px solid var(--mantine-color-gray-3)', borderRadius: 8, padding: 6 }}>
-        <Box className="fee-staircase-slider-grid" data-testid="fee-staircase-zeitkat">
+        <Box className={`fee-staircase-slider-grid${simulation ? ' fee-staircase-slider-grid--simulation' : ''}`} data-testid="fee-staircase-zeitkat">
           {ZEITKAT_SLIDER_ZONES.map((zone) => (
             <ContributionSlider
               key={zone.id}
@@ -368,8 +408,11 @@ export default function FeeStaircaseEditor({
               priceMax={priceMax}
               simulation={simulation}
               invalid={invalidZeitkatIds.has(zone.id)}
+              focused={focusedZeitkatId === zone.id}
               onChange={(value) => updateZeitkatAmount(zone, Number(value) || 0)}
               onActivate={() => activateZeitkat(zone)}
+              onDeactivate={() => deactivateZeitkat(zone)}
+              onFocus={() => setFocusedZeitkatId(zone.id)}
             />
           ))}
         </Box>

@@ -14,12 +14,17 @@ async function seedFeeCatalogScenario(page, options = {}) {
     kindergarten: 'Kindergarten',
     schulkind: 'Schulkind',
   };
+  const groupTypes = options.groupTypes || {
+    krippe: 'Krippe',
+    kindergarten: 'Kindergarten',
+    schulkind: 'Schulkind',
+  };
 
   await page.goto('/');
   await page.waitForLoadState('networkidle');
   await waitForAppStore(page);
 
-  await page.evaluate(({ scenarioId, groupNames }) => {
+  await page.evaluate(({ scenarioId, groupNames, groupTypes }) => {
     const store = window.__APP_STORE;
 
     store.dispatch({
@@ -45,7 +50,7 @@ async function seedFeeCatalogScenario(page, options = {}) {
           id: 'g-kat-krippe',
           name: groupNames.krippe,
           icon: 'openmoji:baby',
-          type: 'Krippe',
+          type: groupTypes.krippe,
         },
       },
     });
@@ -58,7 +63,7 @@ async function seedFeeCatalogScenario(page, options = {}) {
           id: 'g-kat-kiga',
           name: groupNames.kindergarten,
           icon: 'openmoji:child',
-          type: 'Kindergarten',
+          type: groupTypes.kindergarten,
         },
       },
     });
@@ -71,7 +76,7 @@ async function seedFeeCatalogScenario(page, options = {}) {
           id: 'g-kat-schulkind',
           name: groupNames.schulkind,
           icon: 'openmoji:school',
-          type: 'Schulkind',
+          type: groupTypes.schulkind,
         },
       },
     });
@@ -80,7 +85,7 @@ async function seedFeeCatalogScenario(page, options = {}) {
       type: 'ui/setActivePage',
       payload: 'data',
     });
-  }, { scenarioId, groupNames });
+  }, { scenarioId, groupNames, groupTypes });
 }
 
 async function openFinanceTab(page) {
@@ -110,17 +115,13 @@ async function selectWizardSource(page, dialog, groupLabel, sourceLabel) {
   await page.getByRole('option', { name: sourceLabel }).click();
 }
 
-test('imports Gramschatz fee structures as ZEITKAT categories', async ({ page }) => {
+test('imports Gramschatz fee structures with one click when group types identify the tariff bands', async ({ page }) => {
   await seedFeeCatalogScenario(page);
   await openFinanceTab(page);
 
-  const dialog = await openFeeCatalogImportWizard(page);
-  await selectWizardSource(page, dialog, 'Krippe', 'Beiträge für Kinder unter 3 Jahren (7 Staffeln)');
-  await selectWizardSource(page, dialog, 'Kindergarten', 'Beiträge für Kinder über 3 Jahren (vor Schuleintritt) (7 Staffeln)');
-
-  await expect(dialog.getByRole('button', { name: 'Import anwenden' })).toBeEnabled();
-  await dialog.getByRole('button', { name: 'Import anwenden' }).click();
-  await expect(dialog).toBeHidden();
+  await page.locator('input[type="file"]').setInputFiles(importFile);
+  await page.getByRole('button', { name: 'Kataloge importieren', exact: true }).last().click();
+  await expect(page.getByRole('dialog', { name: 'Import-Wizard: Beitragskataloge zuordnen' })).toHaveCount(0);
 
   const importedCatalogs = await page.evaluate(() => {
     const state = window.__APP_STORE.getState();
@@ -139,16 +140,21 @@ test('imports Gramschatz fee structures as ZEITKAT categories', async ({ page })
 
   const krippePanel = await openFeeGroup(page, 'Krippe');
   await expect(krippePanel.getByTestId('fee-staircase-zeitkat')).toBeVisible();
-  await expect(krippePanel.getByLabel('Betrag ZEITKAT 04')).toHaveValue('170 EUR');
+  await expect(krippePanel.getByLabel('Betrag ZEITKAT 04')).toHaveValue('170 €');
 });
 
-test('supports manual wizard mapping when group names do not match', async ({ page }) => {
+test('pre-fills recognizable groups and keeps a manual mapping fallback for ambiguous names', async ({ page }) => {
   await seedFeeCatalogScenario(page, {
     scenarioId: 'fee-catalog-import-e2e-manual',
     groupNames: {
-      krippe: 'U3 Blau',
-      kindergarten: 'Kiga Gelb',
-      schulkind: 'Hort Rot',
+      krippe: 'Bärchengruppe',
+      kindergarten: 'Sonnengruppe',
+      schulkind: 'Fuchsgruppe',
+    },
+    groupTypes: {
+      krippe: 'Regelgruppe',
+      kindergarten: 'Regelgruppe',
+      schulkind: 'Regelgruppe',
     },
   });
   await openFinanceTab(page);
@@ -156,9 +162,9 @@ test('supports manual wizard mapping when group names do not match', async ({ pa
   const dialog = await openFeeCatalogImportWizard(page);
   await expect(dialog.getByText('Nicht automatisch zugeordnete Quellen')).toBeVisible();
 
-  await selectWizardSource(page, dialog, 'U3 Blau', 'Beiträge für Kinder unter 3 Jahren (7 Staffeln)');
-  await selectWizardSource(page, dialog, 'Kiga Gelb', 'Beiträge für Kinder über 3 Jahren (vor Schuleintritt) (7 Staffeln)');
-  await selectWizardSource(page, dialog, 'Hort Rot', 'Beiträge für die Mittagsbetreuung / Ferienbetreuung der Schulkinder (3 Staffeln)');
+  await selectWizardSource(page, dialog, 'Bärchengruppe', 'Beiträge für Kinder unter 3 Jahren (7 Staffeln)');
+  await selectWizardSource(page, dialog, 'Sonnengruppe', 'Beiträge für Kinder über 3 Jahren (vor Schuleintritt) (7 Staffeln)');
+  await selectWizardSource(page, dialog, 'Fuchsgruppe', 'Beiträge für die Mittagsbetreuung / Ferienbetreuung der Schulkinder (3 Staffeln)');
 
   await expect(dialog.getByRole('button', { name: 'Import anwenden' })).toBeEnabled();
   await dialog.getByRole('button', { name: 'Import anwenden' }).click();
@@ -179,7 +185,7 @@ test('supports manual wizard mapping when group names do not match', async ({ pa
   expect(importedCatalogs['g-kat-schulkind'][0]).toMatchObject({ zeitkatId: '01', monthlyAmount: 110 });
   expect(importedCatalogs['g-kat-krippe'].every((entry) => !Object.hasOwn(entry, 'maxHours'))).toBe(true);
 
-  const u3Panel = await openFeeGroup(page, 'U3 Blau');
-  await expect(u3Panel.getByTestId('fee-staircase-zeitkat')).toBeVisible();
-  await expect(u3Panel.getByLabel('Betrag ZEITKAT 04')).toHaveValue('170 EUR');
+  const krippePanel = await openFeeGroup(page, 'Bärchengruppe');
+  await expect(krippePanel.getByTestId('fee-staircase-zeitkat')).toBeVisible();
+  await expect(krippePanel.getByLabel('Betrag ZEITKAT 04')).toHaveValue('170 €');
 });

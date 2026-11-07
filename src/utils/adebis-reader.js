@@ -33,6 +33,7 @@ export async function extractAdebisData(file, isAnonymized, options = {}) {
             'KIND',
             [
                 'KINDNR', 'AUFNDAT', 'AUSTRDAT', 'GRUNR', 'GEBDATUM', 'FNAME', 'STATUS',
+                'ISKRIPPENKIND', 'KEINUNTER3', 'LLU3AUSNAHME', 'KRIPPENK', 'FIXUNTER3',
                 'SUBSTATUS', 'SCHULART', 'SPRACHE', 'GESCHLECHT',
                 // Familien-/Geschwisterbasis: Familienname + Haushaltsadresse + adebis-Geschwisterfelder
                 'NAME', 'VORNAME', 'STRASSE', 'LKZ', 'PLZ', 'WOHNORT', 'ORTSTEIL',
@@ -69,6 +70,9 @@ export async function extractAdebisData(file, isAnonymized, options = {}) {
                 'ENDDAT',
                 'ARBZEIT',
                 'ARBZEITB',
+                'BEGINNMODE',
+                'ENDMODE',
+                'STATHIDE',
                 'URLAUB',
                 'QUALIFIK',
                 'VERTRAGART',
@@ -121,8 +125,8 @@ export async function extractAdebisData(file, isAnonymized, options = {}) {
             [
                 'IDNR', 'KINDNR', 'BELVON', 'BELBIS', 'ZEITEN',
                 'ART', 'ZEITKAT', 'BUZEITKAT', 'GEWKAT', 'PANTEIL',
-                'BETRSTD', 'BETRTAGE', 'FERIEN', 'SCHULKIND', 'KRIPPENK',
-                'VORKURS', 'BEHINDERT', 'MIGRATION'
+                'BETRSTD', 'BETRTAGE', 'FERIEN', 'SCHULKIND', 'KRIPPENK', 'KEINUNTER3', 'FIXUNTER3', 'ISKRIPPENKIND', 'LLU3AUSNAHME',
+                'VORKURS', 'BEHINDERT', 'MIGRATION', 'LNU3MONAT', 'FUNTER3'
             ],
             b => (isSnapshotMode ? isFutureOrEmptyDate(b.BELBIS) : true)
         );

@@ -11,6 +11,7 @@ import {
   RingProgress,
   Select,
   Stack,
+  Stepper,
   Switch,
   Text,
   Title,
@@ -167,6 +168,7 @@ const STORY_STEPS = [
     id: 'quality',
     category: '01',
     title: 'Datenqualität',
+    stepperLabel: 'Daten',
     subtitle: 'Datenvollständigkeit & Validierung',
     gradient: 'linear-gradient(135deg, #0f172a 0%, #1d4ed8 100%)',
     accent: '#1d4ed8',
@@ -178,6 +180,7 @@ const STORY_STEPS = [
     id: 'status',
     category: '02',
     title: 'Bedarfsdeckung',
+    stepperLabel: 'Bedarf',
     subtitle: 'Alltagsdeckung & Akute Engpässe',
     gradient: 'linear-gradient(135deg, #052e16 0%, #0f766e 100%)',
     accent: '#0f766e',
@@ -189,6 +192,7 @@ const STORY_STEPS = [
     id: 'transitions',
     category: '03',
     title: 'Resilienz',
+    stepperLabel: 'Resilienz',
     subtitle: 'Personalausfälle & Engpassanalyse',
     gradient: 'linear-gradient(135deg, #312e81 0%, #6d28d9 100%)',
     accent: '#6d28d9',
@@ -200,6 +204,7 @@ const STORY_STEPS = [
     id: 'cohort',
     category: '04',
     title: 'Finanzen',
+    stepperLabel: 'Finanzen',
     subtitle: 'Monatsverlauf Einnahmen & Ausgaben',
     gradient: 'linear-gradient(135deg, #7c2d12 0%, #ea580c 100%)',
     accent: '#ea580c',
@@ -211,6 +216,7 @@ const STORY_STEPS = [
     id: 'compare',
     category: '05',
     title: 'Ausblick',
+    stepperLabel: 'Ausblick',
     subtitle: 'Strukturwechsel und Altersprognose',
     gradient: 'linear-gradient(135deg, #4a044e 0%, #be185d 100%)',
     accent: '#be185d',
@@ -222,6 +228,7 @@ const STORY_STEPS = [
     id: 'options',
     category: '06',
     title: 'Simulation von Beitragsänderungen',
+    stepperLabel: 'Beiträge',
     subtitle: 'Beitragssätze und Mehrstunden-Ausschöpfung vergleichen',
     gradient: 'linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%)',
     accent: '#7c3aed',
@@ -233,6 +240,7 @@ const STORY_STEPS = [
     id: 'trends',
     category: '07',
     title: 'Trend-Radar',
+    stepperLabel: 'Trends',
     subtitle: 'Historischer Vergleich & Entwicklung',
     gradient: 'linear-gradient(135deg, #0f766e 0%, #0ea5e9 100%)',
     accent: '#0ea5e9',
@@ -2773,37 +2781,6 @@ function ForecastStageCarousel({
   );
 }
 
-function StoryCard({ story, isActive, onSelect }) {
-  const StoryIcon = story.icon;
-
-  return (
-    <Paper
-      shadow="none"
-      p="sm"
-      radius="md"
-      onClick={onSelect}
-      className={`analysis-story-card ${isActive ? 'is-active' : ''}`}
-      data-active={isActive ? 'true' : 'false'}
-      data-testid={`story-card-${story.id}`}
-      style={{ background: story.gradient }}
-    >
-      <div className="analysis-story-icon-wrap" aria-hidden>
-        <StoryIcon size={86} stroke={1} />
-      </div>
-
-      <div className="analysis-story-content">
-        <div className="analysis-story-header">
-          <Text className="analysis-story-category" size="sm">
-            {story.category}
-          </Text>
-          <Title order={3} className="analysis-story-title">
-            {story.title}
-          </Title>
-        </div>
-      </div>
-    </Paper>
-  );
-}
 
 function AnalysisProgressPanel({ stageIndex, isLoading, stages }) {
   const panelStages = stages?.length ? stages : [ANALYSIS_LOADING_STAGES[0]];
@@ -2898,11 +2875,7 @@ function VisuView() {
     const idx = STORY_STEPS.findIndex((step) => step.id === normalizedSubPage);
     return idx >= 0 ? idx : 0;
   });
-  const activeStepRef = React.useRef(activeStep);
   const privacyMode = useSelector((state) => state.ui.privacyMode || false);
-  const [emblaApi, setEmblaApi] = React.useState(null);
-  const [canScrollPrev, setCanScrollPrev] = React.useState(false);
-  const [canScrollNext, setCanScrollNext] = React.useState(false);
   const [demographyResolution, setDemographyResolution] = React.useState('quarter');
   const [simulateInflow, setSimulateInflow] = React.useState(false);
   const [monteCarloConfig, setMonteCarloConfig] = React.useState({
@@ -2929,7 +2902,6 @@ function VisuView() {
 
   // Debounce step changes by 500ms so heavy analysis only starts after user settles
   React.useEffect(() => {
-    activeStepRef.current = activeStep;
     const timer = setTimeout(() => setSettledStep(activeStep), 500);
     return () => clearTimeout(timer);
   }, [activeStep]);
@@ -5211,29 +5183,6 @@ function VisuView() {
     dispatch(ensureScenario(selectedScenarioId));
   }, [dispatch, selectedScenarioId]);
 
-  React.useEffect(() => {
-    if (!emblaApi) return;
-
-    const updateScrollState = () => {
-      setCanScrollPrev(emblaApi.canScrollPrev());
-      setCanScrollNext(emblaApi.canScrollNext());
-    };
-
-    updateScrollState();
-    emblaApi.on('select', updateScrollState);
-    emblaApi.on('reInit', updateScrollState);
-
-    return () => {
-      emblaApi.off('select', updateScrollState);
-      emblaApi.off('reInit', updateScrollState);
-    };
-  }, [emblaApi]);
-
-  // Fix: when emblaApi first initializes scroll to current active step (sidebar nav sync)
-  React.useEffect(() => {
-    if (!emblaApi) return;
-    emblaApi.scrollTo(activeStepRef.current);
-  }, [emblaApi]);
 
   const handleStepChange = React.useCallback((index) => {
     const safeIndex = Math.max(0, Math.min(STORY_STEPS.length - 1, Number(index) || 0));
@@ -5245,18 +5194,6 @@ function VisuView() {
     }
   }, [activeAnalysisSubPage, dispatch]);
 
-  const slides = STORY_STEPS.map((story, index) => (
-    <Carousel.Slide key={story.id} className="analysis-story-slide">
-      <StoryCard
-        story={story}
-        isActive={index === activeStep}
-        onSelect={() => {
-          handleStepChange(index);
-          emblaApi?.scrollTo(index);
-        }}
-      />
-    </Carousel.Slide>
-  ));
 
   React.useEffect(() => {
     const normalizedSubPage = ANALYSIS_SUBPAGE_ALIASES[activeAnalysisSubPage] || activeAnalysisSubPage;
@@ -5264,49 +5201,51 @@ function VisuView() {
       dispatch(setAnalysisSubPage(normalizedSubPage));
     }
     const stepIndex = STORY_STEPS.findIndex((step) => step.id === normalizedSubPage);
-    if (stepIndex >= 0 && stepIndex !== activeStep) {
-      setActiveStep(stepIndex);
-      emblaApi?.scrollTo(stepIndex);
-    }
-  }, [activeAnalysisSubPage, activeStep, dispatch, emblaApi]);
+    if (stepIndex >= 0 && stepIndex !== activeStep) setActiveStep(stepIndex);
+  }, [activeAnalysisSubPage, activeStep, dispatch]);
 
   return (
     <Box
       data-testid="analysis-clean-sheet"
-      className="analysis-view-root"
+      className={`analysis-view-root${activeStory.id === 'options' ? ' analysis-view-root--options-scroll' : ''}`}
       style={{ '--analysis-link-accent': activeStory.accent }}
     >
       <Box className="analysis-album-flow-root">
         <Paper p="xs" className="analysis-album-flow-shell">
-          <Carousel
-            withIndicators
-            getEmblaApi={setEmblaApi}
-            onSlideChange={handleStepChange}
-            slideSize={{ base: '86%', sm: '52%', lg: '42%' }}
-            slideGap="md"
-            emblaOptions={{ align: 'center', slidesToScroll: 1, loop: false, containScroll: false }}
-            nextControlProps={{
-              'aria-label': 'Next slide',
-              style: {
-                visibility: canScrollNext ? 'visible' : 'hidden',
-                pointerEvents: canScrollNext ? 'auto' : 'none',
-              },
-            }}
-            previousControlProps={{
-              'aria-label': 'Previous slide',
-              style: {
-                visibility: canScrollPrev ? 'visible' : 'hidden',
-                pointerEvents: canScrollPrev ? 'auto' : 'none',
-              },
-            }}
-            className="analysis-album-flow-carousel"
-          >
-            {slides}
-          </Carousel>
+          <Box className="analysis-story-stepper-scroll" data-testid="analysis-story-navigation">
+            <Stepper
+              active={activeStep}
+              onStepClick={handleStepChange}
+              allowNextStepsSelect
+              wrap={false}
+              size="xs"
+              iconSize={24}
+              className="analysis-story-stepper"
+              aria-label="Analysebereiche"
+            >
+              {STORY_STEPS.map((story) => {
+                const StoryIcon = story.icon;
+                return (
+                  <Stepper.Step
+                    key={story.id}
+                    label={story.stepperLabel || story.title}
+                    title={`${story.title} — ${story.subtitle}`}
+                    aria-label={`${story.category} ${story.title}: ${story.subtitle}`}
+                    icon={<StoryIcon size={12} stroke={1.7} />}
+                    data-testid={`story-step-${story.id}`}
+                  />
+                );
+              })}
+            </Stepper>
+          </Box>
         </Paper>
       </Box>
 
-      <Paper className="analysis-stage-shell" p="xs" withBorder>
+      <Paper
+        className={`analysis-stage-shell${activeStory.id === 'options' ? ' analysis-stage-shell--options-scroll' : ''}`}
+        p="xs"
+        withBorder
+      >
         {stageRecommendations.length > 0 ? (
           <Group grow align="stretch" gap="xs" className="analysis-stage-recommendations" data-testid="analysis-stage-recommendations">
             {stageRecommendations.map((item) => (
@@ -5378,7 +5317,10 @@ function VisuView() {
           </Group>
         ) : null}
 
-        <Box className="analysis-stage-content" data-testid="analysis-stage-content">
+        <Box
+          className={`analysis-stage-content${activeStory.id === 'options' ? ' analysis-stage-content--options' : ''}`}
+          data-testid="analysis-stage-content"
+        >
           {settledStep !== activeStep ? (
             <Box className="analysis-diagram-placeholder" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Text size="sm" c="dimmed">Wird berechnet…</Text>
@@ -5421,7 +5363,7 @@ function VisuView() {
           ) : activeStory.id === 'trends' ? (
             <TrendHistoryCarousel trendData={trendHistoryData} accent={activeStory.accent} />
           ) : activeStory.id === 'options' ? (
-            <FundingSimulationPanel accent={activeStory.accent} />
+            <FundingSimulationPanel accent={activeStory.accent} scrollPage />
           ) : (
             <DiagramPlaceholder story={activeStory} />
           )}

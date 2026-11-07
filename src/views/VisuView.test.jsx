@@ -6,8 +6,8 @@ import { Provider } from 'react-redux';
 import store from '../store/store';
 import VisuView from './VisuView';
 
-describe('VisuView album flow', () => {
-  it('switches active story card on click', async () => {
+describe('VisuView analysis stepper', () => {
+  it('switches analysis sections with the stepper', async () => {
     render(
       <Provider store={store}>
         <MantineProvider>
@@ -16,15 +16,19 @@ describe('VisuView album flow', () => {
       </Provider>
     );
 
-    expect(await screen.findAllByTestId(/story-card-/)).toHaveLength(7);
-    expect(screen.getByTestId('story-card-quality')).toHaveAttribute('data-active', 'true');
+    expect(await screen.findAllByTestId(/story-step-/)).toHaveLength(7);
+    expect(screen.getByTestId('analysis-story-navigation')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByTestId('story-card-status'));
+    fireEvent.click(screen.getByTestId('story-step-status'));
+    await screen.findByText('Kapazität & Bedarf');
 
+    fireEvent.click(screen.getByTestId('story-step-options'));
     await waitFor(() => {
-      expect(screen.getByTestId('story-card-status')).toHaveAttribute('data-active', 'true');
+      expect(screen.getByTestId('analysis-stage-content')).toHaveClass('analysis-stage-content--options');
     }, { timeout: 15000 });
-
-    expect(screen.getByTestId('story-card-quality')).toHaveAttribute('data-active', 'false');
-  }, 20000);
+    expect(screen.getByTestId('analysis-stage-content')).toHaveClass('analysis-stage-content--options');
+    await waitFor(() => {
+      expect(screen.getByTestId('simulation-results-panel')).toBeInTheDocument();
+    }, { timeout: 15000 });
+  }, 30000);
 });
