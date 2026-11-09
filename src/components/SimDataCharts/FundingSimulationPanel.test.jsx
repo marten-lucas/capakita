@@ -7,7 +7,7 @@ import FundingSimulationPanel from './FundingSimulationPanel';
 import simScenarioReducer, { updateScenario } from '../../store/simScenarioSlice';
 import simDataReducer from '../../store/simDataSlice';
 import simBookingReducer from '../../store/simBookingSlice';
-import simGroupReducer from '../../store/simGroupSlice';
+import simGroupReducer, { importGroupAssignments } from '../../store/simGroupSlice';
 import simQualificationReducer from '../../store/simQualificationSlice';
 import simOverlayReducer from '../../store/simOverlaySlice';
 import simFinanceReducer, {
@@ -639,6 +639,43 @@ describe('FundingSimulationPanel', () => {
     fireEvent.click(screen.getByTestId('annual-family-impact-toggle-2027'));
     const familyImpact = await screen.findByTestId('annual-family-impact-2027-surname:reuter');
     expect(familyImpact.textContent).toContain('+150,00 €');
+  });
+
+  it('uses the fixed-base-year group assignment when the original assignment expires before the forecast year', () => {
+    const store = createTestStore();
+    store.dispatch({
+      type: 'simData/updateDataItemFields',
+      payload: {
+        scenarioId: 'scenario-1',
+        itemId: 'child-1',
+        fields: { groupId: '' },
+      },
+    });
+    store.dispatch(importGroupAssignments({
+      scenarioId: 'scenario-1',
+      assignments: [{
+        id: 'historical-group-assignment',
+        kindId: 'child-1',
+        groupId: 'g1',
+        start: '2026-01-01',
+        end: '2026-12-31',
+      }],
+    }));
+    render(
+      <Provider store={store}>
+        <MantineProvider>
+          <FundingSimulationPanel accent="#0f766e" />
+        </MantineProvider>
+      </Provider>
+    );
+
+    openSimulationSettings();
+    fireEvent.click(screen.getByTestId('fixed-base-year-toggle'));
+
+    const contributions2026 = getEuroAmount(screen.getByTestId('annual-contributions-2026'));
+    const contributions2027 = getEuroAmount(screen.getByTestId('annual-contributions-2027'));
+    expect(contributions2027 - contributions2026).toBeCloseTo(2400, 2);
+    expect(screen.getByTestId('annual-contributions-2027').textContent).toContain('+2.400,00 € zum Vorjahr');
   });
 
   it('setzt den temporären Einzelpreis zurück auf den geladenen Wert', () => {

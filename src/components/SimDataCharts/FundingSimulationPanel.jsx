@@ -366,8 +366,8 @@ function getSimulationDemandForDate({ scenarioId, referenceDate, selectedGroupId
   };
 }
 
-function rebaseSimulationDemandToMonth(demandData, targetDate) {
-  // Keep the selected base-year cohort active in the corresponding target-year month.
+function rebaseSimulationDemandToMonth(demandData, targetDate, baseReferenceDate) {
+  // Keep the selected base-year cohort and its group assignments active in each target month.
   const [year, month] = String(targetDate).slice(0, 7).split('-').map(Number);
   const monthEnd = `${year}-${String(month).padStart(2, '0')}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`;
   const rebaseRecord = (record) => ({ ...record, startdate: targetDate, enddate: monthEnd });
@@ -379,12 +379,26 @@ function rebaseSimulationDemandToMonth(demandData, targetDate) {
     itemId,
     Object.fromEntries(Object.entries(bookings || {}).map(([bookingId, booking]) => [bookingId, rebaseRecord(booking)])),
   ]));
+  const effectiveGroupAssignmentsByItem = Object.fromEntries(
+    Object.entries(demandData.effectiveGroupAssignmentsByItem || {}).map(([itemId, assignments]) => {
+      const activeAssignment = Object.entries(assignments || {})
+        .filter(([, assignment]) => (!assignment.start || assignment.start <= baseReferenceDate)
+          && (!assignment.end || assignment.end >= baseReferenceDate))
+        .sort(([, left], [, right]) => String(right.start || '').localeCompare(String(left.start || '')))[0];
+      if (!activeAssignment) return [itemId, {}];
+      const [assignmentId, assignment] = activeAssignment;
+      return [itemId, {
+        [assignmentId]: { ...assignment, start: targetDate, end: monthEnd },
+      }];
+    })
+  );
 
   return {
     ...demandData,
     demand: (demandData.demand || []).map(rebaseRecord),
     effectiveDataItems,
     effectiveBookingsByItem,
+    effectiveGroupAssignmentsByItem,
     parentFeeSubsidyChildren: (demandData.parentFeeSubsidyChildren || []).map((child) => ({
       ...child,
       item: rebaseRecord(child.item || {}),
@@ -784,7 +798,7 @@ function FundingSimulationPanel({ scrollPage = false }) {
           simulationData,
         });
         const demandData = fixedBaseYearEnabled
-          ? rebaseSimulationDemandToMonth(sourceDemandData, monthReferenceDate)
+          ? rebaseSimulationDemandToMonth(sourceDemandData, monthReferenceDate, basisMonthReferenceDate)
           : sourceDemandData;
         const monthSimulationData = fixedBaseYearEnabled ? {
           ...simulationData,
@@ -792,6 +806,10 @@ function FundingSimulationPanel({ scrollPage = false }) {
           bookingsByItem: {
             ...simulationData.bookingsByItem,
             ...demandData.effectiveBookingsByItem,
+          },
+          groupAssignmentsByItem: {
+            ...simulationData.groupAssignmentsByItem,
+            ...demandData.effectiveGroupAssignmentsByItem,
           },
         } : simulationData;
         const monthlyFinance = calculateScenarioMonthlyFinance({
