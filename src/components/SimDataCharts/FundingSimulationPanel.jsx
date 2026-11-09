@@ -27,7 +27,7 @@ const EMPTY_FINANCE = {};
 const EMPTY_GROUP_FEE_CATALOGS = {};
 const formatEuro = (value) => `${Number(value || 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
 const formatSignedEuro = (value) => `${Number(value) > 0 ? '+' : ''}${formatEuro(value)}`;
-const formatWeeklyHours = (value) => `${Number(value || 0).toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} h/Woche`;
+
 const formatDailyHours = (value) => `${Number(value || 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} h/Tag`;
 const formatHours = (value) => `${Number(value || 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} h`;
 const formatPercent = (value) => `${Number(value || 0).toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} %`;
@@ -1253,9 +1253,7 @@ function FundingSimulationPanel({ scrollPage = false }) {
     referenceDate,
     potentialMonthlyBudget,
   ]);
-  const familyPotentialById = React.useMemo(() => new Map(
-    familyPotentials.map((family) => [family.id, family])
-  ), [familyPotentials]);
+
   const familyPotentialTotals = React.useMemo(() => familyPotentials.reduce((total, family) => ({
     upgradeWeeklyHours: total.upgradeWeeklyHours + family.potentialUpgradeWeeklyHours,
     downgradeWeeklyHours: total.downgradeWeeklyHours + family.potentialDowngradeWeeklyHours,
@@ -1289,23 +1287,14 @@ function FundingSimulationPanel({ scrollPage = false }) {
       });
     });
 
-    return Array.from(grouped.values()).map((family) => {
-      const deltaMonthlyParentFees = family.monthlyParentFeesAfter - family.monthlyParentFeesBefore;
-      return {
+    return Array.from(grouped.values())
+      .map((family) => ({
         ...family,
-        deltaMonthlyParentFees,
-        changePercent: family.monthlyParentFeesBefore > 0
-          ? deltaMonthlyParentFees / family.monthlyParentFeesBefore * 100
-          : null,
-        potential: familyPotentialById.get(family.id) || {
-          potentialUpgradeWeeklyHours: 0,
-          potentialDowngradeWeeklyHours: 0,
-        },
-      };
-    })
+        deltaMonthlyParentFees: family.monthlyParentFeesAfter - family.monthlyParentFeesBefore,
+      }))
       .filter((family) => Math.abs(family.deltaMonthlyParentFees) >= 0.005)
       .sort((left, right) => Math.abs(right.deltaMonthlyParentFees) - Math.abs(left.deltaMonthlyParentFees));
-  }, [currentSimulation.familyContributions, familyPresentation, familyPotentialById]);
+  }, [currentSimulation.familyContributions, familyPresentation]);
 
   const setTemporaryCatalog = (groupId, nextEntries) => {
     const originalEntries = groupFeeCatalogs[groupId] || [];
@@ -2125,49 +2114,6 @@ function FundingSimulationPanel({ scrollPage = false }) {
             )}
           </Stack>
 
-          <Stack className="funding-simulation-section" gap="xs">
-            <Text fw={700} size="sm">Von Beitragsänderungen betroffene Familien · Stichtag</Text>
-            {affectedFamilyRows.length === 0 ? (
-              <Text size="sm" c="dimmed" data-testid="no-affected-families">
-                Für die aktuellen Beitragssätze sind keine Familien von einer Beitragsänderung betroffen.
-              </Text>
-            ) : (
-              <Paper withBorder radius="sm" style={{ overflowX: 'auto' }}>
-                <Table striped highlightOnHover withTableBorder fz="xs" miw={680} data-testid="affected-families-table">
-                  <Table.Thead>
-                    <Table.Tr>
-                      <Table.Th>Familie</Table.Th>
-                      <Table.Th ta="right">Beiträge / Monat</Table.Th>
-                      <Table.Th ta="right">Veränderung</Table.Th>
-                      <Table.Th ta="right">Veränderung %</Table.Th>
-                      <Table.Th ta="right">Potential Upgrade</Table.Th>
-                      <Table.Th ta="right">Potential Downgrade</Table.Th>
-                    </Table.Tr>
-                  </Table.Thead>
-                  <Table.Tbody>
-                    {affectedFamilyRows.map((family) => (
-                      <Table.Tr key={family.id} data-testid={`affected-family-${family.id}`}>
-                        <Table.Td>{family.label}</Table.Td>
-                        <Table.Td ta="right">{formatEuro(family.monthlyParentFeesAfter)}</Table.Td>
-                        <Table.Td ta="right">{formatSignedEuro(family.deltaMonthlyParentFees)}</Table.Td>
-                        <Table.Td ta="right">{family.changePercent == null ? '–' : formatPercent(family.changePercent)}</Table.Td>
-                        <Table.Td ta="right">
-                          {family.potential.potentialUpgradeWeeklyHours > 0
-                            ? `+${formatWeeklyHours(family.potential.potentialUpgradeWeeklyHours)}`
-                            : '–'}
-                        </Table.Td>
-                        <Table.Td ta="right">
-                          {family.potential.potentialDowngradeWeeklyHours > 0
-                            ? `−${formatWeeklyHours(family.potential.potentialDowngradeWeeklyHours)}`
-                            : '–'}
-                        </Table.Td>
-                      </Table.Tr>
-                    ))}
-                  </Table.Tbody>
-                </Table>
-              </Paper>
-            )}
-          </Stack>
           <Modal
             opened={Boolean(selectedAnnualDetails)}
             onClose={() => setSelectedDetailsYear(null)}

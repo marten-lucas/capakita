@@ -218,7 +218,7 @@ describe('FundingSimulationPanel', () => {
     fireEvent.click(groupToggle);
     expect(screen.queryByTestId('family-tree-family-surname:reuter')).toBeNull();
     expect(screen.getByTestId('family-tree-child-child-1')).toBeTruthy();
-    expect(within(resultsPanel).getByTestId('no-affected-families')).toBeTruthy();
+    expect(within(resultsPanel).queryByText('Von Beitragsänderungen betroffene Familien · Stichtag')).toBeNull();
     openFuchsTariffGroup();
     expect(screen.getByTestId('fee-staircase-zeitkat')).toBeTruthy();
     openFuchsTariffTable();
@@ -318,7 +318,8 @@ describe('FundingSimulationPanel', () => {
     openFuchsTariffGroup();
     setFeeAmount('Betrag ZEITKAT 05', 150);
     const comparisonBeforeFilter = screen.getByTestId('annual-income-row-2026').textContent;
-    const familyBeforeFilter = screen.getByTestId('affected-family-surname:reuter').textContent;
+    fireEvent.click(screen.getByTestId('annual-family-impact-toggle-2026'));
+    const familyBeforeFilter = screen.getByTestId('annual-family-impact-2026-surname:reuter').textContent;
     const groupFilter = screen.getByRole('combobox', { name: 'Gruppen für Tarif-Einstellungen' });
     fireEvent.click(groupFilter);
     fireEvent.click(screen.getByRole('option', { name: 'Ohne Gruppe' }));
@@ -327,7 +328,7 @@ describe('FundingSimulationPanel', () => {
     expect(store.getState().simFinance.financeByScenario['scenario-1'].settings.fundingSimulation.selectedGroupIds)
       .toEqual(['__NO_GROUP__']);
     expect(screen.getByTestId('annual-income-row-2026').textContent).toBe(comparisonBeforeFilter);
-    expect(screen.getByTestId('affected-family-surname:reuter').textContent).toBe(familyBeforeFilter);
+    expect(screen.getByTestId('annual-family-impact-2026-surname:reuter').textContent).toBe(familyBeforeFilter);
 
     expect(screen.queryByTestId('simulation-tariff-groups')).toBeNull();
     expect(screen.queryByTestId('simulation-group-results')).toBeNull();
@@ -525,11 +526,6 @@ describe('FundingSimulationPanel', () => {
     expect(screen.queryByText(/Konfigurierter Zuschuss/)).toBeNull();
     expect(screen.queryByTestId('simulation-parent-cost-impact')).toBeNull();
     expect(screen.queryByTestId('simulation-group-results')).toBeNull();
-    const familyRow = screen.getByTestId('affected-family-surname:reuter');
-    expect(familyRow.textContent).toContain('100,00 €');
-    expect(familyRow.textContent).toContain('+100,00 €');
-    expect(familyRow.querySelectorAll('td')[3].textContent).toBe('–');
-    expect(familyRow.textContent).toContain('+8,0 h/Woche');
     expect(screen.getByTestId('annual-income-row-2026').textContent).toContain('1.200,00 €');
     expect(screen.getByTestId('annual-income-row-2026').textContent).toContain('3.617,60 €');
     expect(screen.getByTestId('annual-income-row-2026').textContent).toContain('+1.200,00 € Simulation');
@@ -567,7 +563,8 @@ describe('FundingSimulationPanel', () => {
     );
     openFuchsTariffGroup();
     setFeeAmount('Betrag ZEITKAT 05', 150);
-    expect(within(screen.getByTestId('affected-family-surname:beringer')).getByText('Familie Beringer')).toBeTruthy();
+    fireEvent.click(screen.getByTestId('annual-family-impact-toggle-2026'));
+    expect(within(screen.getByTestId('annual-family-impact-2026-surname:beringer')).getByText('Familie Beringer')).toBeTruthy();
 
     view.unmount();
     store.dispatch(updateScenario({ scenarioId: 'scenario-1', updates: { importedAnonymized: true } }));
@@ -580,8 +577,9 @@ describe('FundingSimulationPanel', () => {
     );
     openFuchsTariffGroup();
     setFeeAmount('Betrag ZEITKAT 05', 150);
-    expect(within(screen.getByTestId('affected-family-fam-child-1')).getByText('Familie 1')).toBeTruthy();
-    expect(within(screen.getByTestId('affected-family-fam-child-2')).getByText('Familie 2')).toBeTruthy();
+    fireEvent.click(screen.getByTestId('annual-family-impact-toggle-2026'));
+    expect(within(screen.getByTestId('annual-family-impact-2026-fam-child-1')).getByText('Familie 1')).toBeTruthy();
+    expect(within(screen.getByTestId('annual-family-impact-2026-fam-child-2')).getByText('Familie 2')).toBeTruthy();
   });
 
   it('ordnet importierte Stundenobergrenzen ZEITKAT zu', () => {
