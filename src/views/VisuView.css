@@ -90,6 +90,7 @@
 .analysis-stage-shell {
   position: relative;
   flex: 1 1 auto;
+  min-width: 0;
   min-height: 0;
   margin-inline: clamp(0.75rem, 1.25vw, 1.25rem);
   margin-top: 0;
@@ -139,6 +140,7 @@
 
 .analysis-stage-content {
   grid-row: 2;
+  min-width: 0;
   min-height: 0;
   overflow: hidden;
   padding: 0.25rem 0.3rem 0.1rem;
@@ -151,6 +153,9 @@
 
 .analysis-stage-content--options {
   position: relative;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   height: 100%;
 }
 

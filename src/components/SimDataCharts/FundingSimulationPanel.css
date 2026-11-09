@@ -1,5 +1,19 @@
 .funding-simulation-panel {
   gap: 0.55rem;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.funding-simulation-panel > *,
+.funding-simulation-settings,
+.funding-simulation-scenario-manager,
+.funding-simulation-modeler,
+.funding-simulation-results {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .funding-simulation-settings {
@@ -13,7 +27,16 @@
   background: var(--mantine-color-body);
 }
 
+.funding-simulation-modeler .mantine-Carousel-root,
+.funding-simulation-modeler .mantine-Carousel-viewport,
 .funding-simulation-modeler .mantine-Carousel-slide {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.funding-simulation-modeler .mantine-Carousel-container {
   min-width: 0;
 }
 
@@ -46,8 +69,12 @@
 }
 
 .funding-simulation-table-scroll {
+  width: 100%;
+  min-width: 0;
   max-width: 100%;
+  overflow-x: auto;
   border-color: var(--mantine-color-gray-3);
+  box-sizing: border-box;
 }
 
 

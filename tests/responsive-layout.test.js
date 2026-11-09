@@ -41,6 +41,33 @@ async function expectNoHorizontalOverflow(page, label) {
   ).toBeLessThanOrEqual(metrics.clientWidth + 1);
 }
 
+async function expectSimulationSectionsContained(page, label) {
+  await expect(page.getByTestId('funding-simulation-panel'), `${label} simulation panel should render`).toBeVisible({ timeout: 30000 });
+  const overflowingSections = await page.evaluate(() => {
+    const panel = document.querySelector('[data-testid="funding-simulation-panel"]');
+    if (!panel) return [{ name: 'funding-simulation-panel', missing: true }];
+
+    const bounds = panel.getBoundingClientRect();
+    const sectionIds = [
+      'simulation-settings-panel',
+      'simulation-scenario-manager',
+      'simulation-modeler-panel',
+      'simulation-results-panel',
+    ];
+
+    return sectionIds.flatMap((testId) => {
+      const section = panel.querySelector(`[data-testid="${testId}"]`);
+      if (!section) return [{ name: testId, missing: true }];
+      const rect = section.getBoundingClientRect();
+      return rect.left < bounds.left - 1 || rect.right > bounds.right + 1
+        ? [{ name: testId, left: Math.round(rect.left), right: Math.round(rect.right), panelLeft: Math.round(bounds.left), panelRight: Math.round(bounds.right) }]
+        : [];
+    });
+  });
+
+  expect(overflowingSections, `${label} sections should stay within the simulation panel`).toEqual([]);
+}
+
 async function seedResponsiveScenario(page) {
   await page.goto('/');
   await page.waitForLoadState('networkidle');
@@ -255,6 +282,7 @@ test('analysis stepper remains navigable without viewport overflow', async ({ pa
   await expect(navigation.locator('[data-testid^="story-step-"]')).toHaveCount(7);
   await page.getByTestId('story-step-options').click();
   await expect(page.getByTestId('analysis-stage-content')).toHaveClass(/analysis-stage-content--options/);
+  await expectSimulationSectionsContained(page, 'analysis view');
   await expectNoHorizontalOverflow(page, 'analysis view');
 });
 
