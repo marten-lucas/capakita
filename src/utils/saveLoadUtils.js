@@ -20,6 +20,48 @@ export const validatePassword = (password) => {
   return null;
 };
 
+const CAPAKITA_EXPORT_FORMAT = 'capakita-export';
+const CAPAKITA_EXPORT_VERSION = 1;
+
+export function encodeCapakitaExport(data, { password = '', anonymized = false } = {}) {
+  const json = JSON.stringify(data);
+  if (password) return CryptoJS.AES.encrypt(json, password).toString();
+  if (!anonymized) throw new Error('Nicht anonymisierte Exporte müssen mit einem Passwort geschützt werden.');
+
+  return JSON.stringify({
+    format: CAPAKITA_EXPORT_FORMAT,
+    version: CAPAKITA_EXPORT_VERSION,
+    encrypted: false,
+    anonymized: true,
+    payload: data,
+  });
+}
+
+export function decodeCapakitaExport(text, password = '') {
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    parsed = null;
+  }
+
+  if (parsed?.format === CAPAKITA_EXPORT_FORMAT) {
+    if (parsed.version !== CAPAKITA_EXPORT_VERSION) {
+      throw new Error('Diese Capakita-Dateiversion wird nicht unterstützt.');
+    }
+    if (parsed.encrypted !== false || parsed.anonymized !== true || !parsed.payload || typeof parsed.payload !== 'object') {
+      throw new Error('Die anonymisierte Capakita-Datei ist ungültig.');
+    }
+    return parsed.payload;
+  }
+
+  if (!password) throw new Error('Für diese passwortgeschützte Capakita-Datei ist ein Passwort erforderlich.');
+  const bytes = CryptoJS.AES.decrypt(text, password);
+  const decrypted = bytes.toString(CryptoJS.enc.Utf8);
+  if (!decrypted) throw new Error('Falsches Passwort oder beschädigte Capakita-Datei.');
+  return JSON.parse(decrypted);
+}
+
 // Extract save data from Redux store state
 export const extractSaveData = (state) => {
   return {

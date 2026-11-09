@@ -41,9 +41,12 @@ function renderSaveDialog() {
   return store;
 }
 
-async function submitExport() {
-  fireEvent.change(screen.getByLabelText('Passwort'), { target: { value: 'Abcdef1!' } });
-  fireEvent.change(screen.getByLabelText('Passwort bestätigen'), { target: { value: 'Abcdef1!' } });
+async function submitExport(password = '') {
+  if (password) {
+    const passwordLabel = screen.getByLabelText(/Passwortschutz \(optional\)|Passwort$/);
+    fireEvent.change(passwordLabel, { target: { value: password } });
+    fireEvent.change(screen.getByLabelText(/Passwort bestätigen/), { target: { value: password } });
+  }
   fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
   await waitFor(() => expect(saveDataMock).toHaveBeenCalled());
 }
@@ -59,9 +62,10 @@ describe('ScenarioSaveDialog anonymized export', () => {
 
     expect(toggle.checked).toBe(true);
     expect(screen.getByText(/Geburtsdaten und Betreuungszeiträume bleiben/)).toBeTruthy();
+    expect(screen.getByText(/Ohne Passwort ist die Datei unverschlüsselt/)).toBeTruthy();
     await submitExport();
 
-    expect(saveDataMock).toHaveBeenCalledWith('Abcdef1!', { anonymize: true });
+    expect(saveDataMock).toHaveBeenCalledWith('', { anonymize: true });
   });
 
   it('requires an explicit opt-out to save the source data unchanged', async () => {
@@ -71,8 +75,15 @@ describe('ScenarioSaveDialog anonymized export', () => {
 
     expect(toggle.checked).toBe(false);
     expect(screen.getByText(/kann personenbezogene Daten aus allen Szenarien enthalten/)).toBeTruthy();
-    await submitExport();
+    await submitExport('Abcdef1!');
 
     expect(saveDataMock).toHaveBeenCalledWith('Abcdef1!', { anonymize: false });
+  });
+
+  it('allows an anonymized export to keep optional password protection', async () => {
+    renderSaveDialog();
+    await submitExport('Abcdef1!');
+
+    expect(saveDataMock).toHaveBeenCalledWith('Abcdef1!', { anonymize: true });
   });
 });

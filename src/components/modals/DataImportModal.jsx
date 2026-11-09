@@ -147,8 +147,9 @@ function DataImportModal({ opened, onClose, title = 'Datenimport-Wizard', requir
     file
     && !isPreparing
     && (!isCapakitaFile || (
-      importPassword
-      && (!requirePasswordConfirmation || (importPasswordConfirm && !hasPasswordMismatch))
+      !importPassword
+      || !requirePasswordConfirmation
+      || (importPasswordConfirm && !hasPasswordMismatch)
     ))
   );
   const contentAreaStyle = isMobile
@@ -307,13 +308,13 @@ function DataImportModal({ opened, onClose, title = 'Datenimport-Wizard', requir
             {isCapakitaFile && (
               <>
                 <PasswordInput
-                  label="Passwort für .capakita"
-                  placeholder="Passwort eingeben"
+                  label="Passwort für .capakita (falls geschützt)"
+                  placeholder="Leer lassen, falls die Datei ohne Passwort gespeichert wurde"
                   value={importPassword}
                   onChange={(event) => setImportPassword(event.currentTarget.value)}
                 />
 
-                {requirePasswordConfirmation && (
+                {requirePasswordConfirmation && importPassword && (
                   <PasswordInput
                     label="Passwort bestätigen"
                     placeholder="Passwort bestätigen"
@@ -322,6 +323,9 @@ function DataImportModal({ opened, onClose, title = 'Datenimport-Wizard', requir
                     error={hasPasswordMismatch ? 'Passwörter stimmen nicht überein.' : null}
                   />
                 )}
+                <Text size="xs" c="dimmed">
+                  Anonymisierte Exporte ohne Passwort können direkt geöffnet werden. Für verschlüsselte Exporte ist das Passwort erforderlich.
+                </Text>
               </>
             )}
 

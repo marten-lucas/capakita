@@ -20,8 +20,12 @@ function ScenarioSaveDialog() {
   const [isSaving, setIsSaving] = useState(false);
 
   const handleSubmit = async () => {
-    if (pwValue !== pwValue2) {
+    if ((pwValue || pwValue2) && pwValue !== pwValue2) {
       setPwError('Passwörter stimmen nicht überein.');
+      return;
+    }
+    if (!anonymizeExport && !pwValue) {
+      setPwError('Nicht anonymisierte Exporte müssen mit einem Passwort geschützt werden.');
       return;
     }
 
@@ -68,7 +72,7 @@ function ScenarioSaveDialog() {
         />
         {anonymizeExport ? (
           <Alert color="blue" variant="light">
-            Direkte Namen, Adressen, Kontaktdaten und ADEBIS-Personen-IDs werden entfernt oder ersetzt; individuelle Personalkosten werden ausgelassen. Geburtsdaten und Betreuungszeiträume bleiben zur Prüfung der Förderberechnung erhalten. Prüfe den Export daher vor jeder Weitergabe.
+            Direkte Namen, Adressen, Kontaktdaten und ADEBIS-Personen-IDs werden entfernt oder ersetzt; individuelle Personalkosten werden ausgelassen. Geburtsdaten und Betreuungszeiträume bleiben zur Prüfung der Förderberechnung erhalten. Ohne Passwort ist die Datei unverschlüsselt: Gib sie nur weiter, wenn du die verbleibenden Daten geprüft hast.
           </Alert>
         ) : (
           <Alert icon={<IconAlertTriangle size={16} />} color="yellow" variant="light">
@@ -77,15 +81,15 @@ function ScenarioSaveDialog() {
         )}
 
         <PasswordInput
-          label="Passwort"
-          placeholder="Passwort eingeben"
+          label={anonymizeExport ? 'Passwortschutz (optional)' : 'Passwort'}
+          placeholder={anonymizeExport ? 'Leer lassen, um ohne Passwort zu speichern' : 'Passwort eingeben'}
           value={pwValue}
           onChange={(event) => setPwValue(event.currentTarget.value)}
           disabled={isSaving}
           error={pwError && !pwValue2 ? pwError : null}
         />
         <PasswordInput
-          label="Passwort bestätigen"
+          label={anonymizeExport ? 'Passwort bestätigen (optional)' : 'Passwort bestätigen'}
           placeholder="Passwort bestätigen"
           value={pwValue2}
           onChange={(event) => setPwValue2(event.currentTarget.value)}
@@ -94,15 +98,20 @@ function ScenarioSaveDialog() {
         />
 
         <Text size="xs" c="dimmed">
-          Das Passwort muss mindestens 8 Zeichen lang sein und Groß- und Kleinbuchstaben, 
-          Zahlen sowie Sonderzeichen enthalten.
+          {anonymizeExport
+            ? 'Wenn du ein Passwort setzt, muss es mindestens 8 Zeichen lang sein und Groß- und Kleinbuchstaben, Zahlen sowie Sonderzeichen enthalten.'
+            : 'Ein Passwort ist erforderlich und muss mindestens 8 Zeichen lang sein sowie Groß- und Kleinbuchstaben, Zahlen und Sonderzeichen enthalten.'}
         </Text>
 
         <Group justify="flex-end" mt="md" wrap="wrap">
           <Button variant="subtle" onClick={handleClose} disabled={isSaving} fullWidth={isMobile}>
             Abbrechen
           </Button>
-          <Button onClick={handleSubmit} disabled={isSaving || !pwValue || !pwValue2} fullWidth={isMobile}>
+          <Button
+            onClick={handleSubmit}
+            disabled={isSaving || (!anonymizeExport && (!pwValue || !pwValue2)) || (Boolean(pwValue || pwValue2) && (!pwValue || !pwValue2))}
+            fullWidth={isMobile}
+          >
             {isSaving ? <Loader size="xs" color="white" /> : 'Speichern'}
           </Button>
         </Group>

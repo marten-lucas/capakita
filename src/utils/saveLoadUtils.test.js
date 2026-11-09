@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { anonymizeSaveData } from './saveLoadUtils';
+import { anonymizeSaveData, decodeCapakitaExport, encodeCapakitaExport } from './saveLoadUtils';
 
 describe('anonymizeSaveData', () => {
   it('redacts personal identifiers in every scenario while preserving calculation inputs', () => {
@@ -103,5 +103,39 @@ describe('anonymizeSaveData', () => {
     expect(anonymized.financeByScenario['scenario-1'].bayKiBiGRules[0].baseValue).toBe(1563.88);
     expect(source.dataByScenario['scenario-1']['child-1'].name).toBe('Erkan Reuter');
     expect(source.financeByScenario['scenario-1'].itemFinances['staff-1'].salaryHistory[0].monthlyAmount).toBe(4200);
+  });
+});
+
+describe('Capakita scenario export format', () => {
+  const anonymizedPayload = {
+    scenarios: [{ id: 'scenario-1', importedAnonymized: true }],
+    dataByScenario: { 'scenario-1': {} },
+  };
+
+  it('round-trips anonymized exports without a password using a versioned envelope', () => {
+    const fileContent = encodeCapakitaExport(anonymizedPayload, { anonymized: true });
+    const envelope = JSON.parse(fileContent);
+
+    expect(envelope).toMatchObject({
+      format: 'capakita-export',
+      version: 1,
+      encrypted: false,
+      anonymized: true,
+    });
+    expect(decodeCapakitaExport(fileContent)).toEqual(anonymizedPayload);
+  });
+
+  it('requires password protection for non-anonymized exports', () => {
+    expect(() => encodeCapakitaExport({ data: 'private' })).toThrow(/müssen mit einem Passwort geschützt werden/);
+  });
+
+  it('continues to read password-protected exports and rejects a missing password', () => {
+    const encrypted = encodeCapakitaExport(anonymizedPayload, {
+      password: 'Abcdef1!',
+      anonymized: true,
+    });
+
+    expect(decodeCapakitaExport(encrypted, 'Abcdef1!')).toEqual(anonymizedPayload);
+    expect(() => decodeCapakitaExport(encrypted)).toThrow(/Passwort erforderlich/);
   });
 });

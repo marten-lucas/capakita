@@ -1,6 +1,5 @@
 import { useCallback } from 'react';
 import { useDispatch, useSelector, useStore } from 'react-redux';
-import CryptoJS from 'crypto-js';
 import { createId } from '../utils/idUtils';
 import { addScenario, setSelectedItems, updateScenario } from '../store/simScenarioSlice';
 import { refreshAllEvents } from '../store/eventSlice';
@@ -9,6 +8,7 @@ import { buildFamilyRelations, attachFamilyInfo } from '../utils/adebisFamily';
 import { adebis2FeeCatalogs } from '../utils/adebisFeeCatalog';
 import { hasZeitkatFeeCatalog, mergeImportedZeitkatFeeCatalogs } from '../utils/scenarioFinanceImport';
 import { isRecordActiveOnDate } from '../utils/financeUtils';
+import { decodeCapakitaExport } from '../utils/saveLoadUtils';
 import {
   adebis2simData,
   adebis2bookings,
@@ -247,17 +247,7 @@ async function parseCapakitaPayload(file, password) {
     return JSON.parse(text);
   }
 
-  if (!password) {
-    throw new Error('Für .capakita-Dateien ist ein Passwort erforderlich.');
-  }
-
-  const bytes = CryptoJS.AES.decrypt(text, password);
-  const decrypted = bytes.toString(CryptoJS.enc.Utf8);
-  if (!decrypted) {
-    throw new Error('Falsches Passwort oder beschädigte Capakita-Datei.');
-  }
-
-  return JSON.parse(decrypted);
+  return decodeCapakitaExport(text, password);
 }
 
 function filterByScope(preparedImport, importOptions) {

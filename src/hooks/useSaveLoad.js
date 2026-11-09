@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import CryptoJS from 'crypto-js';
-import { anonymizeSaveData, validatePassword } from '../utils/saveLoadUtils';
+
+import { anonymizeSaveData, decodeCapakitaExport, encodeCapakitaExport, validatePassword } from '../utils/saveLoadUtils';
 import { setScenarios, setSelectedScenarioId, setSelectedItems } from '../store/simScenarioSlice';
 
 
@@ -18,7 +18,9 @@ export function useSaveLoad() {
 
   const saveData = useCallback(async (password, { anonymize = false } = {}) => {
     try {
-      const passwordError = validatePassword(password);
+      const passwordError = password
+        ? validatePassword(password)
+        : anonymize ? null : validatePassword(password);
       if (passwordError) {
         return {
           success: false,
@@ -41,8 +43,7 @@ export function useSaveLoad() {
       };
 
       const exportData = anonymize ? anonymizeSaveData(workspaceData) : workspaceData;
-      const json = JSON.stringify(exportData);
-      const ciphertext = CryptoJS.AES.encrypt(json, password).toString();
+      const fileContent = encodeCapakitaExport(exportData, { password, anonymized: anonymize });
       
       // Filename template: {datetime}-{scenarioname}.cap.capakita
       const scenarioName = exportData.scenarios.find((scenario) => scenario.id === exportData.selectedScenarioId)?.name || 'Unbenannt';
@@ -51,7 +52,7 @@ export function useSaveLoad() {
       const safeName = scenarioName.replace(/[^a-zA-Z0-9_-]/g, '_');
       const filename = `${datetime}-${safeName}.capakita`;
 
-      const blob = new Blob([ciphertext], { type: 'text/plain' });
+      const blob = new Blob([fileContent], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -83,17 +84,7 @@ export function useSaveLoad() {
       const text = await file.text();
       
       try {
-        const bytes = CryptoJS.AES.decrypt(text, password);
-        const decryptedText = bytes.toString(CryptoJS.enc.Utf8);
-        
-        if (!decryptedText) {
-          return {
-            success: false,
-            error: 'Falsches Passwort oder beschädigte Datei.'
-          };
-        }
-
-        const data = JSON.parse(decryptedText);
+        const data = decodeCapakitaExport(text, password);
         
         // Clear existing state and load new data
         dispatch(setScenarios(data.scenarios || []));
@@ -129,10 +120,10 @@ export function useSaveLoad() {
         dispatch(setSelectedItems(data.selectedItems?.[data.selectedScenarioId] || []));
 
         return { success: true };
-      } catch {
+      } catch (error) {
         return {
           success: false,
-          error: 'Falsches Passwort oder beschädigte Datei.'
+          error: error.message || 'Falsches Passwort oder beschädigte Datei.'
         };
       }
     } catch {
