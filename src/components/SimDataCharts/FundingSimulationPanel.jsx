@@ -208,7 +208,7 @@ function getBookingValidityLabels(bookings, year) {
 
 
 
-function AnnualFundingInput({ label, value, onCommit, testId }) {
+function AnnualFundingInput({ label, value, onCommit, testId, disabled = false }) {
   const [draft, setDraft] = React.useState(value ?? 0);
   React.useEffect(() => setDraft(value ?? 0), [value]);
 
@@ -218,6 +218,7 @@ function AnnualFundingInput({ label, value, onCommit, testId }) {
       value={draft}
       onChange={setDraft}
       onBlur={() => onCommit(draft === '' ? 0 : Number(draft))}
+      disabled={disabled}
       min={0}
       decimalScale={2}
       thousandSeparator="."
@@ -736,15 +737,18 @@ function FundingSimulationPanel({ scrollPage = false }) {
     const legacyActualFunding = reformForecast.actualFunding || {};
     const annualFundingInputsByYear = reformForecast.annualFundingInputsByYear || {};
     return fundingYears.map((year) => {
+      const manualInputYear = fixedBaseYearEnabled ? fixedBaseYear : year;
+      const manualInputDefaults = manualInputYear === 2026 ? legacyActualFunding : {};
+      const manualInputsForYear = annualFundingInputsByYear[String(manualInputYear)] || {};
       const manualInputs = {
-        under3Federal: Math.max(0, Number(annualFundingInputsByYear[String(year)]?.under3Federal
-          ?? (year === 2026 ? legacyActualFunding.under3Federal : 0)) || 0),
-        personnelBonus: Math.max(0, Number(annualFundingInputsByYear[String(year)]?.personnelBonus
-          ?? (year === 2026 ? legacyActualFunding.personnelBonus : 0)) || 0),
-        assistance: Math.max(0, Number(annualFundingInputsByYear[String(year)]?.assistance
-          ?? (year === 2026 ? legacyActualFunding.assistance : 0)) || 0),
-        languageSpecialists: Math.max(0, Number(annualFundingInputsByYear[String(year)]?.languageSpecialists
-          ?? (year === 2026 ? legacyActualFunding.languageSpecialists : 0)) || 0),
+        under3Federal: Math.max(0, Number(manualInputsForYear.under3Federal
+          ?? manualInputDefaults.under3Federal ?? 0) || 0),
+        personnelBonus: Math.max(0, Number(manualInputsForYear.personnelBonus
+          ?? manualInputDefaults.personnelBonus ?? 0) || 0),
+        assistance: Math.max(0, Number(manualInputsForYear.assistance
+          ?? manualInputDefaults.assistance ?? 0) || 0),
+        languageSpecialists: Math.max(0, Number(manualInputsForYear.languageSpecialists
+          ?? manualInputDefaults.languageSpecialists ?? 0) || 0),
       };
       const monthlyDetails = [];
       const families = new Map();
@@ -1537,8 +1541,8 @@ function FundingSimulationPanel({ scrollPage = false }) {
               </Group>
               <Text size="xs" c="dimmed">
                 {fixedBaseYearEnabled
-                  ? `Kinderbestand und Buchungsstunden aus ${fixedBaseYear} gelten für alle Ergebnisjahre; Förderregeln und altersabhängige Faktoren werden weiter je Ergebnisjahr berechnet.`
-                  : 'Ohne Fixierung werden Kinderbestand und Buchungsstunden je Ergebnisjahr aus den jeweiligen Buchungsdaten ermittelt.'}
+                  ? `Kinderbestand, Buchungsstunden und die vier jährlichen Zusatzförderungen (U3-Bundesmittel, Personalbonus, Assistenz, Sprachförderung) aus ${fixedBaseYear} gelten für alle Ergebnisjahre. Die übrigen Förderregeln werden weiter je Ergebnisjahr berechnet.`
+                  : 'Ohne Fixierung werden Kinderbestand, Buchungsstunden und jährliche Zusatzförderungen je Ergebnisjahr ermittelt.'}
               </Text>
               <Group justify="space-between" align="flex-end" wrap="wrap">
                 <Text size="xs" c="dimmed">Grenzwert für die Familien-Impact-Auswertung</Text>
@@ -1957,7 +1961,8 @@ function FundingSimulationPanel({ scrollPage = false }) {
                               <AnnualFundingInput
                                 label={`${label} ${row.year}`}
                                 value={row.annualFundingInputs[field]}
-                                onCommit={(value) => updateAnnualFundingInput(row.year, field, value)}
+                                onCommit={(value) => updateAnnualFundingInput(fixedBaseYearEnabled ? fixedBaseYear : row.year, field, value)}
+                                disabled={fixedBaseYearEnabled && row.year !== fixedBaseYear}
                                 testId={`annual-funding-input-${row.year}-${field}`}
                               />
                             </Table.Td>

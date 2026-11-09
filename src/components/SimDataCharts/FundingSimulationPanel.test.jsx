@@ -10,7 +10,11 @@ import simBookingReducer from '../../store/simBookingSlice';
 import simGroupReducer from '../../store/simGroupSlice';
 import simQualificationReducer from '../../store/simQualificationSlice';
 import simOverlayReducer from '../../store/simOverlaySlice';
-import simFinanceReducer, { setGroupFeeCatalogs, updateGroupParentFeeSubsidy } from '../../store/simFinanceSlice';
+import simFinanceReducer, {
+  setGroupFeeCatalogs,
+  updateGroupParentFeeSubsidy,
+  updateScenarioFinanceSettings,
+} from '../../store/simFinanceSlice';
 import chartReducer from '../../store/chartSlice';
 
 const REF = '2026-03-15';
@@ -374,6 +378,49 @@ describe('FundingSimulationPanel', () => {
     expect(screen.getByLabelText('Betrag ZEITKAT 05').disabled).toBe(true);
     expect(screen.getByTestId('annual-contributions-2026').textContent).not.toBe(contributionsBefore);
     expect(store.getState().simFinance.financeByScenario['scenario-1'].groupFeeCatalogs.g1[0].enabled).toBeUndefined();
+  });
+
+  it('fixiert die jährlichen Zusatzförderungen auf das ausgewählte Basisjahr', () => {
+    const store = createTestStore({ include2027BookingChange: true });
+    store.dispatch(updateScenarioFinanceSettings({
+      scenarioId: 'scenario-1',
+      updates: {
+        reformForecast: {
+          annualFundingInputsByYear: {
+            2026: { under3Federal: 1000, personnelBonus: 200, assistance: 300, languageSpecialists: 400 },
+            2027: { under3Federal: 9000, personnelBonus: 1000, assistance: 2000, languageSpecialists: 3000 },
+          },
+        },
+      },
+    }));
+    render(
+      <Provider store={store}>
+        <MantineProvider>
+          <FundingSimulationPanel accent="#0f766e" />
+        </MantineProvider>
+      </Provider>
+    );
+
+    openSimulationSettings();
+    fireEvent.click(screen.getByTestId('fixed-base-year-toggle'));
+    const baseYearSelect = screen.getByRole('combobox', { name: 'Fixiertes Basisjahr' });
+    fireEvent.click(baseYearSelect);
+    fireEvent.click(screen.getByRole('option', { name: '2027' }));
+
+    expect(screen.getByTestId('annual-funding-input-total-2026').textContent).toContain('15.000,00 €');
+    expect(screen.getByTestId('annual-funding-input-total-2027').textContent).toContain('15.000,00 €');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Zusatzförderungsspalten einblenden' }));
+    expect(screen.getByLabelText('U3-Bundesmittel 2026').disabled).toBe(true);
+    const fixedYearInput = screen.getByLabelText('U3-Bundesmittel 2027');
+    expect(fixedYearInput.disabled).toBe(false);
+    fireEvent.change(fixedYearInput, { target: { value: '2500' } });
+    fireEvent.blur(fixedYearInput);
+
+    expect(store.getState().simFinance.financeByScenario['scenario-1'].settings.reformForecast.annualFundingInputsByYear['2027'].under3Federal)
+      .toBe(2500);
+    expect(screen.getByLabelText('U3-Bundesmittel 2026').value)
+      .toBe(screen.getByLabelText('U3-Bundesmittel 2027').value);
   });
 
   it('speichert jahresspezifische Zusatzförderungen direkt aus der Ergebnistabelle', () => {
