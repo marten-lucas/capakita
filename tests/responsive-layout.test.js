@@ -283,6 +283,9 @@ test('analysis stepper remains navigable without viewport overflow', async ({ pa
   await page.getByTestId('story-step-options').click();
   await expect(page.getByTestId('analysis-stage-content')).toHaveClass(/analysis-stage-content--options/);
   await expectSimulationSectionsContained(page, 'analysis view');
+  const simulationSettingsPanel = page.getByTestId('simulation-settings-panel');
+  await simulationSettingsPanel.getByRole('button').click();
+  await expect(simulationSettingsPanel.getByTestId('family-potential-budget')).toBeVisible();
   await expectNoHorizontalOverflow(page, 'analysis view');
 });
 

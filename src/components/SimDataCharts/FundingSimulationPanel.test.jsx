@@ -197,7 +197,7 @@ describe('FundingSimulationPanel', () => {
     expect(comparisonRow.textContent).toContain('3,20 h/Tag');
     expect(within(resultsPanel).getByTestId('annual-upgrade-potential-2026').textContent).toContain('h/Tag');
     expect(within(resultsPanel).getByTestId('annual-downgrade-potential-2026')).toBeTruthy();
-    expect(within(resultsPanel).getByTestId('family-potential-budget')).toBeTruthy();
+    expect(within(screen.getByTestId('simulation-settings-panel')).getByTestId('family-potential-budget')).toBeTruthy();
     fireEvent.click(within(resultsPanel).getByTestId('annual-income-details-2026'));
     const adebisTotal = await screen.findByTestId('adebis-monthly-total');
     expect(adebisTotal.textContent).toContain('17,60 €');
@@ -332,6 +332,28 @@ describe('FundingSimulationPanel', () => {
 
     expect(screen.queryByTestId('simulation-tariff-groups')).toBeNull();
     expect(screen.queryByTestId('simulation-group-results')).toBeNull();
+  });
+
+  it('speichert das Familienbudget im gemeinsamen Workspace', () => {
+    const store = createTestStore();
+    render(
+      <Provider store={store}>
+        <MantineProvider>
+          <FundingSimulationPanel accent="#0f766e" />
+        </MantineProvider>
+      </Provider>
+    );
+
+    openSimulationSettings();
+    const settingsPanel = screen.getByTestId('simulation-settings-panel');
+    const budgetInput = within(settingsPanel).getByLabelText('Budgetänderung pro Familie / Monat');
+    fireEvent.change(budgetInput, { target: { value: '25' } });
+    fireEvent.blur(budgetInput);
+
+    expect(store.getState().simFinance.financeByScenario['scenario-1'].settings.fundingSimulation.potentialMonthlyBudget)
+      .toBe(25);
+    expect(within(settingsPanel).getByTestId('family-potential-budget')).toBeTruthy();
+    expect(screen.queryByTestId('family-potential-budget-control')).toBeNull();
   });
 
   it('ignoriert deaktivierte ZEITKAT-Kategorien in der lokalen Simulation', () => {

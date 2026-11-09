@@ -1540,6 +1540,23 @@ function FundingSimulationPanel({ scrollPage = false }) {
                   ? `Kinderbestand und Buchungsstunden aus ${fixedBaseYear} gelten für alle Ergebnisjahre; Förderregeln und altersabhängige Faktoren werden weiter je Ergebnisjahr berechnet.`
                   : 'Ohne Fixierung werden Kinderbestand und Buchungsstunden je Ergebnisjahr aus den jeweiligen Buchungsdaten ermittelt.'}
               </Text>
+              <Group justify="space-between" align="flex-end" wrap="wrap">
+                <Text size="xs" c="dimmed">Grenzwert für die Familien-Impact-Auswertung</Text>
+                <NumberInput
+                  label="Budgetänderung pro Familie / Monat"
+                  value={potentialMonthlyBudget}
+                  onChange={(value) => updateFundingSimulation({ potentialMonthlyBudget: Math.max(0, Number(value) || 0) })}
+                  min={0}
+                  max={500}
+                  step={5}
+                  decimalScale={2}
+                  thousandSeparator="."
+                  decimalSeparator=","
+                  suffix=" EUR"
+                  w={230}
+                  data-testid="family-potential-budget"
+                />
+              </Group>
               {!hasRule || !hasSimulationFeeRows ? (
                 <Group gap="xs" align="flex-start">
                   {!hasRule ? (
@@ -2051,23 +2068,7 @@ function FundingSimulationPanel({ scrollPage = false }) {
           </Stack>
 
           <Stack className="funding-simulation-section" gap="xs">
-            <Group justify="space-between" align="flex-end" wrap="wrap">
-              <Text fw={700} size="sm">Von Beitragsänderungen betroffene Familien · Stichtag</Text>
-              <NumberInput
-                label="Budgetänderung pro Familie / Monat"
-                value={potentialMonthlyBudget}
-                onChange={(value) => updateFundingSimulation({ potentialMonthlyBudget: Math.max(0, Number(value) || 0) })}
-                min={0}
-                max={500}
-                step={5}
-                decimalScale={2}
-                thousandSeparator="."
-                decimalSeparator=","
-                suffix=" EUR"
-                w={230}
-                data-testid="family-potential-budget"
-              />
-            </Group>
+            <Text fw={700} size="sm">Von Beitragsänderungen betroffene Familien · Stichtag</Text>
             {affectedFamilyRows.length === 0 ? (
               <Text size="sm" c="dimmed" data-testid="no-affected-families">
                 Für die aktuellen Beitragssätze sind keine Familien von einer Beitragsänderung betroffen.
