@@ -188,6 +188,8 @@ describe('FundingSimulationPanel', () => {
     const resultsPanel = screen.getByTestId('simulation-results-panel');
     expect(within(resultsPanel).getByRole('heading', { name: 'Ergebnis der Jahre & Familien-Impact' })).toBeTruthy();
     const comparisonRow = within(resultsPanel).getByTestId('annual-income-row-2026');
+    expect(screen.getByTestId('reform-actual-comparison-bookingTime').textContent).toContain('Capakita-Berechnung:');
+    expect(screen.queryByTestId('reform-team-rate-2027-first50')).toBeNull();
     expect(within(resultsPanel).getByTestId('annual-income-row-2027')).toBeTruthy();
     expect(within(resultsPanel).getByTestId('annual-income-row-2028')).toBeTruthy();
     expect(within(resultsPanel).getByTestId('annual-income-row-2029')).toBeTruthy();

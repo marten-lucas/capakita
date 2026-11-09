@@ -230,6 +230,51 @@ function BayKiBiGDetail({ item, scenarioId, dispatch }) {
           suffix=" EUR"
         />
       </SimpleGrid>
+      {Number(String(item.validFrom || '').slice(0, 4)) >= 2027 ? (
+        <div>
+          <Text fw={500} mb="sm">Teamzuschuss je genehmigtem Platz (EUR/Jahr)</Text>
+          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+            <BufferedNumberInput
+              label="Platz 1–50"
+              value={item.teamGrantRates?.first50 ?? 0}
+              onCommit={(value) => dispatch(updateBayKiBiGRule({
+                scenarioId,
+                ruleId: item.id,
+                updates: {
+                  teamGrantRates: {
+                    ...(item.teamGrantRates || {}),
+                    first50: Number(value) || 0,
+                  },
+                },
+              }))}
+              decimalScale={2}
+              min={0}
+              thousandSeparator="."
+              decimalSeparator=","
+              suffix=" EUR"
+            />
+            <BufferedNumberInput
+              label="Platz 51–150"
+              value={item.teamGrantRates?.remaining100 ?? 0}
+              onCommit={(value) => dispatch(updateBayKiBiGRule({
+                scenarioId,
+                ruleId: item.id,
+                updates: {
+                  teamGrantRates: {
+                    ...(item.teamGrantRates || {}),
+                    remaining100: Number(value) || 0,
+                  },
+                },
+              }))}
+              decimalScale={2}
+              min={0}
+              thousandSeparator="."
+              decimalSeparator=","
+              suffix=" EUR"
+            />
+          </SimpleGrid>
+        </div>
+      ) : null}
       <div>
         <Text fw={500} mb="sm">Gewichtungsfaktoren</Text>
         <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md">

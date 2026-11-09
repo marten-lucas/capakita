@@ -17,7 +17,7 @@ import {
 import { calculateScenarioMonthlyFinance, isRecordActiveOnDate, pickApplicableValidityEntry, resolveGroupIdAtDate } from '../../utils/financeUtils';
 import { shouldIncludeDataItemInAnalysis } from '../../utils/dataVisibility';
 import { calculateAdebisMonthMetrics } from '../../utils/adebisAnalysis';
-import { calculateReformForecast, REFORM_FIXED_ASSUMPTIONS } from '../../utils/reformSimulation';
+import { calculateReformForecast } from '../../utils/reformSimulation';
 import FeeStaircaseEditor from '../common/FeeStaircaseEditor';
 import './FundingSimulationPanel.css';
 
@@ -584,29 +584,7 @@ function FundingSimulationPanel({ scrollPage = false }) {
       },
     }));
   }, [dispatch, financeScenario?.settings?.reformForecast, selectedScenarioId]);
-  const updateReformTeamRate = React.useCallback((year, field, value) => {
-    const reformForecast = financeScenario?.settings?.reformForecast || {};
-    const teamRatesByYear = reformForecast.teamRatesByYear || {};
-    const currentRates = teamRatesByYear[String(year)] || REFORM_FIXED_ASSUMPTIONS.teamRatesByYear[year] || {};
-    const numericValue = value === '' || value == null
-      ? 0
-      : Number(String(value).trim().replace(',', '.'));
-    dispatch(updateScenarioFinanceSettings({
-      scenarioId: selectedScenarioId,
-      updates: {
-        reformForecast: {
-          ...reformForecast,
-          teamRatesByYear: {
-            ...teamRatesByYear,
-            [String(year)]: {
-              ...currentRates,
-              [field]: Math.max(0, Number.isFinite(numericValue) ? numericValue : 0),
-            },
-          },
-        },
-      },
-    }));
-  }, [dispatch, financeScenario?.settings?.reformForecast, selectedScenarioId]);
+
   const updateReformEligibility = React.useCallback((enabled) => {
     const reformForecast = financeScenario?.settings?.reformForecast || {};
     dispatch(updateScenarioFinanceSettings({
@@ -1604,60 +1582,47 @@ function FundingSimulationPanel({ scrollPage = false }) {
                     </Group>
                   </Group>
                   <Text size="xs" c="dimmed">
-                    Bei Anspruch ersetzt der Teamzuschuss ab 2027 in der bestehenden Förderanspruchssumme die bisherigen Personalbonus-, Assistenz- und Sprachförderbeträge. Mit fixiertem Basisjahr 2026 werden zusätzlich Buchungszeitenförderung, Qualitätsbonus und weitere Reformkomponenten aus den 2026-Istwerten fortgeschrieben; 2026 bleibt der Vergleichs-Ausgangspunkt.
+                    Bei Anspruch ersetzt der Teamzuschuss ab 2027 in der bestehenden Förderanspruchssumme die bisherigen Personalbonus-, Assistenz- und Sprachförderbeträge. Mit fixiertem Basisjahr 2026 werden zusätzlich Buchungszeitenförderung, Qualitätsbonus und weitere Reformkomponenten aus den 2026-Istwerten fortgeschrieben; 2026 bleibt der Vergleichs-Ausgangspunkt. Die Teamzuschuss-Sätze je Förderjahr pflegst du unter Optionen → Förderung → BayKiBiG-Rahmen.
                   </Text>
                   <Text size="xs" fw={600}>2026-Istwerte als Reform-Basis (aus Capakita vorbelegt, bei Bedarf überschreiben)</Text>
+                  <Text size="xs" c="dimmed">
+                    Ein gespeicherter Reformwert hat Vorrang; andernfalls wird der Wert aus der Capakita-Jahresberechnung 2026 vorbelegt. Manuell erfasste Zusatzförderungen sind entsprechend gekennzeichnet.
+                  </Text>
                   <Group gap="xs" align="flex-end" wrap="wrap">
                     {[
-                      ['bookingTime', 'Buchungszeitenförderung'],
-                      ['qualityBonus', 'Qualitätsbonus'],
-                      ['preparatoryCourses', 'Vorkurse'],
-                      ['under3Additional', 'U3-Zusatzförderung'],
-                      ['under3Federal', 'U3-Bundesmittel'],
-                      ['parentFeeSubsidy', 'Elternbeitragszuschuss'],
-                      ['assistance', 'Assistenz'],
-                      ['personnelBonus', 'Personalbonus'],
-                      ['languageSpecialists', 'Sprachfachkräfte'],
-                    ].map(([field, label]) => (
-                      <NumberInput
-                        key={field}
-                        label={label}
-                        value={reformForecastSettings.actualFunding?.[field] ?? reformActualFundingDefaults[field]}
-                        onChange={(value) => updateReformActualFunding(field, value)}
-                        min={0}
-                        decimalScale={2}
-                        w={160}
-                        data-testid={`reform-actual-${field}`}
-                      />
-                    ))}
-                  </Group>
-                  <Text size="xs" fw={600}>Teamzuschuss je genehmigtem Platz</Text>
-                  <Group gap="xs" align="flex-end" wrap="wrap">
-                    {[2027, 2028, 2029].map((year) => {
-                      const rates = reformForecastSettings.teamRatesByYear?.[String(year)]
-                        || REFORM_FIXED_ASSUMPTIONS.teamRatesByYear[year];
+                      ['bookingTime', 'Buchungszeitenförderung', 'Capakita-Berechnung'],
+                      ['qualityBonus', 'Qualitätsbonus', 'Capakita-Berechnung'],
+                      ['preparatoryCourses', 'Vorkurse', 'Capakita-Berechnung'],
+                      ['under3Additional', 'U3-Zusatzförderung', 'Capakita-Berechnung'],
+                      ['under3Federal', 'U3-Bundesmittel', 'Capakita-Jahreswert (manuell)'],
+                      ['parentFeeSubsidy', 'Elternbeitragszuschuss', 'Capakita-Berechnung'],
+                      ['assistance', 'Assistenz', 'Capakita-Jahreswert (manuell)'],
+                      ['personnelBonus', 'Personalbonus', 'Capakita-Jahreswert (manuell)'],
+                      ['languageSpecialists', 'Sprachfachkräfte', 'Capakita-Jahreswert (manuell)'],
+                    ].map(([field, label, sourceLabel]) => {
+                      const calculatedValue = Number(reformActualFundingDefaults[field]) || 0;
+                      const inputValue = Number(reformActualFunding[field]) || 0;
+                      const hasSavedValue = reformForecastSettings.actualFunding?.[field] != null;
+                      const difference = inputValue - calculatedValue;
                       return (
-                        <Group key={year} gap="xs" align="flex-end" wrap="nowrap">
-                          <Text size="xs" fw={600} pb={8}>{year}</Text>
+                        <Stack key={field} gap={2} w={160}>
                           <NumberInput
-                            label="Platz 1–50"
-                            value={rates.first50}
-                            onChange={(value) => updateReformTeamRate(year, 'first50', value)}
+                            label={label}
+                            value={inputValue}
+                            onChange={(value) => updateReformActualFunding(field, value)}
                             min={0}
                             decimalScale={2}
-                            w={120}
-                            data-testid={`reform-team-rate-${year}-first50`}
+                            data-testid={`reform-actual-${field}`}
                           />
-                          <NumberInput
-                            label="Platz 51–150"
-                            value={rates.remaining100}
-                            onChange={(value) => updateReformTeamRate(year, 'remaining100', value)}
-                            min={0}
-                            decimalScale={2}
-                            w={130}
-                            data-testid={`reform-team-rate-${year}-remaining100`}
-                          />
-                        </Group>
+                          <Text size="xs" c="dimmed" data-testid={`reform-actual-comparison-${field}`}>
+                            {sourceLabel}: {formatEuro(calculatedValue)}
+                          </Text>
+                          {hasSavedValue && Math.abs(difference) >= 0.005 ? (
+                            <Text size="xs" c={difference > 0 ? 'orange' : 'red'} data-testid={`reform-actual-difference-${field}`}>
+                              Abweichung: {formatSignedEuro(difference)}
+                            </Text>
+                          ) : null}
+                        </Stack>
                       );
                     })}
                   </Group>

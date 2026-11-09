@@ -7,6 +7,8 @@
  * - Weight factors from row 5 (C5=regelkind, E5=schulkind, G5=migration, I5=under3, K5=disabled)
  */
 
+import DEFAULT_ADEBIS_BAYKIBIG_TABLES from '../data/adebis-baykibig-foerdertabellen-2026-2029.json';
+
 function parseBayKiBiGWorkbook(workbook) {
   if (!workbook.SheetNames.includes('Fördertabellen')) {
     throw new Error('Sheet "Fördertabellen" not found in Excel file');
@@ -36,11 +38,15 @@ function parseBayKiBiGWorkbook(workbook) {
   const currentYear = new Date().getFullYear();
   const validFrom = `${currentYear}-01-01`;
   const validUntil = `${currentYear}-12-31`;
+  const yearDefaults = DEFAULT_ADEBIS_BAYKIBIG_TABLES.rules.find(
+    (rule) => Number(String(rule.validFrom).slice(0, 4)) === currentYear
+  );
 
   return {
     label: `BayKiBiG ${currentYear} (offizielle Tabelle)`,
     baseValue,
     weightFactors: factors,
+    teamGrantRates: yearDefaults?.teamGrantRates || {},
     validFrom,
     validUntil,
   };

@@ -33,6 +33,10 @@
       "qualityBonusBenchmark": 693.28,
       "under3AdditionalFactor": 0.025,
       "preparatoryCoursePerChild": 0,
+      "teamGrantRates": {
+        "first50": 500,
+        "remaining100": 167.61
+      },
       "weightFactors": {
         "regelkind_3to6": 1.0,
         "schulkind": 1.2,
@@ -50,6 +54,10 @@
       "qualityBonusBenchmark": 852.36,
       "under3AdditionalFactor": 0.025,
       "preparatoryCoursePerChild": 0,
+      "teamGrantRates": {
+        "first50": 700,
+        "remaining100": 242.37
+      },
       "weightFactors": {
         "regelkind_3to6": 1.0,
         "schulkind": 1.2,
@@ -67,6 +75,10 @@
       "qualityBonusBenchmark": 857.87,
       "under3AdditionalFactor": 0.025,
       "preparatoryCoursePerChild": 0,
+      "teamGrantRates": {
+        "first50": 700,
+        "remaining100": 242.37
+      },
       "weightFactors": {
         "regelkind_3to6": 1.0,
         "schulkind": 1.2,

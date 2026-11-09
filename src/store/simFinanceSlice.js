@@ -90,6 +90,7 @@ function normalizeValidityEntry(entry = {}, defaultValues = {}) {
 
 function normalizeBayKiBiGRule(rule = {}) {
   const year = Number(String(rule.validFrom || '').slice(0, 4));
+  const defaultRule = DEFAULT_ADEBIS_BAYKIBIG_TABLES.rules.find((entry) => getRuleYear(entry.validFrom) === year);
   const defaultQualityBonusBenchmark = DEFAULT_ADEBIS_BAYKIBIG_TABLES.qualityBonusBenchmarkByYear[year] ?? 0;
   return normalizeValidityEntry(rule, {
     label: rule.label || '',
@@ -97,6 +98,10 @@ function normalizeBayKiBiGRule(rule = {}) {
     qualityBonusBenchmark: rule.qualityBonusBenchmark ?? defaultQualityBonusBenchmark,
     under3AdditionalFactor: rule.under3AdditionalFactor ?? 0.025,
     preparatoryCoursePerChild: rule.preparatoryCoursePerChild ?? 0,
+    teamGrantRates: {
+      ...(defaultRule?.teamGrantRates || {}),
+      ...(rule.teamGrantRates || {}),
+    },
     weightFactors: {
       regelkind_3to6: rule.weightFactors?.regelkind_3to6 ?? 1.0,
       schulkind: rule.weightFactors?.schulkind ?? 1.2,
@@ -227,6 +232,25 @@ function normalizeScenarioFinance(finance = {}) {
     ...createEmptyScenarioFinance().settings,
     ...(finance.settings || {}),
   };
+  const reformForecast = settings.reformForecast || {};
+  const {
+    teamRatesByYear: legacyTeamRatesByYear = {},
+    ...reformForecastWithoutLegacyRates
+  } = reformForecast;
+  if (Object.hasOwn(reformForecast, 'teamRatesByYear')) {
+    settings.reformForecast = reformForecastWithoutLegacyRates;
+  }
+  const bayKiBiGRules = mergeDefaultBayKiBiGRules(finance.bayKiBiGRules)
+    .map((rule) => {
+      const normalizedRule = normalizeBayKiBiGRule(rule);
+      const legacyRates = legacyTeamRatesByYear[String(getRuleYear(normalizedRule.validFrom))];
+      return legacyRates
+        ? normalizeBayKiBiGRule({
+          ...normalizedRule,
+          teamGrantRates: { ...normalizedRule.teamGrantRates, ...legacyRates },
+        })
+        : normalizedRule;
+    });
   const groupFeeCatalogs = Object.fromEntries(
     Object.entries(finance.groupFeeCatalogs || {}).map(([groupId, entries]) => [
       String(groupId),
@@ -250,8 +274,7 @@ function normalizeScenarioFinance(finance = {}) {
     parentFeeSubsidy: legacyParentFeeSubsidy,
     parentFeeSubsidiesByGroup,
     settings,
-    bayKiBiGRules: mergeDefaultBayKiBiGRules(finance.bayKiBiGRules)
-      .map((rule) => normalizeBayKiBiGRule(rule)),
+    bayKiBiGRules,
     groupFeeCatalogs,
     itemFinances: Object.fromEntries(
       Object.entries(finance.itemFinances || {}).map(([itemId, itemFinance]) => [

@@ -3,13 +3,15 @@ import DEFAULT_ADEBIS_BAYKIBIG_TABLES from '../data/adebis-baykibig-foerdertabel
 
 export const REFORM_YEARS = [2026, 2027, 2028, 2029];
 
+const DEFAULT_TEAM_RATES_BY_YEAR = Object.fromEntries(
+  DEFAULT_ADEBIS_BAYKIBIG_TABLES.rules
+    .filter((rule) => rule.teamGrantRates)
+    .map((rule) => [Number(String(rule.validFrom).slice(0, 4)), rule.teamGrantRates])
+);
+
 export const REFORM_FIXED_ASSUMPTIONS = {
   qualityBonusBenchmarkByYear: DEFAULT_ADEBIS_BAYKIBIG_TABLES.qualityBonusBenchmarkByYear,
-  teamRatesByYear: {
-    2027: { first50: 500, remaining100: 167.61 },
-    2028: { first50: 700, remaining100: 242.37 },
-    2029: { first50: 700, remaining100: 242.37 },
-  },
+  teamRatesByYear: DEFAULT_TEAM_RATES_BY_YEAR,
 };
 
 export const DEFAULT_REFORM_FORECAST = {
@@ -49,18 +51,28 @@ function getBayKiBiGBaseValueForYear(rules, year) {
   return previousRule ? Number(previousRule.baseValue) : null;
 }
 
-function getTeamGrant(year, approvedPlaces, teamGrantEligible, teamRatesByYear = {}) {
-  if (year < 2027 || !teamGrantEligible) return 0;
-  const ratesForYear = {
+function getTeamGrantRatesForYear(year, bayKiBiGRules = []) {
+  const date = `${year}-01-01`;
+  const hasRates = (rule) => rule?.teamGrantRates && Object.keys(rule.teamGrantRates).length > 0;
+  const applicableRule = pickApplicableValidityEntry(bayKiBiGRules, date, hasRates)
+    || pickLatestValidityEntry(bayKiBiGRules, (rule) => hasRates(rule)
+      && (!rule.validFrom || rule.validFrom <= date));
+  return {
     ...REFORM_FIXED_ASSUMPTIONS.teamRatesByYear[year],
-    ...(teamRatesByYear?.[year] || teamRatesByYear?.[String(year)] || {}),
+    ...(applicableRule?.teamGrantRates || {}),
   };
-  if (!ratesForYear) return 0;
+}
+
+function getTeamGrant(year, approvedPlaces, teamGrantEligible, bayKiBiGRules = []) {
+  if (year < 2027 || !teamGrantEligible) return 0;
+  const ratesForYear = getTeamGrantRatesForYear(year, bayKiBiGRules);
+  const first50Rate = Number(ratesForYear.first50);
+  const remaining100Rate = Number(ratesForYear.remaining100);
+  if (!Number.isFinite(first50Rate) || !Number.isFinite(remaining100Rate)) return 0;
   const places = Math.max(0, Math.floor(amount(approvedPlaces)));
   const first50Places = Math.min(places, 50);
   const remainingPlaces = Math.min(Math.max(places - 50, 0), 100);
-  return first50Places * ratesForYear.first50
-    + remainingPlaces * ratesForYear.remaining100;
+  return first50Places * first50Rate + remainingPlaces * remaining100Rate;
 }
 
 /**
@@ -104,7 +116,7 @@ export function calculateReformForecast(input = {}, simulatedChangesByYear = {},
       year,
       settings.approvedPlaces,
       settings.teamGrantEligible === true,
-      settings.teamRatesByYear
+      bayKiBiGRules
     );
     const priorGuidelineFunding = year >= 2027 && settings.teamGrantEligible === true
       ? amount(settings.actualFunding.assistance)
@@ -133,15 +145,18 @@ export function calculateReformForecast(input = {}, simulatedChangesByYear = {},
     previousResult = unroundedResult;
   });
 
+  const teamRatesByYear = { ...REFORM_FIXED_ASSUMPTIONS.teamRatesByYear };
+  REFORM_YEARS.forEach((year) => {
+    const rates = getTeamGrantRatesForYear(year, bayKiBiGRules);
+    if (Object.keys(rates).length > 0) teamRatesByYear[year] = rates;
+  });
+
   return {
     results,
     assumptions: {
       approvedPlaces: Math.max(0, Math.floor(amount(settings.approvedPlaces))),
       teamGrantEligible: settings.teamGrantEligible === true,
-      teamRatesByYear: {
-        ...REFORM_FIXED_ASSUMPTIONS.teamRatesByYear,
-        ...(settings.teamRatesByYear || {}),
-      },
+      teamRatesByYear,
       qualityBonusBenchmarkByYear: REFORM_FIXED_ASSUMPTIONS.qualityBonusBenchmarkByYear,
       hasActualBaseline: Object.values(settings.actualFunding).some((value) => amount(value) !== 0),
       parentFeeSubsidyIncludedInResult: false,

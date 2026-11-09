@@ -168,6 +168,27 @@ describe('OrgaTabFinance', () => {
     expect(store.getState().simFinance.financeByScenario['scenario-1'].parentFeeSubsidiesByGroup['group-2']).toBeUndefined();
   });
 
+  it('edits team-grant rates on the yearly BayKiBiG master rule', () => {
+    const store = createTestStore();
+
+    render(
+      <MantineProvider>
+        <Provider store={store}>
+          <OrgaTabFinance />
+        </Provider>
+      </MantineProvider>
+    );
+
+    fireEvent.click(screen.getByText('BayKiBiG 2027'));
+    const firstTierInput = screen.getAllByLabelText('Platz 1–50')[0];
+    fireEvent.change(firstTierInput, { target: { value: '650' } });
+    fireEvent.blur(firstTierInput);
+
+    const rule = store.getState().simFinance.financeByScenario['scenario-1'].bayKiBiGRules
+      .find((entry) => entry.validFrom === '2027-01-01');
+    expect(rule.teamGrantRates).toEqual({ first50: 650, remaining100: 167.61 });
+  });
+
   it('adds a new BayKiBiG rule via the add button', () => {
     const store = createTestStore();
 

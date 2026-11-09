@@ -55,6 +55,23 @@ describe('financeImport URL import (Fallback-Kette)', () => {
     });
   });
 
+  it('ergänzt beim Jahresimport die Teamzuschuss-Sätze aus den BayKiBiG-Jahresstammdaten', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2027-04-01T12:00:00.000Z'));
+    try {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okResponse()));
+      const result = await importBayKiBiGTableFromUrl(STMAS_URL, {
+        applicationBaseUrl: new URL('http://localhost:4173/'),
+        serverProxyAvailable: true,
+      });
+
+      expect(result.validFrom).toBe('2027-01-01');
+      expect(result.teamGrantRates).toEqual({ first50: 500, remaining100: 167.61 });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('nutzt auf GitHub Pages die lokale Tabellenkopie vor Cross-Origin-Fallbacks', async () => {
     const pagesBase = new URL('https://marten-lucas.github.io/capakita/');
     const pagesOptions = { applicationBaseUrl: pagesBase, serverProxyAvailable: false };

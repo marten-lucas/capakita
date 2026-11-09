@@ -76,12 +76,18 @@ describe('calculateReformForecast', () => {
     expect(result.results[1].combinedResult).toBeCloseTo(1748.28);
   });
 
-  it('uses editable yearly team-grant rates in the reform calculation', () => {
+  it('uses the year-specific team-grant rates from the BayKiBiG master rule', () => {
     const result = calculateReformForecast({
       approvedPlaces: 51,
       teamGrantEligible: true,
-      teamRatesByYear: { 2027: { first50: 600, remaining100: 200 } },
-    });
+    }, {}, [
+      {
+        id: 'rule-2027',
+        validFrom: '2027-01-01',
+        validUntil: '2027-12-31',
+        teamGrantRates: { first50: 600, remaining100: 200 },
+      },
+    ]);
 
     expect(result.results.find((row) => row.year === 2027).teamGrant).toBe(30200);
     expect(result.assumptions.teamRatesByYear[2027]).toEqual({ first50: 600, remaining100: 200 });

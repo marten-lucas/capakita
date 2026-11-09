@@ -83,6 +83,7 @@ describe('simFinanceSlice', () => {
     expect(rules.find((rule) => rule.validFrom === '2027-01-01')).toMatchObject({
       baseValue: 1563.88,
       weightFactors,
+      teamGrantRates: { first50: 500, remaining100: 167.61 },
     });
     expect(state.financeByScenario['scenario-empty'].bayKiBiGRules).toHaveLength(4);
     expect(state.financeByScenario['scenario-empty'].bayKiBiGRules[0]).toMatchObject({
@@ -92,6 +93,27 @@ describe('simFinanceSlice', () => {
       baseValue: 1563.88,
     });
     expect(state.financeByScenario['scenario-placeholder'].bayKiBiGRules).toHaveLength(5);
+  });
+
+  it('migrates saved team-grant rates into the yearly BayKiBiG master rules', () => {
+    const state = simFinanceReducer(undefined, loadFinanceByScenario({
+      'scenario-1': {
+        settings: {
+          reformForecast: {
+            approvedPlaces: 47,
+            teamRatesByYear: {
+              2027: { first50: 600, remaining100: 200 },
+            },
+          },
+        },
+      },
+    }));
+    const finance = state.financeByScenario['scenario-1'];
+
+    expect(finance.bayKiBiGRules.find((rule) => rule.validFrom === '2027-01-01').teamGrantRates)
+      .toEqual({ first50: 600, remaining100: 200 });
+    expect(finance.settings.reformForecast).not.toHaveProperty('teamRatesByYear');
+    expect(finance.settings.reformForecast.approvedPlaces).toBe(47);
   });
 
   it('seeds missing defaults for an already-loaded scenario', () => {
