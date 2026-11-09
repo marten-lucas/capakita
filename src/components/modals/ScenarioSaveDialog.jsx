@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { Modal, Button, Stack, Text, Group, PasswordInput, Loader, Alert } from '@mantine/core';
+import { Modal, Button, Stack, Text, Group, PasswordInput, Loader, Alert, Checkbox } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { useSaveLoad } from '../../hooks/useSaveLoad';
 import { useSelector, useDispatch } from 'react-redux';
 import { setSaveDialogOpen } from '../../store/simScenarioSlice';
-import { selectSelectedScenario } from '../../store/simScenarioSlice';
+
 import { IconAlertTriangle } from '@tabler/icons-react';
 
 function ScenarioSaveDialog() {
@@ -12,8 +12,7 @@ function ScenarioSaveDialog() {
   const isMobile = useMediaQuery('(max-width: 48em)');
   const opened = useSelector(state => state.simScenario.saveDialogOpen);
   const { saveData } = useSaveLoad();
-  const selectedScenario = useSelector(selectSelectedScenario);
-  const showPrivacyWarning = Boolean(selectedScenario && selectedScenario.imported && !selectedScenario.importedAnonymized);
+  const [anonymizeExport, setAnonymizeExport] = useState(true);
   
   const [pwValue, setPwValue] = useState('');
   const [pwValue2, setPwValue2] = useState('');
@@ -27,12 +26,13 @@ function ScenarioSaveDialog() {
     }
 
     setIsSaving(true);
-    const result = await saveData(pwValue);
+    const result = await saveData(pwValue, { anonymize: anonymizeExport });
     
     if (result.success) {
       setPwValue('');
       setPwValue2('');
       setPwError('');
+      setAnonymizeExport(true);
       dispatch(setSaveDialogOpen(false));
     } else {
       setPwError(result.error);
@@ -45,6 +45,7 @@ function ScenarioSaveDialog() {
     setPwValue('');
     setPwValue2('');
     setPwError('');
+    setAnonymizeExport(true);
     dispatch(setSaveDialogOpen(false));
   };
 
@@ -58,9 +59,20 @@ function ScenarioSaveDialog() {
       size={isMobile ? '100%' : 'md'}
     >
       <Stack>
-        {showPrivacyWarning && (
+        <Checkbox
+          label="Daten im Export anonymisieren"
+          checked={anonymizeExport}
+          onChange={(event) => setAnonymizeExport(event.currentTarget.checked)}
+          disabled={isSaving}
+          data-testid="anonymize-export-toggle"
+        />
+        {anonymizeExport ? (
+          <Alert color="blue" variant="light">
+            Direkte Namen, Adressen, Kontaktdaten und ADEBIS-Personen-IDs werden entfernt oder ersetzt; individuelle Personalkosten werden ausgelassen. Geburtsdaten und Betreuungszeiträume bleiben zur Prüfung der Förderberechnung erhalten. Prüfe den Export daher vor jeder Weitergabe.
+          </Alert>
+        ) : (
           <Alert icon={<IconAlertTriangle size={16} />} color="yellow" variant="light">
-            Achtung: Das gewählte Szenario enthält nicht-anonymisierte personenbezogene Daten. Beim Speichern werden diese Daten in der verschlüsselten Datei enthalten sein. Stelle sicher, dass du die Datenschutzanforderungen beachtest.
+            Der Export wird unverändert gespeichert und kann personenbezogene Daten aus allen Szenarien enthalten. Gib die Datei nur weiter, wenn du dazu berechtigt bist.
           </Alert>
         )}
 

@@ -171,6 +171,7 @@ function buildPreparedImportFromCapakitaData({
     || Object.keys(payload?.dataByScenario || {})[0]
     || payload?.scenarios?.[0]?.id
     || null;
+  const scenarioMetadata = (payload?.scenarios || []).find((scenario) => String(scenario.id) === String(scenarioId));
 
   if (!scenarioId) {
     throw new Error('Die Capakita-Datei enthält kein gültiges Szenario.');
@@ -223,7 +224,7 @@ function buildPreparedImportFromCapakitaData({
       conflicts: [],
       sourceFile: fileName,
     },
-    isAnonymized: false,
+    isAnonymized: scenarioMetadata?.importedAnonymized === true,
     simDataList,
     groupDefs,
     qualiDefs,

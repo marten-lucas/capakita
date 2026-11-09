@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import CryptoJS from 'crypto-js';
-import { validatePassword } from '../utils/saveLoadUtils';
+import { anonymizeSaveData, validatePassword } from '../utils/saveLoadUtils';
 import { setScenarios, setSelectedScenarioId, setSelectedItems } from '../store/simScenarioSlice';
 
 
@@ -16,7 +16,7 @@ export function useSaveLoad() {
   const simFinance = useSelector(state => state.simFinance);
   const chart = useSelector(state => state.chart);
 
-  const saveData = useCallback(async (password) => {
+  const saveData = useCallback(async (password, { anonymize = false } = {}) => {
     try {
       const passwordError = validatePassword(password);
       if (passwordError) {
@@ -26,7 +26,7 @@ export function useSaveLoad() {
         };
       }
 
-      const saveData = {
+      const workspaceData = {
         scenarios: simScenario.scenarios,
         selectedScenarioId: simScenario.selectedScenarioId,
         dataByScenario: simData.dataByScenario,
@@ -40,11 +40,12 @@ export function useSaveLoad() {
         selectedItems: simScenario.selectedItems,
       };
 
-      const json = JSON.stringify(saveData);
+      const exportData = anonymize ? anonymizeSaveData(workspaceData) : workspaceData;
+      const json = JSON.stringify(exportData);
       const ciphertext = CryptoJS.AES.encrypt(json, password).toString();
       
       // Filename template: {datetime}-{scenarioname}.cap.capakita
-      const scenarioName = simScenario.scenarios.find(s => s.id === simScenario.selectedScenarioId)?.name || 'Unbenannt';
+      const scenarioName = exportData.scenarios.find((scenario) => scenario.id === exportData.selectedScenarioId)?.name || 'Unbenannt';
       const now = new Date();
       const datetime = now.toISOString().replace(/[:.]/g, '-').slice(0, 19); // e.g. 2024-06-13T12-34-56-789
       const safeName = scenarioName.replace(/[^a-zA-Z0-9_-]/g, '_');

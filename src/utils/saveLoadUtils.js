@@ -47,6 +47,108 @@ export const extractSaveData = (state) => {
   };
 };
 
+const PRIVATE_EXPORT_FIELDS = new Set([
+  'adebisid', 'address', 'adrnr', 'anstellnr', 'bemerkung', 'bic', 'comment', 'famnr', 'geschw1vn', 'geschw2vn', 'geschw3vn', 'grunr',
+  'grund', 'iban', 'idnr', 'kindnr', 'kontoinhaber', 'kontonr', 'kontonummer', 'landkreis', 'lkz', 'mail',
+  'medicalreason', 'mobile', 'mobil', 'notiz', 'notes', 'ort', 'ortsteil', 'phone', 'personalnr', 'persnr',
+  'plz', 'postcode', 'postalcode', 'reason', 'reasontext', 'remark', 'sourcefile', 'filename', 'originalfilename',
+  'strasse', 'street', 'telefon', 'telefonnummer', 'wohnort',
+]);
+const PRIVATE_NAME_FIELDS = new Set([
+  'name', 'fname', 'vorname', 'nachname', 'firstname', 'lastname', 'surname', 'fullname', 'bez',
+]);
+
+function normalizeExportField(key) {
+  return String(key).toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function stripPrivateExportFields(value, removeNames = false) {
+  if (Array.isArray(value)) return value.map((entry) => stripPrivateExportFields(entry, removeNames));
+  if (!value || typeof value !== 'object') return value;
+
+  return Object.fromEntries(Object.entries(value)
+    .filter(([key]) => {
+      const normalizedKey = normalizeExportField(key);
+      return !PRIVATE_EXPORT_FIELDS.has(normalizedKey)
+        && !(removeNames && PRIVATE_NAME_FIELDS.has(normalizedKey));
+    })
+    .map(([key, entry]) => [key, stripPrivateExportFields(entry, removeNames)]));
+}
+
+function anonymizeScenarioDataItems(items = {}) {
+  const familyIds = new Map();
+  const childCounters = { demand: 0, capacity: 0, other: 0 };
+
+  return Object.fromEntries(Object.entries(items).map(([itemId, sourceItem]) => {
+    const item = stripPrivateExportFields(sourceItem, true);
+    const type = sourceItem?.type || 'other';
+    childCounters[type] = (childCounters[type] || 0) + 1;
+    const displayName = type === 'demand'
+      ? `Kind ${childCounters.demand}`
+      : type === 'capacity' ? `Mitarbeiter ${childCounters.capacity}` : `Eintrag ${childCounters.other}`;
+    const familyKey = String(sourceItem?.familyId || sourceItem?.familyLabel || `item:${itemId}`);
+    if (type === 'demand' && !familyIds.has(familyKey)) {
+      familyIds.set(familyKey, `family-${familyIds.size + 1}`);
+    }
+    const familyId = type === 'demand' ? familyIds.get(familyKey) : undefined;
+    const familyLabel = type === 'demand' ? `Familie ${familyIds.get(familyKey).slice('family-'.length)}` : undefined;
+    const rawdata = stripPrivateExportFields(sourceItem?.rawdata || {}, true);
+    const originalData = sourceItem?.originalData && typeof sourceItem.originalData === 'object'
+      ? {
+        ...stripPrivateExportFields(sourceItem.originalData, true),
+        name: displayName,
+        remark: '',
+        ...(type === 'demand' ? { familyId, familyLabel } : {}),
+      }
+      : undefined;
+
+    return [String(itemId), {
+      ...item,
+      id: String(itemId),
+      name: displayName,
+      remark: '',
+      ...(type === 'demand' ? { familyId, familyLabel } : {}),
+      ...(Object.keys(rawdata).length > 0 ? { rawdata } : {}),
+      ...(originalData ? { originalData } : {}),
+    }];
+  }));
+}
+
+function anonymizeGroupDefinitions(groupDefinitions = []) {
+  return groupDefinitions.map((definition, index) => ({
+    ...stripPrivateExportFields(definition, true),
+    name: `Gruppe ${index + 1}`,
+    ...(definition?.rawdata
+      ? { rawdata: stripPrivateExportFields(definition.rawdata, true) }
+      : {}),
+  }));
+}
+
+export function anonymizeSaveData(saveData) {
+  const data = stripPrivateExportFields(saveData || {});
+  data.scenarios = (data.scenarios || []).map((scenario, index) => ({
+    ...stripPrivateExportFields(scenario, true),
+    name: `Szenario ${index + 1}`,
+    remark: '',
+    importedAnonymized: true,
+  }));
+  data.dataByScenario = Object.fromEntries(Object.entries(data.dataByScenario || {}).map(([scenarioId, items]) => [
+    scenarioId,
+    anonymizeScenarioDataItems(items),
+  ]));
+  data.groupDefsByScenario = Object.fromEntries(Object.entries(data.groupDefsByScenario || {}).map(([scenarioId, definitions]) => [
+    scenarioId,
+    anonymizeGroupDefinitions(definitions),
+  ]));
+  data.bookingsByScenario = stripPrivateExportFields(data.bookingsByScenario || {}, true);
+  data.groupsByScenario = stripPrivateExportFields(data.groupsByScenario || {}, true);
+  data.financeByScenario = Object.fromEntries(Object.entries(data.financeByScenario || {}).map(([scenarioId, finance]) => [
+    scenarioId,
+    { ...stripPrivateExportFields(finance), itemFinances: {} },
+  ]));
+  return data;
+}
+
 // Save data to encrypted file
 export const saveToFile = async (data, password, filename = 'capakita-data.enc') => {
   try {
