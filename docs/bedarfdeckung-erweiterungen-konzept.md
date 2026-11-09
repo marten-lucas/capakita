@@ -148,20 +148,17 @@ Gruppenfilter), Regression gegen `kita-anonym-*.zip` (ZEITKAT-Verteilung nicht l
 
 ## 3. A3 – Simulation von Beitragsänderungen
 
-**Ziel-Flow**: Analyse → „Simulation von Beitragsänderungen". Die geladenen ZEITKAT-Beiträge aus dem Capakita-Datenspeicher werden gruppenweise als absolute Monatsbeträge angezeigt. Slider-Änderungen sind lokal und können pro Gruppe oder insgesamt zurückgesetzt werden; Optionen und Szenarien bleiben unverändert.
+**Ziel-Flow**: Analyse → „Simulation von Beitragsänderungen". Die geladenen ZEITKAT-Beiträge aus dem Capakita-Datenspeicher werden gruppenweise als absolute Monatsbeträge angezeigt. Simulationsszenarien, Filter, fixiertes Basisjahr und temporäre Tarifwerte werden im gemeinsamen Workspace gespeichert; die BayKiBiG-/Beitragsstammdaten selbst bleiben unverändert.
 
 ### 3.1 Simulationsmodell
 
 - Ausschöpfungsquote (0–100 %) ist der erwartete Anteil der aktiven Basisbuchungen, der bei identischem Simulationspreis in die direkt nächste ZEITKAT wechselt. Beitragssätze werden ausschließlich anhand der gebuchten Zeitkategorie ausgewählt.
 - Wenn `rawdata.ZEITKAT` fehlt, wird die Kategorie aus mittleren Tagesstunden der gespeicherten Buchungssegmente abgeleitet. Ohne auswertbare Segmente bleibt die Beitrags- und Buchungszeiten-Förderwirkung für diesen Datensatz unbestimmt; der Elternbeitragszuschuss wird unabhängig davon anhand von Geburtsdatum und aktivem Buchungsstatus geprüft.
 - Stunden und Förderänderung werden mit der Quote anteilig hochgerechnet. Förderdelta je Wechsel: `Basiswert × Gewichtung × (Zeitfaktor Ziel − Zeitfaktor Ausgang)`, sofern eine ZEITKAT vorliegt oder abgeleitet werden kann.
-- Elternanteil basiert auf dem geladenen Satz abzüglich des modellierten Elternbeitragszuschusses (Standard: 100 €/Monat je anspruchsberechtigtem Kind in der konfigurierten Gruppe bis zum Enddatum). Der Anspruch beginnt im September des Kalenderjahres, in dem das Kind drei Jahre alt wird; bei bereits zuvor vollendetem dritten Geburtstag gilt er ab Januar. Eine aktive Schulkind-/Hortbuchung beendet den Anspruch; das Kind muss in dem Monat eine aktive Basisbuchung haben. Der Zuschussbetrag gilt je Kind und Monat, auch wenn der Bruttobeitrag niedriger ist; der Elternanteil bleibt bei mindestens 0 €. Der Simulationszuschuss ist lokal änderbar. Zuschuss-Einnahme und netto zu zahlender Elternanteil werden getrennt ausgewiesen; Gesamteinnahmen = Förderanspruch inklusive Zuschuss + Elternanteil.
-- Preiseingaben sind rein lokale React-Komponentenzustände und werden beim Szenariowechsel
-  zurückgesetzt. Nur aktive Basisbuchungen (Regel-/Kurzzeitbuchungen) fließen in die Berechnung;
-  Alternativ- und Ferienbuchungen bleiben ausgeschlossen.
-- Ergebnisaggregation: je organisatorischer Gruppe und gesamt Buchungsstunden vorher/nachher,
-  monatliche Förderänderung, Elternbeitragsänderung und Gesamteinnahmenänderung (zusätzlich
-  Jahresdelta); Kinder-/Familien-Details bleiben als Drilldown verfügbar.
+- Elternanteil basiert auf dem geladenen Satz abzüglich des konfigurierten Elternbeitragszuschusses (Standard: 100 €/Monat je anspruchsberechtigtem Kind in der Beitragsordnung bis zum Enddatum). Der Anspruch beginnt im September des Kalenderjahres, in dem das Kind drei Jahre alt wird; bei bereits zuvor vollendetem dritten Geburtstag gilt er ab Januar. Eine aktive Schulkind-/Hortbuchung beendet den Anspruch; das Kind muss in dem Monat eine aktive Basisbuchung haben. Der Zuschussbetrag gilt je Kind und Monat, auch wenn der Bruttobeitrag niedriger ist; der Elternanteil bleibt bei mindestens 0 €. Es gibt keinen zusätzlichen Simulationsschalter für den Zuschuss: Das Enddatum beendet ihn automatisch. Läuft er aus, wird der Wegfall als Jahresänderung der Elternbeiträge und als Familien-Impact gegenüber dem Vorjahr ausgewiesen.
+- Bei fixiertem Basisjahr werden Kinderbestand, Buchungsstunden und die vier jährlichen Zusatzförderungswerte (U3-Bundesmittel, Personalbonus, Assistenz, Sprachförderung) aus diesem Jahr übernommen. Nur die Basisjahr-Zeile bleibt für diese Jahreswerte editierbar.
+- Nur aktive Basisbuchungen (Regel-/Kurzzeitbuchungen) fließen in die Berechnung; Alternativ- und Ferienbuchungen bleiben ausgeschlossen.
+- Die Ergebnistabelle zeigt Vorjahresänderung und Simulationseffekt getrennt. Familien-Details weisen sowohl die simulierte Tarifänderung als auch die Veränderung zum Vorjahr aus.
 
 ### 3.2 Umsetzung und Tests
 

@@ -240,6 +240,21 @@ function normalizeScenarioFinance(finance = {}) {
   if (Object.hasOwn(reformForecast, 'teamRatesByYear')) {
     settings.reformForecast = reformForecastWithoutLegacyRates;
   }
+  if (settings.fundingSimulation) {
+    const fundingSimulation = { ...settings.fundingSimulation };
+    delete fundingSimulation.parentFeeSubsidyEnabledByGroup;
+    if (Array.isArray(fundingSimulation.simulationScenarios)) {
+      fundingSimulation.simulationScenarios = fundingSimulation.simulationScenarios.map((scenario) => {
+        const cleanedScenario = { ...scenario };
+        if (cleanedScenario.data && typeof cleanedScenario.data === 'object') {
+          cleanedScenario.data = { ...cleanedScenario.data };
+          delete cleanedScenario.data.parentFeeSubsidyEnabledByGroup;
+        }
+        return cleanedScenario;
+      });
+    }
+    settings.fundingSimulation = fundingSimulation;
+  }
   const bayKiBiGRules = mergeDefaultBayKiBiGRules(finance.bayKiBiGRules)
     .map((rule) => {
       const normalizedRule = normalizeBayKiBiGRule(rule);

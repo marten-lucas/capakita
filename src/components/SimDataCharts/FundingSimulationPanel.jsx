@@ -47,7 +47,6 @@ const createBaselineSimulationScenario = (year) => ({
   data: {
     temporaryCatalogEntries: {},
     temporaryPrices: {},
-    parentFeeSubsidyEnabledByGroup: {},
     selectedGroupIds: [],
     fixedBaseYearEnabled: false,
     fixedBaseYear: year,
@@ -144,7 +143,7 @@ async function generateSimulationPdfReport({
 
   writeText('Jahresergebnisse', { size: 11, bold: true, after: 2 });
   drawTable(
-    ['Jahr', 'Zusatzförderung', 'Std./Tag Ø', 'Förderanspruch', 'Delta Förderung', 'Elternbeiträge', 'Delta Beiträge', 'Einnahmen', 'Delta Einnahmen/Vorjahr', 'Upgrade-Potenzial', 'Downgrade-Potenzial'],
+    ['Jahr', 'Zusatzförderung', 'Std./Tag Ø', 'Förderanspruch', 'Delta Förderung/Vorjahr', 'Elternbeiträge', 'Delta Beiträge (Vorjahr/Sim.)', 'Einnahmen', 'Delta Einnahmen (Vorjahr/Sim.)', 'Upgrade-Potenzial', 'Downgrade-Potenzial'],
     annualRows,
     [14, 27, 20, 27, 23, 25, 23, 25, 28, 32, 32]
   );
@@ -231,21 +230,39 @@ function AnnualFundingInput({ label, value, onCommit, testId, disabled = false }
   );
 }
 
-function AnnualMetricCell({ value, change, formatValue, formatChange, changeLabel = 'zum Vorjahr' }) {
-  const changeColor = change == null || Math.abs(change) < 0.005
+function AnnualMetricCell({
+  value,
+  change,
+  simulationChange,
+  formatValue,
+  formatChange,
+  changeLabel = 'zum Vorjahr',
+  simulationChangeLabel = 'Simulation',
+}) {
+  const getChangeColor = (amount) => amount == null || Math.abs(amount) < 0.005
     ? 'dimmed'
-    : change > 0 ? 'teal.7' : 'red.7';
+    : amount > 0 ? 'teal.7' : 'red.7';
   return (
     <Stack gap={0} align="flex-end" style={{ minWidth: 0 }}>
       <Text style={{ whiteSpace: 'nowrap' }}>{formatValue(value)}</Text>
       {change == null ? null : (
         <Text
           size="xs"
-          c={changeColor}
+          c={getChangeColor(change)}
           ta="right"
           style={{ maxWidth: '100%', whiteSpace: 'normal', overflowWrap: 'anywhere', lineHeight: 1.15 }}
         >
           {formatChange(change)} {changeLabel}
+        </Text>
+      )}
+      {simulationChange == null ? null : (
+        <Text
+          size="xs"
+          c={getChangeColor(simulationChange)}
+          ta="right"
+          style={{ maxWidth: '100%', whiteSpace: 'normal', overflowWrap: 'anywhere', lineHeight: 1.15 }}
+        >
+          {formatChange(simulationChange)} {simulationChangeLabel}
         </Text>
       )}
     </Stack>
@@ -525,7 +542,6 @@ function FundingSimulationPanel({ scrollPage = false }) {
     : currentYear;
   const temporaryCatalogEntries = fundingSimulationSettings.temporaryCatalogEntries || EMPTY_FINANCE;
   const temporaryPrices = fundingSimulationSettings.temporaryPrices || EMPTY_FINANCE;
-  const temporaryParentFeeSubsidyEnabledByGroup = fundingSimulationSettings.parentFeeSubsidyEnabledByGroup || EMPTY_FINANCE;
   const selectedGroupIds = React.useMemo(
     () => (Array.isArray(fundingSimulationSettings.selectedGroupIds) ? fundingSimulationSettings.selectedGroupIds : []),
     [fundingSimulationSettings.selectedGroupIds]
@@ -649,12 +665,9 @@ function FundingSimulationPanel({ scrollPage = false }) {
     ]);
     return Object.fromEntries(Array.from(groupIds).map((groupId) => {
       const saved = parentFeeSubsidiesByGroup[groupId] || parentFeeSubsidy;
-      return [groupId, {
-        ...saved,
-        enabled: temporaryParentFeeSubsidyEnabledByGroup[groupId] ?? (saved.enabled !== false),
-      }];
+      return [groupId, { ...saved, enabled: saved.enabled !== false }];
     }));
-  }, [groupDefs, parentFeeSubsidiesByGroup, parentFeeSubsidy, groupFeeCatalogs, temporaryParentFeeSubsidyEnabledByGroup]);
+  }, [groupDefs, parentFeeSubsidiesByGroup, parentFeeSubsidy, groupFeeCatalogs]);
   const simulationData = React.useMemo(() => {
     const dataItems = getEffectiveDataItems();
     const bookingsByItem = {};
@@ -736,7 +749,7 @@ function FundingSimulationPanel({ scrollPage = false }) {
     const reformForecast = financeScenario?.settings?.reformForecast || {};
     const legacyActualFunding = reformForecast.actualFunding || {};
     const annualFundingInputsByYear = reformForecast.annualFundingInputsByYear || {};
-    return fundingYears.map((year) => {
+    const annualRows = fundingYears.map((year) => {
       const manualInputYear = fixedBaseYearEnabled ? fixedBaseYear : year;
       const manualInputDefaults = manualInputYear === 2026 ? legacyActualFunding : {};
       const manualInputsForYear = annualFundingInputsByYear[String(manualInputYear)] || {};
@@ -754,9 +767,9 @@ function FundingSimulationPanel({ scrollPage = false }) {
       const families = new Map();
       const familyContributionImpacts = new Map();
       let contributions = 0;
+      let baselineContributions = 0;
       let contributionsChange = 0;
       let annualParentFeeSubsidy = 0;
-      let annualParentFeeSubsidyChange = 0;
       let eligibleParentFeeSubsidyChildMonths = 0;
 
       Array.from({ length: 12 }, (_, monthIndex) => {
@@ -915,12 +928,11 @@ function FundingSimulationPanel({ scrollPage = false }) {
             * (Number(childRow.bayKiBiGRule?.baseValue) || adebisMetrics.basisValue) / 24;
         });
 
-        contributions += monthlyFinance.summary.incomeParents
-          - baselineParentFeeSubsidy
-          + monthlySimulation.totals.deltaParentFees;
+        const monthlyBaselineContributions = monthlyFinance.summary.incomeParents - baselineParentFeeSubsidy;
+        baselineContributions += monthlyBaselineContributions;
+        contributions += monthlyBaselineContributions + monthlySimulation.totals.deltaParentFees;
         contributionsChange += monthlySimulation.totals.deltaParentFees;
         annualParentFeeSubsidy += monthlyParentFeeSubsidy;
-        annualParentFeeSubsidyChange += monthlySimulation.totals.deltaParentFeeSubsidy;
         eligibleParentFeeSubsidyChildMonths += monthlySimulation.totals.eligibleParentFeeSubsidyChildren;
       });
 
@@ -951,20 +963,18 @@ function FundingSimulationPanel({ scrollPage = false }) {
       const additionalFunding = Math.round((preparatoryCourses + under3Additional + under3Federal + qualityBonus
         + personnelBonus + assistance + languageSpecialists) * 100) / 100;
       const totalFunding = Math.round((baseFunding + additionalFunding + annualParentFeeSubsidy) * 100) / 100;
-      const fundingChange = Math.round(annualParentFeeSubsidyChange * 100) / 100;
       const contributionsChangeRounded = Math.round(contributionsChange * 100) / 100;
+      const baselineContributionsRounded = Math.round(baselineContributions * 100) / 100;
       const contributionsRounded = Math.round(contributions * 100) / 100;
-      const familyImpacts = Array.from(familyContributionImpacts.values()).map((family) => {
-        const annualDelta = family.monthlyParentFeesAfter - family.monthlyParentFeesBefore;
-        return {
-          ...family,
-          averageMonthlyParentFeesBefore: family.monthlyParentFeesBefore / 12,
-          averageMonthlyParentFeesAfter: family.monthlyParentFeesAfter / 12,
-          averageMonthlyDelta: annualDelta / 12,
-          annualDelta,
-        };
-      }).filter((family) => Math.abs(family.annualDelta) >= 0.005)
-        .sort((left, right) => Math.abs(right.annualDelta) - Math.abs(left.annualDelta));
+      const familyParentFeesById = Object.fromEntries(Array.from(familyContributionImpacts.values()).map((family) => [
+        family.id,
+        {
+          id: family.id,
+          label: family.label,
+          monthlyParentFeesBefore: Math.round(family.monthlyParentFeesBefore * 100) / 100,
+          monthlyParentFeesAfter: Math.round(family.monthlyParentFeesAfter * 100) / 100,
+        },
+      ]));
       const familyTree = Array.from(families.values()).map((family) => {
         const children = Array.from(family.children.values()).map((child) => ({
           ...child,
@@ -1001,17 +1011,49 @@ function FundingSimulationPanel({ scrollPage = false }) {
         averageDailyBookingHours: meanMetric('bookingHoursDaily'),
         additionalFunding,
         totalFunding,
-        fundingChange,
         contributions: contributionsRounded,
+        baselineContributions: baselineContributionsRounded,
         contributionsChange: contributionsChangeRounded,
         annualParentFeeSubsidy: Math.round(annualParentFeeSubsidy * 100) / 100,
         eligibleParentFeeSubsidyChildMonths,
         totalIncome: Math.round((totalFunding + contributionsRounded) * 100) / 100,
-        totalIncomeChange: Math.round((fundingChange + contributionsChangeRounded) * 100) / 100,
+        baselineTotalIncome: Math.round((totalFunding + baselineContributionsRounded) * 100) / 100,
+        totalIncomeChange: Math.round((contributionsRounded - baselineContributionsRounded) * 100) / 100,
         monthlyDetails,
         familyTree,
-        familyImpacts,
+        familyParentFeesById,
       };
+    });
+    return annualRows.map((row, index) => {
+      const currentFamilyFees = row.familyParentFeesById || {};
+      const previousFamilyFees = annualRows[index - 1]?.familyParentFeesById || {};
+      const familyIds = new Set([...Object.keys(currentFamilyFees), ...Object.keys(previousFamilyFees)]);
+      const familyImpacts = Array.from(familyIds).map((familyId) => {
+        const current = currentFamilyFees[familyId];
+        const previous = previousFamilyFees[familyId];
+        const annualDelta = (current?.monthlyParentFeesAfter || 0) - (current?.monthlyParentFeesBefore || 0);
+        const yearOverYearAnnualDelta = index === 0
+          ? null
+          : (current?.monthlyParentFeesBefore || 0) - (previous?.monthlyParentFeesBefore || 0);
+        return {
+          id: familyId,
+          label: current?.label || previous?.label || familyId,
+          monthlyParentFeesBefore: current?.monthlyParentFeesBefore || 0,
+          monthlyParentFeesAfter: current?.monthlyParentFeesAfter || 0,
+          averageMonthlyParentFeesBefore: (current?.monthlyParentFeesBefore || 0) / 12,
+          averageMonthlyParentFeesAfter: (current?.monthlyParentFeesAfter || 0) / 12,
+          averageMonthlyDelta: annualDelta / 12,
+          annualDelta,
+          averageMonthlyYearOverYearDelta: yearOverYearAnnualDelta == null ? null : yearOverYearAnnualDelta / 12,
+          yearOverYearAnnualDelta,
+        };
+      }).filter((family) => Math.abs(family.annualDelta) >= 0.005
+        || (family.yearOverYearAnnualDelta != null && Math.abs(family.yearOverYearAnnualDelta) >= 0.005))
+        .sort((left, right) => Math.max(Math.abs(right.annualDelta), Math.abs(right.yearOverYearAnnualDelta || 0))
+          - Math.max(Math.abs(left.annualDelta), Math.abs(left.yearOverYearAnnualDelta || 0)));
+      const rowData = { ...row };
+      delete rowData.familyParentFeesById;
+      return { ...rowData, familyImpacts };
     });
   }, [
     fundingYears,
@@ -1070,11 +1112,15 @@ function FundingSimulationPanel({ scrollPage = false }) {
       ? reformProjectionFunding - standardFundingExcludingPassThrough
       : reformGuidelineFunding - existingGuidelineFunding;
     const totalFunding = Math.round((row.totalFunding + adjustment) * 100) / 100;
+    const totalIncome = Math.round((totalFunding + row.contributions) * 100) / 100;
+    const baselineTotalIncome = Math.round((totalFunding + row.baselineContributions) * 100) / 100;
     return {
       ...row,
       additionalFunding: Math.round((row.additionalFunding + adjustment) * 100) / 100,
       totalFunding,
-      totalIncome: Math.round((totalFunding + row.contributions) * 100) / 100,
+      totalIncome,
+      baselineTotalIncome,
+      totalIncomeChange: Math.round((totalIncome - baselineTotalIncome) * 100) / 100,
       reformTeamGrant: reformYear?.teamGrant || 0,
       reformPriorGuidelineFunding: reformYear?.priorGuidelineFunding || 0,
       reformTeamGrantNet: reformYear?.teamGrantNet || 0,
@@ -1283,7 +1329,6 @@ function FundingSimulationPanel({ scrollPage = false }) {
       Object.entries(values).filter(([id]) => id !== String(groupId))
     );
     updateFundingSimulation({
-      parentFeeSubsidyEnabledByGroup: keepOtherGroups(temporaryParentFeeSubsidyEnabledByGroup),
       temporaryCatalogEntries: keepOtherGroups(temporaryCatalogEntries),
       temporaryPrices: keepOtherGroups(temporaryPrices),
     });
@@ -1292,7 +1337,6 @@ function FundingSimulationPanel({ scrollPage = false }) {
     updateFundingSimulation({
       temporaryCatalogEntries: {},
       temporaryPrices: {},
-      parentFeeSubsidyEnabledByGroup: {},
     });
   };
   const selectedSimulationScenario = simulationScenarios.find((scenario) => scenario.id === selectedSimulationScenarioId)
@@ -1300,8 +1344,6 @@ function FundingSimulationPanel({ scrollPage = false }) {
   const captureSimulationScenarioData = () => ({
     temporaryCatalogEntries: clonePlainData(temporaryCatalogEntries),
     temporaryPrices: clonePlainData(temporaryPrices),
-    parentFeeSubsidyEnabledByGroup: Object.fromEntries(Object.entries(effectiveParentFeeSubsidiesByGroup)
-      .map(([groupId, subsidy]) => [groupId, subsidy.enabled !== false])),
     selectedGroupIds: [...selectedGroupIds],
     fixedBaseYearEnabled,
     fixedBaseYear,
@@ -1315,7 +1357,6 @@ function FundingSimulationPanel({ scrollPage = false }) {
       selectedSimulationScenarioId: scenario.id,
       temporaryCatalogEntries: clonePlainData(data.temporaryCatalogEntries || {}),
       temporaryPrices: clonePlainData(data.temporaryPrices || {}),
-      parentFeeSubsidyEnabledByGroup: clonePlainData(data.parentFeeSubsidyEnabledByGroup || {}),
       selectedGroupIds: [...(data.selectedGroupIds || [])],
       fixedBaseYearEnabled: data.fixedBaseYearEnabled === true,
       fixedBaseYear: Number(data.fixedBaseYear) || currentYear,
@@ -1342,7 +1383,6 @@ function FundingSimulationPanel({ scrollPage = false }) {
       data: {
         temporaryCatalogEntries: {},
         temporaryPrices: {},
-        parentFeeSubsidyEnabledByGroup: {},
         selectedGroupIds: [],
         fixedBaseYearEnabled: false,
         fixedBaseYear: currentYear,
@@ -1354,7 +1394,6 @@ function FundingSimulationPanel({ scrollPage = false }) {
       selectedSimulationScenarioId: scenario.id,
       temporaryCatalogEntries: {},
       temporaryPrices: {},
-      parentFeeSubsidyEnabledByGroup: {},
       selectedGroupIds: [],
       fixedBaseYearEnabled: false,
       fixedBaseYear: currentYear,
@@ -1387,11 +1426,11 @@ function FundingSimulationPanel({ scrollPage = false }) {
           formatEuro(row.additionalFunding),
           formatDailyHours(row.averageDailyBookingHours),
           formatEuro(row.totalFunding),
-          formatSignedEuro(row.fundingChange),
+          previous ? formatSignedEuro(row.totalFunding - previous.totalFunding) : '–',
           formatEuro(row.contributions),
-          formatSignedEuro(row.contributionsChange),
+          `${previous ? formatSignedEuro(row.baselineContributions - previous.baselineContributions) : '–'} / ${formatSignedEuro(row.contributionsChange)} Sim.`,
           formatEuro(row.totalIncome),
-          previous ? formatSignedEuro(row.totalIncome - previous.totalIncome) : '–',
+          `${previous ? formatSignedEuro(row.baselineTotalIncome - previous.baselineTotalIncome) : '–'} / ${formatSignedEuro(row.totalIncomeChange)} Sim.`,
           upgradeHours > 0 ? `${formatDailyHours(upgradeHours)} · ${formatSignedEuro(upgradeHours * fundingPerWeightedDailyHour)}` : '–',
           downgradeHours > 0 ? `-${formatDailyHours(downgradeHours)} · ${formatSignedEuro(-downgradeHours * fundingPerWeightedDailyHour)}` : '–',
         ];
@@ -1429,7 +1468,7 @@ function FundingSimulationPanel({ scrollPage = false }) {
         ? selectedGroupIds.map((groupId) => groupFilterOptions.find((option) => option.value === groupId)?.label || groupId).join(', ')
         : 'Alle Gruppen';
       const baseYearLabel = fixedBaseYearEnabled
-        ? `Fixiertes Basisjahr: ${fixedBaseYear} (Kinderbestand und Buchungsstunden)`
+        ? `Fixiertes Basisjahr: ${fixedBaseYear} (Kinderbestand, Buchungsstunden und Zusatzförderungen)`
         : `Kein fixiertes Basisjahr · Jahresbasis nach Buchungsdaten (Stichtagsjahr ${currentYear})`;
       const familyRows = affectedFamilyRows.slice(0, 10).map((family) => [
         family.label,
@@ -1756,8 +1795,6 @@ function FundingSimulationPanel({ scrollPage = false }) {
             >
               {tariffGroups.map((group) => {
                 const storedSubsidy = parentFeeSubsidiesByGroup[group.id] || parentFeeSubsidy;
-                const subsidyEnabled = temporaryParentFeeSubsidyEnabledByGroup[group.id]
-                  ?? (storedSubsidy.enabled !== false);
                 return (
                   <Carousel.Slide key={group.id} data-testid={`simulation-tariff-slide-${group.id}`}>
                     <Stack gap="xs">
@@ -1771,18 +1808,7 @@ function FundingSimulationPanel({ scrollPage = false }) {
                             Elternbeitragszuschuss: {formatEuro(storedSubsidy.monthlyAmount)} / Kind / Monat · gilt bis {formatBookingDate(storedSubsidy.endDate, 'unbegrenzt')}
                           </Text>
                         </Stack>
-                        <Switch
-                          size="xs"
-                          label="Elternbeitragszuschuss aktiv"
-                          checked={subsidyEnabled}
-                          onChange={(event) => updateFundingSimulation({
-                            parentFeeSubsidyEnabledByGroup: {
-                              ...temporaryParentFeeSubsidyEnabledByGroup,
-                              [group.id]: event.currentTarget.checked,
-                            },
-                          })}
-                          data-testid={`simulation-parent-fee-subsidy-${group.id}`}
-                        />
+
                       </Group>
                       <FeeStaircaseEditor
                         entries={effectiveFeeCatalogs[group.id] || []}
@@ -1865,7 +1891,7 @@ function FundingSimulationPanel({ scrollPage = false }) {
                           <Table.Th ta="right" rowSpan={2}>Buchungsstunden / Tag (Ø Jahr)</Table.Th>
                           <Table.Th ta="right" rowSpan={2}>{reformForecastSettings.teamGrantEligible === true ? 'Förderanspruch inkl. Teamzuschuss' : 'Förderanspruch'}</Table.Th>
                           <Table.Th ta="right" rowSpan={2}>Elternbeiträge</Table.Th>
-                          <Table.Th ta="right" rowSpan={2}>Einnahmen (Delta)</Table.Th>
+                          <Table.Th ta="right" rowSpan={2}>Einnahmen</Table.Th>
                           <Table.Th ta="right" rowSpan={2}>Upgradepotential</Table.Th>
                           <Table.Th ta="right" rowSpan={2}>Downgradepotential</Table.Th>
                         </Table.Tr>
@@ -1898,7 +1924,7 @@ function FundingSimulationPanel({ scrollPage = false }) {
                         <Table.Th ta="right">Buchungsstunden / Tag (Ø Jahr)</Table.Th>
                         <Table.Th ta="right">{reformForecastSettings.teamGrantEligible === true ? 'Förderanspruch inkl. Teamzuschuss' : 'Förderanspruch'}</Table.Th>
                         <Table.Th ta="right">Elternbeiträge</Table.Th>
-                        <Table.Th ta="right">Einnahmen (Delta)</Table.Th>
+                        <Table.Th ta="right">Einnahmen</Table.Th>
                         <Table.Th ta="right">Upgradepotential</Table.Th>
                         <Table.Th ta="right">Downgradepotential</Table.Th>
                       </Table.Tr>
@@ -1912,6 +1938,9 @@ function FundingSimulationPanel({ scrollPage = false }) {
                         : null;
                       const annualFundingInputTotal = Object.values(row.annualFundingInputs)
                         .reduce((sum, value) => sum + (Number(value) || 0), 0);
+                      const previousFundingInputTotal = previous
+                        ? Object.values(previous.annualFundingInputs).reduce((sum, value) => sum + (Number(value) || 0), 0)
+                        : null;
                       const annualBasisValueTotal = row.monthlyDetails
                         .reduce((sum, month) => sum + (Number(month.basisValue) || 0), 0);
                       const annualFundingPerWeightedDailyHour = annualBasisValueTotal / 24;
@@ -1958,17 +1987,29 @@ function FundingSimulationPanel({ scrollPage = false }) {
                             ['languageSpecialists', 'Sprachförderung-Fördersumme'],
                           ].map(([field, label]) => (
                             <Table.Td ta="right" key={field}>
-                              <AnnualFundingInput
-                                label={`${label} ${row.year}`}
-                                value={row.annualFundingInputs[field]}
-                                onCommit={(value) => updateAnnualFundingInput(fixedBaseYearEnabled ? fixedBaseYear : row.year, field, value)}
-                                disabled={fixedBaseYearEnabled && row.year !== fixedBaseYear}
-                                testId={`annual-funding-input-${row.year}-${field}`}
-                              />
+                              <Stack gap={0} align="flex-end">
+                                <AnnualFundingInput
+                                  label={`${label} ${row.year}`}
+                                  value={row.annualFundingInputs[field]}
+                                  onCommit={(value) => updateAnnualFundingInput(fixedBaseYearEnabled ? fixedBaseYear : row.year, field, value)}
+                                  disabled={fixedBaseYearEnabled && row.year !== fixedBaseYear}
+                                  testId={`annual-funding-input-${row.year}-${field}`}
+                                />
+                                {previous ? (
+                                  <Text size="xs" c="dimmed" data-testid={`annual-funding-input-change-${row.year}-${field}`}>
+                                    {formatSignedEuro((Number(row.annualFundingInputs[field]) || 0) - (Number(previous.annualFundingInputs[field]) || 0))} zum Vorjahr
+                                  </Text>
+                                ) : null}
+                              </Stack>
                             </Table.Td>
                           ))) : (
                             <Table.Td ta="right" data-testid={`annual-funding-input-total-${row.year}`}>
-                              {formatEuro(annualFundingInputTotal)}
+                              <AnnualMetricCell
+                                value={annualFundingInputTotal}
+                                change={previousFundingInputTotal == null ? null : annualFundingInputTotal - previousFundingInputTotal}
+                                formatValue={formatEuro}
+                                formatChange={formatSignedEuro}
+                              />
                             </Table.Td>
                           )}
                           <Table.Td ta="right" data-testid={`annual-booking-hours-${row.year}`}>
@@ -1982,8 +2023,7 @@ function FundingSimulationPanel({ scrollPage = false }) {
                           <Table.Td ta="right" fw={700} data-testid={`annual-funding-${row.year}`}>
                             <AnnualMetricCell
                               value={row.totalFunding}
-                              change={row.fundingChange}
-                              changeLabel="zur Zuschussregel"
+                              change={previous ? row.totalFunding - previous.totalFunding : null}
                               formatValue={formatEuro}
                               formatChange={formatSignedEuro}
                             />
@@ -1991,8 +2031,8 @@ function FundingSimulationPanel({ scrollPage = false }) {
                           <Table.Td ta="right" data-testid={`annual-contributions-${row.year}`}>
                             <AnnualMetricCell
                               value={row.contributions}
-                              change={row.contributionsChange}
-                              changeLabel="zur Beitragsordnung"
+                              change={previous ? row.baselineContributions - previous.baselineContributions : null}
+                              simulationChange={row.contributionsChange}
                               formatValue={formatEuro}
                               formatChange={formatSignedEuro}
                             />
@@ -2000,7 +2040,8 @@ function FundingSimulationPanel({ scrollPage = false }) {
                           <Table.Td ta="right" fw={700}>
                             <AnnualMetricCell
                               value={row.totalIncome}
-                              change={previous ? row.totalIncome - previous.totalIncome : null}
+                              change={previous ? row.baselineTotalIncome - previous.baselineTotalIncome : null}
+                              simulationChange={row.totalIncomeChange}
                               formatValue={formatEuro}
                               formatChange={formatSignedEuro}
                             />
@@ -2037,7 +2078,8 @@ function FundingSimulationPanel({ scrollPage = false }) {
                                             <Table.Th>Familie</Table.Th>
                                             <Table.Th ta="right">Aktueller Beitrag · Ø / Monat</Table.Th>
                                             <Table.Th ta="right">Neuer Beitrag · Ø / Monat</Table.Th>
-                                            <Table.Th ta="right">Änderung · Ø / Monat</Table.Th>
+                                            <Table.Th ta="right">Änderung durch Simulation · Ø / Monat</Table.Th>
+                                            <Table.Th ta="right">Änderung zum Vorjahr · Ø / Monat</Table.Th>
                                           </Table.Tr>
                                         </Table.Thead>
                                         <Table.Tbody>
@@ -2049,9 +2091,20 @@ function FundingSimulationPanel({ scrollPage = false }) {
                                               <Table.Td
                                                 ta="right"
                                                 c={family.averageMonthlyDelta > 0.005 ? 'red.7' : family.averageMonthlyDelta < -0.005 ? 'teal.7' : 'dimmed'}
-                                                title={`Jahresdelta: ${formatSignedEuro(family.annualDelta)}`}
+                                                title={`Simulationsdelta im Jahr: ${formatSignedEuro(family.annualDelta)}`}
                                               >
                                                 {formatSignedEuro(family.averageMonthlyDelta)}
+                                              </Table.Td>
+                                              <Table.Td
+                                                ta="right"
+                                                c={family.averageMonthlyYearOverYearDelta > 0.005 ? 'red.7' : family.averageMonthlyYearOverYearDelta < -0.005 ? 'teal.7' : 'dimmed'}
+                                                title={family.yearOverYearAnnualDelta == null
+                                                  ? 'Kein Vorjahr im Vergleich'
+                                                  : `Veränderung zum Vorjahr im Jahr: ${formatSignedEuro(family.yearOverYearAnnualDelta)}`}
+                                              >
+                                                {family.averageMonthlyYearOverYearDelta == null
+                                                  ? '–'
+                                                  : formatSignedEuro(family.averageMonthlyYearOverYearDelta)}
                                               </Table.Td>
                                             </Table.Tr>
                                           ))}

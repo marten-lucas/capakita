@@ -278,8 +278,6 @@ describe('FundingSimulationPanel', () => {
 
     openFuchsTariffGroup();
     setFeeAmount('Betrag ZEITKAT 05', 150);
-    const subsidySwitch = screen.getByRole('switch', { name: 'Elternbeitragszuschuss aktiv' });
-    fireEvent.click(subsidySwitch);
     fireEvent.click(screen.getByTestId('save-simulation-scenario'));
     const scenarioNameInput = await screen.findByTestId('simulation-scenario-name');
     fireEvent.change(scenarioNameInput, { target: { value: 'Härtefall-Simulation' } });
@@ -293,7 +291,6 @@ describe('FundingSimulationPanel', () => {
     expect(persistedOptions.simulationScenarios.some((scenario) => scenario.name === 'Härtefall-Simulation')).toBe(true);
     expect(screen.getByLabelText('Betrag ZEITKAT 05').value).toBe('150 €');
     setFeeAmount('Betrag ZEITKAT 05', 200);
-    fireEvent.click(subsidySwitch);
     const scenarioSelect = screen.getByRole('combobox', { name: 'Szenario' });
     fireEvent.click(scenarioSelect);
     fireEvent.click(screen.getByRole('option', { name: 'Standard-Tarif 2026' }));
@@ -302,12 +299,10 @@ describe('FundingSimulationPanel', () => {
     fireEvent.click(screen.getByRole('option', { name: 'Härtefall-Simulation' }));
 
     expect(screen.getByLabelText('Betrag ZEITKAT 05').value).toBe('150 €');
-    expect(screen.getByRole('switch', { name: 'Elternbeitragszuschuss aktiv' }).checked).toBe(false);
     fireEvent.click(screen.getByTestId('clone-simulation-scenario'));
     expect(screen.getByLabelText('Betrag ZEITKAT 05').value).toBe('150 €');
     fireEvent.click(screen.getByTestId('new-simulation-scenario'));
     expect(screen.getByLabelText('Betrag ZEITKAT 05').value).toBe('100 €');
-    expect(screen.getByRole('switch', { name: 'Elternbeitragszuschuss aktiv' }).checked).toBe(true);
   });
 
   it('filtert die Simulation nach ausgewählten Gruppen und speichert den Filter im Workspace', () => {
@@ -371,12 +366,11 @@ describe('FundingSimulationPanel', () => {
     );
 
     openFuchsTariffGroup();
-    fireEvent.click(screen.getByRole('switch', { name: 'Elternbeitragszuschuss aktiv' }));
     const contributionsBefore = screen.getByTestId('annual-contributions-2026').textContent;
     fireEvent.click(screen.getByLabelText('Deaktiviere Beitrag ZEITKAT 05'));
 
     expect(screen.getByLabelText('Betrag ZEITKAT 05').disabled).toBe(true);
-    expect(screen.getByTestId('annual-contributions-2026').textContent).not.toBe(contributionsBefore);
+    expect(screen.getByTestId('annual-contributions-2026').textContent).toBe(contributionsBefore);
     expect(store.getState().simFinance.financeByScenario['scenario-1'].groupFeeCatalogs.g1[0].enabled).toBeUndefined();
   });
 
@@ -538,8 +532,7 @@ describe('FundingSimulationPanel', () => {
     expect(familyRow.textContent).toContain('+8,0 h/Woche');
     expect(screen.getByTestId('annual-income-row-2026').textContent).toContain('1.200,00 €');
     expect(screen.getByTestId('annual-income-row-2026').textContent).toContain('3.617,60 €');
-    expect(screen.getByTestId('annual-income-row-2026').textContent).toContain('0,00 € zur Zuschussregel');
-    expect(screen.getByTestId('annual-income-row-2026').textContent).toContain('+1.200,00 € zur Beitragsordnung');
+    expect(screen.getByTestId('annual-income-row-2026').textContent).toContain('+1.200,00 € Simulation');
     fireEvent.click(screen.getByTestId('annual-family-impact-toggle-2028'));
     expect(await screen.findByTestId('annual-family-impact-table-2028')).toBeTruthy();
     expect(screen.getByTestId('annual-family-impact-2028-surname:reuter').textContent).toContain('Familie Reuter');
@@ -619,8 +612,8 @@ describe('FundingSimulationPanel', () => {
     expect(screen.getByTestId('fee-staircase-slider-13')).toBeTruthy();
   });
 
-  it('verwendet den Elternbeitragszuschuss je Beitragsordnung statt globaler Simulationsoption', () => {
-    const store = createTestStore();
+  it('uses the subsidy end date to show the 2027 family fee increase', async () => {
+    const store = createTestStore({ include2027BookingChange: true });
     render(
       <Provider store={store}>
         <MantineProvider>
@@ -629,27 +622,25 @@ describe('FundingSimulationPanel', () => {
       </Provider>
     );
 
-    expect(screen.queryByTestId('parent-fee-subsidy-control')).toBeNull();
+    expect(screen.queryByRole('switch', { name: 'Elternbeitragszuschuss aktiv' })).toBeNull();
     act(() => store.dispatch(updateGroupParentFeeSubsidy({
       scenarioId: 'scenario-1',
       groupId: 'g1',
-      updates: { monthlyAmount: 75, endDate: '2026-02-28' },
+      updates: { monthlyAmount: 75, endDate: '2026-12-31', maximumAgeYears: 100 },
     })));
-    expect(store.getState().simFinance.financeByScenario['scenario-1'].parentFeeSubsidiesByGroup.g1).toMatchObject({
-      monthlyAmount: 75,
-      endDate: '2026-02-28',
-      enabled: true,
-    });
     expect(screen.getByTestId('simulation-parent-fee-subsidy-amount-g1').textContent).toContain('75,00 €');
-    const fundingBeforeToggle = getEuroAmount(screen.getByTestId('annual-funding-2026'));
-    const contributionsBeforeToggle = getEuroAmount(screen.getByTestId('annual-contributions-2026'));
-    const simulationSubsidySwitch = screen.getByRole('switch', { name: 'Elternbeitragszuschuss aktiv' });
-    expect(simulationSubsidySwitch.checked).toBe(true);
-    fireEvent.click(simulationSubsidySwitch);
-    expect(simulationSubsidySwitch.checked).toBe(false);
-    expect(getEuroAmount(screen.getByTestId('annual-funding-2026'))).toBeLessThan(fundingBeforeToggle);
-    expect(getEuroAmount(screen.getByTestId('annual-contributions-2026'))).toBeGreaterThan(contributionsBeforeToggle);
-    expect(store.getState().simFinance.financeByScenario['scenario-1'].parentFeeSubsidiesByGroup.g1.enabled).toBe(true);
+
+    openSimulationSettings();
+    fireEvent.click(screen.getByTestId('fixed-base-year-toggle'));
+    const contributions2026 = getEuroAmount(screen.getByTestId('annual-contributions-2026'));
+    const contributions2027 = getEuroAmount(screen.getByTestId('annual-contributions-2027'));
+    expect(contributions2027 - contributions2026).toBeCloseTo(1800, 2);
+    expect(screen.getByTestId('annual-contributions-2027').textContent).toContain('+1.800,00 € zum Vorjahr');
+    expect(screen.getByTestId('annual-contributions-2027').textContent).toContain('0,00 € Simulation');
+
+    fireEvent.click(screen.getByTestId('annual-family-impact-toggle-2027'));
+    const familyImpact = await screen.findByTestId('annual-family-impact-2027-surname:reuter');
+    expect(familyImpact.textContent).toContain('+150,00 €');
   });
 
   it('setzt den temporären Einzelpreis zurück auf den geladenen Wert', () => {

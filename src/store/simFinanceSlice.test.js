@@ -27,6 +27,29 @@ describe('simFinanceSlice', () => {
     });
   });
 
+  it('drops legacy temporary subsidy toggles when loading saved simulation options', () => {
+    const state = simFinanceReducer(undefined, loadFinanceByScenario({
+      'scenario-1': {
+        settings: {
+          fundingSimulation: {
+            selectedGroupIds: ['group-1'],
+            parentFeeSubsidyEnabledByGroup: { 'group-1': false },
+            simulationScenarios: [{
+              id: 'scenario-old',
+              name: 'Alt',
+              data: { parentFeeSubsidyEnabledByGroup: { 'group-1': false } },
+            }],
+          },
+        },
+      },
+    }));
+    const fundingSimulation = state.financeByScenario['scenario-1'].settings.fundingSimulation;
+
+    expect(fundingSimulation).not.toHaveProperty('parentFeeSubsidyEnabledByGroup');
+    expect(fundingSimulation.selectedGroupIds).toEqual(['group-1']);
+    expect(fundingSimulation.simulationScenarios[0].data).not.toHaveProperty('parentFeeSubsidyEnabledByGroup');
+  });
+
   it('adds the legacy monthly parent-fee subsidy to the scenario finance model', () => {
     const state = simFinanceReducer(undefined, loadFinanceByScenario({
       'scenario-default': {},
