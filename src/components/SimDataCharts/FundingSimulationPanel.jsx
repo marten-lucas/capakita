@@ -4,7 +4,7 @@ import { Carousel } from '@mantine/carousel';
 import { IconChevronDown, IconChevronRight, IconChevronUp, IconCopy, IconDeviceFloppy, IconFileText, IconInfoCircle, IconPlus, IconRefresh } from '@tabler/icons-react';
 import { useDispatch, useSelector } from 'react-redux';
 import { notifications } from '@mantine/notifications';
-import { seedDefaultBayKiBiGRules, updateScenarioFinanceSettings } from '../../store/simFinanceSlice';
+import { seedDefaultBayKiBiGRules, updateFundingSimulationSettings, updateScenarioFinanceSettings } from '../../store/simFinanceSlice';
 import { useOverlayData } from '../../hooks/useOverlayData';
 import { filterBookings } from '../../utils/chartUtils/chartUtils';
 import { decodeBuchungsart, getFeeBandZeitkatId, isAdebisTrue, ZEITKAT_CATALOG } from '../../utils/adebisConstants';
@@ -41,6 +41,19 @@ const formatZeitkatList = (zeitkatIds = []) => zeitkatIds.map((zeitkatId) => {
 }).join(', ') || '–';
 const clonePlainData = (value) => JSON.parse(JSON.stringify(value));
 const createLocalScenarioId = () => `simulation-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+const createBaselineSimulationScenario = (year) => ({
+  id: 'baseline',
+  name: `Standard-Tarif ${year}`,
+  data: {
+    temporaryCatalogEntries: {},
+    temporaryPrices: {},
+    parentFeeSubsidyEnabledByGroup: {},
+    selectedGroupIds: [],
+    fixedBaseYearEnabled: false,
+    fixedBaseYear: year,
+    potentialMonthlyBudget: 50,
+  },
+});
 
 async function generateSimulationPdfReport({
   scenarioName,
@@ -496,25 +509,32 @@ function FundingSimulationPanel({ scrollPage = false }) {
   const referenceDate = useSelector((state) => state.chart?.referenceDate)
     || new Date().toISOString().slice(0, 10);
   const currentYear = Number(referenceDate.slice(0, 4));
-  const [fixedBaseYearEnabled, setFixedBaseYearEnabled] = React.useState(false);
-  const [fixedBaseYear, setFixedBaseYear] = React.useState(currentYear);
+  const fundingSimulationSettings = financeScenario?.settings?.fundingSimulation || EMPTY_FINANCE;
+  const storedSimulationScenarios = fundingSimulationSettings.simulationScenarios;
+  const simulationScenarios = Array.isArray(storedSimulationScenarios) && storedSimulationScenarios.length > 0
+    ? storedSimulationScenarios
+    : [createBaselineSimulationScenario(currentYear)];
+  const storedSelectedSimulationScenarioId = fundingSimulationSettings.selectedSimulationScenarioId;
+  const selectedSimulationScenarioId = simulationScenarios.some((scenario) => scenario.id === storedSelectedSimulationScenarioId)
+    ? storedSelectedSimulationScenarioId
+    : simulationScenarios[0].id;
+  const fixedBaseYearEnabled = fundingSimulationSettings.fixedBaseYearEnabled === true;
+  const fixedBaseYear = fixedBaseYearEnabled
+    ? Number(fundingSimulationSettings.fixedBaseYear) || currentYear
+    : currentYear;
+  const temporaryCatalogEntries = fundingSimulationSettings.temporaryCatalogEntries || EMPTY_FINANCE;
+  const temporaryPrices = fundingSimulationSettings.temporaryPrices || EMPTY_FINANCE;
+  const temporaryParentFeeSubsidyEnabledByGroup = fundingSimulationSettings.parentFeeSubsidyEnabledByGroup || EMPTY_FINANCE;
+  const selectedGroupIds = React.useMemo(
+    () => (Array.isArray(fundingSimulationSettings.selectedGroupIds) ? fundingSimulationSettings.selectedGroupIds : []),
+    [fundingSimulationSettings.selectedGroupIds]
+  );
+  const potentialMonthlyBudget = Number.isFinite(Number(fundingSimulationSettings.potentialMonthlyBudget))
+    ? Number(fundingSimulationSettings.potentialMonthlyBudget)
+    : 50;
   const [pdfExportLoading, setPdfExportLoading] = React.useState(false);
   const [scenarioSaveOpened, setScenarioSaveOpened] = React.useState(false);
   const [scenarioNameDraft, setScenarioNameDraft] = React.useState('');
-  const [simulationScenarios, setSimulationScenarios] = React.useState(() => [{
-    id: 'baseline',
-    name: `Standard-Tarif ${currentYear}`,
-    data: {
-      temporaryCatalogEntries: {},
-      temporaryPrices: {},
-      parentFeeSubsidyEnabledByGroup: {},
-      selectedGroupIds: [],
-      fixedBaseYearEnabled: false,
-      fixedBaseYear: currentYear,
-      potentialMonthlyBudget: 50,
-    },
-  }]);
-  const [selectedSimulationScenarioId, setSelectedSimulationScenarioId] = React.useState('baseline');
   const {
     getEffectiveDataItems,
     getEffectiveBookings,
@@ -523,16 +543,15 @@ function FundingSimulationPanel({ scrollPage = false }) {
     getEffectiveQualificationAssignments,
     getEffectiveQualificationDefs,
   } = useOverlayData();
-  const [temporaryCatalogEntries, setTemporaryCatalogEntries] = React.useState({});
-  const [temporaryPrices, setTemporaryPrices] = React.useState({});
-  const [selectedGroupIds, setSelectedGroupIds] = React.useState([]);
-  const [potentialMonthlyBudget, setPotentialMonthlyBudget] = React.useState(50);
   const [selectedDetailsYear, setSelectedDetailsYear] = React.useState(null);
   const [expandedFamilyYear, setExpandedFamilyYear] = React.useState(null);
   const [detailsTab, setDetailsTab] = React.useState('adebis');
   const [groupFamilies, setGroupFamilies] = React.useState(true);
   const [showAnnualFundingInputs, setShowAnnualFundingInputs] = React.useState(false);
-  const [temporaryParentFeeSubsidyEnabledByGroup, setTemporaryParentFeeSubsidyEnabledByGroup] = React.useState({});
+  const updateFundingSimulation = React.useCallback((updates) => {
+    if (!selectedScenarioId) return;
+    dispatch(updateFundingSimulationSettings({ scenarioId: selectedScenarioId, updates }));
+  }, [dispatch, selectedScenarioId]);
   const updateAdebisMonthlyOverride = React.useCallback((field, monthKey, value) => {
     const adebisAnalysis = financeScenario?.settings?.adebisAnalysis || {};
     dispatch(updateScenarioFinanceSettings({
@@ -613,18 +632,8 @@ function FundingSimulationPanel({ scrollPage = false }) {
   }, [dispatch, financeScenario?.settings?.reformForecast, selectedScenarioId]);
 
   React.useEffect(() => {
-    setTemporaryCatalogEntries({});
-    setTemporaryPrices({});
-    setTemporaryParentFeeSubsidyEnabledByGroup({});
-    setSelectedGroupIds([]);
-    setSelectedSimulationScenarioId('baseline');
-    setFixedBaseYearEnabled(false);
     if (selectedScenarioId) dispatch(seedDefaultBayKiBiGRules({ scenarioId: selectedScenarioId }));
   }, [selectedScenarioId, dispatch]);
-
-  React.useEffect(() => {
-    if (!fixedBaseYearEnabled) setFixedBaseYear(currentYear);
-  }, [currentYear, fixedBaseYearEnabled]);
 
   const groupFeeCatalogs = financeScenario?.groupFeeCatalogs || EMPTY_GROUP_FEE_CATALOGS;
   const parentFeeSubsidy = financeScenario?.parentFeeSubsidy || DEFAULT_PARENT_FEE_SUBSIDY;
@@ -1260,30 +1269,27 @@ function FundingSimulationPanel({ scrollPage = false }) {
       }
       return { ...entry, monthlyAmount: original ? originalAmount : 0 };
     });
-    setTemporaryCatalogEntries((current) => ({ ...current, [groupId]: structuralEntries }));
-    setTemporaryPrices((current) => ({ ...current, [groupId]: overrides }));
+    updateFundingSimulation({
+      temporaryCatalogEntries: { ...temporaryCatalogEntries, [groupId]: structuralEntries },
+      temporaryPrices: { ...temporaryPrices, [groupId]: overrides },
+    });
   };
   const resetTemporaryCatalog = (groupId) => {
-    setTemporaryParentFeeSubsidyEnabledByGroup((current) => {
-      const next = { ...current };
-      delete next[groupId];
-      return next;
-    });
-    setTemporaryCatalogEntries((current) => {
-      const next = { ...current };
-      delete next[groupId];
-      return next;
-    });
-    setTemporaryPrices((current) => {
-      const next = { ...current };
-      delete next[groupId];
-      return next;
+    const keepOtherGroups = (values) => Object.fromEntries(
+      Object.entries(values).filter(([id]) => id !== String(groupId))
+    );
+    updateFundingSimulation({
+      parentFeeSubsidyEnabledByGroup: keepOtherGroups(temporaryParentFeeSubsidyEnabledByGroup),
+      temporaryCatalogEntries: keepOtherGroups(temporaryCatalogEntries),
+      temporaryPrices: keepOtherGroups(temporaryPrices),
     });
   };
   const resetAllTemporaryCatalogs = () => {
-    setTemporaryCatalogEntries({});
-    setTemporaryPrices({});
-    setTemporaryParentFeeSubsidyEnabledByGroup({});
+    updateFundingSimulation({
+      temporaryCatalogEntries: {},
+      temporaryPrices: {},
+      parentFeeSubsidyEnabledByGroup: {},
+    });
   };
   const selectedSimulationScenario = simulationScenarios.find((scenario) => scenario.id === selectedSimulationScenarioId)
     || simulationScenarios[0];
@@ -1301,25 +1307,29 @@ function FundingSimulationPanel({ scrollPage = false }) {
     const scenario = simulationScenarios.find((entry) => entry.id === scenarioId);
     if (!scenario) return;
     const data = scenario.data || {};
-    setSelectedSimulationScenarioId(scenario.id);
-    setTemporaryCatalogEntries(clonePlainData(data.temporaryCatalogEntries || {}));
-    setTemporaryPrices(clonePlainData(data.temporaryPrices || {}));
-    setTemporaryParentFeeSubsidyEnabledByGroup(clonePlainData(data.parentFeeSubsidyEnabledByGroup || {}));
-    setSelectedGroupIds([...(data.selectedGroupIds || [])]);
-    setFixedBaseYearEnabled(data.fixedBaseYearEnabled === true);
-    setFixedBaseYear(Number(data.fixedBaseYear) || currentYear);
-    setPotentialMonthlyBudget(Number.isFinite(Number(data.potentialMonthlyBudget))
-      ? Number(data.potentialMonthlyBudget)
-      : 50);
+    updateFundingSimulation({
+      selectedSimulationScenarioId: scenario.id,
+      temporaryCatalogEntries: clonePlainData(data.temporaryCatalogEntries || {}),
+      temporaryPrices: clonePlainData(data.temporaryPrices || {}),
+      parentFeeSubsidyEnabledByGroup: clonePlainData(data.parentFeeSubsidyEnabledByGroup || {}),
+      selectedGroupIds: [...(data.selectedGroupIds || [])],
+      fixedBaseYearEnabled: data.fixedBaseYearEnabled === true,
+      fixedBaseYear: Number(data.fixedBaseYear) || currentYear,
+      potentialMonthlyBudget: Number.isFinite(Number(data.potentialMonthlyBudget))
+        ? Number(data.potentialMonthlyBudget)
+        : 50,
+    });
   };
   const handleSaveSimulationScenario = () => {
     const name = scenarioNameDraft.trim();
     if (!name) return;
     const scenario = { id: createLocalScenarioId(), name, data: captureSimulationScenarioData() };
-    setSimulationScenarios((current) => [...current, scenario]);
-    setSelectedSimulationScenarioId(scenario.id);
+    updateFundingSimulation({
+      simulationScenarios: [...simulationScenarios, scenario],
+      selectedSimulationScenarioId: scenario.id,
+    });
     setScenarioSaveOpened(false);
-    notifications.show({ title: 'Szenario gespeichert', message: `„${name}“ ist in dieser Sitzung verfügbar.`, color: 'teal' });
+    notifications.show({ title: 'Szenario gespeichert', message: `„${name}“ wird im gemeinsamen Workspace gespeichert.`, color: 'teal' });
   };
   const handleNewSimulationScenario = () => {
     const scenario = {
@@ -1335,15 +1345,17 @@ function FundingSimulationPanel({ scrollPage = false }) {
         potentialMonthlyBudget: 50,
       },
     };
-    setSimulationScenarios((current) => [...current, scenario]);
-    setSelectedSimulationScenarioId(scenario.id);
-    setTemporaryCatalogEntries({});
-    setTemporaryPrices({});
-    setTemporaryParentFeeSubsidyEnabledByGroup({});
-    setSelectedGroupIds([]);
-    setFixedBaseYearEnabled(false);
-    setFixedBaseYear(currentYear);
-    setPotentialMonthlyBudget(50);
+    updateFundingSimulation({
+      simulationScenarios: [...simulationScenarios, scenario],
+      selectedSimulationScenarioId: scenario.id,
+      temporaryCatalogEntries: {},
+      temporaryPrices: {},
+      parentFeeSubsidyEnabledByGroup: {},
+      selectedGroupIds: [],
+      fixedBaseYearEnabled: false,
+      fixedBaseYear: currentYear,
+      potentialMonthlyBudget: 50,
+    });
   };
   const handleCloneSimulationScenario = () => {
     const scenario = {
@@ -1351,8 +1363,10 @@ function FundingSimulationPanel({ scrollPage = false }) {
       name: `${selectedSimulationScenario?.name || 'Szenario'} (Kopie)`,
       data: captureSimulationScenarioData(),
     };
-    setSimulationScenarios((current) => [...current, scenario]);
-    setSelectedSimulationScenarioId(scenario.id);
+    updateFundingSimulation({
+      simulationScenarios: [...simulationScenarios, scenario],
+      selectedSimulationScenarioId: scenario.id,
+    });
   };
   const handleExportPdf = async () => {
     setPdfExportLoading(true);
@@ -1481,7 +1495,7 @@ function FundingSimulationPanel({ scrollPage = false }) {
               <Group justify="space-between" align="center" wrap="wrap" data-testid="temporary-category-prices-header">
                 <Stack gap={2}>
                   <Text fw={700} size="sm">Simulationseinstellungen</Text>
-                  <Text size="xs" c="dimmed">Stichtag {formatBookingDate(referenceDate, referenceDate)} · lokale Änderungen werden nicht gespeichert</Text>
+                  <Text size="xs" c="dimmed">Stichtag {formatBookingDate(referenceDate, referenceDate)} · Simulationsänderungen werden im gemeinsamen Workspace gespeichert</Text>
                 </Stack>
                 {categoryPriceRows.length > 0 || Object.keys(temporaryCatalogEntries).length > 0 ? (
                   <Button
@@ -1500,7 +1514,10 @@ function FundingSimulationPanel({ scrollPage = false }) {
                 <Switch
                   label="Basisjahr für Betreuungsstunden fixieren"
                   checked={fixedBaseYearEnabled}
-                  onChange={(event) => setFixedBaseYearEnabled(event.currentTarget.checked)}
+                  onChange={(event) => updateFundingSimulation({
+                    fixedBaseYearEnabled: event.currentTarget.checked,
+                    fixedBaseYear: event.currentTarget.checked ? currentYear : fixedBaseYear,
+                  })}
                   data-testid="fixed-base-year-toggle"
                 />
                 <Select
@@ -1509,11 +1526,10 @@ function FundingSimulationPanel({ scrollPage = false }) {
                   value={fixedBaseYearEnabled ? String(fixedBaseYear) : 'none'}
                   onChange={(value) => {
                     if (!value || value === 'none') {
-                      setFixedBaseYearEnabled(false);
+                      updateFundingSimulation({ fixedBaseYearEnabled: false, fixedBaseYear: currentYear });
                       return;
                     }
-                    setFixedBaseYear(Number(value));
-                    setFixedBaseYearEnabled(true);
+                    updateFundingSimulation({ fixedBaseYear: Number(value), fixedBaseYearEnabled: true });
                   }}
                   w={150}
                   data-testid="fixed-base-year-select"
@@ -1549,7 +1565,7 @@ function FundingSimulationPanel({ scrollPage = false }) {
                   placeholder="Alle Gruppen"
                   data={groupFilterOptions}
                   value={selectedGroupIds}
-                  onChange={setSelectedGroupIds}
+                  onChange={(value) => updateFundingSimulation({ selectedGroupIds: value })}
                   searchable
                   clearable
                   data-testid="simulation-group-filter"
@@ -1738,13 +1754,12 @@ function FundingSimulationPanel({ scrollPage = false }) {
                           size="xs"
                           label="Elternbeitragszuschuss aktiv"
                           checked={subsidyEnabled}
-                          onChange={(event) => {
-                            const enabled = event.currentTarget.checked;
-                            setTemporaryParentFeeSubsidyEnabledByGroup((current) => ({
-                              ...current,
-                              [group.id]: enabled,
-                            }));
-                          }}
+                          onChange={(event) => updateFundingSimulation({
+                            parentFeeSubsidyEnabledByGroup: {
+                              ...temporaryParentFeeSubsidyEnabledByGroup,
+                              [group.id]: event.currentTarget.checked,
+                            },
+                          })}
                           data-testid={`simulation-parent-fee-subsidy-${group.id}`}
                         />
                       </Group>
@@ -2041,7 +2056,7 @@ function FundingSimulationPanel({ scrollPage = false }) {
               <NumberInput
                 label="Budgetänderung pro Familie / Monat"
                 value={potentialMonthlyBudget}
-                onChange={(value) => setPotentialMonthlyBudget(Math.max(0, Number(value) || 0))}
+                onChange={(value) => updateFundingSimulation({ potentialMonthlyBudget: Math.max(0, Number(value) || 0) })}
                 min={0}
                 max={500}
                 step={5}

@@ -4,11 +4,29 @@ import simFinanceReducer, {
   deletePersonnelCostEntry,
   loadFinanceByScenario,
   seedDefaultBayKiBiGRules,
+  updateFundingSimulationSettings,
   updateGroupParentFeeSubsidy,
   updatePersonnelCostEntry,
 } from './simFinanceSlice';
 
 describe('simFinanceSlice', () => {
+  it('merges shared workspace simulation settings without replacing other options', () => {
+    let state = simFinanceReducer(undefined, updateFundingSimulationSettings({
+      scenarioId: 'scenario-1',
+      updates: { fixedBaseYearEnabled: true, fixedBaseYear: 2027 },
+    }));
+    state = simFinanceReducer(state, updateFundingSimulationSettings({
+      scenarioId: 'scenario-1',
+      updates: { selectedGroupIds: ['group-1'] },
+    }));
+
+    expect(state.financeByScenario['scenario-1'].settings.fundingSimulation).toEqual({
+      fixedBaseYearEnabled: true,
+      fixedBaseYear: 2027,
+      selectedGroupIds: ['group-1'],
+    });
+  });
+
   it('adds the legacy monthly parent-fee subsidy to the scenario finance model', () => {
     const state = simFinanceReducer(undefined, loadFinanceByScenario({
       'scenario-default': {},

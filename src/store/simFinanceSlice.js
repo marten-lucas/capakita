@@ -318,6 +318,15 @@ const simFinanceSlice = createSlice({
         ...updates,
       };
     },
+    updateFundingSimulationSettings(state, action) {
+      const { scenarioId, updates } = action.payload;
+      const scenarioFinance = ensureScenarioFinanceState(state, scenarioId);
+      scenarioFinance.settings ||= {};
+      scenarioFinance.settings.fundingSimulation = {
+        ...(scenarioFinance.settings.fundingSimulation || {}),
+        ...updates,
+      };
+    },
     updateParentFeeSubsidy(state, action) {
       const { scenarioId, updates } = action.payload;
       const scenarioFinance = ensureScenarioFinanceState(state, scenarioId);
@@ -519,6 +528,7 @@ const simFinanceSlice = createSlice({
 
 export const {
   updateScenarioFinanceSettings,
+  updateFundingSimulationSettings,
   updateParentFeeSubsidy,
   updateGroupParentFeeSubsidy,
   setGroupParentFeeSubsidies,

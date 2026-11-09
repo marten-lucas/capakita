@@ -226,9 +226,10 @@ describe('FundingSimulationPanel', () => {
     expect(screen.queryByTestId('reform-forecast-results')).toBeNull();
   });
 
-  it('verwendet bei fixiertem Basisjahr dessen Kinder- und Buchungsstundenprofil für alle Ergebnisjahre', () => {
+  it('verwendet und speichert bei fixiertem Basisjahr dessen Kinder- und Buchungsstundenprofil', () => {
+    const store = createTestStore({ include2027BookingChange: true });
     render(
-      <Provider store={createTestStore({ include2027BookingChange: true })}>
+      <Provider store={store}>
         <MantineProvider>
           <FundingSimulationPanel accent="#0f766e" />
         </MantineProvider>
@@ -249,17 +250,22 @@ describe('FundingSimulationPanel', () => {
     expect(getHours(2026)).toBe(hours2027);
     expect(getHours(2027)).toBe(hours2027);
     expect(screen.getByTestId('fixed-base-year-toggle').checked).toBe(true);
+    expect(store.getState().simFinance.financeByScenario['scenario-1'].settings.fundingSimulation)
+      .toMatchObject({ fixedBaseYearEnabled: true, fixedBaseYear: 2027 });
 
     fireEvent.click(baseYearSelect);
     fireEvent.click(screen.getByRole('option', { name: 'Keins' }));
     expect(screen.getByTestId('fixed-base-year-toggle').checked).toBe(false);
+    expect(store.getState().simFinance.financeByScenario['scenario-1'].settings.fundingSimulation)
+      .toMatchObject({ fixedBaseYearEnabled: false, fixedBaseYear: 2026 });
     expect(getHours(2026)).toBe(hours2026);
     expect(getHours(2027)).toBe(hours2027);
   });
 
-  it('speichert und wechselt zwischen benannten Simulationsszenarien', async () => {
+  it('speichert und wechselt zwischen benannten Simulationsszenarien im Workspace', async () => {
+    const store = createTestStore();
     render(
-      <Provider store={createTestStore()}>
+      <Provider store={store}>
         <MantineProvider>
           <FundingSimulationPanel accent="#0f766e" />
         </MantineProvider>
@@ -278,6 +284,9 @@ describe('FundingSimulationPanel', () => {
     expect(saveScenarioButton.disabled).toBe(false);
     fireEvent.click(saveScenarioButton);
 
+    const persistedOptions = store.getState().simFinance.financeByScenario['scenario-1'].settings.fundingSimulation;
+    expect(persistedOptions.selectedSimulationScenarioId).toBeTruthy();
+    expect(persistedOptions.simulationScenarios.some((scenario) => scenario.name === 'Härtefall-Simulation')).toBe(true);
     expect(screen.getByLabelText('Betrag ZEITKAT 05').value).toBe('150 €');
     setFeeAmount('Betrag ZEITKAT 05', 200);
     fireEvent.click(subsidySwitch);
@@ -297,9 +306,10 @@ describe('FundingSimulationPanel', () => {
     expect(screen.getByRole('switch', { name: 'Elternbeitragszuschuss aktiv' }).checked).toBe(true);
   });
 
-  it('filtert die Simulation nach ausgewählten Gruppen', () => {
+  it('filtert die Simulation nach ausgewählten Gruppen und speichert den Filter im Workspace', () => {
+    const store = createTestStore();
     render(
-      <Provider store={createTestStore()}>
+      <Provider store={store}>
         <MantineProvider>
           <FundingSimulationPanel accent="#0f766e" />
         </MantineProvider>
@@ -315,6 +325,8 @@ describe('FundingSimulationPanel', () => {
     fireEvent.click(screen.getByRole('option', { name: 'Ohne Gruppe' }));
 
     expect(screen.getByTestId('simulation-group-filter')).toBeTruthy();
+    expect(store.getState().simFinance.financeByScenario['scenario-1'].settings.fundingSimulation.selectedGroupIds)
+      .toEqual(['__NO_GROUP__']);
     expect(screen.getByTestId('annual-income-row-2026').textContent).toBe(comparisonBeforeFilter);
     expect(screen.getByTestId('affected-family-surname:reuter').textContent).toBe(familyBeforeFilter);
 
