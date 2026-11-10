@@ -1,6 +1,7 @@
 import React from 'react';
-import { Accordion, ActionIcon, Badge, Box, Button, Collapse, Group, Modal, MultiSelect, NumberInput, Paper, Popover, Select, Stack, Switch, Table, Tabs, Text, TextInput, Title, Tooltip } from '@mantine/core';
+import { Accordion, ActionIcon, Badge, Box, Button, Collapse, Group, Modal, MultiSelect, NumberInput, Paper, Popover, SegmentedControl, Select, Stack, Switch, Table, Tabs, Text, TextInput, Title, Tooltip } from '@mantine/core';
 import { Carousel } from '@mantine/carousel';
+import { BarChart } from '@mantine/charts';
 import { IconChevronDown, IconChevronRight, IconChevronUp, IconCopy, IconDeviceFloppy, IconFileText, IconInfoCircle, IconPlus, IconRefresh } from '@tabler/icons-react';
 import { useDispatch, useSelector } from 'react-redux';
 import { notifications } from '@mantine/notifications';
@@ -12,6 +13,7 @@ import {
   calculateFamilyFeePotentials,
   getFeeBandSimulationPriceKey,
   getFeeCatalogSimulationRows,
+  isParentFeeSubsidyEligible,
   simulateContributionChanges,
 } from '../../utils/foerderSimulation';
 import { calculateScenarioMonthlyFinance, isRecordActiveOnDate, pickApplicableValidityEntry, resolveGroupIdAtDate } from '../../utils/financeUtils';
@@ -20,12 +22,15 @@ import { calculateAdebisMonthMetrics } from '../../utils/adebisAnalysis';
 import { calculateReformForecast } from '../../utils/reformSimulation';
 import FeeStaircaseEditor from '../common/FeeStaircaseEditor';
 import { buildAnnualFamilyImpactPdfGroups, buildSimulationFeePdfRows } from './simulationPdfUtils';
+import { buildFamilyImpactHistogramData } from './familyImpactHistogram';
+import { buildAggregateSimulationSnapshot, buildStandaloneSimulationHtml } from './simulationHtmlExport';
 import './FundingSimulationPanel.css';
 
 
 
 const EMPTY_FINANCE = {};
 const EMPTY_GROUP_FEE_CATALOGS = {};
+const FAMILY_HISTOGRAM_COLORS = ['blue.6', 'teal.6', 'orange.6', 'grape.6', 'cyan.6', 'pink.6'];
 const formatEuro = (value) => `${Number(value || 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
 const formatSignedEuro = (value) => `${Number(value) > 0 ? '+' : ''}${formatEuro(value)}`;
 
@@ -690,6 +695,7 @@ function FundingSimulationPanel({ scrollPage = false }) {
     ? Number(fundingSimulationSettings.potentialMonthlyBudget)
     : 50;
   const [pdfExportLoading, setPdfExportLoading] = React.useState(false);
+  const [pendingHtmlExport, setPendingHtmlExport] = React.useState(null);
   const [scenarioSaveOpened, setScenarioSaveOpened] = React.useState(false);
   const [scenarioNameDraft, setScenarioNameDraft] = React.useState('');
   const {
@@ -705,6 +711,7 @@ function FundingSimulationPanel({ scrollPage = false }) {
   const [detailsTab, setDetailsTab] = React.useState('adebis');
   const [groupFamilies, setGroupFamilies] = React.useState(true);
   const [showAnnualFundingInputs, setShowAnnualFundingInputs] = React.useState(false);
+  const [familyHistogramMode, setFamilyHistogramMode] = React.useState('total');
   const updateFundingSimulation = React.useCallback((updates) => {
     if (!selectedScenarioId) return;
     dispatch(updateFundingSimulationSettings({ scenarioId: selectedScenarioId, updates }));
@@ -889,6 +896,7 @@ function FundingSimulationPanel({ scrollPage = false }) {
     const reformForecast = financeScenario?.settings?.reformForecast || {};
     const legacyActualFunding = reformForecast.actualFunding || {};
     const annualFundingInputsByYear = reformForecast.annualFundingInputsByYear || {};
+    const familyProfilesById = new Map();
     const annualRows = fundingYears.map((year) => {
       const manualInputYear = fixedBaseYearEnabled ? fixedBaseYear : year;
       const manualInputDefaults = manualInputYear === 2026 ? legacyActualFunding : {};
@@ -906,6 +914,7 @@ function FundingSimulationPanel({ scrollPage = false }) {
       const monthlyDetails = [];
       const families = new Map();
       const familyContributionImpacts = new Map();
+      const familyFeeProfilesById = new Map();
       let contributions = 0;
       let baselineContributions = 0;
       let contributionsChange = 0;
@@ -1033,11 +1042,35 @@ function FundingSimulationPanel({ scrollPage = false }) {
           parentFeeSubsidy: monthlyParentFeeSubsidy,
         });
 
+        const subsidyChildById = new Map((demandData.parentFeeSubsidyChildren || []).map((child) => [
+          String(child.itemId),
+          child,
+        ]));
         monthlyFinance.childRows.forEach((childRow) => {
           const childId = String(childRow.itemId);
           const item = childRow.item || monthSimulationData.dataItems[childId] || {};
           const familyId = familyPresentation.keyByChildId[childId]
             || String(item.familyId || item.familyLabel || `child:${childId}`);
+          const profileFamilyKey = String(item.familyId || item.familyLabel || `child:${childId}`);
+          const subsidyChild = subsidyChildById.get(childId);
+          const subsidyGroupId = String(subsidyChild?.groupId || childRow.groupId || item.groupId || '');
+          const subsidyGroup = groupDefs.find((group) => String(group.id) === subsidyGroupId) || null;
+          const subsidyEligible = Boolean(subsidyChild && isParentFeeSubsidyEligible(
+            item,
+            subsidyGroup,
+            subsidyChild.bookings || [],
+            monthReferenceDate
+          ));
+          if (!familyFeeProfilesById.has(profileFamilyKey)) {
+            familyFeeProfilesById.set(profileFamilyKey, Array.from({ length: 12 }, () => new Map()));
+          }
+          const monthlyFeeProfile = familyFeeProfilesById.get(profileFamilyKey)[monthIndex];
+          const profileBandKey = JSON.stringify([
+            String(childRow.groupId || item.groupId || ''),
+            String(childRow.zeitkatId || ''),
+            subsidyEligible,
+          ]);
+          monthlyFeeProfile.set(profileBandKey, (monthlyFeeProfile.get(profileBandKey) || 0) + 1);
           if (!families.has(familyId)) {
             families.set(familyId, {
               id: familyId,
@@ -1078,6 +1111,21 @@ function FundingSimulationPanel({ scrollPage = false }) {
         contributionsChange += monthlySimulation.totals.deltaParentFees;
         annualParentFeeSubsidy += monthlyParentFeeSubsidy;
         eligibleParentFeeSubsidyChildMonths += monthlySimulation.totals.eligibleParentFeeSubsidyChildren;
+      });
+      familyFeeProfilesById.forEach((monthlyProfiles, familyKey) => {
+        if (!familyProfilesById.has(familyKey)) familyProfilesById.set(familyKey, { years: {} });
+        familyProfilesById.get(familyKey).years[String(year)] = monthlyProfiles.map((bands) => (
+          Array.from(bands.entries()).map(([key, childCount]) => {
+            const [groupId, zeitkatId, subsidyEligible] = JSON.parse(key);
+            return {
+              groupId,
+              zeitkatId,
+              childCount,
+              subsidyEligibleChildCount: subsidyEligible ? childCount : 0,
+            };
+          }).sort((left, right) => `${left.groupId}|${left.zeitkatId}|${left.subsidyEligibleChildCount}`
+            .localeCompare(`${right.groupId}|${right.zeitkatId}|${right.subsidyEligibleChildCount}`))
+        ));
       });
 
       const meanMetric = (field) => monthlyDetails.length
@@ -1168,6 +1216,29 @@ function FundingSimulationPanel({ scrollPage = false }) {
         familyParentFeesById,
       };
     });
+    const emptyMonths = Array.from({ length: 12 }, () => []);
+    const profileClasses = new Map();
+    familyProfilesById.forEach((familyProfile) => {
+      const years = Object.fromEntries(fundingYears.map((profileYear) => [
+        String(profileYear),
+        familyProfile.years[String(profileYear)] || emptyMonths,
+      ]));
+      const signature = JSON.stringify(years);
+      if (!profileClasses.has(signature)) {
+        profileClasses.set(signature, { familyCount: 0, years });
+      }
+      profileClasses.get(signature).familyCount += 1;
+    });
+    const allProfileClasses = Array.from(profileClasses.values());
+    const minimumFamilyCount = 5;
+    const familyProfileData = {
+      totalFamilies: familyProfilesById.size,
+      minimumFamilyCount,
+      suppressedFamilyCount: allProfileClasses
+        .filter((profile) => profile.familyCount < minimumFamilyCount)
+        .reduce((sum, profile) => sum + profile.familyCount, 0),
+      profiles: allProfileClasses.filter((profile) => profile.familyCount >= minimumFamilyCount),
+    };
     return annualRows.map((row, index) => {
       const currentFamilyFees = row.familyParentFeesById || {};
       const previousFamilyFees = annualRows[index - 1]?.familyParentFeesById || {};
@@ -1197,7 +1268,11 @@ function FundingSimulationPanel({ scrollPage = false }) {
           - Math.max(Math.abs(left.annualDelta), Math.abs(left.yearOverYearAnnualDelta || 0)));
       const rowData = { ...row };
       delete rowData.familyParentFeesById;
-      return { ...rowData, familyImpacts };
+      return {
+        ...rowData,
+        familyImpacts,
+        ...(index === 0 ? { familyProfileData } : {}),
+      };
     });
   }, [
     fundingYears,
@@ -1281,6 +1356,14 @@ function FundingSimulationPanel({ scrollPage = false }) {
     reformActualFunding.assistance,
     reformActualFunding.languageSpecialists,
   ]);
+  const familyImpactHistogram = React.useMemo(
+    () => buildFamilyImpactHistogramData(annualIncomeRows, familyHistogramMode),
+    [annualIncomeRows, familyHistogramMode]
+  );
+  const familyImpactHistogramSeries = familyImpactHistogram.series.map((year, index) => ({
+    name: year,
+    color: FAMILY_HISTOGRAM_COLORS[index % FAMILY_HISTOGRAM_COLORS.length],
+  }));
   const selectedAnnualDetails = annualIncomeRows.find((row) => row.year === selectedDetailsYear) || null;
   const selectedAnnualDetailTotals = selectedAnnualDetails?.monthlyDetails.reduce((total, row) => ({
     children: total.children + row.children,
@@ -1490,6 +1573,54 @@ function FundingSimulationPanel({ scrollPage = false }) {
       simulationScenarios: [...simulationScenarios, scenario],
       selectedSimulationScenarioId: scenario.id,
     });
+  };
+  const handleExportHtml = () => {
+    try {
+      const snapshot = buildAggregateSimulationSnapshot({
+        annualIncomeRows,
+        familyProfileData: annualIncomeRows.find((row) => row.familyProfileData)?.familyProfileData,
+        groupDefs,
+        groupFeeCatalogs,
+        simulationCatalogs,
+        effectiveFeeCatalogs,
+        temporaryPrices,
+        parentFeeSubsidy,
+        effectiveParentFeeSubsidiesByGroup,
+        referenceDate,
+        fixedBaseYearEnabled,
+        fixedBaseYear,
+        potentialMonthlyBudget,
+      });
+      setPendingHtmlExport(snapshot);
+    } catch (error) {
+      notifications.show({
+        title: 'HTML-Export fehlgeschlagen',
+        message: error instanceof Error ? error.message : 'Die HTML-Datei konnte nicht erstellt werden.',
+        color: 'red',
+      });
+    }
+  };
+  const handleConfirmHtmlExport = () => {
+    if (!pendingHtmlExport) return;
+    try {
+      const html = buildStandaloneSimulationHtml(pendingHtmlExport);
+      const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `capakita-beitragssimulation-${pendingHtmlExport.referenceMonth || 'export'}.html`;
+      document.body.append(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setPendingHtmlExport(null);
+      notifications.show({ title: 'HTML exportiert', message: 'Die datensparsame Simulation wurde heruntergeladen.', color: 'teal' });
+    } catch (error) {
+      notifications.show({
+        title: 'HTML-Export fehlgeschlagen',
+        message: error instanceof Error ? error.message : 'Die HTML-Datei konnte nicht erstellt werden.',
+        color: 'red',
+      });
+    }
   };
   const handleExportPdf = async () => {
     setPdfExportLoading(true);
@@ -1935,6 +2066,15 @@ function FundingSimulationPanel({ scrollPage = false }) {
                 size="xs"
                 variant="outline"
                 leftSection={<IconFileText size={15} />}
+                onClick={handleExportHtml}
+                data-testid="export-simulation-html"
+              >
+                HTML exportieren
+              </Button>
+              <Button
+                size="xs"
+                variant="outline"
+                leftSection={<IconFileText size={15} />}
                 loading={pdfExportLoading}
                 onClick={handleExportPdf}
                 data-testid="export-simulation-pdf"
@@ -2235,6 +2375,56 @@ function FundingSimulationPanel({ scrollPage = false }) {
             )}
           </Stack>
 
+          <Paper withBorder p="sm" radius="md" data-testid="family-impact-histogram-section">
+            <Stack gap="xs">
+              <Group justify="space-between" align="center" wrap="wrap">
+                <Stack gap={0}>
+                  <Text fw={700} size="sm">Beitragsänderungen betroffener Familien</Text>
+                  <Text size="xs" c="dimmed">Anzahl Familien je durchschnittlicher Beitragsänderung pro Monat; die Verteilung folgt den Jahres-Drilldowns.</Text>
+                </Stack>
+                <SegmentedControl
+                  size="xs"
+                  value={familyHistogramMode}
+                  onChange={setFamilyHistogramMode}
+                  data={[
+                    { label: 'Gesamtwirkung', value: 'total' },
+                    { label: 'Zum Vorjahr', value: 'yearOverYear' },
+                    { label: 'Simulation', value: 'simulation' },
+                  ]}
+                  data-testid="family-impact-histogram-mode"
+                />
+              </Group>
+              {familyImpactHistogramSeries.length === 0 ? (
+                <Text size="sm" c="dimmed" data-testid="family-impact-histogram-empty">
+                  {familyHistogramMode === 'simulation'
+                    ? 'Die aktuelle Tarifsimulation ändert noch keine Familienbeiträge. Verändere oben einen Tarif, um die Verteilung neu zu berechnen.'
+                    : 'Im ausgewählten Vergleich sind keine Familienbeitragsänderungen enthalten.'}
+                </Text>
+              ) : (
+                <Box
+                  data-testid="family-impact-histogram-chart"
+                  data-histogram-summary={familyImpactHistogram.series.map((year) => (
+                    `${year}:${familyImpactHistogram.data.map((row) => row[year] || 0).join(',')}`
+                  )).join(';')}
+                >
+                  <BarChart
+                    data={familyImpactHistogram.data}
+                    dataKey="range"
+                    series={familyImpactHistogramSeries}
+                    orientation="horizontal"
+                    h={280}
+                    maxBarWidth={34}
+                    withLegend
+                    withTooltip
+                    yAxisLabel="Anzahl Familien"
+                    xAxisLabel="Änderung des Elternbeitrags je Familie / Monat"
+                    valueFormatter={(value) => `${Number(value).toLocaleString('de-DE')} Familien`}
+                  />
+                </Box>
+              )}
+            </Stack>
+          </Paper>
+
           <Modal
             opened={Boolean(selectedAnnualDetails)}
             onClose={() => setSelectedDetailsYear(null)}
@@ -2527,6 +2717,32 @@ function FundingSimulationPanel({ scrollPage = false }) {
                   </Stack>
                 </Tabs.Panel>
               </Tabs>
+            ) : null}
+          </Modal>
+          <Modal
+            opened={Boolean(pendingHtmlExport)}
+            onClose={() => setPendingHtmlExport(null)}
+            title="Datenschutz prüfen – HTML-Export"
+            centered
+            size="md"
+            data-testid="html-export-preview"
+          >
+            {pendingHtmlExport ? (
+              <Stack gap="sm">
+                <Text>
+                  Die HTML-Datei ist unverschlüsselt. Sie enthält keine Namen, Familien- oder Kind-IDs, Geburtsdaten oder Einzelbuchungen; exportiert werden nur aggregierte Tarifprofile.
+                </Text>
+                <Text size="sm" c="dimmed">
+                  {pendingHtmlExport.groups.length} neutrale Gruppen · {pendingHtmlExport.privacy.includedProfileClasses} Profilgruppen ab {pendingHtmlExport.privacy.minimumFamilyCount} Familien · {pendingHtmlExport.privacy.suppressedFamilyCount} Familienprofile unterdrückt
+                </Text>
+                <Text size="sm" c="dimmed">
+                  Unterdrückte Profile bleiben bei Änderungen auf ihrem Export-Ausgangswert und werden nicht neu berechnet. Jahresgesamtsummen und Histogramm zeigen die Tarifauswirkung daher nur für aufgeschlüsselte Profile. Die Datei läuft lokal und benötigt keine Internetverbindung.
+                </Text>
+                <Group justify="flex-end" mt="sm">
+                  <Button variant="default" onClick={() => setPendingHtmlExport(null)}>Abbrechen</Button>
+                  <Button onClick={handleConfirmHtmlExport} data-testid="confirm-export-simulation-html">HTML herunterladen</Button>
+                </Group>
+              </Stack>
             ) : null}
           </Modal>
         </Stack>

@@ -40,6 +40,7 @@
     "@mantine/form": "^9.0.2",
     "@mantine/hooks": "^9.0.2",
     "@mantine/notifications": "^9.0.2",
+    "@picocss/pico": "^2.1.1",
     "@reduxjs/toolkit": "^2.8.2",
     "@tabler/icons-react": "^3.41.1",
     "ajv": "^8.20.0",

@@ -86,6 +86,7 @@ Ein separater Release-Workflow erstellt bei Tags oder manuellem Start einen GitH
 ## Dokumentation
 
 - Anwenderdokumentation: siehe [docs/user-guide.md](docs/user-guide.md)
+- HTML-Export für die Beitragssimulation: siehe [docs/html-export-konzept.md](docs/html-export-konzept.md)
 - Coolify-/Backend-Konzept: siehe [docs/coolify-backend-konzept.md](docs/coolify-backend-konzept.md)
 - Refactor-Status und Zielbild: siehe [docs/refactor-plan.md](docs/refactor-plan.md)
 

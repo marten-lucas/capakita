@@ -123,7 +123,7 @@ function calculateAppliedParentFeeSubsidy(isEligible, monthlyAmount) {
   return Math.max(0, Number(monthlyAmount) || 0);
 }
 
-function isParentFeeSubsidyEligible(child, group, bookings, referenceDate) {
+export function isParentFeeSubsidyEligible(child, group, bookings, referenceDate) {
   if (String(group?.type || '').toLowerCase() === 'schulkindgruppe') return false;
   if ((bookings || []).some((booking) => isAdebisTrue(booking?.rawdata?.SCHULKIND))) return false;
 
