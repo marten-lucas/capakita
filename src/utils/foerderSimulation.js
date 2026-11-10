@@ -643,6 +643,7 @@ function maximumPotentialWithinBudget(options, budget) {
   const capacity = Math.max(0, Math.floor((Number(budget) || 0) * 100 + 0.000001));
   let freeHours = 0;
   let freeWeightedHours = 0;
+  let freeCost = 0;
   const choices = [];
   options.forEach(({ cost, hours, weightedHours }) => {
     if (!(hours > 0)) return;
@@ -650,13 +651,14 @@ function maximumPotentialWithinBudget(options, budget) {
     if (costInCents === 0) {
       freeHours += hours;
       freeWeightedHours += weightedHours;
+      freeCost += costInCents;
     } else if (costInCents <= capacity) {
       choices.push({ cost: costInCents, hours, weightedHours });
     }
   });
 
   const best = Array(capacity + 1).fill(null);
-  best[0] = { hours: 0, weightedHours: 0 };
+  best[0] = { hours: 0, weightedHours: 0, cost: 0 };
   choices.forEach((choice) => {
     for (let remaining = capacity; remaining >= choice.cost; remaining -= 1) {
       const previous = best[remaining - choice.cost];
@@ -664,6 +666,7 @@ function maximumPotentialWithinBudget(options, budget) {
       const candidate = {
         hours: previous.hours + choice.hours,
         weightedHours: previous.weightedHours + choice.weightedHours,
+        cost: previous.cost + choice.cost,
       };
       const current = best[remaining];
       if (!current || candidate.hours > current.hours + 0.005
@@ -678,10 +681,11 @@ function maximumPotentialWithinBudget(options, budget) {
       || (Math.abs(candidate.hours - current.hours) <= 0.005
         && candidate.weightedHours > current.weightedHours)) return candidate;
     return current;
-  }, null) || { hours: 0, weightedHours: 0 };
+  }, null) || { hours: 0, weightedHours: 0, cost: 0 };
   return {
     weeklyHours: roundHours(freeHours + selected.hours),
     weightedDailyHours: roundHours((freeWeightedHours + selected.weightedHours) / 5),
+    monthlyParentFeeChange: roundMoney((freeCost + selected.cost) / 100),
   };
 }
 
@@ -822,6 +826,8 @@ export function calculateFamilyFeePotentials({
       potentialDowngradeWeeklyHours: downgrade.weeklyHours,
       potentialUpgradeWeightedDailyHours: upgrade.weightedDailyHours,
       potentialDowngradeWeightedDailyHours: downgrade.weightedDailyHours,
+      potentialUpgradeMonthlyParentFeeChange: upgrade.monthlyParentFeeChange,
+      potentialDowngradeMonthlyParentFeeChange: -downgrade.monthlyParentFeeChange,
     };
   });
 }

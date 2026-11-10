@@ -192,7 +192,7 @@ describe('FundingSimulationPanel PDF export data', () => {
       baselineActive: true,
       simulatedActive: true,
     });
-    expect(rows).toHaveLength(12);
+    expect(rows).toHaveLength(1);
   });
 
   it('uses the annual family drilldown to create PDF groups by year', () => {

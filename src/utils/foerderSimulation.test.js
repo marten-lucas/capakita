@@ -146,6 +146,8 @@ describe('simulateContributionChanges', () => {
       potentialDowngradeWeeklyHours: 2,
       potentialUpgradeWeightedDailyHours: 0.2,
       potentialDowngradeWeightedDailyHours: 0.4,
+      potentialUpgradeMonthlyParentFeeChange: 50,
+      potentialDowngradeMonthlyParentFeeChange: -40,
     }]);
   });
 
@@ -169,6 +171,7 @@ describe('simulateContributionChanges', () => {
     expect(result[0]).toMatchObject({
       potentialUpgradeWeeklyHours: 1,
       potentialUpgradeWeightedDailyHours: 0.2,
+      potentialUpgradeMonthlyParentFeeChange: 0,
     });
   });
 

@@ -64,6 +64,7 @@ async function generateSimulationPdfReport({
   annualRows,
   annualFundingDetailRows,
   familyYearGroups,
+  potentialMonthlyBudget,
 }) {
   const { jsPDF } = await import('jspdf');
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
@@ -90,14 +91,19 @@ async function generateSimulationPdfReport({
     y += after;
   };
 
-  const drawTable = (headers, rows, widths, alignments = []) => {
+  const drawTable = (headers, rows, widths, alignments = [], style = {}) => {
+    const {
+      fontSize = 6.3,
+      headerFontSize = 6.5,
+      padding = 1.4,
+      lineHeight = 2.8,
+      minRowHeight = 7,
+    } = style;
     const drawRow = (cells, isHeader, repeatHeader = true) => {
       doc.setFont('helvetica', isHeader ? 'bold' : 'normal');
-      doc.setFontSize(isHeader ? 6.5 : 6.3);
-      const padding = 1.4;
-      const lineHeight = 2.8;
+      doc.setFontSize(isHeader ? headerFontSize : fontSize);
       const wrapped = cells.map((cell, index) => doc.splitTextToSize(String(cell ?? '–'), widths[index] - padding * 2));
-      const rowHeight = Math.max(7, Math.max(...wrapped.map((lines) => lines.length)) * lineHeight + padding * 2);
+      const rowHeight = Math.max(minRowHeight, Math.max(...wrapped.map((lines) => lines.length)) * lineHeight + padding * 2);
       if (y + rowHeight > pageHeight - bottomMargin) {
         doc.addPage();
         y = margin;
@@ -123,113 +129,112 @@ async function generateSimulationPdfReport({
     y += 4;
   };
 
-  const drawFeeSliderChart = (rows) => {
+  const drawFeeColumnChart = (rows) => {
     if (rows.length === 0) {
       writeText('Für den aktuellen Gruppenfilter sind keine Tarifstaffeln vorhanden.', { size: 8, after: 4 });
       return;
     }
 
-    const labelWidth = 74;
-    const trackWidth = 112;
-    const valueWidth = 61;
-    const deltaWidth = pageWidth - margin * 2 - labelWidth - trackWidth - valueWidth;
-    const trackX = margin + labelWidth;
-    const valueX = trackX + trackWidth;
-    const deltaX = valueX + valueWidth;
-    const maximumAmount = Math.max(0, ...rows.flatMap((row) => [row.baselineAmount, row.simulatedAmount]));
-    const scaleMaximum = Math.max(50, Math.ceil(maximumAmount / 50) * 50);
-    const groups = Array.from(rows.reduce((map, row) => {
-      if (!map.has(row.groupName)) map.set(row.groupName, []);
-      map.get(row.groupName).push(row);
-      return map;
-    }, new Map()));
+    const axisWidth = 12;
+    const plotX = margin + axisWidth;
+    const plotWidth = pageWidth - margin * 2 - axisWidth;
+    const plotHeight = 25;
+    const plotTop = y + 6;
+    const plotBottom = plotTop + plotHeight;
+    const slotWidth = plotWidth / rows.length;
+    const barWidth = Math.min(11, slotWidth * 0.42);
+    const scaleMaximum = Math.max(50, Math.ceil(Math.max(...rows.flatMap((row) => [row.baselineAmount, row.simulatedAmount])) / 50) * 50);
+    const groupNames = Array.from(new Set(rows.map((row) => row.groupName)));
+    const subsidies = Array.from(new Set(rows.map((row) => {
+      const subsidy = row.subsidy || {};
+      return subsidy.enabled === false
+        ? `${row.groupName}: Zuschuss inaktiv`
+        : `${row.groupName}: Zuschuss ${formatEuro(subsidy.monthlyAmount)} / Kind / Monat bis ${formatBookingDate(subsidy.endDate, 'unbegrenzt')}`;
+    })));
 
-    const drawChartHeader = () => {
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(6.5);
-      doc.setTextColor(45, 55, 72);
-      doc.text('Beitragsstufe', margin, y + 3);
-      doc.text('Tarifskala', trackX, y + 3);
-      doc.text('Ausgang > Simulation', valueX + valueWidth - 1, y + 3, { align: 'right' });
-      doc.text('Änderung / Monat', deltaX + deltaWidth - 1, y + 3, { align: 'right' });
-      y += 5;
+    writeText('Graue Markierung = alter Beitrag · blaue Säule = neuer Beitrag · Rot/Grün = Änderung', { size: 6.2, color: [90, 100, 115], after: 0.5 });
+    writeText(`Elternbeitragszuschuss: ${subsidies.join(' · ')}`, { size: 6, color: [90, 100, 115], after: 1 });
+    doc.setDrawColor(205, 213, 223);
+    doc.setLineWidth(0.35);
+    [0, 0.5, 1].forEach((fraction) => {
+      const gridY = plotBottom - plotHeight * fraction;
+      doc.line(plotX, gridY, plotX + plotWidth, gridY);
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(6);
+      doc.setFontSize(5);
       doc.setTextColor(100, 110, 125);
-      doc.text('0 €', trackX, y + 2.2);
-      doc.text(`${scaleMaximum.toLocaleString('de-DE')} €`, trackX + trackWidth, y + 2.2, { align: 'right' });
-      y += 4;
-    };
-
-    writeText('Beitragskonfiguration · Slider-Ansicht', { size: 11, bold: true, after: 1 });
-    writeText('Grauer Marker: hinterlegter Tarif · Blauer Marker: Simulation · Rot: höherer Elternbeitrag · Grün: niedrigerer Elternbeitrag', { size: 7, color: [90, 100, 115], after: 2 });
-    drawChartHeader();
-
-    groups.forEach(([groupName, groupRows]) => {
-      const subsidy = groupRows[0]?.subsidy || {};
-      const subsidyLabel = subsidy.enabled === false
-        ? 'Elternbeitragszuschuss inaktiv'
-        : `Elternbeitragszuschuss ${formatEuro(subsidy.monthlyAmount)} / Kind / Monat · bis ${formatBookingDate(subsidy.endDate, 'unbegrenzt')}`;
-      writeText(`${groupName} · ${subsidyLabel}`, { size: 8, bold: true, after: 1 });
-
-      groupRows.forEach((row) => {
-        const rowHeight = 6.8;
-        if (y + rowHeight > pageHeight - bottomMargin) {
-          doc.addPage();
-          y = margin;
-          drawChartHeader();
-          writeText(`${groupName} · Fortsetzung`, { size: 8, bold: true, after: 1 });
-        }
-
-        const changed = Math.abs(row.delta) >= 0.005;
-        const changeColor = row.delta > 0 ? [190, 55, 55] : [20, 130, 95];
-        if (changed) {
-          doc.setFillColor(...(row.delta > 0 ? [255, 242, 240] : [237, 249, 244]));
-          doc.rect(margin, y, pageWidth - margin * 2, rowHeight, 'F');
-        }
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(6.3);
-        doc.setTextColor(35, 45, 60);
-        doc.text(`${row.category} · ${row.hours} h/Tag`, margin, y + 4.5);
-
-        const centerY = y + rowHeight / 2;
-        doc.setDrawColor(205, 213, 223);
-        doc.setLineWidth(0.8);
-        doc.line(trackX, centerY, trackX + trackWidth, centerY);
-        [0, 0.5, 1].forEach((fraction) => {
-          const tickX = trackX + trackWidth * fraction;
-          doc.setDrawColor(190, 200, 212);
-          doc.setLineWidth(0.35);
-          doc.line(tickX, centerY - 1.8, tickX, centerY + 1.8);
-        });
-        const toX = (amount) => trackX + Math.max(0, Math.min(1, amount / scaleMaximum)) * trackWidth;
-        const baselineX = toX(row.baselineAmount);
-        const simulatedX = toX(row.simulatedAmount);
-        if (changed) {
-          doc.setDrawColor(...changeColor);
-          doc.setLineWidth(2.2);
-          doc.line(baselineX, centerY, simulatedX, centerY);
-        }
-        if (row.baselineActive) {
-          doc.setFillColor(115, 125, 140);
-          doc.circle(baselineX, centerY, 1.5, 'F');
-        }
-        if (row.simulatedActive) {
-          doc.setFillColor(37, 99, 235);
-          doc.circle(simulatedX, centerY, 0.95, 'F');
-        }
-
-        doc.setTextColor(35, 45, 60);
-        const baselineLabel = row.baselineActive ? formatEuro(row.baselineAmount) : '–';
-        const simulatedLabel = row.simulatedActive ? formatEuro(row.simulatedAmount) : '–';
-        doc.text(`${baselineLabel} > ${simulatedLabel}`, valueX + valueWidth - 1, centerY + 2.1, { align: 'right' });
-        if (changed) doc.setTextColor(...changeColor);
-        doc.text(changed ? formatSignedEuro(row.delta) : '–', deltaX + deltaWidth - 1, centerY + 2.1, { align: 'right' });
-        y += rowHeight;
-      });
-      y += 2;
+      doc.text(`${Math.round(scaleMaximum * fraction).toLocaleString('de-DE')} €`, margin + axisWidth - 1.5, gridY + 1.5, { align: 'right' });
     });
-    y += 2;
+
+    const categoryFontSize = rows.length > 12 ? 4.2 : 5.2;
+    const detailFontSize = rows.length > 12 ? 4.2 : 5.0;
+    rows.forEach((row, index) => {
+      const slotLeft = plotX + index * slotWidth;
+      const centerX = slotLeft + slotWidth / 2;
+      const barX = centerX - barWidth / 2;
+      const baselineY = plotBottom - Math.max(0, Math.min(1, row.baselineAmount / scaleMaximum)) * plotHeight;
+      const simulatedY = plotBottom - Math.max(0, Math.min(1, row.simulatedAmount / scaleMaximum)) * plotHeight;
+      const changed = Math.abs(row.delta) >= 0.005;
+      const increase = row.delta > 0;
+      const changeColor = increase ? [190, 55, 55] : [20, 130, 95];
+      const changeFill = increase ? [225, 103, 98] : [73, 170, 129];
+
+      if (row.simulatedActive && simulatedY < plotBottom) {
+        doc.setFillColor(52, 120, 205);
+        doc.rect(barX, simulatedY, barWidth, plotBottom - simulatedY, 'F');
+      }
+      if (changed) {
+        doc.setFillColor(...changeFill);
+        doc.rect(barX, Math.min(baselineY, simulatedY), barWidth, Math.max(0.8, Math.abs(baselineY - simulatedY)), 'F');
+      }
+      if (row.baselineActive) {
+        doc.setDrawColor(90, 100, 115);
+        doc.setLineWidth(0.6);
+        doc.line(centerX - Math.min(8, slotWidth * 0.32), baselineY, centerX + Math.min(8, slotWidth * 0.32), baselineY);
+      }
+      if (changed) {
+        doc.setDrawColor(...changeColor);
+        doc.setLineWidth(0.5);
+        doc.rect(barX, simulatedY, barWidth, Math.max(0.8, plotBottom - simulatedY), 'S');
+      } else if (row.simulatedActive) {
+        doc.setDrawColor(37, 99, 235);
+        doc.setLineWidth(0.45);
+        doc.rect(barX, simulatedY, barWidth, plotBottom - simulatedY, 'S');
+      }
+
+      const zoneLabel = rows.length > 12
+        ? `${row.category.match(/ZEITKAT\s+(\d+)/)?.[1] || row.category} · G${groupNames.indexOf(row.groupName) + 1}`
+        : row.category.replace(/^ZEITKAT\s+/, '');
+      const labelLines = doc.splitTextToSize(zoneLabel, Math.max(5, slotWidth - 1));
+      const textLineHeight = Math.max(2.1, categoryFontSize * 0.42);
+      let textY = plotBottom + 2;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(categoryFontSize);
+      doc.setTextColor(35, 45, 60);
+      doc.text(labelLines, centerX, textY + textLineHeight, { align: 'center' });
+      textY += labelLines.length * textLineHeight + 0.3;
+      doc.setFontSize(detailFontSize);
+      const oldLabel = row.baselineActive ? formatEuro(row.baselineAmount) : '–';
+      const newLabel = row.simulatedActive ? formatEuro(row.simulatedAmount) : '–';
+      const euroPerHour = row.simulatedActive && row.hours > 0 ? `${formatEuro(row.simulatedAmount / row.hours)}/h` : '–';
+      doc.setTextColor(100, 110, 125);
+      doc.text(`Alt ${oldLabel}`, centerX, textY + textLineHeight, { align: 'center' });
+      textY += textLineHeight;
+      doc.setTextColor(35, 45, 60);
+      doc.text(`Neu ${newLabel}`, centerX, textY + textLineHeight, { align: 'center' });
+      textY += textLineHeight;
+      if (changed) doc.setTextColor(...changeColor);
+      else doc.setTextColor(100, 110, 125);
+      doc.text(euroPerHour, centerX, textY + textLineHeight, { align: 'center' });
+    });
+
+    const labelLineHeight = Math.max(2.1, categoryFontSize * 0.42);
+    const longestLabelLines = Math.max(...rows.map((row) => {
+      const label = rows.length > 12
+        ? `${row.category.match(/ZEITKAT\s+(\d+)/)?.[1] || row.category} · G${groupNames.indexOf(row.groupName) + 1}`
+        : row.category.replace(/^ZEITKAT\s+/, '');
+      return doc.splitTextToSize(label, Math.max(5, slotWidth - 1)).length;
+    }));
+    y = plotBottom + 2 + longestLabelLines * labelLineHeight + 3 * labelLineHeight + 2;
   };
 
   doc.setProperties({
@@ -241,15 +246,18 @@ async function generateSimulationPdfReport({
   writeText(`Szenario: ${scenarioName}`, { size: 10, bold: true, after: 1 });
   writeText(`Stichtag: ${referenceDate}   ·   Gruppenfilter: ${groupFilterLabel}   ·   ${baseYearLabel}`, { size: 8, after: 5 });
 
-  drawFeeSliderChart(feeRows);
+  drawFeeColumnChart(feeRows);
 
   writeText('Jahresergebnisse', { size: 11, bold: true, after: 2 });
   drawTable(
-    ['Jahr', 'Zusatzförderung', 'Std./Tag Ø', 'Förderanspruch', 'Änd. Förderung (VJ/Sim.)', 'Elternbeiträge', 'Änd. Beiträge (VJ/Sim.)', 'Einnahmen', 'Änd. Einnahmen (VJ/Sim.)', 'Upgrade-Potenzial', 'Downgrade-Potenzial'],
+    ['Jahr', 'Zusatzförderung', 'Buchungsstunden / Tag (Ø)', 'Förderanspruch', 'Elternbeiträge', 'Einnahmen', `Upgrade-Potenzial\nBudget ${formatEuro(potentialMonthlyBudget)} / Familie / Monat`, `Downgrade-Potenzial\nBudget ${formatEuro(potentialMonthlyBudget)} / Familie / Monat`],
     annualRows,
-    [14, 25, 19, 25, 26, 25, 27, 25, 27, 32, 32],
-    ['left', 'right', 'right', 'right', 'right', 'right', 'right', 'right', 'right', 'right', 'right']
+    [14, 27, 35, 35, 34, 34, 49, 49],
+    ['left', 'right', 'right', 'right', 'right', 'right', 'right', 'right']
   );
+  writeText(`Potenzial-Einnahmen enthalten Förderungsänderung und Elternbeitragsänderung; Budget gilt je Familie und Monat (${formatEuro(potentialMonthlyBudget)}).`, { size: 7, color: [90, 100, 115], after: 3 });
+  doc.addPage();
+  y = margin;
   writeText('Zusatzförderung – Jahreswerte nach Förderart', { size: 10, bold: true, after: 2 });
   writeText('U3-Zusatzförderung: U3-Kind-Monate × Basiswert × 2,5 %. Der reguläre U3-Gewichtungsfaktor ist darin nicht enthalten.', { size: 7, after: 2 });
   drawTable(
@@ -277,7 +285,8 @@ async function generateSimulationPdfReport({
         ['Jahr', 'Familie', 'Beitrag alt Ø/Mo.', 'Beitrag neu Ø/Mo.', 'Simulation Ø/Mo.', 'Vorjahr Ø/Mo.', 'Vorjahr/Jahr'],
         familyRows,
         [18, 43, 43, 43, 43, 43, 44],
-        ['left', 'left', 'right', 'right', 'right', 'right', 'right']
+        ['left', 'left', 'right', 'right', 'right', 'right', 'right'],
+        { fontSize: 5.6, headerFontSize: 5.8, padding: 0.8, lineHeight: 2.2, minRowHeight: 5 }
       );
     });
   } else {
@@ -384,21 +393,23 @@ function AnnualMetricCell({
   );
 }
 
-function AnnualPotentialCell({ dailyHours, fundingChange, direction, testId }) {
+function AnnualPotentialCell({ dailyHours, fundingChange, parentFeeChange = 0, direction, testId }) {
   if (!(dailyHours > 0)) return <Text c="dimmed" ta="right" data-testid={testId}>–</Text>;
-  const fundingColor = Math.abs(fundingChange) < 0.005
+  const totalIncomeChange = fundingChange + parentFeeChange;
+  const incomeColor = Math.abs(totalIncomeChange) < 0.005
     ? 'dimmed'
-    : fundingChange > 0 ? 'teal.7' : 'red.7';
+    : totalIncomeChange > 0 ? 'teal.7' : 'red.7';
   return (
     <Stack gap={0} align="flex-end" style={{ minWidth: 0 }} data-testid={testId}>
       <Text style={{ whiteSpace: 'nowrap' }}>{direction === 'upgrade' ? '+' : '−'}{formatDailyHours(dailyHours)}</Text>
       <Text
         size="xs"
-        c={fundingColor}
+        c={incomeColor}
         ta="right"
+        title={`Förderung ${formatSignedEuro(fundingChange)} / Jahr · Elternbeiträge ${formatSignedEuro(parentFeeChange)} / Jahr`}
         style={{ maxWidth: '100%', whiteSpace: 'normal', overflowWrap: 'anywhere', lineHeight: 1.15 }}
       >
-        {formatSignedEuro(fundingChange)} / Jahr
+        {formatSignedEuro(totalIncomeChange)} Einnahmen/Jahr
       </Text>
     </Stack>
   );
@@ -1365,11 +1376,15 @@ function FundingSimulationPanel({ scrollPage = false }) {
     downgradeWeeklyHours: total.downgradeWeeklyHours + family.potentialDowngradeWeeklyHours,
     upgradeWeightedDailyHours: total.upgradeWeightedDailyHours + family.potentialUpgradeWeightedDailyHours,
     downgradeWeightedDailyHours: total.downgradeWeightedDailyHours + family.potentialDowngradeWeightedDailyHours,
+    upgradeMonthlyParentFeeChange: total.upgradeMonthlyParentFeeChange + family.potentialUpgradeMonthlyParentFeeChange,
+    downgradeMonthlyParentFeeChange: total.downgradeMonthlyParentFeeChange + family.potentialDowngradeMonthlyParentFeeChange,
   }), {
     upgradeWeeklyHours: 0,
     downgradeWeeklyHours: 0,
     upgradeWeightedDailyHours: 0,
     downgradeWeightedDailyHours: 0,
+    upgradeMonthlyParentFeeChange: 0,
+    downgradeMonthlyParentFeeChange: 0,
   }), [familyPotentials]);
 
   const setTemporaryCatalog = (groupId, nextEntries) => {
@@ -1486,21 +1501,40 @@ function FundingSimulationPanel({ scrollPage = false }) {
         const fundingPerWeightedDailyHour = annualBasisValueTotal / 24;
         const upgradeHours = familyPotentialTotals.upgradeWeeklyHours / 5;
         const downgradeHours = familyPotentialTotals.downgradeWeeklyHours / 5;
-        const formatDeltaPair = (previousDelta, simulationDelta) => (
-          `${previousDelta == null ? '–' : `${formatSignedEuro(previousDelta)} VJ`}\n${formatSignedEuro(simulationDelta)} Sim.`
+        const upgradeFundingChange = familyPotentialTotals.upgradeWeightedDailyHours * fundingPerWeightedDailyHour;
+        const downgradeFundingChange = -familyPotentialTotals.downgradeWeightedDailyHours * fundingPerWeightedDailyHour;
+        const upgradeParentFeeChange = familyPotentialTotals.upgradeMonthlyParentFeeChange * 12;
+        const downgradeParentFeeChange = familyPotentialTotals.downgradeMonthlyParentFeeChange * 12;
+        const formatPotential = (hours, totalIncomeChange, direction) => (
+          hours > 0
+            ? `${direction === 'upgrade' ? '+' : '-'}${formatDailyHours(hours)}\n${formatSignedEuro(totalIncomeChange)} Einnahmen/Jahr`
+            : '–'
         );
+        const formatAnnualMetric = (value, yearChange, simulationChange = null) => [
+          formatEuro(value),
+          ...(yearChange == null ? [] : [`${formatSignedEuro(yearChange)} zum Vorjahr`]),
+          ...(simulationChange == null ? [] : [`${formatSignedEuro(simulationChange)} Simulation`]),
+        ].join('\n');
+        const hourChange = previous
+          ? row.averageDailyBookingHours - previous.averageDailyBookingHours
+          : null;
         return [
           row.year,
           formatEuro(row.additionalFunding),
-          formatDailyHours(row.averageDailyBookingHours),
-          formatEuro(row.totalFunding),
-          formatDeltaPair(previous ? row.totalFunding - previous.totalFunding : null, 0),
-          formatEuro(row.contributions),
-          formatDeltaPair(previous ? row.baselineContributions - previous.baselineContributions : null, row.contributionsChange),
-          formatEuro(row.totalIncome),
-          formatDeltaPair(previous ? row.baselineTotalIncome - previous.baselineTotalIncome : null, row.totalIncomeChange),
-          upgradeHours > 0 ? `${formatDailyHours(upgradeHours)} · ${formatSignedEuro(upgradeHours * fundingPerWeightedDailyHour)}` : '–',
-          downgradeHours > 0 ? `-${formatDailyHours(downgradeHours)} · ${formatSignedEuro(-downgradeHours * fundingPerWeightedDailyHour)}` : '–',
+          [formatDailyHours(row.averageDailyBookingHours), ...(hourChange == null ? [] : [`${formatSignedHours(hourChange)} zum Vorjahr`])].join('\n'),
+          formatAnnualMetric(row.totalFunding, previous ? row.totalFunding - previous.totalFunding : null),
+          formatAnnualMetric(
+            row.contributions,
+            previous ? row.baselineContributions - previous.baselineContributions : null,
+            row.contributionsChange
+          ),
+          formatAnnualMetric(
+            row.totalIncome,
+            previous ? row.baselineTotalIncome - previous.baselineTotalIncome : null,
+            row.totalIncomeChange
+          ),
+          formatPotential(upgradeHours, upgradeFundingChange + upgradeParentFeeChange, 'upgrade'),
+          formatPotential(downgradeHours, downgradeFundingChange + downgradeParentFeeChange, 'downgrade'),
         ];
       });
       const annualFundingDetailRows = annualIncomeRows.map((row) => [
@@ -1539,6 +1573,7 @@ function FundingSimulationPanel({ scrollPage = false }) {
         annualRows,
         annualFundingDetailRows,
         familyYearGroups,
+        potentialMonthlyBudget,
       });
       notifications.show({ title: 'PDF exportiert', message: 'Der Simulationsbericht wurde heruntergeladen.', color: 'teal' });
     } catch (error) {
@@ -1945,8 +1980,18 @@ function FundingSimulationPanel({ scrollPage = false }) {
                           <Table.Th ta="right" rowSpan={2}>{reformForecastSettings.teamGrantEligible === true ? 'Förderanspruch inkl. Teamzuschuss' : 'Förderanspruch'}</Table.Th>
                           <Table.Th ta="right" rowSpan={2}>Elternbeiträge</Table.Th>
                           <Table.Th ta="right" rowSpan={2}>Einnahmen</Table.Th>
-                          <Table.Th ta="right" rowSpan={2}>Upgradepotential</Table.Th>
-                          <Table.Th ta="right" rowSpan={2}>Downgradepotential</Table.Th>
+                          <Table.Th ta="right" rowSpan={2}>
+                            <Stack gap={0} align="flex-end">
+                              <Text size="xs">Upgradepotenzial</Text>
+                              <Text size="xs" c="dimmed">Budget {formatEuro(potentialMonthlyBudget)} / Familie / Monat</Text>
+                            </Stack>
+                          </Table.Th>
+                          <Table.Th ta="right" rowSpan={2}>
+                            <Stack gap={0} align="flex-end">
+                              <Text size="xs">Downgradepotenzial</Text>
+                              <Text size="xs" c="dimmed">Budget {formatEuro(potentialMonthlyBudget)} / Familie / Monat</Text>
+                            </Stack>
+                          </Table.Th>
                         </Table.Tr>
                         <Table.Tr>
                           <Table.Th ta="right">U3-Bundesmittel</Table.Th>
@@ -1978,8 +2023,18 @@ function FundingSimulationPanel({ scrollPage = false }) {
                         <Table.Th ta="right">{reformForecastSettings.teamGrantEligible === true ? 'Förderanspruch inkl. Teamzuschuss' : 'Förderanspruch'}</Table.Th>
                         <Table.Th ta="right">Elternbeiträge</Table.Th>
                         <Table.Th ta="right">Einnahmen</Table.Th>
-                        <Table.Th ta="right">Upgradepotential</Table.Th>
-                        <Table.Th ta="right">Downgradepotential</Table.Th>
+                        <Table.Th ta="right">
+                          <Stack gap={0} align="flex-end">
+                            <Text size="xs">Upgradepotenzial</Text>
+                            <Text size="xs" c="dimmed">Budget {formatEuro(potentialMonthlyBudget)} / Familie / Monat</Text>
+                          </Stack>
+                        </Table.Th>
+                        <Table.Th ta="right">
+                          <Stack gap={0} align="flex-end">
+                            <Text size="xs">Downgradepotenzial</Text>
+                            <Text size="xs" c="dimmed">Budget {formatEuro(potentialMonthlyBudget)} / Familie / Monat</Text>
+                          </Stack>
+                        </Table.Th>
                       </Table.Tr>
                     )}
                   </Table.Thead>
@@ -2103,6 +2158,7 @@ function FundingSimulationPanel({ scrollPage = false }) {
                             <AnnualPotentialCell
                               dailyHours={familyPotentialTotals.upgradeWeeklyHours / 5}
                               fundingChange={upgradePotentialFunding}
+                              parentFeeChange={familyPotentialTotals.upgradeMonthlyParentFeeChange * 12}
                               direction="upgrade"
                               testId={`annual-upgrade-potential-${row.year}`}
                             />
@@ -2111,6 +2167,7 @@ function FundingSimulationPanel({ scrollPage = false }) {
                             <AnnualPotentialCell
                               dailyHours={familyPotentialTotals.downgradeWeeklyHours / 5}
                               fundingChange={downgradePotentialFunding}
+                              parentFeeChange={familyPotentialTotals.downgradeMonthlyParentFeeChange * 12}
                               direction="downgrade"
                               testId={`annual-downgrade-potential-${row.year}`}
                             />

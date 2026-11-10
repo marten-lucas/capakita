@@ -28,7 +28,7 @@ export function buildSimulationFeePdfRows({
         delta: Math.round((simulatedAmount - baselineAmount) * 100) / 100,
       };
     });
-  });
+  }).filter((row) => row.baselineActive || row.simulatedActive);
 }
 
 export function buildAnnualFamilyImpactPdfGroups(annualIncomeRows = []) {
