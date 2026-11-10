@@ -19,6 +19,7 @@ import { shouldIncludeDataItemInAnalysis } from '../../utils/dataVisibility';
 import { calculateAdebisMonthMetrics } from '../../utils/adebisAnalysis';
 import { calculateReformForecast } from '../../utils/reformSimulation';
 import FeeStaircaseEditor from '../common/FeeStaircaseEditor';
+import { buildAnnualFamilyImpactPdfGroups, buildSimulationFeePdfRows } from './simulationPdfUtils';
 import './FundingSimulationPanel.css';
 
 
@@ -62,8 +63,7 @@ async function generateSimulationPdfReport({
   feeRows,
   annualRows,
   annualFundingDetailRows,
-  familyRows,
-  omittedFamilyCount,
+  familyYearGroups,
 }) {
   const { jsPDF } = await import('jspdf');
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
@@ -90,7 +90,7 @@ async function generateSimulationPdfReport({
     y += after;
   };
 
-  const drawTable = (headers, rows, widths) => {
+  const drawTable = (headers, rows, widths, alignments = []) => {
     const drawRow = (cells, isHeader, repeatHeader = true) => {
       doc.setFont('helvetica', isHeader ? 'bold' : 'normal');
       doc.setFontSize(isHeader ? 6.5 : 6.3);
@@ -110,7 +110,9 @@ async function generateSimulationPdfReport({
         else doc.setFillColor(255, 255, 255);
         doc.rect(x, y, width, rowHeight, 'FD');
         doc.setTextColor(30, 41, 59);
-        doc.text(wrapped[index], x + padding, y + padding + 2.3);
+        const alignment = alignments[index] || 'left';
+        const textX = alignment === 'right' ? x + width - padding : x + padding;
+        doc.text(wrapped[index], textX, y + padding + 2.3, { align: alignment });
         x += width;
       });
       y += rowHeight;
@@ -119,6 +121,115 @@ async function generateSimulationPdfReport({
     drawRow(headers, true);
     rows.forEach((row) => drawRow(row, false));
     y += 4;
+  };
+
+  const drawFeeSliderChart = (rows) => {
+    if (rows.length === 0) {
+      writeText('Für den aktuellen Gruppenfilter sind keine Tarifstaffeln vorhanden.', { size: 8, after: 4 });
+      return;
+    }
+
+    const labelWidth = 74;
+    const trackWidth = 112;
+    const valueWidth = 61;
+    const deltaWidth = pageWidth - margin * 2 - labelWidth - trackWidth - valueWidth;
+    const trackX = margin + labelWidth;
+    const valueX = trackX + trackWidth;
+    const deltaX = valueX + valueWidth;
+    const maximumAmount = Math.max(0, ...rows.flatMap((row) => [row.baselineAmount, row.simulatedAmount]));
+    const scaleMaximum = Math.max(50, Math.ceil(maximumAmount / 50) * 50);
+    const groups = Array.from(rows.reduce((map, row) => {
+      if (!map.has(row.groupName)) map.set(row.groupName, []);
+      map.get(row.groupName).push(row);
+      return map;
+    }, new Map()));
+
+    const drawChartHeader = () => {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(6.5);
+      doc.setTextColor(45, 55, 72);
+      doc.text('Beitragsstufe', margin, y + 3);
+      doc.text('Tarifskala', trackX, y + 3);
+      doc.text('Ausgang > Simulation', valueX + valueWidth - 1, y + 3, { align: 'right' });
+      doc.text('Änderung / Monat', deltaX + deltaWidth - 1, y + 3, { align: 'right' });
+      y += 5;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(6);
+      doc.setTextColor(100, 110, 125);
+      doc.text('0 €', trackX, y + 2.2);
+      doc.text(`${scaleMaximum.toLocaleString('de-DE')} €`, trackX + trackWidth, y + 2.2, { align: 'right' });
+      y += 4;
+    };
+
+    writeText('Beitragskonfiguration · Slider-Ansicht', { size: 11, bold: true, after: 1 });
+    writeText('Grauer Marker: hinterlegter Tarif · Blauer Marker: Simulation · Rot: höherer Elternbeitrag · Grün: niedrigerer Elternbeitrag', { size: 7, color: [90, 100, 115], after: 2 });
+    drawChartHeader();
+
+    groups.forEach(([groupName, groupRows]) => {
+      const subsidy = groupRows[0]?.subsidy || {};
+      const subsidyLabel = subsidy.enabled === false
+        ? 'Elternbeitragszuschuss inaktiv'
+        : `Elternbeitragszuschuss ${formatEuro(subsidy.monthlyAmount)} / Kind / Monat · bis ${formatBookingDate(subsidy.endDate, 'unbegrenzt')}`;
+      writeText(`${groupName} · ${subsidyLabel}`, { size: 8, bold: true, after: 1 });
+
+      groupRows.forEach((row) => {
+        const rowHeight = 6.8;
+        if (y + rowHeight > pageHeight - bottomMargin) {
+          doc.addPage();
+          y = margin;
+          drawChartHeader();
+          writeText(`${groupName} · Fortsetzung`, { size: 8, bold: true, after: 1 });
+        }
+
+        const changed = Math.abs(row.delta) >= 0.005;
+        const changeColor = row.delta > 0 ? [190, 55, 55] : [20, 130, 95];
+        if (changed) {
+          doc.setFillColor(...(row.delta > 0 ? [255, 242, 240] : [237, 249, 244]));
+          doc.rect(margin, y, pageWidth - margin * 2, rowHeight, 'F');
+        }
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(6.3);
+        doc.setTextColor(35, 45, 60);
+        doc.text(`${row.category} · ${row.hours} h/Tag`, margin, y + 4.5);
+
+        const centerY = y + rowHeight / 2;
+        doc.setDrawColor(205, 213, 223);
+        doc.setLineWidth(0.8);
+        doc.line(trackX, centerY, trackX + trackWidth, centerY);
+        [0, 0.5, 1].forEach((fraction) => {
+          const tickX = trackX + trackWidth * fraction;
+          doc.setDrawColor(190, 200, 212);
+          doc.setLineWidth(0.35);
+          doc.line(tickX, centerY - 1.8, tickX, centerY + 1.8);
+        });
+        const toX = (amount) => trackX + Math.max(0, Math.min(1, amount / scaleMaximum)) * trackWidth;
+        const baselineX = toX(row.baselineAmount);
+        const simulatedX = toX(row.simulatedAmount);
+        if (changed) {
+          doc.setDrawColor(...changeColor);
+          doc.setLineWidth(2.2);
+          doc.line(baselineX, centerY, simulatedX, centerY);
+        }
+        if (row.baselineActive) {
+          doc.setFillColor(115, 125, 140);
+          doc.circle(baselineX, centerY, 1.5, 'F');
+        }
+        if (row.simulatedActive) {
+          doc.setFillColor(37, 99, 235);
+          doc.circle(simulatedX, centerY, 0.95, 'F');
+        }
+
+        doc.setTextColor(35, 45, 60);
+        const baselineLabel = row.baselineActive ? formatEuro(row.baselineAmount) : '–';
+        const simulatedLabel = row.simulatedActive ? formatEuro(row.simulatedAmount) : '–';
+        doc.text(`${baselineLabel} > ${simulatedLabel}`, valueX + valueWidth - 1, centerY + 2.1, { align: 'right' });
+        if (changed) doc.setTextColor(...changeColor);
+        doc.text(changed ? formatSignedEuro(row.delta) : '–', deltaX + deltaWidth - 1, centerY + 2.1, { align: 'right' });
+        y += rowHeight;
+      });
+      y += 2;
+    });
+    y += 2;
   };
 
   doc.setProperties({
@@ -130,43 +241,47 @@ async function generateSimulationPdfReport({
   writeText(`Szenario: ${scenarioName}`, { size: 10, bold: true, after: 1 });
   writeText(`Stichtag: ${referenceDate}   ·   Gruppenfilter: ${groupFilterLabel}   ·   ${baseYearLabel}`, { size: 8, after: 5 });
 
-  writeText('Beitragskonfiguration', { size: 11, bold: true, after: 2 });
-  if (feeRows.length) {
-    drawTable(
-      ['Gruppe', 'Zuschuss', 'Kategorie', 'Stunden/Tag', 'Status', 'Monatsbeitrag', '€/h-Äquivalent'],
-      feeRows,
-      [40, 24, 32, 25, 18, 30, 30]
-    );
-  } else {
-    writeText('Für den aktuellen Gruppenfilter sind keine Tarifstaffeln vorhanden.', { size: 8, after: 4 });
-  }
+  drawFeeSliderChart(feeRows);
 
   writeText('Jahresergebnisse', { size: 11, bold: true, after: 2 });
   drawTable(
-    ['Jahr', 'Zusatzförderung', 'Std./Tag Ø', 'Förderanspruch', 'Delta Förderung/Vorjahr', 'Elternbeiträge', 'Delta Beiträge (Vorjahr/Sim.)', 'Einnahmen', 'Delta Einnahmen (Vorjahr/Sim.)', 'Upgrade-Potenzial', 'Downgrade-Potenzial'],
+    ['Jahr', 'Zusatzförderung', 'Std./Tag Ø', 'Förderanspruch', 'Änd. Förderung (VJ/Sim.)', 'Elternbeiträge', 'Änd. Beiträge (VJ/Sim.)', 'Einnahmen', 'Änd. Einnahmen (VJ/Sim.)', 'Upgrade-Potenzial', 'Downgrade-Potenzial'],
     annualRows,
-    [14, 27, 20, 27, 23, 25, 23, 25, 28, 32, 32]
+    [14, 25, 19, 25, 26, 25, 27, 25, 27, 32, 32],
+    ['left', 'right', 'right', 'right', 'right', 'right', 'right', 'right', 'right', 'right', 'right']
   );
   writeText('Zusatzförderung – Jahreswerte nach Förderart', { size: 10, bold: true, after: 2 });
   writeText('U3-Zusatzförderung: U3-Kind-Monate × Basiswert × 2,5 %. Der reguläre U3-Gewichtungsfaktor ist darin nicht enthalten.', { size: 7, after: 2 });
   drawTable(
     ['Jahr', 'U3-Kind-Monate', 'ZusF. U3', 'U3-Bund', 'Personalbonus', 'Assistenz', 'Sprache', 'Team brutto', 'Abzug bisherig', 'Reform netto'],
     annualFundingDetailRows,
-    [16, 23, 25, 27, 25, 25, 24, 31, 31, 31]
+    [16, 23, 25, 27, 25, 25, 24, 31, 31, 31],
+    ['left', 'right', 'right', 'right', 'right', 'right', 'right', 'right', 'right', 'right']
   );
 
-  writeText('Am stärksten betroffene Familien (Stichtag)', { size: 11, bold: true, after: 2 });
-  if (familyRows.length) {
-    drawTable(
-      ['Familie', 'Bisheriger Beitrag/Monat', 'Neuer Beitrag/Monat', 'Änderung/Monat'],
-      familyRows,
-      [80, 48, 48, 45]
-    );
-    if (omittedFamilyCount > 0) {
-      writeText(`Weitere betroffene Familien nicht aufgeführt: ${omittedFamilyCount}.`, { size: 7, after: 2 });
-    }
+  writeText('Betroffene Familien nach Jahr', { size: 11, bold: true, after: 2 });
+  if (familyYearGroups.length) {
+    writeText('Die Jahreszeilen aus dem Web-Drilldown sind im PDF je Jahr aufgeklappt dargestellt.', { size: 7, color: [90, 100, 115], after: 2 });
+    familyYearGroups.forEach(({ year, families }) => {
+      writeText(`${year} · ${families.length} betroffene Familien`, { size: 9, bold: true, after: 1 });
+      const familyRows = families.map((family) => [
+        year,
+        family.label,
+        formatEuro(family.averageMonthlyParentFeesBefore),
+        formatEuro(family.averageMonthlyParentFeesAfter),
+        formatSignedEuro(family.averageMonthlyDelta),
+        family.averageMonthlyYearOverYearDelta == null ? '–' : formatSignedEuro(family.averageMonthlyYearOverYearDelta),
+        family.yearOverYearAnnualDelta == null ? '–' : formatSignedEuro(family.yearOverYearAnnualDelta),
+      ]);
+      drawTable(
+        ['Jahr', 'Familie', 'Beitrag alt Ø/Mo.', 'Beitrag neu Ø/Mo.', 'Simulation Ø/Mo.', 'Vorjahr Ø/Mo.', 'Vorjahr/Jahr'],
+        familyRows,
+        [18, 43, 43, 43, 43, 43, 44],
+        ['left', 'left', 'right', 'right', 'right', 'right', 'right']
+      );
+    });
   } else {
-    writeText('Am Stichtag sind keine Familien von einer Beitragsänderung betroffen.', { size: 8, after: 2 });
+    writeText('In den Jahresvergleichen sind keine Familien mit Beitragsänderungen enthalten.', { size: 8, after: 2 });
   }
 
   const pageCount = doc.getNumberOfPages();
@@ -1218,34 +1333,7 @@ function FundingSimulationPanel({ scrollPage = false }) {
     selectedGroupIds: [],
     simulationData,
   }), [selectedScenarioId, referenceDate, simulationData]);
-  const currentSimulation = React.useMemo(() => simulateContributionChanges({
-    demandBookings: currentDemandData.demand,
-    dataItems: simulationData.dataItems,
-    groupDefs,
-    bayKiBiGRules: financeScenario?.bayKiBiGRules || [],
-    groupFeeCatalogs: simulationCatalogs,
-    originalGroupFeeCatalogs: groupFeeCatalogs,
-    parentFeeSubsidy,
-    parentFeeSubsidiesByGroup: effectiveParentFeeSubsidiesByGroup,
-    baselineParentFeeSubsidy: parentFeeSubsidy,
-    baselineParentFeeSubsidiesByGroup: parentFeeSubsidiesByGroup,
-    parentFeeSubsidyChildren: currentDemandData.parentFeeSubsidyChildren,
-    temporaryPrices,
-    utilizationPercent: 0,
-    referenceDate,
-  }), [
-    currentDemandData,
-    simulationData,
-    groupDefs,
-    financeScenario?.bayKiBiGRules,
-    simulationCatalogs,
-    groupFeeCatalogs,
-    parentFeeSubsidy,
-    parentFeeSubsidiesByGroup,
-    effectiveParentFeeSubsidiesByGroup,
-    temporaryPrices,
-    referenceDate,
-  ]);
+
   const familyPotentials = React.useMemo(() => calculateFamilyFeePotentials({
     demandBookings: currentDemandData.demand,
     dataItems: simulationData.dataItems,
@@ -1283,36 +1371,6 @@ function FundingSimulationPanel({ scrollPage = false }) {
     upgradeWeightedDailyHours: 0,
     downgradeWeightedDailyHours: 0,
   }), [familyPotentials]);
-  const affectedFamilyRows = React.useMemo(() => {
-    const grouped = new Map();
-    currentSimulation.familyContributions.forEach((family) => {
-      const familyKeys = new Set((family.childIds || []).map((childId) => (
-        familyPresentation.keyByChildId[String(childId)] || `child:${childId}`
-      )));
-      if (familyKeys.size === 0) familyKeys.add(family.id);
-      familyKeys.forEach((familyKey) => {
-        if (!grouped.has(familyKey)) {
-          grouped.set(familyKey, {
-            id: familyKey,
-            label: familyPresentation.labelByKey.get(familyKey) || family.label || familyKey,
-            monthlyParentFeesBefore: 0,
-            monthlyParentFeesAfter: 0,
-          });
-        }
-        const row = grouped.get(familyKey);
-        row.monthlyParentFeesBefore += family.monthlyParentFeesBefore;
-        row.monthlyParentFeesAfter += family.monthlyParentFeesAfter;
-      });
-    });
-
-    return Array.from(grouped.values())
-      .map((family) => ({
-        ...family,
-        deltaMonthlyParentFees: family.monthlyParentFeesAfter - family.monthlyParentFeesBefore,
-      }))
-      .filter((family) => Math.abs(family.deltaMonthlyParentFees) >= 0.005)
-      .sort((left, right) => Math.abs(right.deltaMonthlyParentFees) - Math.abs(left.deltaMonthlyParentFees));
-  }, [currentSimulation.familyContributions, familyPresentation]);
 
   const setTemporaryCatalog = (groupId, nextEntries) => {
     const originalEntries = groupFeeCatalogs[groupId] || [];
@@ -1428,16 +1486,19 @@ function FundingSimulationPanel({ scrollPage = false }) {
         const fundingPerWeightedDailyHour = annualBasisValueTotal / 24;
         const upgradeHours = familyPotentialTotals.upgradeWeeklyHours / 5;
         const downgradeHours = familyPotentialTotals.downgradeWeeklyHours / 5;
+        const formatDeltaPair = (previousDelta, simulationDelta) => (
+          `${previousDelta == null ? '–' : `${formatSignedEuro(previousDelta)} VJ`}\n${formatSignedEuro(simulationDelta)} Sim.`
+        );
         return [
           row.year,
           formatEuro(row.additionalFunding),
           formatDailyHours(row.averageDailyBookingHours),
           formatEuro(row.totalFunding),
-          previous ? formatSignedEuro(row.totalFunding - previous.totalFunding) : '–',
+          formatDeltaPair(previous ? row.totalFunding - previous.totalFunding : null, 0),
           formatEuro(row.contributions),
-          `${previous ? formatSignedEuro(row.baselineContributions - previous.baselineContributions) : '–'} / ${formatSignedEuro(row.contributionsChange)} Sim.`,
+          formatDeltaPair(previous ? row.baselineContributions - previous.baselineContributions : null, row.contributionsChange),
           formatEuro(row.totalIncome),
-          `${previous ? formatSignedEuro(row.baselineTotalIncome - previous.baselineTotalIncome) : '–'} / ${formatSignedEuro(row.totalIncomeChange)} Sim.`,
+          formatDeltaPair(previous ? row.baselineTotalIncome - previous.baselineTotalIncome : null, row.totalIncomeChange),
           upgradeHours > 0 ? `${formatDailyHours(upgradeHours)} · ${formatSignedEuro(upgradeHours * fundingPerWeightedDailyHour)}` : '–',
           downgradeHours > 0 ? `-${formatDailyHours(downgradeHours)} · ${formatSignedEuro(-downgradeHours * fundingPerWeightedDailyHour)}` : '–',
         ];
@@ -1454,22 +1515,13 @@ function FundingSimulationPanel({ scrollPage = false }) {
         formatEuro(row.reformPriorGuidelineFunding),
         formatEuro(row.reformTeamGrantNet),
       ]);
-      const feeRows = tariffGroups.flatMap((group) => {
-        const subsidy = effectiveParentFeeSubsidiesByGroup[group.id] || parentFeeSubsidy;
-        return ZEITKAT_CATALOG.map((zone) => {
-          const entry = (effectiveFeeCatalogs[group.id] || []).find((candidate) => getFeeBandZeitkatId(candidate) === zone.id);
-          const amount = Number(entry?.monthlyAmount) || 0;
-          const active = Boolean(entry && entry.enabled !== false && amount > 0);
-          return [
-            group.name,
-            `${subsidy.enabled !== false ? 'aktiv' : 'inaktiv'} · ${formatEuro(subsidy.monthlyAmount)}`,
-            `ZEITKAT ${zone.id} (${zone.kurzbez}h)`,
-            `${zone.maxHours} h/Tag`,
-            active ? 'Aktiv' : 'Inaktiv',
-            entry ? formatEuro(amount) : '–',
-            entry ? `${(amount / zone.maxHours).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €/h` : '–',
-          ];
-        });
+      const feeRows = buildSimulationFeePdfRows({
+        tariffGroups,
+        groupFeeCatalogs,
+        effectiveFeeCatalogs,
+        parentFeeSubsidiesByGroup: effectiveParentFeeSubsidiesByGroup,
+        parentFeeSubsidy,
+        referenceDate,
       });
       const groupFilterLabel = selectedGroupIds.length
         ? selectedGroupIds.map((groupId) => groupFilterOptions.find((option) => option.value === groupId)?.label || groupId).join(', ')
@@ -1477,12 +1529,7 @@ function FundingSimulationPanel({ scrollPage = false }) {
       const baseYearLabel = fixedBaseYearEnabled
         ? `Fixiertes Basisjahr: ${fixedBaseYear} (Kinderbestand, Buchungsstunden und Zusatzförderungen)`
         : `Kein fixiertes Basisjahr · Jahresbasis nach Buchungsdaten (Stichtagsjahr ${currentYear})`;
-      const familyRows = affectedFamilyRows.slice(0, 10).map((family) => [
-        family.label,
-        formatEuro(family.monthlyParentFeesBefore),
-        formatEuro(family.monthlyParentFeesAfter),
-        formatSignedEuro(family.deltaMonthlyParentFees),
-      ]);
+      const familyYearGroups = buildAnnualFamilyImpactPdfGroups(annualIncomeRows);
       await generateSimulationPdfReport({
         scenarioName: selectedSimulationScenario?.name || 'Szenario',
         referenceDate,
@@ -1491,8 +1538,7 @@ function FundingSimulationPanel({ scrollPage = false }) {
         feeRows,
         annualRows,
         annualFundingDetailRows,
-        familyRows,
-        omittedFamilyCount: Math.max(0, affectedFamilyRows.length - familyRows.length),
+        familyYearGroups,
       });
       notifications.show({ title: 'PDF exportiert', message: 'Der Simulationsbericht wurde heruntergeladen.', color: 'teal' });
     } catch (error) {

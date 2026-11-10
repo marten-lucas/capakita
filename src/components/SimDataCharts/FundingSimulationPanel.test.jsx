@@ -4,6 +4,7 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { MantineProvider } from '@mantine/core';
 import FundingSimulationPanel from './FundingSimulationPanel';
+import { buildAnnualFamilyImpactPdfGroups, buildSimulationFeePdfRows } from './simulationPdfUtils';
 import simScenarioReducer, { updateScenario } from '../../store/simScenarioSlice';
 import simDataReducer from '../../store/simDataSlice';
 import simBookingReducer from '../../store/simBookingSlice';
@@ -167,6 +168,60 @@ function getEuroAmount(element) {
   const amount = element.textContent.match(/-?[\d.]+,\d{2}/)?.[0] || '0,00';
   return Number(amount.replace(/\./g, '').replace(',', '.'));
 }
+
+describe('FundingSimulationPanel PDF export data', () => {
+  it('keeps original and simulated tariff values together for the slider chart', () => {
+    const rows = buildSimulationFeePdfRows({
+      tariffGroups: [{ id: 'g1', name: 'Fuchsgruppe' }],
+      groupFeeCatalogs: {
+        g1: [{ id: 'fee-04', zeitkatId: '04', monthlyAmount: 150, validFrom: '2026-01-01' }],
+      },
+      effectiveFeeCatalogs: {
+        g1: [{ id: 'fee-04', zeitkatId: '04', monthlyAmount: 180, validFrom: '2026-01-01' }],
+      },
+      parentFeeSubsidiesByGroup: { g1: { enabled: true, monthlyAmount: 100, endDate: '2026-12-31' } },
+      referenceDate: '2026-03-01',
+    });
+    const changedFee = rows.find((row) => row.category.startsWith('ZEITKAT 04'));
+
+    expect(changedFee).toMatchObject({
+      groupName: 'Fuchsgruppe',
+      baselineAmount: 150,
+      simulatedAmount: 180,
+      delta: 30,
+      baselineActive: true,
+      simulatedActive: true,
+    });
+    expect(rows).toHaveLength(12);
+  });
+
+  it('uses the annual family drilldown to create PDF groups by year', () => {
+    const groups = buildAnnualFamilyImpactPdfGroups([
+      { year: 2026, familyImpacts: [] },
+      { year: 2027, familyImpacts: [{
+        id: 'family-1',
+        label: 'Familie 1',
+        averageMonthlyParentFeesBefore: 200,
+        averageMonthlyParentFeesAfter: 300,
+        averageMonthlyDelta: 0,
+        averageMonthlyYearOverYearDelta: 100,
+        yearOverYearAnnualDelta: 1200,
+      }] },
+    ]);
+
+    expect(groups).toEqual([{
+      year: 2027,
+      families: [{
+        label: 'Familie 1',
+        averageMonthlyParentFeesBefore: 200,
+        averageMonthlyParentFeesAfter: 300,
+        averageMonthlyDelta: 0,
+        averageMonthlyYearOverYearDelta: 100,
+        yearOverYearAnnualDelta: 1200,
+      }],
+    }]);
+  });
+});
 
 describe('FundingSimulationPanel', () => {
   it('zeigt Tarif-Konfigurationen und Jahresergebnisse in getrennten Bereichen', async () => {
