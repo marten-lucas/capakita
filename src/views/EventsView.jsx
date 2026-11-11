@@ -3,7 +3,7 @@ import dayjs from 'dayjs';
 import { CopyableHighcharts as HighchartsReact } from '../components/common/CopyToClipboardButton';
 import Highcharts from 'highcharts';
 import { useSelector } from 'react-redux';
-import { selectEventsForScenario } from '../store/eventSlice';
+import { useScenarioEvents } from '../hooks/useScenarioEvents';
 import { useOverlayData } from '../hooks/useOverlayData';
 import { getActiveDemandChildrenAtDate } from '../utils/dataVisibility';
 import { resolveGroupIdAtDate } from '../utils/financeUtils';
@@ -71,7 +71,7 @@ function EventsView() {
   const isMobile = useMediaQuery('(max-width: 48em)');
   const isTestEnvironment = import.meta.env.MODE === 'test';
   const selectedScenarioId = useSelector((state) => state.simScenario.selectedScenarioId);
-  const events = useSelector((state) => selectEventsForScenario(state, selectedScenarioId));
+  const { events } = useScenarioEvents(selectedScenarioId);
   const referenceDateFromChart = useSelector((state) => state.chart?.[selectedScenarioId]?.referenceDate);
   const referenceDate = referenceDateFromChart || new Date().toISOString().slice(0, 10);
   const { getEffectiveDataItems, getEffectiveGroupDefs, getEffectiveGroupAssignments } = useOverlayData();

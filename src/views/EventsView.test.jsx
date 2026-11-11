@@ -5,14 +5,24 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { MantineProvider } from '@mantine/core';
 import { Provider } from 'react-redux';
 import EventsView from './EventsView';
+import SimDataEventsTab from '../components/SimDataDetail/SimDataEventsTab';
+import simScenarioReducer from '../store/simScenarioSlice';
+import simDataReducer from '../store/simDataSlice';
+import simBookingReducer from '../store/simBookingSlice';
+import simGroupReducer from '../store/simGroupSlice';
+import simQualificationReducer from '../store/simQualificationSlice';
+import simOverlayReducer from '../store/simOverlaySlice';
+import chartReducer from '../store/chartSlice';
+import eventReducer from '../store/eventSlice';
 
 const scenarioId = 'events-filter-scenario';
 const referenceDate = '2026-06-01';
 
-function createTestStore() {
+function createTestStore({ selectedItemId = null } = {}) {
   const initialState = {
     simScenario: {
       selectedScenarioId: scenarioId,
+      selectedItems: { [scenarioId]: selectedItemId ? [selectedItemId] : [] },
       scenarios: [{ id: scenarioId, name: 'Ereignisfilter-Test' }],
     },
     simOverlay: { overlaysByScenario: {} },
@@ -20,18 +30,21 @@ function createTestStore() {
       dataByScenario: {
         [scenarioId]: {
           'child-active-regel': {
-            id: 'child-active-regel', type: 'demand', name: 'Marta Regel', startdate: '2025-01-01', groupId: 'regel',
+            id: 'child-active-regel', type: 'demand', name: 'Marta Regel', dateofbirth: '2021-03-01', startdate: '2025-01-01', groupId: 'regel',
           },
           'child-active-krippe': {
-            id: 'child-active-krippe', type: 'demand', name: 'Berta Krippe', startdate: '2025-01-01', groupId: 'krippe',
+            id: 'child-active-krippe', type: 'demand', name: 'Berta Krippe', dateofbirth: '2024-02-01', startdate: '2025-01-01', groupId: 'krippe',
           },
           'child-inactive': {
-            id: 'child-inactive', type: 'demand', name: 'Ines Inaktiv', startdate: '2024-01-01', enddate: '2026-05-31', groupId: 'krippe',
+            id: 'child-inactive', type: 'demand', name: 'Ines Inaktiv', dateofbirth: '2020-01-01', startdate: '2024-01-01', enddate: '2026-05-31', groupId: 'krippe',
+          },
+          'staff-1': {
+            id: 'staff-1', type: 'capacity', name: 'Erzieher Team', startdate: '2024-01-01',
           },
         },
       },
     },
-    simBooking: { bookingsByScenario: {} },
+    simBooking: { bookingsByScenario: { [scenarioId]: {} } },
     simGroup: {
       groupDefsByScenario: {
         [scenarioId]: [
@@ -50,18 +63,25 @@ function createTestStore() {
     simQualification: { qualificationDefsByScenario: {}, qualificationAssignmentsByScenario: {} },
     chart: { [scenarioId]: { referenceDate } },
     events: {
-      eventsByScenario: {
-        [scenarioId]: [
-          { id: 'event-regel', entityType: 'demand', entityId: 'child-active-regel', entityName: 'Marta Regel', type: 'group_assignment_start', effectiveDate: '2026-07-01', description: 'Wechsel Regelgruppe' },
-          { id: 'event-krippe', entityType: 'demand', entityId: 'child-active-krippe', entityName: 'Berta Krippe', type: 'group_assignment_start', effectiveDate: '2026-07-02', description: 'Wechsel Krippe' },
-          { id: 'event-inactive', entityType: 'demand', entityId: 'child-inactive', entityName: 'Ines Inaktiv', type: 'group_assignment_start', effectiveDate: '2026-07-03', description: 'Wechsel inaktiv' },
-          { id: 'event-staff', entityType: 'capacity', entityId: 'staff-1', entityName: 'Erzieher Team', type: 'presence_start', effectiveDate: '2026-07-04', description: 'Dienstbeginn' },
-        ],
-      },
+      eventsByScenario: {},
+      disabledEventIdsByScenario: {},
+      _needsRefresh: true,
     },
   };
 
-  return configureStore({ reducer: (state = initialState) => state });
+  return configureStore({
+    reducer: {
+      simScenario: simScenarioReducer,
+      simData: simDataReducer,
+      simBooking: simBookingReducer,
+      simGroup: simGroupReducer,
+      simQualification: simQualificationReducer,
+      simOverlay: simOverlayReducer,
+      chart: chartReducer,
+      events: eventReducer,
+    },
+    preloadedState: initialState,
+  });
 }
 
 function renderEventsView() {
@@ -75,11 +95,28 @@ function renderEventsView() {
 }
 
 describe('EventsView filters', () => {
+  it('shows the selected child event history split into read-only real and automatic tabs', async () => {
+    render(
+      <Provider store={createTestStore({ selectedItemId: 'child-active-krippe' })}>
+        <MantineProvider>
+          <SimDataEventsTab />
+        </MantineProvider>
+      </Provider>
+    );
+
+    expect(await screen.findByText('Gruppenzuweisung beginnt (krippe)')).toBeInTheDocument();
+    expect(screen.queryByText('Automatischer Gruppenwechsel: Krippe → Kita')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText(/^Automatische/));
+    expect(await screen.findByText('Automatischer Gruppenwechsel: Krippe → Kita')).toBeInTheDocument();
+    expect(screen.queryByText('Gruppenzuweisung beginnt (krippe)')).not.toBeInTheDocument();
+  });
+
   it('shows the stichtag and filters children by active status, name, and current group', async () => {
     renderEventsView();
 
     expect(screen.getByTestId('events-filter-reference-date')).toHaveTextContent('01.06.2026');
-    expect(screen.getByText('Ines Inaktiv')).toBeInTheDocument();
+    expect(await screen.findByText('Ines Inaktiv')).toBeInTheDocument();
 
     fireEvent.click(screen.getByLabelText('Nur aktive Kinder'));
     expect(screen.getByText('Marta Regel')).toBeInTheDocument();

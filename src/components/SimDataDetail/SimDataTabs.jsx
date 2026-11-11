@@ -2,13 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { Tabs, Box, Text, Center } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
-import { IconUser, IconClock, IconUsers, IconTools } from '@tabler/icons-react';
+import { IconUser, IconClock, IconUsers, IconTools, IconCalendarEvent } from '@tabler/icons-react';
 import { useOverlayData } from '../../hooks/useOverlayData';
 import { selectPrimarySelectedItemId } from '../../store/simScenarioSlice';
 import SimDataGeneralTab from './SimDataGeneralTab';
 import SimDataBookingTab from './Bookings/SimDataBookingTab';
 import SimDataGroupsTab from './Groups/SimDataGroupsTab';
 import SimDataFinanceTab from './SimDataFinanceTab';
+import SimDataEventsTab from './SimDataEventsTab';
 
 function SimDataTabs() {
   const [activeTab, setActiveTab] = useState('general');
@@ -58,6 +59,11 @@ function SimDataTabs() {
               Gruppen
             </Tabs.Tab>
           )}
+          {!isEmployee && (
+            <Tabs.Tab value="events" leftSection={<IconCalendarEvent size={16} />}>
+              Ereignisse
+            </Tabs.Tab>
+          )}
           <Tabs.Tab value="finance" leftSection={<IconTools size={16} />}>
             Finanzen
           </Tabs.Tab>
@@ -73,6 +79,11 @@ function SimDataTabs() {
           {!isEmployee && (
             <Tabs.Panel value="groups" style={{ minHeight: '100%' }}>
               <SimDataGroupsTab />
+            </Tabs.Panel>
+          )}
+          {!isEmployee && (
+            <Tabs.Panel value="events" style={{ minHeight: '100%' }}>
+              <SimDataEventsTab />
             </Tabs.Panel>
           )}
           <Tabs.Panel value="finance" style={{ minHeight: '100%' }}>
