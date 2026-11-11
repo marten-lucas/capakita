@@ -46,4 +46,33 @@ describe('buildFamilyImpactHistogramData', () => {
     expect(result.data.find((row) => row.range === '50–99 €')['2027']).toBe(1);
     expect(result.affectedFamiliesByYear['2027']).toBe(1);
   });
+
+  it('calculates labeled-summary values from affected families only for each mode', () => {
+    const yearOverYear = buildFamilyImpactHistogramData(annualRows, 'yearOverYear');
+    expect(yearOverYear.statisticsByYear['2027']).toEqual({
+      average: 325 / 3,
+      median: 100,
+      averageRange: '100–149 €',
+      medianRange: '100–149 €',
+      affectedFamilies: 3,
+    });
+
+    const total = buildFamilyImpactHistogramData(annualRows, 'total');
+    expect(total.statisticsByYear['2027']).toEqual({
+      average: 130,
+      median: 100,
+      averageRange: '100–149 €',
+      medianRange: '100–149 €',
+      affectedFamilies: 3,
+    });
+
+    const simulation = buildFamilyImpactHistogramData(annualRows, 'simulation');
+    expect(simulation.statisticsByYear['2027']).toEqual({
+      average: 65,
+      median: 65,
+      averageRange: '50–99 €',
+      medianRange: '50–99 €',
+      affectedFamilies: 1,
+    });
+  });
 });

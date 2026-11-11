@@ -17,6 +17,11 @@ function getHistogramBinKey(value) {
   return HISTOGRAM_BINS[5].key;
 }
 
+function getHistogramRange(value) {
+  const key = getHistogramBinKey(value);
+  return HISTOGRAM_BINS.find((bin) => bin.key === key)?.label || 'zwischen Senkung und Erhöhung';
+}
+
 export function buildFamilyImpactHistogramData(annualIncomeRows = [], mode = 'yearOverYear') {
   const getImpactAmount = (family) => {
     const simulationDelta = Number(family.averageMonthlyDelta) || 0;
@@ -27,13 +32,34 @@ export function buildFamilyImpactHistogramData(annualIncomeRows = [], mode = 'ye
   };
   const yearlyCounts = (annualIncomeRows || []).map((yearRow) => {
     const counts = Object.fromEntries(HISTOGRAM_BINS.map((bin) => [bin.key, 0]));
+    const changes = [];
     (yearRow.familyImpacts || []).forEach((family) => {
       const amount = getImpactAmount(family);
       if (!Number.isFinite(amount)) return;
       const binKey = getHistogramBinKey(amount);
-      if (binKey) counts[binKey] += 1;
+      if (!binKey) return;
+      counts[binKey] += 1;
+      changes.push(amount);
     });
-    return { year: String(yearRow.year), counts };
+    const sortedChanges = [...changes].sort((left, right) => left - right);
+    const middle = Math.floor(sortedChanges.length / 2);
+    const median = sortedChanges.length === 0
+      ? null
+      : sortedChanges.length % 2 === 0
+        ? (sortedChanges[middle - 1] + sortedChanges[middle]) / 2
+        : sortedChanges[middle];
+    const average = changes.length ? changes.reduce((sum, amount) => sum + amount, 0) / changes.length : null;
+    return {
+      year: String(yearRow.year),
+      counts,
+      statistics: {
+        average,
+        median,
+        averageRange: average == null ? null : getHistogramRange(average),
+        medianRange: median == null ? null : getHistogramRange(median),
+        affectedFamilies: changes.length,
+      },
+    };
   }).filter((yearRow) => Object.values(yearRow.counts).some((count) => count > 0));
 
   return {
@@ -46,5 +72,6 @@ export function buildFamilyImpactHistogramData(annualIncomeRows = [], mode = 'ye
       year,
       Object.values(counts).reduce((sum, count) => sum + count, 0),
     ])),
+    statisticsByYear: Object.fromEntries(yearlyCounts.map(({ year, statistics }) => [year, statistics])),
   };
 }

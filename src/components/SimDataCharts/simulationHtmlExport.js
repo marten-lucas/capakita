@@ -281,6 +281,9 @@ function calculateAggregateSimulationResultsInternal(snapshot, state, initialize
   const histogramSeries = (snapshot.years || []).map((yearRow, index, rows) => {
     const previousYear = rows[index - 1]?.year;
     const counts = Object.fromEntries(histogramBins.map((bin) => [bin.key, 0]));
+    const weightedChanges = [];
+    let affectedFamilies = 0;
+    let totalChange = 0;
     (snapshot.familyProfiles || []).forEach((profile) => {
       const currentBaseline = calculateProfileYear(profile, yearRow.year, false).parentFees / 12;
       const currentSimulation = calculateProfileYear(profile, yearRow.year, true).parentFees / 12;
@@ -295,9 +298,35 @@ function calculateAggregateSimulationResultsInternal(snapshot, state, initialize
           ? previousYearDelta
           : simulationDelta + previousYearDelta;
       const binKey = getHistogramBinKey(amount);
-      if (binKey) counts[binKey] += Number(profile.familyCount) || 0;
+      const familyCount = Math.max(0, Math.floor(Number(profile.familyCount) || 0));
+      if (!binKey || familyCount === 0) return;
+      counts[binKey] += familyCount;
+      affectedFamilies += familyCount;
+      totalChange += amount * familyCount;
+      weightedChanges.push({ amount, familyCount });
     });
-    return { year: String(yearRow.year), counts };
+    weightedChanges.sort((left, right) => left.amount - right.amount);
+    const getWeightedValueAt = (target) => {
+      let cumulative = 0;
+      for (const item of weightedChanges) {
+        cumulative += item.familyCount;
+        if (target < cumulative) return item.amount;
+      }
+      return null;
+    };
+    const median = affectedFamilies === 0
+      ? null
+      : round((getWeightedValueAt(Math.floor((affectedFamilies - 1) / 2))
+        + getWeightedValueAt(Math.floor(affectedFamilies / 2))) / 2);
+    return {
+      year: String(yearRow.year),
+      counts,
+      statistics: {
+        average: affectedFamilies ? round(totalChange / affectedFamilies) : null,
+        median,
+        affectedFamilies,
+      },
+    };
   }).filter((row) => Object.values(row.counts).some((count) => count > 0));
 
   return {
@@ -312,6 +341,7 @@ function calculateAggregateSimulationResultsInternal(snapshot, state, initialize
         series.year,
         Object.values(series.counts).reduce((sum, count) => sum + count, 0),
       ])),
+      statisticsByYear: Object.fromEntries(histogramSeries.map((series) => [series.year, series.statistics])),
     },
     suppressedFamilyCount: snapshot.privacy?.suppressedFamilyCount || 0,
   };
@@ -339,6 +369,7 @@ function standaloneSimulationRuntime(initializeState, calculateResults) {
   const data = JSON.parse(dataNode.textContent);
   const state = initializeState(data);
   const euro = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
+  const euroPrecise = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 2 });
   const make = (tag, text, className) => {
     const node = document.createElement(tag);
     if (text != null) node.textContent = text;
@@ -456,10 +487,44 @@ function standaloneSimulationRuntime(initializeState, calculateResults) {
     else if (results.histogram.years.length) histogramYear.value = results.histogram.years[0];
     clear(histogramNode);
     const year = histogramYear.value;
+    const statistics = results.histogram.statisticsByYear[year];
+    const affected = results.histogram.affectedFamiliesByYear[year] || 0;
+    document.getElementById('affected-count').textContent = `${affected} betroffene Familien${results.suppressedFamilyCount ? ` · ${results.suppressedFamilyCount} Familien nicht aufgeschlüsselt` : ''}`;
+    suppressionNote.hidden = !results.suppressedFamilyCount;
+    if (!year || !statistics) {
+      histogramNode.append(make('p', 'In dieser Ansicht sind keine aufgeschlüsselten Familien von einer Beitragsänderung betroffen.'));
+      return;
+    }
     const maxCount = Math.max(1, ...results.histogram.bins.map((bin) => bin.counts[year] || 0));
+    const statisticsNode = make('div', null, 'histogram-statistics');
+    const markerValues = [
+      { key: 'average', label: 'Durchschnitt', value: statistics.average },
+      { key: 'median', label: 'Median', value: statistics.median },
+    ];
+    const getMarkerBinIndex = (value) => {
+      if (Math.abs(value) <= 0.005) return null;
+      if (value < 0) return 0;
+      if (value < 50) return 1;
+      if (value < 100) return 2;
+      if (value < 150) return 3;
+      if (value < 200) return 4;
+      return 5;
+    };
+    const getMarkerBinLabel = (index) => index == null
+      ? 'zwischen Senkung und Erhöhung'
+      : results.histogram.bins[index].label;
+    markerValues.forEach((marker) => {
+      const binIndex = getMarkerBinIndex(marker.value);
+      const changeLabel = `${marker.label}: ${marker.value > 0 ? '+' : ''}${euroPrecise.format(marker.value)} / Monat`;
+      const label = make('span', `${changeLabel} · ${getMarkerBinLabel(binIndex)}`, `histogram-stat histogram-stat-${marker.key}`);
+      const swatch = make('span', null, 'histogram-stat-swatch');
+      swatch.setAttribute('aria-hidden', 'true');
+      label.prepend(swatch);
+      statisticsNode.append(label);
+    });
     const chart = make('div', null, 'histogram-chart');
     chart.setAttribute('role', 'img');
-    chart.setAttribute('aria-label', `Histogramm der Beitragsänderungen für ${year}`);
+    chart.setAttribute('aria-label', `Histogramm der Beitragsänderungen für ${year}; Durchschnitt ${euroPrecise.format(statistics.average)}, Median ${euroPrecise.format(statistics.median)}`);
     results.histogram.bins.forEach((bin) => {
       const count = bin.counts[year] || 0;
       const column = make('div', null, 'histogram-column');
@@ -471,10 +536,18 @@ function standaloneSimulationRuntime(initializeState, calculateResults) {
       column.append(value, track, make('span', bin.label, 'histogram-label'));
       chart.append(column);
     });
-    histogramNode.append(chart);
-    const affected = results.histogram.affectedFamiliesByYear[year] || 0;
-    document.getElementById('affected-count').textContent = `${affected} betroffene Familien${results.suppressedFamilyCount ? ` · ${results.suppressedFamilyCount} Familien nicht aufgeschlüsselt` : ''}`;
-    suppressionNote.hidden = !results.suppressedFamilyCount;
+    markerValues.forEach((marker) => {
+      const binIndex = getMarkerBinIndex(marker.value);
+      const line = make('div', null, `histogram-marker histogram-marker-${marker.key}`);
+      const markerPosition = binIndex == null
+        ? (1 / results.histogram.bins.length) * 100
+        : ((binIndex + 0.5) / results.histogram.bins.length) * 100;
+      line.style.left = `${markerPosition}%`;
+      line.title = `${marker.label}: ${marker.value > 0 ? '+' : ''}${euroPrecise.format(marker.value)} / Monat (${getMarkerBinLabel(binIndex)})`;
+      line.setAttribute('aria-hidden', 'true');
+      chart.append(line);
+    });
+    histogramNode.append(statisticsNode, chart);
   }
 
   function refreshResults() {
@@ -521,7 +594,7 @@ export function buildStandaloneSimulationHtml(snapshot) {
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; connect-src 'none'; font-src 'none'">
 <title>CapaKita – interaktive Beitragssimulation</title>
 <style>${picoCss}
-:root{--pico-font-size:100%;--pico-spacing:1rem}body{max-width:1200px;margin:0 auto;padding:1.25rem}.privacy-notice{border-left:4px solid #c0841a;padding:.75rem 1rem;background:var(--pico-card-background-color)}.group-card{border:1px solid var(--pico-muted-border-color);border-radius:.75rem;padding:1rem;margin:1rem 0}.group-card h3{margin-bottom:.75rem}.tariff-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.75rem}.tariff-field,.subsidy-fields>label{margin:0}.tariff-field>span{display:block;font-weight:600}.input-row{display:flex;align-items:center;gap:.5rem}.input-row>input{margin:0}.enabled-field{display:inline-flex;align-items:center;gap:.4rem;white-space:nowrap}.enabled-field input{margin:0}.subsidy-fields{display:flex;align-items:end;flex-wrap:wrap;gap:.75rem;margin-top:1rem;padding-top:1rem;border-top:1px solid var(--pico-muted-border-color)}.subsidy-fields strong{width:100%}.subsidy-fields label{min-width:180px}.actions{display:flex;gap:.5rem;flex-wrap:wrap;margin:1rem 0}.histogram-toolbar{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}.histogram-toolbar select{width:auto}.histogram-chart{height:260px;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:.5rem;align-items:end;border-bottom:1px solid var(--pico-muted-border-color);padding:.5rem .25rem 0}.histogram-column{height:100%;display:grid;grid-template-rows:1.5rem 1fr 2.75rem;align-items:end;text-align:center;min-width:0}.histogram-value{font-variant-numeric:tabular-nums}.histogram-track{height:100%;display:flex;align-items:end;justify-content:center}.histogram-bar{width:min(65%,3rem);background:var(--pico-primary);border-radius:.3rem .3rem 0 0;min-height:0}.histogram-column:nth-child(1) .histogram-bar{background:#718096}.histogram-column:nth-child(n+3) .histogram-bar{background:#d88727}.histogram-column:nth-child(n+5) .histogram-bar{background:#b5473c}.histogram-label{font-size:.8rem;line-height:1.15;align-self:start;padding-top:.35rem}table{font-variant-numeric:tabular-nums}th,td{text-align:right}th:first-child,td:first-child{text-align:left}#suppression-note{color:var(--pico-del-color)}@media(max-width:640px){body{padding:.75rem}.histogram-chart{gap:.15rem}.histogram-label{font-size:.65rem}.histogram-chart{height:220px}table{font-size:.8rem}}
+:root{--pico-font-size:100%;--pico-spacing:1rem}body{max-width:1200px;margin:0 auto;padding:1.25rem}.privacy-notice{border-left:4px solid #c0841a;padding:.75rem 1rem;background:var(--pico-card-background-color)}.group-card{border:1px solid var(--pico-muted-border-color);border-radius:.75rem;padding:1rem;margin:1rem 0}.group-card h3{margin-bottom:.75rem}.tariff-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.75rem}.tariff-field,.subsidy-fields>label{margin:0}.tariff-field>span{display:block;font-weight:600}.input-row{display:flex;align-items:center;gap:.5rem}.input-row>input{margin:0}.enabled-field{display:inline-flex;align-items:center;gap:.4rem;white-space:nowrap}.enabled-field input{margin:0}.subsidy-fields{display:flex;align-items:end;flex-wrap:wrap;gap:.75rem;margin-top:1rem;padding-top:1rem;border-top:1px solid var(--pico-muted-border-color)}.subsidy-fields strong{width:100%}.subsidy-fields label{min-width:180px}.actions{display:flex;gap:.5rem;flex-wrap:wrap;margin:1rem 0}.histogram-toolbar{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}.histogram-toolbar select{width:auto}.histogram-chart{height:260px;position:relative;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:.5rem;align-items:end;border-bottom:1px solid var(--pico-muted-border-color);padding:.5rem .25rem 0}.histogram-statistics{display:flex;flex-wrap:wrap;gap:.5rem 1rem;font-size:.9rem}.histogram-stat{display:inline-flex;align-items:center;gap:.4rem}.histogram-stat-average{color:#1677b8}.histogram-stat-median{color:#b5473c}.histogram-stat-swatch{width:1.1rem;border-top:2px dashed currentColor}.histogram-marker{position:absolute;z-index:2;top:.5rem;bottom:3rem;width:0;border-left:2px dashed;pointer-events:none}.histogram-marker-average{color:#1677b8;transform:translateX(-3px)}.histogram-marker-median{color:#b5473c;transform:translateX(3px)}.histogram-column{height:100%;display:grid;grid-template-rows:1.5rem 1fr 2.75rem;align-items:end;text-align:center;min-width:0}.histogram-value{font-variant-numeric:tabular-nums}.histogram-track{height:100%;display:flex;align-items:end;justify-content:center}.histogram-bar{width:min(65%,3rem);background:var(--pico-primary);border-radius:.3rem .3rem 0 0;min-height:0}.histogram-column:nth-child(1) .histogram-bar{background:#718096}.histogram-column:nth-child(n+3) .histogram-bar{background:#d88727}.histogram-column:nth-child(n+5) .histogram-bar{background:#b5473c}.histogram-label{font-size:.8rem;line-height:1.15;align-self:start;padding-top:.35rem}table{font-variant-numeric:tabular-nums}th,td{text-align:right}th:first-child,td:first-child{text-align:left}#suppression-note{color:var(--pico-del-color)}@media(max-width:640px){body{padding:.75rem}.histogram-chart{gap:.15rem}.histogram-label{font-size:.65rem}.histogram-chart{height:220px}table{font-size:.8rem}}
 </style>
 </head>
 <body>
@@ -530,7 +603,7 @@ export function buildStandaloneSimulationHtml(snapshot) {
 <p class="privacy-notice"><strong>Datenschutz:</strong> Diese Datei enthält nur aggregierte Tarifprofile. Es werden keine Namen, IDs oder Einzelbuchungen exportiert. Seltene Profile unter ${HTML_FAMILY_PROFILE_MIN_COUNT} Familien sind unterdrückt. Der Inhalt dieser HTML-Datei ist unverschlüsselt.</p>
 <section><h2>Beiträge anpassen</h2><p>Änderungen werden ausschließlich in diesem Browser neu berechnet.</p><div id="tariff-controls"></div><div class="actions"><button id="reset-simulation" class="secondary">Änderungen zurücksetzen</button><button id="download-updated">Aktualisierte HTML-Datei herunterladen</button><button type="button" class="outline" onclick="window.print()">Drucken / als PDF speichern</button></div></section>
 <section><h2>Jahresergebnisse</h2><div id="annual-results"></div></section>
-<section><h2>Beitragsänderungen der betroffenen Familien</h2><p>Familien werden nach ihrer monatlichen Beitragsänderung gruppiert; jede Säule zeigt die Anzahl der Familien im jeweiligen Bereich.</p><div class="histogram-toolbar"><label for="histogram-year">Jahr</label><select id="histogram-year"></select><strong id="affected-count"></strong></div><div id="family-histogram"></div><p id="suppression-note" hidden>Datenschutzbedingt unterdrückte Familienprofile werden nicht neu berechnet: Ihr Beitragsanteil bleibt in den Jahresgesamtsummen auf dem Export-Ausgangswert. Änderungen und Histogramm zeigen deshalb nur die aufgeschlüsselten Profile; die Gesamtauswirkung ist unvollständig.</p><p><small>Die Histogrammänderung umfasst standardmäßig die Tarif-/Zuschusssimulation und den Effekt zum Vorjahr. Alle Berechnungen laufen lokal; die Datei lädt keine Inhalte aus dem Internet.</small></p></section>
+<section><h2>Beitragsänderungen der betroffenen Familien</h2><p>Jede Säule zeigt die Anzahl der Familien im Bereich. Markierte Linien und Labels zeigen Durchschnitt und Median der monatlichen Änderungen betroffener Familien.</p><div class="histogram-toolbar"><label for="histogram-year">Jahr</label><select id="histogram-year"></select><strong id="affected-count"></strong></div><div id="family-histogram"></div><p id="suppression-note" hidden>Datenschutzbedingt unterdrückte Familienprofile werden nicht neu berechnet: Ihr Beitragsanteil bleibt in den Jahresgesamtsummen auf dem Export-Ausgangswert. Änderungen und Histogramm zeigen deshalb nur die aufgeschlüsselten Profile; die Gesamtauswirkung ist unvollständig.</p><p><small>Die Histogrammänderung umfasst standardmäßig die Tarif-/Zuschusssimulation und den Effekt zum Vorjahr. Alle Berechnungen laufen lokal; die Datei lädt keine Inhalte aus dem Internet.</small></p></section>
 </main>
 <script id="simulation-data" type="application/json">${json}</script>
 <script>${inlineRuntime}</script>

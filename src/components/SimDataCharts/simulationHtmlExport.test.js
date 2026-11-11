@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { JSDOM } from 'jsdom';
+import { JSDOM, VirtualConsole } from 'jsdom';
 import {
   buildAggregateSimulationSnapshot,
   buildStandaloneSimulationHtml,
@@ -79,9 +79,16 @@ describe('standalone simulation HTML export', () => {
 
   it('runs the inline script and updates the displayed results from file-style HTML', () => {
     const { snapshot } = createFixture();
-    const dom = new JSDOM(buildStandaloneSimulationHtml(snapshot), { runScripts: 'dangerously' });
+    const jsdomErrors = [];
+    const virtualConsole = new VirtualConsole();
+    virtualConsole.on('jsdomError', (error) => jsdomErrors.push(error));
+    const dom = new JSDOM(buildStandaloneSimulationHtml(snapshot), {
+      runScripts: 'dangerously',
+      virtualConsole,
+    });
     const { document, Event } = dom.window;
 
+    expect(jsdomErrors).toEqual([]);
     expect(document.querySelector('#annual-results tbody').textContent).toContain('3.000');
     const amount = document.querySelector('input[aria-label^="Gruppe 1 ZEITKAT 05"]');
     amount.value = '120';
@@ -89,6 +96,10 @@ describe('standalone simulation HTML export', () => {
 
     expect(document.querySelector('#annual-results tbody').textContent).toContain('4.200');
     expect(document.querySelector('#affected-count').textContent).toContain('5 betroffene Familien');
+    expect(document.querySelector('.histogram-statistics').textContent).toContain('Durchschnitt:');
+    expect(document.querySelector('.histogram-statistics').textContent).toContain('Median:');
+    expect(document.querySelector('.histogram-marker-average')).toBeTruthy();
+    expect(document.querySelector('.histogram-marker-median')).toBeTruthy();
     dom.window.close();
   });
 
@@ -103,6 +114,7 @@ describe('standalone simulation HTML export', () => {
     expect(updated.annualResults[0].parentFees).toBe(4200);
     expect(updated.histogram.affectedFamiliesByYear['2026']).toBe(5);
     expect(updated.histogram.bins.find((bin) => bin.label === '1–49 €').counts['2026']).toBe(5);
+    expect(updated.histogram.statisticsByYear['2026']).toEqual({ average: 20, median: 20, affectedFamilies: 5 });
   });
 
   it('applies the subsidy end date by month and updates the family histogram', () => {

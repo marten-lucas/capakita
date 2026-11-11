@@ -237,12 +237,16 @@ describe('FundingSimulationPanel', () => {
 
     const histogram = screen.getByTestId('family-impact-histogram-chart');
     const beforeTariffChange = histogram.getAttribute('data-histogram-summary');
+    const year = beforeTariffChange.split(';')[0].split(':')[0];
+    const beforeStatistics = screen.getByTestId(`family-impact-histogram-average-${year}`).textContent;
+    expect(screen.getByTestId(`family-impact-histogram-median-${year}`).textContent).toContain('Median:');
     openFuchsTariffTable();
     setFeeAmount('Betrag ZEITKAT 05', 150);
 
     expect(screen.queryByTestId('family-impact-histogram-empty')).toBeNull();
     expect(screen.getByTestId('family-impact-histogram-chart').getAttribute('data-histogram-summary'))
       .not.toBe(beforeTariffChange);
+    expect(screen.getByTestId(`family-impact-histogram-average-${year}`).textContent).not.toBe(beforeStatistics);
     fireEvent.click(screen.getByRole('radio', { name: 'Simulation' }));
     expect(screen.getByTestId('family-impact-histogram-chart')).toBeTruthy();
   });

@@ -2380,7 +2380,7 @@ function FundingSimulationPanel({ scrollPage = false }) {
               <Group justify="space-between" align="center" wrap="wrap">
                 <Stack gap={0}>
                   <Text fw={700} size="sm">Beitragsänderungen betroffener Familien</Text>
-                  <Text size="xs" c="dimmed">Anzahl Familien je durchschnittlicher Beitragsänderung pro Monat; die Verteilung folgt den Jahres-Drilldowns.</Text>
+                  <Text size="xs" c="dimmed">Anzahl Familien je Beitragsänderung pro Monat; Durchschnitt und Median werden für betroffene Familien im jeweiligen Modus berechnet.</Text>
                 </Stack>
                 <SegmentedControl
                   size="xs"
@@ -2407,6 +2407,24 @@ function FundingSimulationPanel({ scrollPage = false }) {
                     `${year}:${familyImpactHistogram.data.map((row) => row[year] || 0).join(',')}`
                   )).join(';')}
                 >
+                  <Group gap="xs" align="center" wrap="wrap" mb="xs" data-testid="family-impact-histogram-statistics">
+                    {familyImpactHistogram.series.map((year, index) => {
+                      const statistics = familyImpactHistogram.statisticsByYear[year];
+                      return (
+                        <Group key={year} gap="xs" wrap="wrap" data-testid={`family-impact-histogram-statistics-${year}`}>
+                          <Badge color={FAMILY_HISTOGRAM_COLORS[index % FAMILY_HISTOGRAM_COLORS.length]} variant="light">{year}</Badge>
+                          <Text size="xs" data-testid={`family-impact-histogram-average-${year}`}>
+                            <span aria-hidden="true" style={{ display: 'inline-block', width: 14, borderTop: '2px dashed var(--mantine-color-blue-6)', marginRight: 5, verticalAlign: 'middle' }} />
+                            Durchschnitt: {formatSignedEuro(statistics.average)} ({statistics.averageRange})
+                          </Text>
+                          <Text size="xs" data-testid={`family-impact-histogram-median-${year}`}>
+                            <span aria-hidden="true" style={{ display: 'inline-block', width: 14, borderTop: '2px dashed var(--mantine-color-orange-6)', marginRight: 5, verticalAlign: 'middle' }} />
+                            Median: {formatSignedEuro(statistics.median)} ({statistics.medianRange})
+                          </Text>
+                        </Group>
+                      );
+                    })}
+                  </Group>
                   <BarChart
                     data={familyImpactHistogram.data}
                     dataKey="range"
