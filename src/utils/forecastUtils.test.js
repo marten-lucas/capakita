@@ -1,11 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import {
   getForecastGroupAssignments,
+  getForecastGroupRank,
   getFutureGroupAssignmentDates,
   shouldProjectAutoTransition,
 } from './forecastUtils';
 
 describe('forecast group transition helpers', () => {
+  it('sorts Sankey stages from Krippe through Regelgruppe to school, without mistaking Vorschule for school', () => {
+    expect(getForecastGroupRank('krippe', { name: 'Bärchengruppe', type: 'Krippe' })).toBe(0);
+    expect(getForecastGroupRank('vorschule', { name: 'Vorschule', type: 'Regelgruppe' })).toBe(1);
+    expect(getForecastGroupRank('school', { name: 'Schulkind-Fuchsgruppe', type: 'Schulkindgruppe' })).toBe(2);
+    expect(getForecastGroupRank('__AUTO_STAGE_EXIT__', { name: 'Aus Einrichtung', type: 'Exit' })).toBe(3);
+  });
+
   it('normalizes imported assignment maps and includes future explicit assignment dates', () => {
     const assignments = {
       old: { id: 'old', groupId: 'krippe', start: '2024-09-01', end: '2026-08-31' },

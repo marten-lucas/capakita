@@ -10,6 +10,19 @@ export function getFutureGroupAssignmentDates(assignments, referenceDate) {
     .filter((dateIso) => dateIso && dateIso >= String(referenceDate || ''));
 }
 
+export function getForecastGroupRank(groupIdRaw, groupMeta = {}, exitGroupId = '__AUTO_STAGE_EXIT__') {
+  const groupId = String(groupIdRaw || '');
+  const type = String(groupMeta.type || '').toLowerCase();
+  const name = String(groupMeta.name || '').trim().toLowerCase();
+
+  if (groupId === String(exitGroupId) || type.includes('exit') || name.includes('aus einrichtung')) return 3;
+  if (groupId === '__NO_GROUP__') return 4;
+  if (type.includes('kripp') || type.includes('u3') || /^(krippe|krippengruppe|u3)(?:$|[\s_-])/.test(name)) return 0;
+  if (type.includes('regel') || type.includes('kita') || type.includes('vorschul') || /^(regel|kita|kindergarten|vorschul)(?:$|[\s_-])/.test(name)) return 1;
+  if (type.includes('schul') || type.includes('hort') || /^(schulkind(?:gruppe|betreuung)?|schulgruppe|schule|hort(?:gruppe)?)(?:$|[\s_-])/.test(name)) return 2;
+  return 1;
+}
+
 export function shouldProjectAutoTransition(assignments, transitionDate, dateIso) {
   const transitionDateIso = String(transitionDate || '');
   const targetDateIso = String(dateIso || '');

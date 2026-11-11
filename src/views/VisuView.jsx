@@ -35,7 +35,7 @@ import { selectHistoricalStatistics, selectGroupTransitionStatistics } from '../
 import { useOverlayData } from '../hooks/useOverlayData';
 import { calculateScenarioMonthlyFinance, isDateWithinRange, isRecordActiveOnDate, resolveGroupIdAtDate } from '../utils/financeUtils';
 import { buildOverlayAwareData } from '../utils/overlayUtils';
-import { getForecastGroupAssignments, getFutureGroupAssignmentDates, shouldProjectAutoTransition } from '../utils/forecastUtils';
+import { getForecastGroupAssignments, getForecastGroupRank, getFutureGroupAssignmentDates, shouldProjectAutoTransition } from '../utils/forecastUtils';
 import { exportChart } from '../utils/chartExport';
 import { isArchivedDataItem, shouldIncludeDataItemInAnalysis, getActiveDemandChildrenAtDate } from '../utils/dataVisibility';
 import { filterBookings, generateCareRatioSeries } from '../utils/chartUtils/chartUtils';
@@ -1560,13 +1560,24 @@ function PreviewSankeyChart({ previewFlow, accent, privacyMode = false }) {
           ...entry,
           color: resolveNodeColor(toNode?.groupId),
         };
+      }).sort((left, right) => {
+        const dateDiff = String(left?.stepDateIso || '').localeCompare(String(right?.stepDateIso || ''));
+        if (dateDiff !== 0) return dateDiff;
+        const fromRankDiff = Number(nodesById.get(String(left.from))?.rank || 0)
+          - Number(nodesById.get(String(right.from))?.rank || 0);
+        if (fromRankDiff !== 0) return fromRankDiff;
+        const toRankDiff = Number(nodesById.get(String(left.to))?.rank || 0)
+          - Number(nodesById.get(String(right.to))?.rank || 0);
+        if (toRankDiff !== 0) return toRankDiff;
+        return String(nodesById.get(String(left.from))?.name || '')
+          .localeCompare(String(nodesById.get(String(right.from))?.name || ''), 'de', { sensitivity: 'base' });
       });
 
       const nodesWithColor = [...nodes]
         .sort((left, right) => {
           const dateDiff = String(left?.dateIso || '').localeCompare(String(right?.dateIso || ''));
           if (dateDiff !== 0) return dateDiff;
-          return Number(right?.rank || 0) - Number(left?.rank || 0);
+          return Number(left?.rank || 0) - Number(right?.rank || 0);
         })
         .map((node) => ({
           ...node,
@@ -1575,7 +1586,7 @@ function PreviewSankeyChart({ previewFlow, accent, privacyMode = false }) {
 
       return {
         chart: {
-          backgroundColor: 'transparent',
+          backgroundColor: '#f8fafc',
           spacing: [40, 8, 8, 8],
           events: {
             render() {
@@ -1692,7 +1703,7 @@ function PreviewSankeyChart({ previewFlow, accent, privacyMode = false }) {
               nodeFormatter() {
                 return this.name;
               },
-              style: { fontSize: '10px', textOutline: 'none' },
+              style: { color: '#0f172a', fontSize: '10px', fontWeight: '600', textOutline: 'none' },
             },
           },
         ],
@@ -4125,7 +4136,7 @@ function VisuView() {
       });
       map[String(syntheticGroupIds.kita)] = '#0ea5e9';
       map[String(syntheticGroupIds.school)] = '#6366f1';
-      map[String(syntheticGroupIds.exit)] = '#475569';
+      map[String(syntheticGroupIds.exit)] = '#cbd5e1';
       map.__NO_GROUP__ = '#94a3b8';
       return map;
     })();
@@ -4159,19 +4170,11 @@ function VisuView() {
       return baseName;
     };
 
-    const getAgeBucketRank = (groupId) => {
-      const id = String(groupId || '');
-      const meta = groupMetaById.get(id) || { name: id, type: '' };
-      const haystack = `${String(meta.name || '')} ${String(meta.type || '')}`.toLowerCase();
-
-      // Render order top -> bottom: Schule, Regelgruppe, Krippe.
-      if (id === String(syntheticGroupIds.exit) || haystack.includes('exit') || haystack.includes('aus einrichtung')) return 4;
-      if (haystack.includes('schul') || haystack.includes('vorschul') || haystack.includes('hort')) return 3;
-      if (haystack.includes('regel') || haystack.includes('kita') || haystack.includes('kindergarten')) return 2;
-      if (haystack.includes('kripp') || haystack.includes('u3')) return 1;
-      if (id === '__NO_GROUP__') return 0;
-      return 2;
-    };
+    const getAgeBucketRank = (groupId) => getForecastGroupRank(
+      groupId,
+      groupMetaById.get(String(groupId || '')) || {},
+      syntheticGroupIds.exit
+    );
 
     const hasGroupFilter = Array.isArray(selectedGroups) && selectedGroups.length > 0;
     const selectedGroupSet = new Set((selectedGroups || []).map((value) => String(value)));
@@ -4369,11 +4372,19 @@ function VisuView() {
       const dates = [];
       const enddateRaw = String(item?.enddate || '');
       if (enddateRaw && enddateRaw >= referenceDate) dates.push(enddateRaw);
-      // Add grade-exit dates for school children
       if (maxSchoolGradeByGroup.size > 0) {
-        [groupIdByStage.school, ...(groupDefs || []).filter((g) => maxSchoolGradeByGroup.has(String(g.id))).map((g) => String(g.id))].forEach((gid) => {
-          const exitDate = computeSchoolGradeExitDate(item, gid);
-          if (exitDate && exitDate >= referenceDate) dates.push(exitDate);
+        const schoolGroupIds = new Set([
+          groupIdByStage.school,
+          ...(groupDefs || []).filter((group) => maxSchoolGradeByGroup.has(String(group.id))).map((group) => String(group.id)),
+        ]);
+        schoolGroupIds.forEach((groupId) => {
+          const exitDate = computeSchoolGradeExitDate(item, groupId);
+          if (!exitDate || exitDate < referenceDate || !isRecordActiveOnDate(item, exitDate)) return;
+
+          const dayBeforeExit = new Date(`${exitDate}T00:00:00Z`);
+          dayBeforeExit.setUTCDate(dayBeforeExit.getUTCDate() - 1);
+          const groupBeforeExit = resolveGroupAtDate(item, dayBeforeExit.toISOString().slice(0, 10), { includeExit: false });
+          if (String(groupBeforeExit.groupId) === String(groupId)) dates.push(exitDate);
         });
       }
       return dates;
@@ -4522,7 +4533,7 @@ function VisuView() {
       .sort((left, right) => {
         const leftRank = getAgeBucketRank(left.groupId);
         const rightRank = getAgeBucketRank(right.groupId);
-        if (leftRank !== rightRank) return rightRank - leftRank;
+        if (leftRank !== rightRank) return leftRank - rightRank;
 
         const leftMax = Math.max(...left.data, 0);
         const rightMax = Math.max(...right.data, 0);

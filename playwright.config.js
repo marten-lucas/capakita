@@ -9,13 +9,17 @@ export default defineConfig({
   timeout: 120_000,
   fullyParallel: false,
   workers: 1,
-  retries: process.env.CI ? 2 : 0,
+  maxFailures: 1,
+  retries: process.env.CI ? 1 : 0,
   use: {
     baseURL: 'http://127.0.0.1:4173',
     headless: !isHeaded,
-    trace: 'retain-on-failure',
+    trace: 'on-first-retry',
     screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
+    video: 'off',
+    launchOptions: {
+      args: ['--disable-gpu', '--disable-dev-shm-usage'],
+    },
   },
   quiet: !isVerbose,
   projects: [
