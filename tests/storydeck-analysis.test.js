@@ -149,6 +149,21 @@ test('ausblick sankey renders with known and anticipated transitions and can be 
     });
 
     store.dispatch({
+      type: 'simData/simDataItemAdd',
+      payload: {
+        scenarioId: sid,
+        item: {
+          id: 'child-sankey-past-school',
+          name: 'Kind schon im Schulalter',
+          type: 'demand',
+          dateofbirth: '2019-05-10',
+          startdate: '2023-01-01',
+          groupId: 'g-regel',
+        },
+      },
+    });
+
+    store.dispatch({
       type: 'simBooking/addBooking',
       payload: {
         scenarioId: sid,
@@ -212,6 +227,21 @@ test('ausblick sankey renders with known and anticipated transitions and can be 
       },
     });
 
+    store.dispatch({
+      type: 'simGroup/addGroup',
+      payload: {
+        scenarioId: sid,
+        dataItemId: 'child-sankey-past-school',
+        group: {
+          id: 'child-sankey-past-school-assignment',
+          kindId: 'child-sankey-past-school',
+          groupId: 'g-regel',
+          start: '2023-09-01',
+          end: '',
+        },
+      },
+    });
+
     const state = store.getState();
     store.dispatch({
       type: 'events/refreshAllEvents',
@@ -239,8 +269,9 @@ test('ausblick sankey renders with known and anticipated transitions and can be 
   await expect(page.getByTestId('forecast-sankey-export-menu')).toBeVisible();
   const renderedTransitions = await page.getByTestId('forecast-sankey-chart').getAttribute('data-transition-pairs');
   expect(renderedTransitions).toContain('Regelgruppe: 1 Kinder -> Vorschule: 1 Kinder');
-  expect(renderedTransitions).toContain('Vorschule: 1 Kinder -> Schulkindgruppe: 1 Kinder');
+  expect(renderedTransitions).toContain('Vorschule: 1 Kinder -> Schulkindgruppe: 2 Kinder');
   expect(renderedTransitions).toContain('Bärchengruppe: 1 Kinder -> Regelgruppe: 1 Kinder');
+  expect(renderedTransitions).toContain('Schulkindgruppe: 1 Kinder -> Schulkindgruppe: 1 Kinder');
 
   for (const format of ['png', 'svg', 'pdf']) {
     const downloadPromise = page.waitForEvent('download');

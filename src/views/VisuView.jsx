@@ -4183,7 +4183,7 @@ function VisuView() {
       if (!event || event.enabled === false) return false;
       if (event.entityType !== 'demand') return false;
       const eventDateIso = String(event?.simulatedDate || event?.effectiveDate || '');
-      if (!eventDateIso || eventDateIso < referenceDate) return false;
+      if (!eventDateIso) return false;
       return event.type === 'group_assignment_start'
         || event.type === 'group_assignment_end'
         || event.type === 'auto_group_transition';
@@ -4242,7 +4242,11 @@ function VisuView() {
     });
 
     const activeNowChildIds = new Set(activeNowChildren.map((item) => String(item.id || '')));
-    const scenarioEvents = allScenarioEvents.filter((event) => activeNowChildIds.has(String(event?.entityId || '')));
+    const scenarioEventsForActiveChildren = allScenarioEvents.filter((event) => activeNowChildIds.has(String(event?.entityId || '')));
+    const scenarioEvents = scenarioEventsForActiveChildren.filter((event) => {
+      const eventDateIso = String(event?.simulatedDate || event?.effectiveDate || '');
+      return eventDateIso >= referenceDate;
+    });
 
     // Simulated inflow: synthetic "phantom" children entering each Sept 1 in forecast window
     // Compute avg entries directly from dataByScenario historical startdates.
@@ -4293,7 +4297,7 @@ function VisuView() {
     ));
 
     const autoTransitionsByItem = new Map();
-    scenarioEvents
+    scenarioEventsForActiveChildren
       .filter((event) => event?.type === 'auto_group_transition' && event?.metadata?.targetStage)
       .forEach((event) => {
         const itemId = String(event.entityId || '');
