@@ -7,6 +7,7 @@ import {
   Button,
   Group,
   Modal,
+  Menu,
   Paper,
   RingProgress,
   Select,
@@ -34,6 +35,8 @@ import { selectHistoricalStatistics, selectGroupTransitionStatistics } from '../
 import { useOverlayData } from '../hooks/useOverlayData';
 import { calculateScenarioMonthlyFinance, isDateWithinRange, isRecordActiveOnDate, resolveGroupIdAtDate } from '../utils/financeUtils';
 import { buildOverlayAwareData } from '../utils/overlayUtils';
+import { getForecastGroupAssignments, getFutureGroupAssignmentDates, shouldProjectAutoTransition } from '../utils/forecastUtils';
+import { exportChart } from '../utils/chartExport';
 import { isArchivedDataItem, shouldIncludeDataItemInAnalysis, getActiveDemandChildrenAtDate } from '../utils/dataVisibility';
 import { filterBookings, generateCareRatioSeries } from '../utils/chartUtils/chartUtils';
 import { buildHistogramDataFromBookings, generateSharedHistogramBins } from '../utils/chartUtils/chartUtilsHistogram';
@@ -52,6 +55,7 @@ import {
   IconArrowsSplit,
   IconChartHistogram,
   IconClockHour4,
+  IconDownload,
   IconPlayerPause,
   IconPlayerPlay,
   IconRoute,
@@ -1461,7 +1465,25 @@ function FinanceTrendChart({ financeTrend, accent }) {
 function PreviewSankeyChart({ previewFlow, accent, privacyMode = false }) {
   const [hoverInfo, setHoverInfo] = React.useState(null);
   const [stageBadgePositions, setStageBadgePositions] = React.useState([]);
+  const [chart, setChart] = React.useState(null);
+  const [exporting, setExporting] = React.useState('');
+  const [exportError, setExportError] = React.useState('');
   const stageBadgeSignatureRef = React.useRef('');
+  const handleChartReady = React.useCallback((nextChart) => setChart(nextChart), []);
+  const exportFilenameBase = `capakita-ausblick-${String(previewFlow?.referenceDate || 'export').replace(/[^0-9-]/g, '')}`;
+
+  const handleExport = async (format) => {
+    if (!chart || exporting) return;
+    setExporting(format);
+    setExportError('');
+    try {
+      await exportChart(chart, format, exportFilenameBase);
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : 'Export fehlgeschlagen.');
+    } finally {
+      setExporting('');
+    }
+  };
 
   const filteredLinks = React.useMemo(() => {
     return previewFlow?.links || [];
@@ -1480,6 +1502,12 @@ function PreviewSankeyChart({ previewFlow, accent, privacyMode = false }) {
   }, [previewFlow?.nodes, filteredLinks]);
 
   const hasData = filteredLinks.length > 0;
+  const transitionPairs = React.useMemo(() => {
+    const namesById = new Map(filteredNodes.map((node) => [String(node.id), String(node.name || '')]));
+    return filteredLinks
+      .map((link) => `${namesById.get(String(link.from)) || ''} -> ${namesById.get(String(link.to)) || ''}`)
+      .join(' | ');
+  }, [filteredLinks, filteredNodes]);
   const stageLabels = React.useMemo(() => {
     const byDate = new Map();
     (filteredNodes || []).forEach((node) => {
@@ -1692,7 +1720,13 @@ function PreviewSankeyChart({ previewFlow, accent, privacyMode = false }) {
   }
 
   return (
-    <Paper className="analysis-diagram-placeholder" withBorder p="xs">
+    <Paper
+      className="analysis-diagram-placeholder"
+      withBorder
+      p="xs"
+      data-testid="forecast-sankey-chart"
+      data-transition-pairs={transitionPairs}
+    >
       <Group align="stretch" gap="sm" wrap="nowrap" style={{ minHeight: 0, height: '100%' }}>
         <Box style={{ flex: 1, minWidth: 0, minHeight: 0 }}>
           <Box style={{ position: 'relative', height: '100%' }}>
@@ -1716,10 +1750,37 @@ function PreviewSankeyChart({ previewFlow, accent, privacyMode = false }) {
                 ))}
               </Box>
             ) : null}
-            <HighchartsReact highcharts={Highcharts} options={options} containerProps={{ style: { height: '100%' } }} />
+            <HighchartsReact
+              highcharts={Highcharts}
+              options={options}
+              callback={handleChartReady}
+              containerProps={{ style: { height: '100%' } }}
+            />
           </Box>
         </Box>
         <Box style={{ width: 320, minWidth: 320, maxWidth: 320, flex: '0 0 320px', borderLeft: '1px solid var(--mantine-color-gray-3)', paddingLeft: 12, overflowY: 'auto' }}>
+          <Group justify="space-between" align="center" mb="xs">
+            <Text size="xs" fw={700}>Sankey exportieren</Text>
+            <Menu position="bottom-end" withinPortal>
+              <Menu.Target>
+                <Button
+                  size="xs"
+                  variant="light"
+                  leftSection={<IconDownload size={14} />}
+                  disabled={!chart || Boolean(exporting)}
+                  data-testid="forecast-sankey-export-menu"
+                >
+                  {exporting ? 'Export…' : 'Export'}
+                </Button>
+              </Menu.Target>
+              <Menu.Dropdown>
+                <Menu.Item onClick={() => handleExport('png')} data-testid="forecast-sankey-export-png">PNG</Menu.Item>
+                <Menu.Item onClick={() => handleExport('svg')} data-testid="forecast-sankey-export-svg">SVG</Menu.Item>
+                <Menu.Item onClick={() => handleExport('pdf')} data-testid="forecast-sankey-export-pdf">PDF</Menu.Item>
+              </Menu.Dropdown>
+            </Menu>
+          </Group>
+          {exportError ? <Text size="xs" c="red" mb="xs">{exportError}</Text> : null}
           {hoverInfo ? (
             <Stack gap={6}>
               <Badge variant="outline" size="sm" color="gray">{hoverInfo.subtitle}</Badge>
@@ -4069,6 +4130,13 @@ function VisuView() {
       return map;
     })();
 
+    const schoolGroupByType = (groupDefs || []).find((group) => {
+      const type = String(group?.type || '').toLowerCase();
+      return type.includes('schul') || type.includes('hort');
+    });
+    const schoolGroupByName = (groupDefs || []).find((group) => (
+      /^(schulkind(?:gruppe|betreuung)?|schulgruppe|schule|hort(?:gruppe)?)(?:$|[\s_-])/i.test(String(group?.name || '').trim())
+    ));
     const groupIdByStage = {
       kita: String(
         (groupDefs || []).find((group) => {
@@ -4077,13 +4145,7 @@ function VisuView() {
           return type.includes('regel') || type.includes('kita') || name.includes('regel') || name.includes('kita');
         })?.id || syntheticGroupIds.kita
       ),
-      school: String(
-        (groupDefs || []).find((group) => {
-          const type = String(group?.type || '').toLowerCase();
-          const name = String(group?.name || '').toLowerCase();
-          return type.includes('schul') || name.includes('schul');
-        })?.id || syntheticGroupIds.school
-      ),
+      school: String(schoolGroupByType?.id || schoolGroupByName?.id || syntheticGroupIds.school),
       exit: String(syntheticGroupIds.exit),
     };
 
@@ -4220,13 +4282,12 @@ function VisuView() {
       }
     }
 
-    const assignmentDates = activeNowChildren.flatMap((item) => {
-      const assignments = getEffectiveGroupAssignments(String(item.id));
-      if (!Array.isArray(assignments)) return [];
-      return assignments
-        .map((assignment) => String(assignment?.start || ''))
-        .filter((dateIso) => dateIso && dateIso >= referenceDate);
-    });
+    const assignmentDates = activeNowChildren.flatMap((item) => (
+      getFutureGroupAssignmentDates(
+        getEffectiveGroupAssignments(String(item.id)),
+        referenceDate
+      )
+    ));
 
     const autoTransitionsByItem = new Map();
     scenarioEvents
@@ -4278,7 +4339,14 @@ function VisuView() {
       const applicable = transitions.filter((event) => getEventDateIso(event) <= String(dateIso));
       const lastTransition = applicable.length ? applicable[applicable.length - 1] : null;
       const targetStage = String(lastTransition?.metadata?.targetStage || '').toLowerCase();
-      const projectedGroupId = Object.prototype.hasOwnProperty.call(groupIdByStage, targetStage)
+      const assignmentsForItem = getForecastGroupAssignments(assignments);
+      const canProjectTransition = lastTransition && shouldProjectAutoTransition(
+        assignmentsForItem,
+        getEventDateIso(lastTransition),
+        dateIso
+      );
+      const projectedGroupId = canProjectTransition
+        && Object.prototype.hasOwnProperty.call(groupIdByStage, targetStage)
         ? groupIdByStage[targetStage]
         : null;
 

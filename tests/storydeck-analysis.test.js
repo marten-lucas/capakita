@@ -85,7 +85,7 @@ test('analyse story flow renders and navigates steps', async ({ page }) => {
   await expect(page.getByText('Slide 5 of 7').first()).toBeVisible();
 });
 
-test('ausblick sankey renders with test data and month picker is available', async ({ page }) => {
+test('ausblick sankey renders with known and anticipated transitions and can be exported', async ({ page }) => {
   await page.goto('/');
   await page.waitForLoadState('networkidle');
 
@@ -103,11 +103,19 @@ test('ausblick sankey renders with test data and month picker is available', asy
 
     store.dispatch({
       type: 'simGroup/addGroupDef',
+      payload: { scenarioId: sid, groupDef: { id: 'g-krippe', name: 'Bärchengruppe', type: 'Krippe' } },
+    });
+    store.dispatch({
+      type: 'simGroup/addGroupDef',
       payload: { scenarioId: sid, groupDef: { id: 'g-regel', name: 'Regelgruppe', type: 'Regelgruppe' } },
     });
     store.dispatch({
       type: 'simGroup/addGroupDef',
       payload: { scenarioId: sid, groupDef: { id: 'g-vorschule', name: 'Vorschule', type: 'Regelgruppe' } },
+    });
+    store.dispatch({
+      type: 'simGroup/addGroupDef',
+      payload: { scenarioId: sid, groupDef: { id: 'g-schulkind', name: 'Schulkindgruppe', type: 'Schulkindgruppe' } },
     });
 
     store.dispatch({
@@ -121,6 +129,21 @@ test('ausblick sankey renders with test data and month picker is available', asy
           dateofbirth: '2021-05-10',
           startdate: '2025-01-01',
           groupId: 'g-regel',
+        },
+      },
+    });
+
+    store.dispatch({
+      type: 'simData/simDataItemAdd',
+      payload: {
+        scenarioId: sid,
+        item: {
+          id: 'child-sankey-krippe',
+          name: 'Kind aus Krippe',
+          type: 'demand',
+          dateofbirth: '2024-05-10',
+          startdate: '2025-01-01',
+          groupId: 'g-krippe',
         },
       },
     });
@@ -174,6 +197,21 @@ test('ausblick sankey renders with test data and month picker is available', asy
       },
     });
 
+    store.dispatch({
+      type: 'simGroup/addGroup',
+      payload: {
+        scenarioId: sid,
+        dataItemId: 'child-sankey-krippe',
+        group: {
+          id: 'child-sankey-krippe-assignment',
+          kindId: 'child-sankey-krippe',
+          groupId: 'g-krippe',
+          start: '2025-01-01',
+          end: '',
+        },
+      },
+    });
+
     const state = store.getState();
     store.dispatch({
       type: 'events/refreshAllEvents',
@@ -193,8 +231,25 @@ test('ausblick sankey renders with test data and month picker is available', asy
   await expect(page.locator('.analysis-stage-content')).toBeVisible();
 
   await page.locator('.analysis-stage-content .analysis-coverage-carousel-nav').last().click();
+  await page.locator('.analysis-stage-content .analysis-coverage-carousel-nav').last().click();
 
   await expect(page.getByText('Keine gruppenbezogenen Ubergange')).toHaveCount(0);
-  await expect(page.locator('.highcharts-sankey-series .highcharts-link').first()).toBeVisible();
-  await expect(page.getByTestId('forecast-sankey-monthpicker')).toBeVisible();
+  const sankeyLinks = page.locator('.highcharts-sankey-series .highcharts-link');
+  await expect(sankeyLinks.first()).toBeVisible();
+  await expect(page.getByTestId('forecast-sankey-export-menu')).toBeVisible();
+  const renderedTransitions = await page.getByTestId('forecast-sankey-chart').getAttribute('data-transition-pairs');
+  expect(renderedTransitions).toContain('Regelgruppe: 1 Kinder -> Vorschule: 1 Kinder');
+  expect(renderedTransitions).toContain('Vorschule: 1 Kinder -> Schulkindgruppe: 1 Kinder');
+  expect(renderedTransitions).toContain('Bärchengruppe: 1 Kinder -> Regelgruppe: 1 Kinder');
+
+  for (const format of ['png', 'svg', 'pdf']) {
+    const downloadPromise = page.waitForEvent('download');
+    await page.getByTestId('forecast-sankey-export-menu').click();
+    await page.getByTestId(`forecast-sankey-export-${format}`).click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toMatch(new RegExp(`\\.${format}$`));
+  }
+
+  await page.locator('.analysis-stage-content .analysis-coverage-carousel-nav').last().click();
+  await expect(page.getByTestId('forecast-demography-monthpicker')).toBeVisible();
 });
