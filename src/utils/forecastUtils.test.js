@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  allocateFillUpCandidates,
   getForecastGroupAssignments,
   getForecastGroupRank,
   getFutureGroupAssignmentDates,
@@ -12,6 +13,18 @@ describe('forecast group transition helpers', () => {
     expect(getForecastGroupRank('vorschule', { name: 'Vorschule', type: 'Regelgruppe' })).toBe(1);
     expect(getForecastGroupRank('school', { name: 'Schulkind-Fuchsgruppe', type: 'Schulkindgruppe' })).toBe(2);
     expect(getForecastGroupRank('__AUTO_STAGE_EXIT__', { name: 'Aus Einrichtung', type: 'Exit' })).toBe(3);
+  });
+
+  it('allocates fill-up places by grade, then sibling priority, then source order', () => {
+    const { accepted, rejected } = allocateFillUpCandidates([
+      { id: 'single', gradePriority: 1, siblingPriority: 0, dataOrder: 0 },
+      { id: 'sibling-a', gradePriority: 1, siblingPriority: 1, dataOrder: 1 },
+      { id: 'sibling-b', gradePriority: 1, siblingPriority: 1, dataOrder: 2 },
+      { id: 'older-grade', gradePriority: 2, siblingPriority: 1, dataOrder: 3 },
+    ], 2);
+
+    expect(accepted.map((candidate) => candidate.id)).toEqual(['sibling-a', 'sibling-b']);
+    expect(rejected.map((candidate) => candidate.id)).toEqual(['single', 'older-grade']);
   });
 
   it('normalizes imported assignment maps and includes future explicit assignment dates', () => {

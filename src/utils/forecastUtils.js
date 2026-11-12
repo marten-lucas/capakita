@@ -23,6 +23,21 @@ export function getForecastGroupRank(groupIdRaw, groupMeta = {}, exitGroupId = '
   return 1;
 }
 
+export function allocateFillUpCandidates(candidates = [], availablePlaces = Infinity) {
+  const ordered = [...candidates].sort((left, right) => (
+    Number(left.gradePriority || Number.MAX_SAFE_INTEGER) - Number(right.gradePriority || Number.MAX_SAFE_INTEGER)
+    || Number(right.siblingPriority || 0) - Number(left.siblingPriority || 0)
+    || Number(left.dataOrder || 0) - Number(right.dataOrder || 0)
+  ));
+  const placeCount = Number.isFinite(Number(availablePlaces))
+    ? Math.max(0, Math.floor(Number(availablePlaces)))
+    : ordered.length;
+  return {
+    accepted: ordered.slice(0, placeCount),
+    rejected: ordered.slice(placeCount),
+  };
+}
+
 export function shouldProjectAutoTransition(assignments, transitionDate, dateIso) {
   const transitionDateIso = String(transitionDate || '');
   const targetDateIso = String(dateIso || '');

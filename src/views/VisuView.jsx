@@ -35,7 +35,7 @@ import { selectHistoricalStatistics, selectGroupTransitionStatistics } from '../
 import { useOverlayData } from '../hooks/useOverlayData';
 import { calculateScenarioMonthlyFinance, isDateWithinRange, isRecordActiveOnDate, resolveGroupIdAtDate } from '../utils/financeUtils';
 import { buildOverlayAwareData } from '../utils/overlayUtils';
-import { getForecastGroupAssignments, getForecastGroupRank, getFutureGroupAssignmentDates, shouldProjectAutoTransition } from '../utils/forecastUtils';
+import { allocateFillUpCandidates, getForecastGroupAssignments, getForecastGroupRank, getFutureGroupAssignmentDates, shouldProjectAutoTransition } from '../utils/forecastUtils';
 import { exportChart } from '../utils/chartExport';
 import { isArchivedDataItem, shouldIncludeDataItemInAnalysis, getActiveDemandChildrenAtDate } from '../utils/dataVisibility';
 import { filterBookings, generateCareRatioSeries } from '../utils/chartUtils/chartUtils';
@@ -4084,11 +4084,18 @@ function VisuView() {
     groupMetaById.set(syntheticGroupIds.school, { name: 'Schule', type: 'Schulkindgruppe' });
     groupMetaById.set(syntheticGroupIds.exit, { name: 'Aus Einrichtung', type: 'Exit' });
 
-    const fillUpGroupIds = new Set(
-      (groupDefs || [])
-        .filter((group) => String(group?.type || '') === 'Schulkindgruppe' && Boolean(group?.fillUp))
-        .map((group) => String(group.id))
-    );
+    const fillUpSchoolGroupDefs = (groupDefs || []).filter((group) => (
+      String(group?.type || '') === 'Schulkindgruppe' && Boolean(group?.fillUp)
+    ));
+    const fillUpGroupIds = new Set(fillUpSchoolGroupDefs.map((group) => String(group.id)));
+    const configuredFacilityLimits = fillUpSchoolGroupDefs
+      .map((group) => String(group?.maxFacilityCount ?? '').trim())
+      .filter((rawLimit) => rawLimit !== '')
+      .map(Number)
+      .filter((limit) => Number.isFinite(limit) && limit >= 0);
+    const fillUpFacilityCapacity = configuredFacilityLimits.length > 0
+      ? Math.min(...configuredFacilityLimits)
+      : Infinity;
 
     const maxSchoolGradeByGroup = new Map();
     (groupDefs || []).forEach((group) => {
@@ -4100,22 +4107,24 @@ function VisuView() {
       }
     });
 
-    // For each school child, pre-compute a simulated exit date based on maxSchoolGrade.
-    // School entry is Sep 1 of the child's enrollment year (Bavaria rule).
-    // After `maxSchoolGrade` years of school, the child exits on Sep 1 of the following year.
-    const computeSchoolGradeExitDate = (item, schoolGroupId) => {
-      const maxGrade = maxSchoolGradeByGroup.get(String(schoolGroupId || ''));
-      if (!maxGrade) return null;
-      const dob = item?.dateofbirth;
-      if (!dob) return null;
-      // Simplified: birth -> 6th birthday -> next Sep 1 = school start year
-      const birthDate = parseIsoDateSafe(dob);
+    const getSchoolStartYear = (item) => {
+      const birthDate = parseIsoDateSafe(item?.dateofbirth);
       if (!birthDate) return null;
       const sixthBirthYear = birthDate.getUTCFullYear() + 6;
       const sixthBirthMonth = birthDate.getUTCMonth() + 1;
-      // Bavaria: enrolled Sep of 6th-birthday year if birthday before Oct 1
-      const schoolStartYear = sixthBirthMonth <= 9 ? sixthBirthYear : sixthBirthYear + 1;
-      // After maxGrade years, the exit is at Sep 1 (start of year after last grade)
+      return sixthBirthMonth <= 9 ? sixthBirthYear : sixthBirthYear + 1;
+    };
+
+    const getSchoolGradePriority = (item, dateIso) => {
+      const schoolStartYear = getSchoolStartYear(item);
+      if (!schoolStartYear) return Number.MAX_SAFE_INTEGER;
+      return Math.max(1, Number(String(dateIso).slice(0, 4)) - schoolStartYear + 1);
+    };
+
+    const computeSchoolGradeExitDate = (item, schoolGroupId) => {
+      const maxGrade = maxSchoolGradeByGroup.get(String(schoolGroupId || ''));
+      const schoolStartYear = getSchoolStartYear(item);
+      if (!maxGrade || !schoolStartYear) return null;
       const exitYear = schoolStartYear + maxGrade;
       return `${String(exitYear).padStart(4, '0')}-09-01`;
     };
@@ -4244,9 +4253,9 @@ function VisuView() {
       }
     };
 
-    const demandItems = getActiveDemandChildrenAtDate(effectiveDataItems || {}, referenceDate);
+    const forecastChildren = getActiveDemandChildrenAtDate(effectiveDataItems || {}, referenceDate);
 
-    const activeNowChildren = demandItems.filter((item) => {
+    const activeNowChildren = forecastChildren.filter((item) => {
       const itemId = String(item.id);
       const assignments = getEffectiveGroupAssignments(itemId);
       const currentGroupId = resolveGroupIdAtDate(assignments, referenceDate, item.groupId || null);
@@ -4255,7 +4264,7 @@ function VisuView() {
       return selectedGroupSet.has(String(currentGroupId));
     });
 
-    const activeNowChildIds = new Set(activeNowChildren.map((item) => String(item.id || '')));
+    const activeNowChildIds = new Set(forecastChildren.map((item) => String(item.id || '')));
     const scenarioEventsForActiveChildren = allScenarioEvents.filter((event) => activeNowChildIds.has(String(event?.entityId || '')));
     const futureScenarioEvents = scenarioEventsForActiveChildren.filter((event) => {
       const eventDateIso = String(event?.simulatedDate || event?.effectiveDate || '');
@@ -4303,7 +4312,7 @@ function VisuView() {
       }
     }
 
-    const assignmentDates = activeNowChildren.flatMap((item) => (
+    const assignmentDates = forecastChildren.flatMap((item) => (
       getFutureGroupAssignmentDates(
         getEffectiveGroupAssignments(String(item.id)),
         referenceDate
@@ -4351,7 +4360,7 @@ function VisuView() {
         : baseGroupId;
     };
 
-    activeNowChildren.forEach((item) => {
+    forecastChildren.forEach((item) => {
       const itemId = String(item.id || '');
       const endDate = String(item.enddate || '');
       if (!itemId || !endDate || endDate < referenceDate) return;
@@ -4395,9 +4404,24 @@ function VisuView() {
         ...assignmentDates,
       ])
     ).sort();
+    const capacityRejectedAtByChildId = new Map();
+    const admittedFillUpGroupByChildId = new Map();
+    const exitedAtByChildId = new Map();
 
     const resolveGroupAtDate = (item, dateIso, { includeExit = true } = {}) => {
       const itemId = String(item?.id || '');
+      const exitedAt = exitedAtByChildId.get(itemId);
+      if (exitedAt && String(dateIso) >= exitedAt) {
+        return includeExit
+          ? { groupId: String(syntheticGroupIds.exit), groupLabel: formatGroupLabel(syntheticGroupIds.exit) }
+          : { groupId: '__NO_GROUP__', groupLabel: noGroup };
+      }
+      const rejectedAt = capacityRejectedAtByChildId.get(itemId);
+      if (rejectedAt && String(dateIso) >= rejectedAt) {
+        return includeExit
+          ? { groupId: String(syntheticGroupIds.exit), groupLabel: formatGroupLabel(syntheticGroupIds.exit) }
+          : { groupId: '__NO_GROUP__', groupLabel: noGroup };
+      }
       const groupIdRaw = resolveProjectedGroupIdAtDate(item, dateIso, { ignoreExitTransitions: true });
       const groupId = groupIdRaw ? String(groupIdRaw) : '__NO_GROUP__';
       const active = isActiveForForecast(item, dateIso, { schoolGroupId: groupId });
@@ -4432,7 +4456,7 @@ function VisuView() {
       return { groupId, groupLabel };
     };
 
-    const timelineTailDates = activeNowChildren.flatMap((item) => {
+    const timelineTailDates = forecastChildren.flatMap((item) => {
       const dates = [];
       const itemId = String(item?.id || '');
       const enddateRaw = String(item?.enddate || '');
@@ -4456,6 +4480,83 @@ function VisuView() {
     });
 
     const timelineDates = Array.from(new Set([referenceDate, ...eventDates, ...timelineTailDates])).sort();
+    const activeDataOrderById = new Map(forecastChildren.map((item, index) => [String(item.id || ''), index]));
+
+    timelineDates.forEach((dateIso) => {
+      const states = forecastChildren.map((item) => ({
+        item,
+        itemId: String(item.id || ''),
+        groupState: resolveGroupAtDate(item, dateIso),
+      }));
+      states.forEach(({ itemId, groupState }) => {
+        if (String(groupState.groupId) === String(syntheticGroupIds.exit) && !exitedAtByChildId.has(itemId)) {
+          exitedAtByChildId.set(itemId, dateIso);
+        }
+      });
+      const familyCounts = new Map();
+      states.forEach(({ item, itemId, groupState }) => {
+        if (String(groupState.groupId) === String(syntheticGroupIds.exit)) return;
+        const familyId = String(item.familyId || item.familyLabel || `child:${itemId}`);
+        familyCounts.set(familyId, Number(familyCounts.get(familyId) || 0) + 1);
+      });
+
+      let guaranteedChildren = 0;
+      let assignedFillUpChildren = 0;
+      const candidates = [];
+
+      states.forEach(({ item, itemId, groupState }) => {
+        if (String(groupState.groupId) === String(syntheticGroupIds.exit)) return;
+        const groupId = String(groupState.groupId || '__NO_GROUP__');
+        if (!fillUpGroupIds.has(groupId)) {
+          guaranteedChildren += 1;
+          return;
+        }
+
+        const assignments = getForecastGroupAssignments(getEffectiveGroupAssignments(itemId));
+        const assignedGroupId = String(resolveGroupIdAtDate(assignments, dateIso, item.groupId || null) || '');
+        const hasActiveFillUpAssignment = fillUpGroupIds.has(assignedGroupId) && (
+          String(item.groupId || '') === assignedGroupId
+          || assignments.some((assignment) => (
+            String(assignment.groupId || '') === assignedGroupId
+            && (!assignment.start || String(assignment.start) <= dateIso)
+            && (!assignment.end || String(assignment.end) >= dateIso)
+          ))
+        );
+        const exitDate = computeSchoolGradeExitDate(item, groupId);
+        const hasKnownFutureFillUpAssignment = assignments.some((assignment) => (
+          fillUpGroupIds.has(String(assignment.groupId || ''))
+          && assignment.start
+          && String(assignment.start) > dateIso
+          && (!exitDate || String(assignment.start) <= exitDate)
+        ));
+        const wasAdmitted = admittedFillUpGroupByChildId.has(itemId);
+
+        if (dateIso === referenceDate || hasActiveFillUpAssignment || hasKnownFutureFillUpAssignment || wasAdmitted) {
+          admittedFillUpGroupByChildId.set(itemId, groupId);
+          assignedFillUpChildren += 1;
+          return;
+        }
+
+        const familyId = String(item.familyId || item.familyLabel || `child:${itemId}`);
+        candidates.push({
+          id: itemId,
+          groupId,
+          gradePriority: getSchoolGradePriority(item, dateIso),
+          siblingPriority: Number(familyCounts.get(familyId) || 0) > 1 ? 1 : 0,
+          dataOrder: Number(activeDataOrderById.get(itemId) || 0),
+        });
+      });
+
+      const availablePlaces = Number.isFinite(fillUpFacilityCapacity)
+        ? Math.max(0, Math.floor(fillUpFacilityCapacity - guaranteedChildren - assignedFillUpChildren))
+        : Infinity;
+      const { accepted, rejected } = allocateFillUpCandidates(candidates, availablePlaces);
+      accepted.forEach((candidate) => admittedFillUpGroupByChildId.set(candidate.id, candidate.groupId));
+      rejected.forEach((candidate) => {
+        capacityRejectedAtByChildId.set(candidate.id, dateIso);
+        exitedAtByChildId.set(candidate.id, dateIso);
+      });
+    });
 
     const stepSummaries = [];
     let previousDate = timelineDates[0] || referenceDate;
@@ -4480,7 +4581,6 @@ function VisuView() {
 
       activeNowChildren.forEach((item) => {
         const fromState = resolveGroupAtDate(item, previousDate);
-        if (String(fromState.groupId) === String(syntheticGroupIds.exit)) return;
         const toState = resolveGroupAtDate(item, eventDate);
         const fromNodeId = ensureNode(previousDate, fromState.groupId, fromState.groupLabel);
         const toNodeId = ensureNode(eventDate, toState.groupId, toState.groupLabel);

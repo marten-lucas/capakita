@@ -115,7 +115,7 @@ test('ausblick Sankey uses past auto transitions as the reference stage and keep
     });
     store.dispatch({
       type: 'simGroup/addGroupDef',
-      payload: { scenarioId: sid, groupDef: { id: 'g-schulkind', name: 'Schulkindgruppe', type: 'Schulkindgruppe', fillUp: true, maxFacilityCount: 47, maxSchoolGrade: '4' } },
+      payload: { scenarioId: sid, groupDef: { id: 'g-schulkind', name: 'Schulkindgruppe', type: 'Schulkindgruppe', fillUp: true, maxFacilityCount: 3, maxSchoolGrade: '4' } },
     });
 
     store.dispatch({
@@ -159,6 +159,21 @@ test('ausblick Sankey uses past auto transitions as the reference stage and keep
           dateofbirth: '2019-05-10',
           startdate: '2023-01-01',
           enddate: '2027-08-31',
+          groupId: 'g-regel',
+        },
+      },
+    });
+
+    store.dispatch({
+      type: 'simData/simDataItemAdd',
+      payload: {
+        scenarioId: sid,
+        item: {
+          id: 'child-sankey-overflow',
+          name: 'Kind aus Datenreihenfolge',
+          type: 'demand',
+          dateofbirth: '2021-06-10',
+          startdate: '2025-01-01',
           groupId: 'g-regel',
         },
       },
@@ -243,6 +258,21 @@ test('ausblick Sankey uses past auto transitions as the reference stage and keep
       },
     });
 
+    store.dispatch({
+      type: 'simGroup/addGroup',
+      payload: {
+        scenarioId: sid,
+        dataItemId: 'child-sankey-overflow',
+        group: {
+          id: 'child-sankey-overflow-assignment',
+          kindId: 'child-sankey-overflow',
+          groupId: 'g-regel',
+          start: '2025-01-01',
+          end: '',
+        },
+      },
+    });
+
     const state = store.getState();
     store.dispatch({
       type: 'events/refreshAllEvents',
@@ -269,11 +299,12 @@ test('ausblick Sankey uses past auto transitions as the reference stage and keep
   await expect(sankeyLinks.first()).toBeVisible();
   await expect(page.getByTestId('forecast-sankey-export-menu')).toBeVisible();
   const renderedTransitions = await page.getByTestId('forecast-sankey-chart').getAttribute('data-transition-pairs');
-  expect(renderedTransitions).toContain('Regelgruppe: 1 Kinder -> Vorschule: 1 Kinder');
+  expect(renderedTransitions).toContain('Regelgruppe: 2 Kinder -> Vorschule: 1 Kinder');
   expect(renderedTransitions).toContain('Vorschule: 1 Kinder -> Schulkindgruppe (Auffuellen): 2 Kinder');
-  expect(renderedTransitions).toContain('Bärchengruppe: 1 Kinder -> Regelgruppe: 1 Kinder');
+  expect(renderedTransitions).toContain('Regelgruppe: 2 Kinder -> Aus Einrichtung: 1 Kinder');
+  expect(renderedTransitions).toContain('Bärchengruppe: 1 Kinder -> Regelgruppe: 2 Kinder');
   expect(renderedTransitions).toContain('Schulkindgruppe (Auffuellen): 1 Kinder -> Schulkindgruppe (Auffuellen): 1 Kinder');
-  expect(renderedTransitions).toContain('Schulkindgruppe (Auffuellen): 2 Kinder -> Aus Einrichtung: 1 Kinder');
+  expect(renderedTransitions).toContain('Schulkindgruppe (Auffuellen): 2 Kinder -> Aus Einrichtung: 2 Kinder');
 
 
   await page.locator('.analysis-stage-content .analysis-coverage-carousel-nav').last().click();
