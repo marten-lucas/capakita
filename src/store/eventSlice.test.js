@@ -106,6 +106,50 @@ describe('eventSlice automatic transitions', () => {
     expect(schoolTransition?.metadata?.bookingDeltaHours).toBe(-1);
   });
 
+  it('projects school entry on September 1 when the source attendance period ends the previous day', () => {
+    const state = eventReducer(
+      undefined,
+      refreshAllEvents({
+        simScenario: { scenarios: [{ id: scenarioId }] },
+        simData: {
+          dataByScenario: {
+            [scenarioId]: {
+              childBoundary: {
+                id: 'childBoundary',
+                name: 'Mia',
+                type: 'demand',
+                dateofbirth: '2020-05-10',
+                startdate: '2025-01-01',
+                enddate: '2026-08-31',
+              },
+            },
+          },
+        },
+        simBooking: { bookingsByScenario: { [scenarioId]: {} } },
+        simGroup: {
+          groupsByScenario: {
+            [scenarioId]: {
+              childBoundary: {
+                assignment: {
+                  id: 'assignment',
+                  groupId: 'g-regel',
+                  start: '2025-01-01',
+                  end: '2026-08-31',
+                },
+              },
+            },
+          },
+        },
+      })
+    );
+
+    const events = state.eventsByScenario[scenarioId] || [];
+    const schoolTransition = events.find((event) => event.id === 'auto_transition_school_childBoundary');
+
+    expect(schoolTransition?.effectiveDate).toBe('2026-09-01');
+    expect(schoolTransition?.metadata?.targetStage).toBe('school');
+  });
+
   it('applies Bavarian school cutoff and corridor boundaries for auto school transitions', () => {
     const state = eventReducer(
       undefined,

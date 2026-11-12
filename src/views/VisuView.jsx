@@ -4144,6 +4144,7 @@ function VisuView() {
         retainedSchoolStay
         && retainedSchoolStay.groupId === String(schoolGroupId || '')
         && date > retainedSchoolStay.endDate
+        && date >= retainedSchoolStay.startDate
         && date < retainedSchoolStay.exitDate
       );
     };
@@ -4365,19 +4366,40 @@ function VisuView() {
       const endDate = String(item.enddate || '');
       if (!itemId || !endDate || endDate < referenceDate) return;
 
-      const groupIdAtEndDate = String(resolveProjectedGroupIdAtDate(item, endDate, { ignoreExitTransitions: true }) || '');
-      const gradeExitDate = computeSchoolGradeExitDate(item, groupIdAtEndDate);
-      if (!gradeExitDate || gradeExitDate <= endDate) return;
+      let schoolGroupId = String(resolveProjectedGroupIdAtDate(item, endDate, { ignoreExitTransitions: true }) || '');
+      let schoolStartDate = endDate;
+      if (!maxSchoolGradeByGroup.has(schoolGroupId)) {
+        const nextDay = new Date(`${endDate}T00:00:00Z`);
+        nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+        const nextDayIso = nextDay.toISOString().slice(0, 10);
+        const nextGroupId = String(resolveProjectedGroupIdAtDate(item, nextDayIso, { ignoreExitTransitions: true }) || '');
+        const hasSchoolTransitionAtBoundary = (
+          (autoTransitionsByItem.get(itemId) || []).some((event) => (
+            String(event?.metadata?.targetStage || '').toLowerCase() === 'school'
+            && getEventDateIso(event) === nextDayIso
+          ))
+          || getForecastGroupAssignments(getEffectiveGroupAssignments(itemId)).some((assignment) => (
+            String(assignment.groupId || '') === nextGroupId
+            && String(assignment.start || '') === nextDayIso
+          ))
+        );
+        if (!maxSchoolGradeByGroup.has(nextGroupId) || !hasSchoolTransitionAtBoundary) return;
+        schoolGroupId = nextGroupId;
+        schoolStartDate = nextDayIso;
+      }
+
+      const gradeExitDate = computeSchoolGradeExitDate(item, schoolGroupId);
+      if (!gradeExitDate || gradeExitDate <= schoolStartDate) return;
 
       const reassignedBeforeGradeExit = getForecastGroupAssignments(getEffectiveGroupAssignments(itemId)).some((assignment) => (
         assignment.start
-        && String(assignment.start) > endDate
+        && String(assignment.start) > schoolStartDate
         && String(assignment.start) < gradeExitDate
-        && String(assignment.groupId || '') !== groupIdAtEndDate
+        && String(assignment.groupId || '') !== schoolGroupId
       ));
       if (reassignedBeforeGradeExit) return;
 
-      schoolStayByChildId.set(itemId, { groupId: groupIdAtEndDate, endDate, exitDate: gradeExitDate });
+      schoolStayByChildId.set(itemId, { groupId: schoolGroupId, endDate, startDate: schoolStartDate, exitDate: gradeExitDate });
     });
 
     const scenarioEvents = futureScenarioEvents.filter((event) => {
@@ -4436,8 +4458,9 @@ function VisuView() {
         );
       const schoolStay = schoolStayByChildId.get(itemId);
       const keepSchoolStay = schoolStay
-        && schoolStay.groupId === groupId
-        && String(dateIso) < schoolStay.exitDate;
+        && String(dateIso) >= schoolStay.endDate
+        && String(dateIso) < schoolStay.exitDate
+        && (String(dateIso) < schoolStay.startDate || schoolStay.groupId === groupId);
 
       if (includeExit && (!active || (isProjectedExit && !keepSchoolStay))) {
         return {
