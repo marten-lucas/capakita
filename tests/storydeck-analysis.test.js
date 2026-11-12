@@ -304,7 +304,7 @@ test('ausblick Sankey uses past auto transitions as the reference stage and keep
   expect(renderedTransitions).toContain('Regelgruppe: 2 Kinder -> Aus Einrichtung: 1 Kinder');
   expect(renderedTransitions).toContain('Bärchengruppe: 1 Kinder -> Regelgruppe: 2 Kinder');
   expect(renderedTransitions).toContain('Schulkindgruppe (Auffuellen): 1 Kinder -> Schulkindgruppe (Auffuellen): 1 Kinder');
-  expect(renderedTransitions).toContain('Schulkindgruppe (Auffuellen): 2 Kinder -> Aus Einrichtung: 2 Kinder');
+  expect(renderedTransitions).toContain('Schulkindgruppe (Auffuellen): 2 Kinder -> Aus Einrichtung: 1 Kinder');
 
 
   await page.locator('.analysis-stage-content .analysis-coverage-carousel-nav').last().click();

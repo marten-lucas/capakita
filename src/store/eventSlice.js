@@ -179,7 +179,7 @@ function buildAutomaticTransitionEvents({ dataItems, existingEvents = [], scenar
             const allowSchoolBoundary = isSchoolTransitionAtAttendanceBoundary(item, transition);
             if (!isWithinAttendanceRange(item, transition.effectiveDate) && !allowSchoolBoundary) return;
             if (hasConflictingRealEvent({
-                existingEvents: events,
+                existingEvents,
                 itemKey,
                 effectiveDate: transition.effectiveDate,
                 attendanceEndDate: item?.enddate,

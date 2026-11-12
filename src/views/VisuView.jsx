@@ -4604,6 +4604,7 @@ function VisuView() {
 
       activeNowChildren.forEach((item) => {
         const fromState = resolveGroupAtDate(item, previousDate);
+        if (String(fromState.groupId) === String(syntheticGroupIds.exit)) return;
         const toState = resolveGroupAtDate(item, eventDate);
         const fromNodeId = ensureNode(previousDate, fromState.groupId, fromState.groupLabel);
         const toNodeId = ensureNode(eventDate, toState.groupId, toState.groupLabel);
@@ -4643,9 +4644,14 @@ function VisuView() {
       .filter((entry) => entry.weight > 0);
 
     const nodeCountById = new Map();
-    timelineDates.forEach((dateIso) => {
+    timelineDates.forEach((dateIso, dateIndex) => {
+      const previousDate = dateIndex > 0 ? timelineDates[dateIndex - 1] : null;
       activeNowChildren.forEach((item) => {
         const state = resolveGroupAtDate(item, dateIso);
+        if (String(state.groupId) === String(syntheticGroupIds.exit) && previousDate) {
+          const previousState = resolveGroupAtDate(item, previousDate);
+          if (String(previousState.groupId) === String(syntheticGroupIds.exit)) return;
+        }
         const nodeId = ensureNode(dateIso, state.groupId, state.groupLabel);
         nodeCountById.set(nodeId, Number(nodeCountById.get(nodeId) || 0) + 1);
       });
