@@ -129,7 +129,7 @@ function hasConflictingRealEvent({ existingEvents = [], itemKey, effectiveDate, 
             && (event?.type === 'presence_end' || event?.type === 'group_assignment_end')
         ) return false;
 
-        return event?.category === 'group_assignment' || event?.type === 'presence_end';
+        return event?.type === 'group_assignment_start' || event?.type === 'presence_end';
     });
 }
 

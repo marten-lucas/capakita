@@ -6,7 +6,7 @@ console.log(`\n📊 E2E Tests running at level: ${getTestLevelDescription()}\n`)
 
 /**
  * Create deterministic test data for chart validation
- * Minimal setup: 3 Bedarf children, 3 Kapazität staff
+ * Minimal setup: one child and one employee with several weekly booking slots
  */
 async function createChartTestData(page) {
   await page.goto('/');
@@ -44,8 +44,6 @@ async function createChartTestData(page) {
 
     const demandChildren = [
       { id: 'chart-child-1', name: 'Child1', dateofbirth: '2021-01-01' },
-      { id: 'chart-child-2', name: 'Child2', dateofbirth: '2020-01-01' },
-      { id: 'chart-child-3', name: 'Child3', dateofbirth: '2019-01-01' },
     ];
 
     demandChildren.forEach((child) => {
@@ -97,8 +95,6 @@ async function createChartTestData(page) {
 
     const staffMembers = [
       { id: 'chart-staff-1', name: 'Staff1' },
-      { id: 'chart-staff-2', name: 'Staff2' },
-      { id: 'chart-staff-3', name: 'Staff3' },
     ];
 
     staffMembers.forEach((staff) => {
@@ -281,14 +277,25 @@ async function createMultiGroupSplitTestData(page) {
   await page.waitForFunction(() => window.__APP_STORE?.getState?.().simScenario?.selectedScenarioId === 'chart-multi-group-split', { timeout: 5000 });
 }
 
-async function goToVisu(page) {
-  await page.evaluate(() => {
-    window.__APP_STORE?.dispatch({
-      type: 'ui/setActivePage',
-      payload: 'visu',
-    });
-  });
-  await page.waitForFunction(() => window.__APP_STORE?.getState?.().ui?.activePage === 'visu', { timeout: 5000 });
+async function goToVisu(page, { stepId = 'status', slideIndex = 0 } = {}) {
+  await page.getByRole('button', { name: 'Analyse', exact: true }).click();
+  await expect(page.getByTestId('analysis-clean-sheet')).toBeVisible();
+
+  await page.getByTestId(`story-step-${stepId}`).click();
+  await expect.poll(() => page.evaluate(() => window.__APP_STORE?.getState?.().ui?.analysisSubPage)).toBe(stepId);
+
+  const stageContent = page.getByTestId('analysis-stage-content');
+  const navigation = stageContent.locator('.analysis-coverage-carousel-nav');
+  const counter = stageContent.locator('.analysis-coverage-carousel-counter');
+  await expect(counter).toBeVisible({ timeout: 10000 });
+
+  let currentSlide = Number((await counter.innerText()).split('/')[0]) - 1;
+  while (currentSlide !== slideIndex) {
+    const direction = currentSlide < slideIndex ? 1 : 0;
+    await navigation.nth(direction).click();
+    currentSlide += direction === 1 ? 1 : -1;
+    await expect.poll(async () => Number((await counter.innerText()).split('/')[0]) - 1).toBe(currentSlide);
+  }
 }
 
 async function getWeeklyChartSvg(page) {
@@ -303,16 +310,13 @@ test('Chart Data Validation - Weekly Chart', async ({ page }) => {
   // Navigate to visualization page
   await goToVisu(page);
   
-  // Check Weekly Chart heading exists
-  const weeklyHeading = page.getByRole('heading', { name: 'Regelbetrieb' });
-  await expect(weeklyHeading).toBeVisible();
+  await expect(page.getByText('Kapazität & Bedarf', { exact: true })).toBeVisible();
   
   // Wait for chart to render
   await page.waitForTimeout(2000);
   
-  // Verify main axis label is present
-  await expect(page.getByText('Zeiten', { exact: true })).toBeVisible();
-  
+  await expect(page.locator('.analysis-stage-content .highcharts-container').first()).toBeVisible();
+
   // Check that SVG chart container exists
   const svgCharts = await page.locator('svg').count();
   expect(svgCharts).toBeGreaterThan(0);
@@ -322,108 +326,59 @@ test('Chart Data Validation - Weekly Chart', async ({ page }) => {
   await expect(chartArea).toBeVisible();
 });
 
-test('Chart Data Validation - Midterm Chart', async ({ page }) => {
+test('Chart Data Validation - Ausblick carousel navigates to Sankey and demography', async ({ page }) => {
   await createChartTestData(page);
-  
-  await goToVisu(page);
-  
-  // Check Midterm Chart heading
-  const midtermHeading = page.getByRole('heading', { name: 'Langzeit', exact: true });
-  await expect(midtermHeading).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Bedarf und Kapazität' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Fachkraftquote und Finanzen' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Ereignisse' })).toBeVisible();
-  
-  // Wait for chart to render
-  await page.waitForTimeout(2000);
-  
-  // Verify xAxis label (Zeitraum) in each midterm chart (strict-mode safe)
-  await expect(page.getByTestId('midterm-demand-capacity-chart').locator('text=Zeitraum')).toBeVisible();
-  await expect(page.getByTestId('midterm-ratio-finance-chart').locator('text=Zeitraum')).toBeVisible();
-  await expect(page.getByTestId('midterm-employee-count-chart').locator('text=Zeitraum')).toBeVisible();
-  
-  // Check that SVG chart container exists
-  const svgCharts = await page.locator('svg').count();
-  expect(svgCharts).toBeGreaterThan(2);
-  
-  // Verify chart area is not empty
-  const chartArea = page.getByTestId('midterm-demand-capacity-chart').locator('svg').first();
-  await expect(chartArea).toBeVisible();
+  await goToVisu(page, { stepId: 'compare', slideIndex: 0 });
+
+  await expect(page.getByText('Ausblick (Sankey)', { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Keine gruppenbezogenen Ubergange/ })).toBeVisible();
+
+  await goToVisu(page, { stepId: 'compare', slideIndex: 3 });
+  await expect(page.getByText('Demografie-Prognose', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('forecast-demography-monthpicker')).toBeVisible();
+  await expect(page.getByTestId('forecast-demography-resolution-filter')).toBeVisible();
 });
 
-test('Chart Data Validation - Age Histogram', async ({ page }) => {
+test('Chart Data Validation - Demography chart filters render', async ({ page }) => {
   await createChartTestData(page);
-  
-  await goToVisu(page);
-  
-  // Check Age Histogram heading
-  const ageHeading = page.getByRole('heading', { name: 'Alters-Histogramm' });
-  await expect(ageHeading).toBeVisible();
-  
-  // Wait for chart to render
-  await page.waitForTimeout(1000);
-  
-  // Verify axis labels
-  await expect(page.locator('text=Alter in Jahren')).toBeVisible();
-  await expect(page.locator('text=Anzahl Kinder')).toBeVisible();
-  
-  // Check for age bin labels using upper category bounds (e.g. 1,25 / 2,5 / 2,75)
-  const ageLabels = page.locator('text=/^\\d+(,\\d+)?$/');
-  await expect(ageLabels.first()).toBeVisible();
+  await goToVisu(page, { stepId: 'compare', slideIndex: 3 });
+
+  await expect(page.getByText('Demografie-Prognose', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('forecast-demography-category-filter')).toBeVisible();
+  await expect(page.getByTestId('forecast-demography-resolution-filter')).toBeVisible();
+  await expect(page.getByTestId('forecast-demography-monthpicker')).toBeVisible();
+  await expect(page.locator('.analysis-stage-content svg').first()).toBeVisible();
 });
 
-test('Chart Data Validation - Booking Histogram', async ({ page }) => {
+test('Chart Data Validation - Booking hours slide renders in Bedarfsdeckung', async ({ page }) => {
   await createChartTestData(page);
-  
-  await goToVisu(page);
-  
-  // Check Booking Histogram heading
-  const histogramHeading = page.getByRole('heading', { name: 'Buchungsverteilung' });
-  await expect(histogramHeading).toBeVisible();
-  
-  // Wait for chart to render
-  await page.waitForTimeout(1000);
-  
-  // Verify axis labels
-  await expect(page.locator('text=Stunden pro Woche')).toBeVisible();
-  
-  // Check for booking hour bin labels (0, 1-4, 5-8, etc.)
-  const binLabels = page.locator('text=/^(0|\\d+-\\d+)$/'); // Pattern like "0", "1-4", "5-8"
-  await expect(binLabels.first()).toBeVisible();
+  await goToVisu(page, { stepId: 'status', slideIndex: 3 });
+
+  await expect(page.getByText('Buchungsstunden', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('Stunden pro Woche', { exact: true })).toBeVisible();
+  await expect(page.locator('.analysis-stage-content .highcharts-container').first()).toBeVisible();
 });
 
-test('Chart Data Validation - All Charts Present with Correct Scaling', async ({ page }) => {
+test('Chart Data Validation - current analysis stages render their charts', async ({ page }) => {
   await createChartTestData(page);
-  
-  await goToVisu(page);
-  
-  // All headings visible
-  await expect(page.getByRole('heading', { name: 'Regelbetrieb' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Langzeit', exact: true })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Alters-Histogramm' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Buchungsverteilung' })).toBeVisible();
-  
-  // All chart containers should be visible (Box with height)
-  const boxes = page.locator('[style*="height"]');
-  const visibleBoxes = await boxes.evaluateAll(els => 
-    els.filter(el => el.offsetHeight > 0).length
-  );
-  expect(visibleBoxes).toBeGreaterThanOrEqual(4);
+  await goToVisu(page, { stepId: 'status' });
+  await expect(page.getByText('Kapazität & Bedarf', { exact: true })).toBeVisible();
+  await expect(page.locator('.analysis-stage-content .highcharts-container').first()).toBeVisible();
+
+  await goToVisu(page, { stepId: 'compare', slideIndex: 0 });
+  await expect(page.getByRole('heading', { name: /Keine gruppenbezogenen Ubergange/ })).toBeVisible();
+
+  await goToVisu(page, { stepId: 'compare', slideIndex: 3 });
+  await expect(page.getByTestId('forecast-demography-monthpicker')).toBeVisible();
 });
 
-test('Chart Group Split - Weekly Group Charts show both split groups', async ({ page }) => {
+test('Chart Group Split - Bedarfsdeckung heatmap shows both split groups', async ({ page }) => {
   await createMultiGroupSplitTestData(page);
-  await goToVisu(page);
-  await expect(page.getByRole('heading', { name: 'Regelbetrieb' })).toBeVisible();
+  await goToVisu(page, { stepId: 'status', slideIndex: 2 });
 
-  const groupChartToggle = page.getByRole('button', { name: /Gruppendiagramme anzeigen/i });
-  await expect(groupChartToggle).toBeVisible();
-  await expect(groupChartToggle).toContainText('Gruppendiagramme anzeigen (2)');
-
-  await groupChartToggle.click();
-
-  await expect(page.getByRole('heading', { name: 'Gruppe: Fuchsgruppe' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Gruppe: Bärchengruppe' })).toBeVisible();
+  await expect(page.getByText('Heatmap (alle Gruppen)', { exact: true })).toBeVisible();
+  await expect(page.getByText('Fuchsgruppe', { exact: true })).toBeVisible();
+  await expect(page.getByText('Bärchengruppe', { exact: true })).toBeVisible();
 });
 
 /**
@@ -431,15 +386,9 @@ test('Chart Group Split - Weekly Group Charts show both split groups', async ({ 
  */
 test('Chart Data Detail - Weekly Chart Time Scaling', async ({ page }) => {
   await createChartTestData(page);
-  await page.evaluate(() => {
-    window.__APP_STORE?.dispatch({
-      type: 'ui/setActivePage',
-      payload: 'visu',
-    });
-  });
-  await page.waitForFunction(() => window.__APP_STORE?.getState?.().ui?.activePage === 'visu', { timeout: 5000 });
-  await expect(page.getByRole('heading', { name: 'Regelbetrieb' })).toBeVisible({ timeout: 10000 });
-  await page.locator('svg').first().waitFor({ state: 'visible', timeout: 10000 });
+  await goToVisu(page, { stepId: 'status' });
+  await expect(page.getByText('Kapazität & Bedarf', { exact: true })).toBeVisible();
+  await page.locator('.analysis-stage-content .highcharts-container svg').first().waitFor({ state: 'visible', timeout: 10000 });
   
   // Check for time categories in Highcharts SVG (should have Mo/Di/Mi/Do/Fr labels)
   const dayLabels = await page.locator('text=/^(Mo|Di|Mi|Do|Fr)$/').count();
@@ -450,39 +399,23 @@ test('Chart Data Detail - Weekly Chart Time Scaling', async ({ page }) => {
   expect(timeLabels).toBeGreaterThan(0);
 });
 
-test('Chart Data Detail - Age Histogram Bins', async ({ page }) => {
+test('Chart Data Detail - Demography controls show the forecast chart', async ({ page }) => {
   await createChartTestData(page);
-  await goToVisu(page);
-  
-  await page.waitForTimeout(2000);
-  
-  // Age histogram should show upper bounds of the 3-month bins with German decimal commas.
-  const ageBinPatterns = await page.locator('text=/^\\d+(,\\d+)?$/').count();
-  expect(ageBinPatterns).toBeGreaterThan(0);
-  
-  // Just verify that age categories exist with the new upper-bound-only format.
-  const ageLabels = await page.locator('text=/^\\d+(,\\d+)?$/').evaluateAll(els =>
-    els.map(el => el.textContent).filter(text => /^\d+(,\d+)?$/.test(text))
-  );
-  
-  // Should have at least 3 age bins
-  expect(ageLabels.length).toBeGreaterThan(3);
+  await goToVisu(page, { stepId: 'compare', slideIndex: 3 });
+
+  await expect(page.getByTestId('forecast-demography-monthpicker')).toBeVisible();
+  await expect(page.getByTestId('forecast-demography-resolution-filter')).toBeVisible();
+  await expect(page.locator('.analysis-stage-content .highcharts-container svg').first()).toBeVisible();
 });
 
 test('Chart Data Detail - Booking Histogram Bins', async ({ page }) => {
   await createChartTestData(page);
-  await goToVisu(page);
-  
-  await page.waitForTimeout(2000);
-  
-  // Booking histogram should have bins like "0", "1-4", "5-8", "9-12"
-  // Check for first bin (0)
-  const zeroBin = page.locator('text=/^0$/');
-  await expect(zeroBin.first()).toBeVisible({ timeout: 5000 });
-  
-  // Check for hour range bins
-  const hourBins = await page.locator('text=/^\\d+-\\d+$/').count();
-  expect(hourBins).toBeGreaterThan(0);
+  await goToVisu(page, { stepId: 'status', slideIndex: 3 });
+
+  await expect(page.getByText('Buchungsstunden', { exact: true }).first()).toBeVisible();
+  await expect(page.locator('.analysis-stage-content .highcharts-container svg').first()).toBeVisible();
+  const histogramLabels = await page.locator('.analysis-stage-content .highcharts-container text').count();
+  expect(histogramLabels).toBeGreaterThan(0);
 });
 
 test('Chart Data Detail - Data Point Values', async ({ page }) => {
@@ -492,10 +425,7 @@ test('Chart Data Detail - Data Point Values', async ({ page }) => {
   await page.waitForTimeout(2000);
   
   // Extract data from the SVG (this is basic - just checks chart rendering)
-  // With 3 children on Monday: we expect demand value >= 3 somewhere
-  // With 3 staff on Monday: we expect capacity value >= 3 somewhere
-  
-  // For a more robust check: verify that at least one numeric value > 0 exists in the charts
+  // Verify that the current weekly chart includes non-zero values for the seeded child and employee.
   const allSvgText = await page.locator('svg text').evaluateAll(els =>
     els.map(el => el.textContent).filter(t => /^\d+$/.test(t) && Number(t) > 0)
   );
@@ -515,84 +445,55 @@ if (shouldRunFullTests()) {
  * - Each chart should have data
  * - No chart should show empty/zero results when we've added data
  */
-test('Chart Integration - All Charts Have Data', async ({ page }) => {
+test('Chart Integration - Bedarfsdeckung shows populated weekly demand and capacity series', async ({ page }) => {
   await createChartTestData(page);
-  await goToVisu(page);
-  await page.waitForTimeout(2000);
-  
-  // Get all SVG elements (one per chart)
-  const svgCharts = page.locator('svg');
-  const chartCount = await svgCharts.count();
-  
-  // We expect at least 4 SVGs (one for each chart type)
-  expect(chartCount).toBeGreaterThanOrEqual(4);
-  
-  // Each chart should have rect or path elements (data visualization primitives)
-  // Check that at least some charts have these
-  const chartsWithData = await svgCharts.evaluateAll(svgs =>
-    svgs.map(svg => ({
-      rects: svg.querySelectorAll('rect[fill]').length,
-      paths: svg.querySelectorAll('path[d]').length,
-      circles: svg.querySelectorAll('circle').length
-    }))
-  );
-  
-  // Most charts should have some visual elements
-  const chartsWithVisuals = chartsWithData.filter(c => 
-    c.rects > 0 || c.paths > 0 || c.circles > 0
-  );
-  expect(chartsWithVisuals.length).toBeGreaterThan(2);
+  await goToVisu(page, { stepId: 'status' });
+
+  const seriesData = await page.evaluate(() => {
+    const chart = window.Highcharts?.charts?.find(
+      (candidate) => candidate?.yAxis?.[0]?.axisTitle?.textStr === 'Bedarf (Kinder)'
+    );
+    return chart?.series?.map((series) => series.points.some((point) => Number(point.y || 0) > 0)) || [];
+  });
+
+  expect(seriesData.length).toBeGreaterThanOrEqual(2);
+  expect(seriesData.some(Boolean)).toBe(true);
 });
 
 /**
  * Regression test: Verify axis label consistency
  */
-test('Chart Axis Labels - All Expected Titles Present', async ({ page }) => {
+test('Chart Axis Labels - weekly, booking-hours and demography stages expose their controls', async ({ page }) => {
   await createChartTestData(page);
-  await goToVisu(page);
-  await page.waitForTimeout(2000);
-  
-  // Define expected axis labels per chart
-  const expectedLabels = [
-    'Zeiten',           // Weekly x-axis
-    'Alter in Jahren',  // Age Histogram x-axis
-    'Stunden pro Woche',// Booking Histogram x-axis
-    'Zeitraum'          // Midterm x-axis
-  ];
-  
-  // Check each expected label exists somewhere on the page
-  for (const label of expectedLabels) {
-    const labelElement = page.locator(`text=${label}`);
-    const count = await labelElement.count();
-    expect(count).toBeGreaterThan(0);
-  }
+  await goToVisu(page, { stepId: 'status' });
+  await expect(page.getByText('Kapazität & Bedarf', { exact: true })).toBeVisible();
+  await expect(page.locator('.analysis-stage-content .highcharts-container svg').first()).toBeVisible();
+
+  await goToVisu(page, { stepId: 'status', slideIndex: 3 });
+  await expect(page.getByText('Stunden pro Woche', { exact: true })).toBeVisible();
+
+  await goToVisu(page, { stepId: 'compare', slideIndex: 3 });
+  await expect(page.getByTestId('forecast-demography-monthpicker')).toBeVisible();
 });
 
 /**
  * Test for proper scaling with no data vs with data
  */
-test('Chart Scaling - Responsive to Data Changes', async ({ page }) => {
-  // Create scenario WITHOUT data first
+test('Chart Scaling - weekly chart responds to added data', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: /Leeres Szenario/i }).click();
-  
-  // Go to visualization (should be empty)
-  await goToVisu(page);
-  await page.waitForTimeout(1000);
-  
-  // Should show "Keine Daten vorhanden" or empty state
-  const noDataMessage = page.getByText(/Keine Daten vorhanden/i);
-  await expect(noDataMessage).toBeVisible();
-  
-  // Add minimal data programmatically to avoid flaky UI interactions
+  await goToVisu(page, { stepId: 'status' });
+  await expect(page.getByText('Kapazität & Bedarf', { exact: true })).toBeVisible();
+
   await createChartTestData(page);
-  
-  // Now go back to visu - should show charts
-  await goToVisu(page);
-  await page.waitForTimeout(2000);
-  
-  // Should now show chart headings (not empty state)
-  await expect(page.getByRole('heading', { name: 'Regelbetrieb' })).toBeVisible();
+  await goToVisu(page, { stepId: 'status' });
+  const populatedValues = await page.evaluate(() => {
+    const chart = window.Highcharts?.charts?.find(
+      (candidate) => candidate?.yAxis?.[0]?.axisTitle?.textStr === 'Bedarf (Kinder)'
+    );
+    return chart?.series?.flatMap((series) => series.points.map((point) => Number(point.y || 0))) || [];
+  });
+  expect(populatedValues.some((value) => value > 0)).toBe(true);
 });
 
 /**
@@ -708,62 +609,23 @@ test('Chart Data Accuracy - Exact Values Match Bookings', async ({ page }) => {
 });
 
 /**
- * CRITICAL: Test that Weekly Chart tooltips show correct TIME CATEGORY + VALUE
- * This verifies that tooltip shows "Mo 7:00: 1" not just "19" or "26"
+ * The Bedarfsdeckung layout keeps weekly time categories visible in its demand chart.
  */
-test('Chart Tooltip Accuracy - Time Category Displayed', async ({ page }) => {
+test('Chart Time Labels - weekly slots remain visible in the demand chart', async ({ page }) => {
   await createChartTestData(page);
+  await goToVisu(page, { stepId: 'status' });
 
-  // Go to visu
-  await goToVisu(page);
-  await page.waitForTimeout(2000);
+  const weeklySvg = await getWeeklyChartSvg(page);
+  const chartCategories = await weeklySvg.evaluate((svg) => {
+    const texts = svg.querySelectorAll('text');
+    return Array.from(texts)
+      .map((element) => element.textContent?.trim())
+      .filter((text) => text && /^\\d{1,2}:\\d{2}$/.test(text));
+  });
 
-  // Hover over chart area around 7:00 to trigger tooltip
-  // The weekly chart should show time categories like "Mo 7:00", "Mo 7:30", etc.
-  // Try hovering a concrete chart point to trigger tooltip (more reliable than hovering whole SVG)
-  const point = page.locator('.highcharts-point').first();
-  await expect(point).toBeVisible();
-  await point.hover();
-
-  // Wait shortly for tooltip to appear
-  let tooltipContent = '';
-  try {
-    await page.waitForSelector('.highcharts-tooltip, .highcharts-tooltip-box', { timeout: 2000 });
-    tooltipContent = await page.locator('.highcharts-tooltip, .highcharts-tooltip-box').first().textContent();
-  } catch {
-    // tooltip might not be rendered as HTML in some modes; leave empty and fall back
-    tooltipContent = '';
-  }
-  
-  // The tooltip should contain either:
-  // - "Mo 7" (abbreviated category)
-  // - "7:00" (the time)
-  // - "Bedarf" (series name)
-  // - A numeric value like "1"
-  
-  // If we can't find tooltip, try checking for data labels in the chart
-  if (!tooltipContent || tooltipContent.length === 0) {
-    // Alternative: Check that chart renders correctly with proper categories
-    const chartCategories = await getWeeklyChartSvg(page).then((weeklySvgLocator) => weeklySvgLocator.evaluate((svg) => {
-      const texts = svg.querySelectorAll('text');
-      return Array.from(texts)
-        .map(el => el.textContent?.trim())
-        .filter(t => t && /^\d{1,2}:\d{2}$/.test(t));
-    }));
-    
-    // Verify time categories include a label inside the booking range (7:00-9:00)
-    expect(chartCategories.length).toBeGreaterThan(0);
-    const chartHours = chartCategories.map(ts => {
-      const m = ts && ts.match(/^(\d{1,2}):/);
-      return m ? Number(m[1]) : null;
-    }).filter(h => h !== null);
-    const hasBookingHourInCategories = chartHours.some(h => h >= 7 && h <= 9);
-    expect(hasBookingHourInCategories).toBe(true);
-  }
-
-  // Final verification: Check that "Bedarf" series and time labels exist
-  await expect(page.getByText('Bedarf').first()).toBeVisible();
-  await expect(page.getByText('Mo').first()).toBeVisible();
+  const chartHours = chartCategories.map((text) => Number(text.match(/^(\\d{1,2}):/)?.[1]));
+  expect(chartHours.some((hour) => hour >= 7 && hour <= 9)).toBe(true);
+  await expect(page.getByText('Kapazität & Bedarf', { exact: true })).toBeVisible();
 });
 
 } // End of: if (shouldRunFullTests())

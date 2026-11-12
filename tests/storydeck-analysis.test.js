@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test('analyse story flow renders and navigates steps', async ({ page }) => {
+test('analysis stepper renders and navigates all analysis sections', async ({ page }) => {
   await page.goto('/');
   await page.waitForLoadState('networkidle');
 
@@ -75,14 +75,14 @@ test('analyse story flow renders and navigates steps', async ({ page }) => {
 
   await expect(page.getByTestId('analysis-clean-sheet')).toBeVisible();
 
-  const storyCarousel = page.locator('.analysis-album-flow-carousel');
-  await storyCarousel.getByRole('button', { name: 'Next slide' }).click();
-  await expect(page.getByText('Slide 2 of 7').first()).toBeVisible();
+  const storyNavigation = page.getByTestId('analysis-story-navigation');
+  await expect(storyNavigation.locator('[data-testid^="story-step-"]')).toHaveCount(7);
 
-  await storyCarousel.getByRole('button', { name: 'Next slide' }).click();
-  await storyCarousel.getByRole('button', { name: 'Next slide' }).click();
-  await storyCarousel.getByRole('button', { name: 'Next slide' }).click();
-  await expect(page.getByText('Slide 5 of 7').first()).toBeVisible();
+  for (const stepId of ['quality', 'status', 'transitions', 'cohort', 'compare', 'options', 'trends']) {
+    await page.getByTestId(`story-step-${stepId}`).click();
+    await expect.poll(() => page.evaluate(() => window.__APP_STORE.getState().ui.analysisSubPage)).toBe(stepId);
+    await expect(page.getByTestId('analysis-stage-content')).toBeVisible();
+  }
 });
 
 test('ausblick Sankey uses past auto transitions as the reference stage and keeps school children through configured grade', async ({ page }) => {
@@ -290,9 +290,7 @@ test('ausblick Sankey uses past auto transitions as the reference stage and keep
 
   await expect(page.getByTestId('analysis-clean-sheet')).toBeVisible();
   await expect(page.locator('.analysis-stage-content')).toBeVisible();
-
-  await page.locator('.analysis-stage-content .analysis-coverage-carousel-nav').last().click();
-  await page.locator('.analysis-stage-content .analysis-coverage-carousel-nav').last().click();
+  await expect(page.getByText('Ausblick (Sankey)', { exact: true })).toBeVisible();
 
   await expect(page.getByText('Keine gruppenbezogenen Ubergange')).toHaveCount(0);
   const sankeyLinks = page.locator('.highcharts-sankey-series .highcharts-link');
@@ -307,6 +305,9 @@ test('ausblick Sankey uses past auto transitions as the reference stage and keep
   expect(renderedTransitions).toContain('Schulkindgruppe (Auffuellen): 2 Kinder -> Aus Einrichtung: 1 Kinder');
 
 
-  await page.locator('.analysis-stage-content .analysis-coverage-carousel-nav').last().click();
+  const nextSlide = page.locator('.analysis-stage-content .analysis-coverage-carousel-nav').last();
+  await nextSlide.click();
+  await nextSlide.click();
+  await nextSlide.click();
   await expect(page.getByTestId('forecast-demography-monthpicker')).toBeVisible();
 });

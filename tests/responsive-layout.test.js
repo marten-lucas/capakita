@@ -227,14 +227,7 @@ async function seedResponsiveScenario(page) {
 }
 
 async function openMainPage(page, name) {
-  const navNamePattern = new RegExp(`^${name}(?:\\s*[:\\-].*)?$`, 'i');
-  let button = page.getByRole('button', { name: navNamePattern }).first();
-  if (await button.count() === 0) {
-    button = page.getByRole('button', { name, exact: true }).first();
-  }
-  if (await button.count() === 0) {
-    button = page.getByLabel(name, { exact: true }).first();
-  }
+  const button = page.locator('button.app-nav-item').filter({ hasText: name }).first();
   await button.scrollIntoViewIfNeeded();
   await expect(button).toBeVisible();
   await button.evaluate((node) => node.click());

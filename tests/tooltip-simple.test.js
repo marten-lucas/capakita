@@ -14,15 +14,13 @@ test('Simple Tooltip Test - App loads and renders', async ({ page }) => {
   await expect(body).toBeVisible();
 });
 
-test('Tooltip Format - Weekly Chart shows category in tooltip', async ({ page }) => {
+test('Analysis stepper exposes the current analysis sections', async ({ page }) => {
   await page.goto('/');
-  
-  // Just verify that we can see the main page
-  const heading = page.locator('h1, h2, h3, .mantine-Title-root').first();
-  await expect(heading).toBeVisible({ timeout: 10000 });
-  
-  // Check that Weekly Chart component exists somewhere
-  // by looking for the "Zeiten" label (which is used in WeeklyChart)
-  // This is a basic sanity check
-  console.log('App loaded successfully');
+  await page.getByRole('button', { name: /Leeres Szenario/i }).click();
+  await page.getByRole('button', { name: 'Analyse', exact: true }).click();
+
+  const navigation = page.getByTestId('analysis-story-navigation');
+  await expect(navigation.locator('[data-testid^="story-step-"]')).toHaveCount(7);
+  await expect(page.getByTestId('story-step-quality')).toBeVisible();
+  await expect(page.getByTestId('story-step-compare')).toBeVisible();
 });

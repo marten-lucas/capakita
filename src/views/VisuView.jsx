@@ -2749,9 +2749,9 @@ function TrendHistoryCarousel({ trendData, accent }) {
 }
 
 const FORECAST_CHART_SLIDES = [
+  { id: 'preview', title: 'Ausblick (Sankey)' },
   { id: 'groups-timeline', title: 'Gruppenverlauf & Event-Timeline' },
   { id: 'booking-hours', title: 'Buchungsstunden-Verlauf' },
-  { id: 'preview', title: 'Ausblick (Sankey)' },
   { id: 'demography', title: 'Demografie-Prognose' },
 ];
 
@@ -2817,23 +2817,23 @@ function ForecastStageCarousel({
       >
         <Carousel.Slide>
           <Box className="analysis-coverage-carousel-slide">
-            {activeIndex === 0 ? <ForecastGroupTimelineChart previewFlow={previewFlow} accent={accent} privacyMode={privacyMode} /> : null}
-          </Box>
-        </Carousel.Slide>
-        <Carousel.Slide>
-          <Box className="analysis-coverage-carousel-slide">
-            {activeIndex === 1 ? <ForecastHoursTimelineChart previewFlow={previewFlow} accent={accent} privacyMode={privacyMode} /> : null}
-          </Box>
-        </Carousel.Slide>
-        <Carousel.Slide>
-          <Box className="analysis-coverage-carousel-slide">
-            {activeIndex === 2 ? (
+            {activeIndex === 0 ? (
               <PreviewSankeyChart
                 previewFlow={previewFlow}
                 accent={accent}
                 privacyMode={privacyMode}
               />
             ) : null}
+          </Box>
+        </Carousel.Slide>
+        <Carousel.Slide>
+          <Box className="analysis-coverage-carousel-slide">
+            {activeIndex === 1 ? <ForecastGroupTimelineChart previewFlow={previewFlow} accent={accent} privacyMode={privacyMode} /> : null}
+          </Box>
+        </Carousel.Slide>
+        <Carousel.Slide>
+          <Box className="analysis-coverage-carousel-slide">
+            {activeIndex === 2 ? <ForecastHoursTimelineChart previewFlow={previewFlow} accent={accent} privacyMode={privacyMode} /> : null}
           </Box>
         </Carousel.Slide>
         <Carousel.Slide>

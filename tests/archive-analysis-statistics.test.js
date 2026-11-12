@@ -96,17 +96,22 @@ async function readWeeklyDemandMax(page) {
   return value;
 }
 
-test('archived items are excluded from Regelbetrieb demand chart', async ({ page }) => {
+test('archived items are excluded from the Bedarfsdeckung demand chart', async ({ page }) => {
   await seedArchiveScenario(page);
 
+  await page.getByRole('button', { name: 'Kinder' }).click();
   await page.getByText('Kind Archiv Eins').first().click();
   const archiveToggle = page.getByTestId('toggle-archive-archive-child-1');
   await expect(archiveToggle).toBeVisible();
   await archiveToggle.click();
 
   await page.getByRole('button', { name: 'Analyse' }).click();
-  await expect(page.getByRole('heading', { name: 'Analyse-Buehne' })).toBeVisible({ timeout: 10000 });
-  await expect(page.getByRole('heading', { name: 'Regelbetrieb' })).toBeVisible({ timeout: 10000 });
+  await expect(page.getByTestId('analysis-clean-sheet')).toBeVisible();
+  await page.getByTestId('story-step-status').click();
+  await expect.poll(() => page.evaluate(() => window.__APP_STORE.getState().ui.analysisSubPage)).toBe('status');
+  await expect.poll(() => page.evaluate(() =>
+    window.Highcharts?.charts?.some((chart) => chart?.yAxis?.[0]?.axisTitle?.textStr === 'Bedarf (Kinder)') || false
+  )).toBe(true);
 
   const maxDemand = await readWeeklyDemandMax(page);
   expect(maxDemand).toBe(1);

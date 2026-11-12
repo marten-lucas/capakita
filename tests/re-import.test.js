@@ -165,6 +165,13 @@ async function createManualDataset(page) {
   await expect(page.getByLabel('Hinzufügen')).toBeVisible();
 }
 
+async function expectAnalysisLayout(page) {
+  await page.getByRole('button', { name: 'Analyse', exact: true }).click();
+  await expect(page.getByTestId('analysis-clean-sheet')).toBeVisible();
+  await expect(page.getByTestId('analysis-story-navigation').locator('[data-testid^="story-step-"]')).toHaveCount(7);
+  await expect(page.getByTestId('story-step-quality')).toBeVisible();
+}
+
 // ==========================================
 // BASIC TESTS (always run)
 // ==========================================
@@ -172,12 +179,7 @@ async function createManualDataset(page) {
 test.describe('BASIC: Manual Data & Visualization', () => {
   test('Manual data entry + visualization', async ({ page }) => {
     await createManualDataset(page);
-    await page.getByRole('button', { name: 'Analyse' }).click();
-
-    await expect(page.getByRole('heading', { name: 'Regelbetrieb' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Langzeit', exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Alters-Histogramm' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Buchungsverteilung' })).toBeVisible();
+    await expectAnalysisLayout(page);
   });
 });
 
@@ -188,7 +190,8 @@ test.describe('BASIC: Export/Import Roundtrip', () => {
     const downloadPromise = page.waitForEvent('download');
     await page.getByLabel('Aktionen').click();
     await page.getByRole('menuitem', { name: 'Szenario speichern' }).click();
-    const saveDialog = page.getByRole('dialog');
+    const saveDialog = page.getByRole('dialog', { name: 'Szenarien speichern' });
+    await saveDialog.getByLabel('Daten im Export anonymisieren').uncheck();
     await saveDialog.getByLabel(/^Passwort$/).fill(exportPassword);
     await saveDialog.getByLabel(/^Passwort bestätigen$/).fill(exportPassword);
     await saveDialog.getByRole('button', { name: 'Speichern' }).click();
@@ -208,7 +211,9 @@ test.describe('BASIC: Export/Import Roundtrip', () => {
     await loadDialog.getByRole('button', { name: /Import ausführen/i }).click();
 
     await expect(page.getByRole('button', { name: 'Hinzufügen' })).toBeVisible();
+    await page.getByRole('button', { name: 'Kinder', exact: true }).click();
     await expect(page.locator('text=Lina').first()).toBeVisible();
+    await page.getByRole('button', { name: 'Mitarbeiter', exact: true }).click();
     await expect(page.locator('text=Mara').first()).toBeVisible();
 
     const importedStaffFinance = await page.evaluate(() => {
@@ -232,9 +237,7 @@ test.describe('BASIC: Export/Import Roundtrip', () => {
       note: 'Roundtrip finance check',
     });
 
-    await page.getByRole('button', { name: 'Analyse' }).click();
-    await expect(page.getByRole('heading', { name: 'Regelbetrieb' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Alters-Histogramm' })).toBeVisible();
+    await expectAnalysisLayout(page);
   });
 });
 
@@ -260,9 +263,7 @@ test.describe('IMPORT: Adebis Data & Visualization', () => {
       await expect(page.getByLabel('Hinzufügen')).toBeVisible();
       await expect(page.locator('.mantine-Avatar-root').first()).toBeVisible();
 
-      await page.getByRole('button', { name: 'Analyse' }).click();
-      await expect(page.getByRole('heading', { name: 'Regelbetrieb' })).toBeVisible();
-      await expect(page.getByRole('heading', { name: 'Alters-Histogramm' })).toBeVisible();
+      await expectAnalysisLayout(page);
     });
   }
 });
@@ -311,57 +312,24 @@ if (shouldRunFullTests()) {
         await importDialog.getByRole('button', { name: /Weiter zur Vorschau/i }).click();
         await importDialog.getByRole('button', { name: /Import ausführen/i }).click();
 
-        await page.getByRole('button', { name: 'Analyse' }).click();
-
-        await expect(page.getByRole('heading', { name: 'Regelbetrieb' })).toBeVisible();
-        await expect(page.getByRole('heading', { name: 'Langzeit', exact: true })).toBeVisible();
-        await expect(page.getByRole('heading', { name: 'Alters-Histogramm' })).toBeVisible();
-        await expect(page.getByRole('heading', { name: 'Buchungsverteilung' })).toBeVisible();
+        await page.getByRole('button', { name: 'Analyse', exact: true }).click();
+        await expect(page.getByTestId('analysis-clean-sheet')).toBeVisible();
 
         const filterToggle = page.getByTestId('analysis-filter-toggle');
-        const ruleCheckbox = page.getByRole('checkbox', { name: 'Regelbetrieb' });
         await expect(filterToggle).toBeVisible();
-        await expect(ruleCheckbox).toBeVisible();
         await filterToggle.click();
-        await expect(ruleCheckbox).not.toBeVisible();
-        await filterToggle.click();
-        await expect(ruleCheckbox).toBeVisible();
-
-        const longtermCheckbox = page.getByRole('checkbox', { name: 'Langzeit' });
-        const ageHistogramCheckbox = page.getByRole('checkbox', { name: 'Alters-Histogramm' });
-        const histogramCheckbox = page.getByRole('checkbox', { name: 'Buchungsverteilung' });
-
-        await expect(ruleCheckbox).toBeChecked();
-        await expect(longtermCheckbox).toBeChecked();
-        await expect(ageHistogramCheckbox).toBeChecked();
-        await expect(histogramCheckbox).toBeChecked();
-
-        await ruleCheckbox.uncheck({ force: true });
-        await expect(page.getByRole('heading', { name: 'Regelbetrieb' })).toHaveCount(0);
-        await ruleCheckbox.check({ force: true });
-        await expect(page.getByRole('heading', { name: 'Regelbetrieb' })).toBeVisible();
-
-        await longtermCheckbox.uncheck({ force: true });
-        await expect(page.getByRole('heading', { name: 'Langzeit', exact: true })).toHaveCount(0);
-        await longtermCheckbox.check({ force: true });
-        await expect(page.getByRole('heading', { name: 'Langzeit', exact: true })).toBeVisible();
-
-        await ageHistogramCheckbox.uncheck({ force: true });
-        await expect(page.getByRole('heading', { name: 'Alters-Histogramm' })).toHaveCount(0);
-        await ageHistogramCheckbox.check({ force: true });
-        await expect(page.getByRole('heading', { name: 'Alters-Histogramm' })).toBeVisible();
-
-        await histogramCheckbox.uncheck({ force: true });
-        await expect(page.getByRole('heading', { name: 'Buchungsverteilung' })).toHaveCount(0);
-        await histogramCheckbox.check({ force: true });
-        await expect(page.getByRole('heading', { name: 'Buchungsverteilung' })).toBeVisible();
-
-        await page.getByRole('combobox', { name: 'Zeitdimension' }).click();
-        await page.getByRole('option', { name: 'Quartal' }).click();
-        await expect(page.getByRole('combobox', { name: 'Zeitdimension' })).toHaveValue('Quartal');
+        await expect(page.getByRole('dialog', { name: 'Kontextfilter' })).toBeVisible();
 
         const groupsCombobox = page.getByRole('combobox', { name: 'Gruppen' });
         const qualificationsCombobox = page.getByRole('combobox', { name: 'Qualifikationen' });
+        const timeDimension = page.getByRole('combobox', { name: 'Zeitdimension' });
+
+        await expect(groupsCombobox).toBeVisible();
+        await expect(qualificationsCombobox).toBeVisible();
+        await expect(timeDimension).toBeVisible();
+        await timeDimension.click();
+        await page.getByRole('option', { name: 'Quartal' }).click();
+        await expect(page.getByRole('combobox', { name: 'Zeitdimension' })).toHaveValue('Quartal');
 
         await expect(groupsCombobox).toBeVisible();
         await expect(qualificationsCombobox).toBeVisible();

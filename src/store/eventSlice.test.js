@@ -280,6 +280,51 @@ describe('eventSlice automatic transitions', () => {
     expect(events.some((event) => event.id === 'auto_transition_school_child1')).toBe(true);
   });
 
+  it('keeps an automatic transition when the previous group assignment ends on that date', () => {
+    const state = eventReducer(
+      undefined,
+      refreshAllEvents({
+        simScenario: { scenarios: [{ id: scenarioId }] },
+        simData: {
+          dataByScenario: {
+            [scenarioId]: {
+              child1: {
+                id: 'child1',
+                name: 'Mia',
+                type: 'demand',
+                dateofbirth: '2024-01-15',
+                startdate: '2026-01-01',
+              },
+            },
+          },
+        },
+        simBooking: { bookingsByScenario: { [scenarioId]: {} } },
+        simGroup: {
+          groupsByScenario: {
+            [scenarioId]: {
+              child1: {
+                ga1: {
+                  id: 'ga1',
+                  groupId: 'g-krippe',
+                  groupName: 'Krippe',
+                  start: '2026-01-01',
+                  end: '2027-01-14',
+                },
+              },
+            },
+          },
+        },
+      })
+    );
+
+    const events = state.eventsByScenario[scenarioId] || [];
+    const transition = events.find((event) => event.id === 'auto_transition_kita_child1');
+
+    expect(events.some((event) => event.id === 'group_assignment_end_child1_ga1' && event.effectiveDate === '2027-01-15')).toBe(true);
+    expect(transition?.effectiveDate).toBe('2027-01-15');
+    expect(transition?.metadata?.targetStage).toBe('kita');
+  });
+
   it('skips automatic transitions after the child has already left the facility', () => {
     const state = eventReducer(
       undefined,

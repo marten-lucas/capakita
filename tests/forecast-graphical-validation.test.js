@@ -29,7 +29,9 @@ async function importScenarioAndOpenForecast(page) {
 
   await expect(page.getByTestId('analysis-clean-sheet')).toBeVisible();
   await expect(page.locator('.analysis-stage-content')).toBeVisible();
-  await expect(page.getByText('Gruppenverlauf & Event-Timeline')).toBeVisible();
+  await expect(page.getByText('Ausblick (Sankey)', { exact: true })).toBeVisible();
+  await page.locator('.analysis-stage-content .analysis-coverage-carousel-nav').last().click();
+  await expect(page.getByText('Gruppenverlauf & Event-Timeline', { exact: true })).toBeVisible();
 }
 
 test('forecast: graphical validation for 2026-09-01 transition alignment and direction', async ({ page }) => {

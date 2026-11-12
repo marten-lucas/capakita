@@ -75,7 +75,7 @@ async function seedScenarioWithCapacityBooking(page) {
                 {
                   id: 'segment-2',
                   booking_start: '10:30',
-                  booking_end: '11:00',
+                  booking_end: '12:30',
                   category: 'pedagogical',
                 },
               ],
@@ -86,6 +86,17 @@ async function seedScenarioWithCapacityBooking(page) {
       },
     });
   });
+}
+
+async function waitForStableBoundingBox(locator) {
+  let previousBox;
+  await expect.poll(async () => {
+    const currentBox = await locator.boundingBox();
+    if (!currentBox) return false;
+    const stable = previousBox && ['x', 'y', 'width', 'height'].every((key) => Math.abs(previousBox[key] - currentBox[key]) < 0.5);
+    previousBox = currentBox;
+    return Boolean(stable);
+  }, { timeout: 5000, intervals: [50, 100] }).toBe(true);
 }
 
 test('booking editor rejects overlapping times on the same day', async ({ page }) => {
@@ -106,12 +117,16 @@ test('booking editor rejects overlapping times on the same day', async ({ page }
   await expect(page.getByText('Montag')).toBeVisible();
 
   const movableBlock = page.locator('[aria-label="Segment 2 verschieben"]').first();
+  await waitForStableBoundingBox(movableBlock);
   const movableBox = await movableBlock.boundingBox();
   expect(movableBox).not.toBeNull();
 
-  await page.mouse.move(movableBox.x + (movableBox.width / 2), movableBox.y + (movableBox.height / 2));
+  const moveStartX = movableBox.x + (movableBox.width * 0.7);
+  const moveY = movableBox.y + (movableBox.height / 2);
+
+  await page.mouse.move(moveStartX, moveY);
   await page.mouse.down();
-  await page.mouse.move(movableBox.x + (movableBox.width / 2) + 70, movableBox.y + (movableBox.height / 2), { steps: 10 });
+  await page.mouse.move(moveStartX + 70, moveY, { steps: 10 });
   await page.mouse.up();
 
   await expect.poll(async () => page.evaluate(() => {
@@ -120,7 +135,7 @@ test('booking editor rejects overlapping times on the same day', async ({ page }
     const booking = state?.simBooking?.bookingsByScenario?.[scenarioId]?.['overlap-capacity-item']?.['booking-overlap-validation'];
     const segment = booking?.times?.[0]?.segments?.[1];
     return segment ? `${segment.booking_start}-${segment.booking_end}` : '';
-  }), { timeout: 5000 }).not.toBe('10:30-11:00');
+  }), { timeout: 5000 }).not.toBe('10:30-12:30');
 
   const beforeResize = await page.evaluate(() => {
     const state = window.__APP_STORE?.getState?.();

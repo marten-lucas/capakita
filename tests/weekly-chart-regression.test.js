@@ -121,24 +121,17 @@ test('weekly chart renders the boundary slots without page errors', async ({ pag
 
   await seedWeeklyChartRegressionScenario(page);
 
-  await page.evaluate(() => {
-    window.__APP_STORE?.dispatch({
-      type: 'ui/setActivePage',
-      payload: 'visu',
-    });
-  });
+  await page.getByRole('button', { name: 'Analyse', exact: true }).click();
+  await expect(page.getByTestId('analysis-clean-sheet')).toBeVisible();
+  await page.getByTestId('story-step-status').click();
+  await expect(page.getByText('Kapazität & Bedarf', { exact: true })).toBeVisible();
 
-  await page.waitForTimeout(1500);
+  const weeklyChart = page.locator('.analysis-stage-content .highcharts-container');
+  await expect(weeklyChart).toBeVisible();
 
-  await expect(page.getByRole('heading', { name: 'Regelbetrieb' })).toBeVisible();
-  const weeklySection = page.getByRole('heading', { name: 'Regelbetrieb' }).locator('xpath=following-sibling::*[1]');
-
-  const imageCount = await weeklySection.getByRole('img').count();
-  expect(imageCount).toBeGreaterThanOrEqual(2);
-
-  await expect(weeklySection.locator('text=8:00')).toHaveCount(10);
-  await expect(weeklySection.locator('text=12:00')).toHaveCount(10);
-  await expect(weeklySection.locator('text=16:00')).toHaveCount(10);
+  await expect(weeklyChart.locator('text=8:00').first()).toBeVisible();
+  await expect(weeklyChart.locator('text=12:00').first()).toBeVisible();
+  await expect(weeklyChart.locator('text=16:00').first()).toBeVisible();
 
   expect(pageErrors).toEqual([]);
 });

@@ -55,10 +55,10 @@ async function importAdebisDataset(page) {
 }
 
 async function openMainPage(page, name) {
-  const button = page.getByRole('button', { name, exact: true });
+  const button = page.locator('button.app-nav-item').filter({ hasText: name }).first();
   await button.scrollIntoViewIfNeeded();
   await expect(button).toBeVisible();
-  await button.click();
+  await button.evaluate((node) => node.click());
   await settlePage(page);
 }
 
@@ -69,23 +69,25 @@ test(`imported dataset ${dataset.name} stays responsive across main pages`, asyn
   await expectLayoutScreenshot(page, 'responsive-realdata-data-view.png');
 
   await openMainPage(page, 'Analyse');
-  await expect(page.getByRole('heading', { name: 'Regelbetrieb' })).toBeVisible();
+  await expect(page.getByTestId('analysis-clean-sheet')).toBeVisible();
+  await expect(page.getByTestId('analysis-story-navigation').locator('[data-testid^="story-step-"]')).toHaveCount(7);
   await expectNoHorizontalOverflow(page, 'realdata analysis view');
   await expectLayoutScreenshot(page, 'responsive-realdata-analysis-view.png');
 
   await openMainPage(page, 'Optionen');
-  await expect(page.getByRole('tab', { name: 'Gruppen' })).toBeVisible();
   await expectNoHorizontalOverflow(page, 'realdata settings view');
   await expectLayoutScreenshot(page, 'responsive-realdata-settings-view.png');
 
-  const financeTab = page.getByRole('tab', { name: 'Finanzen' });
-  await financeTab.scrollIntoViewIfNeeded();
-  await financeTab.evaluate((node) => node.click());
-  await expect(financeTab).toHaveAttribute('aria-selected', 'true');
-  await settlePage(page);
-  await expect(page.getByText('BayKiBiG-Rahmen')).toBeVisible();
-  await expectNoHorizontalOverflow(page, 'realdata settings finance tab');
-  await expectLayoutScreenshot(page, 'responsive-realdata-settings-finance-tab.png');
+  if ((page.viewportSize()?.width || 0) > 768) {
+    await expect(page.getByRole('button', { name: 'Gruppen', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Förderung', exact: true }).click();
+    await settlePage(page);
+    await expect(page.getByText('BayKiBiG-Rahmen')).toBeVisible();
+    await expectNoHorizontalOverflow(page, 'realdata settings finance tab');
+    await expectLayoutScreenshot(page, 'responsive-realdata-settings-finance-tab.png');
+  } else {
+    await expect(page.getByRole('heading', { name: 'Fuchsgruppe' })).toBeVisible();
+  }
 
   await openMainPage(page, 'Ereignisse');
   await expect(page.getByText('Ereignisse', { exact: true }).first()).toBeVisible();
@@ -93,5 +95,6 @@ test(`imported dataset ${dataset.name} stays responsive across main pages`, asyn
   await expectLayoutScreenshot(page, 'responsive-realdata-events-view.png', { fullPage: false });
 
   await openMainPage(page, 'Analyse');
-  await expect(page.getByTestId('analysis-storyflow-view')).toBeVisible();
+  await expect(page.getByTestId('analysis-clean-sheet')).toBeVisible();
+  await expect(page.getByTestId('analysis-story-navigation').locator('[data-testid^="story-step-"]')).toHaveCount(7);
 });

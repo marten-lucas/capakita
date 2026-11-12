@@ -159,8 +159,7 @@ test('realdata 29247781 populates sankey transitions after import', async ({ pag
 
   await expect(page.getByTestId('analysis-clean-sheet')).toBeVisible();
   await expect(page.locator('.analysis-stage-content')).toBeVisible();
-  await page.locator('.analysis-stage-content .analysis-coverage-carousel-nav').last().click();
-  await page.locator('.analysis-stage-content .analysis-coverage-carousel-nav').last().click();
+  await expect(page.getByText('Ausblick (Sankey)', { exact: true })).toBeVisible();
   await expect(page.locator('.highcharts-sankey-series .highcharts-link').first()).toBeVisible();
 
   await page.screenshot({ path: 'test-results/sankey-realdata-29247781.png', fullPage: true });
