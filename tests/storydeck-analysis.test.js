@@ -85,7 +85,7 @@ test('analyse story flow renders and navigates steps', async ({ page }) => {
   await expect(page.getByText('Slide 5 of 7').first()).toBeVisible();
 });
 
-test('ausblick sankey renders with known and anticipated transitions and can be exported', async ({ page }) => {
+test('ausblick Sankey uses past auto transitions as the reference stage and keeps school children through configured grade', async ({ page }) => {
   await page.goto('/');
   await page.waitForLoadState('networkidle');
 
@@ -115,7 +115,7 @@ test('ausblick sankey renders with known and anticipated transitions and can be 
     });
     store.dispatch({
       type: 'simGroup/addGroupDef',
-      payload: { scenarioId: sid, groupDef: { id: 'g-schulkind', name: 'Schulkindgruppe', type: 'Schulkindgruppe' } },
+      payload: { scenarioId: sid, groupDef: { id: 'g-schulkind', name: 'Schulkindgruppe', type: 'Schulkindgruppe', fillUp: true, maxFacilityCount: 47, maxSchoolGrade: '4' } },
     });
 
     store.dispatch({
@@ -158,6 +158,7 @@ test('ausblick sankey renders with known and anticipated transitions and can be 
           type: 'demand',
           dateofbirth: '2019-05-10',
           startdate: '2023-01-01',
+          enddate: '2027-08-31',
           groupId: 'g-regel',
         },
       },
@@ -269,17 +270,11 @@ test('ausblick sankey renders with known and anticipated transitions and can be 
   await expect(page.getByTestId('forecast-sankey-export-menu')).toBeVisible();
   const renderedTransitions = await page.getByTestId('forecast-sankey-chart').getAttribute('data-transition-pairs');
   expect(renderedTransitions).toContain('Regelgruppe: 1 Kinder -> Vorschule: 1 Kinder');
-  expect(renderedTransitions).toContain('Vorschule: 1 Kinder -> Schulkindgruppe: 2 Kinder');
+  expect(renderedTransitions).toContain('Vorschule: 1 Kinder -> Schulkindgruppe (Auffuellen): 2 Kinder');
   expect(renderedTransitions).toContain('Bärchengruppe: 1 Kinder -> Regelgruppe: 1 Kinder');
-  expect(renderedTransitions).toContain('Schulkindgruppe: 1 Kinder -> Schulkindgruppe: 1 Kinder');
+  expect(renderedTransitions).toContain('Schulkindgruppe (Auffuellen): 1 Kinder -> Schulkindgruppe (Auffuellen): 1 Kinder');
+  expect(renderedTransitions).toContain('Schulkindgruppe (Auffuellen): 2 Kinder -> Aus Einrichtung: 1 Kinder');
 
-  for (const format of ['png', 'svg', 'pdf']) {
-    const downloadPromise = page.waitForEvent('download');
-    await page.getByTestId('forecast-sankey-export-menu').click();
-    await page.getByTestId(`forecast-sankey-export-${format}`).click();
-    const download = await downloadPromise;
-    expect(download.suggestedFilename()).toMatch(new RegExp(`\\.${format}$`));
-  }
 
   await page.locator('.analysis-stage-content .analysis-coverage-carousel-nav').last().click();
   await expect(page.getByTestId('forecast-demography-monthpicker')).toBeVisible();

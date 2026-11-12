@@ -4090,12 +4090,12 @@ function VisuView() {
         .map((group) => String(group.id))
     );
 
-    // Build a map of group-id -> maxSchoolGrade for school groups with fill-up
     const maxSchoolGradeByGroup = new Map();
     (groupDefs || []).forEach((group) => {
       const gid = String(group.id);
+      const type = String(group?.type || '').toLowerCase();
       const raw = Number(group?.maxSchoolGrade);
-      if (Number.isFinite(raw) && raw > 0 && fillUpGroupIds.has(gid)) {
+      if (type.includes('schul') && Number.isFinite(raw) && raw > 0) {
         maxSchoolGradeByGroup.set(gid, raw);
       }
     });
@@ -4120,13 +4120,23 @@ function VisuView() {
       return `${String(exitYear).padStart(4, '0')}-09-01`;
     };
 
-    // Override isRecordActiveOnDate for school-group children honoring maxSchoolGrade
+    const schoolStayByChildId = new Map();
     const isActiveForForecast = (item, dateIso, { schoolGroupId = null } = {}) => {
-      if (!isRecordActiveOnDate(item, dateIso)) return false;
-      if (!schoolGroupId || !maxSchoolGradeByGroup.has(String(schoolGroupId))) return true;
-      const exitDate = computeSchoolGradeExitDate(item, schoolGroupId);
-      if (!exitDate) return true;
-      return String(dateIso) < exitDate;
+      const date = String(dateIso || '');
+      if (item?.startdate && date < String(item.startdate)) return false;
+      const configuredExitDate = schoolGroupId
+        ? computeSchoolGradeExitDate(item, schoolGroupId)
+        : null;
+      if (configuredExitDate && date >= configuredExitDate) return false;
+      if (isRecordActiveOnDate(item, date)) return true;
+
+      const retainedSchoolStay = schoolStayByChildId.get(String(item?.id || ''));
+      return Boolean(
+        retainedSchoolStay
+        && retainedSchoolStay.groupId === String(schoolGroupId || '')
+        && date > retainedSchoolStay.endDate
+        && date < retainedSchoolStay.exitDate
+      );
     };
 
     const groupColorsById = (() => {
@@ -4141,13 +4151,17 @@ function VisuView() {
       return map;
     })();
 
-    const schoolGroupByType = (groupDefs || []).find((group) => {
+    const isSchoolGroupDef = (group) => {
       const type = String(group?.type || '').toLowerCase();
       return type.includes('schul') || type.includes('hort');
-    });
-    const schoolGroupByName = (groupDefs || []).find((group) => (
+    };
+    const schoolGroupByType = (groupDefs || []).find((group) => isSchoolGroupDef(group) && !group?.fillUp)
+      || (groupDefs || []).find(isSchoolGroupDef);
+    const isSchoolGroupName = (group) => (
       /^(schulkind(?:gruppe|betreuung)?|schulgruppe|schule|hort(?:gruppe)?)(?:$|[\s_-])/i.test(String(group?.name || '').trim())
-    ));
+    );
+    const schoolGroupByName = (groupDefs || []).find((group) => isSchoolGroupName(group) && !group?.fillUp)
+      || (groupDefs || []).find(isSchoolGroupName);
     const groupIdByStage = {
       kita: String(
         (groupDefs || []).find((group) => {
@@ -4243,7 +4257,7 @@ function VisuView() {
 
     const activeNowChildIds = new Set(activeNowChildren.map((item) => String(item.id || '')));
     const scenarioEventsForActiveChildren = allScenarioEvents.filter((event) => activeNowChildIds.has(String(event?.entityId || '')));
-    const scenarioEvents = scenarioEventsForActiveChildren.filter((event) => {
+    const futureScenarioEvents = scenarioEventsForActiveChildren.filter((event) => {
       const eventDateIso = String(event?.simulatedDate || event?.effectiveDate || '');
       return eventDateIso >= referenceDate;
     });
@@ -4317,6 +4331,64 @@ function VisuView() {
       );
     });
 
+    const resolveProjectedGroupIdAtDate = (item, dateIso, { ignoreExitTransitions = false } = {}) => {
+      const itemId = String(item?.id || '');
+      if (!itemId) return null;
+      const assignments = getEffectiveGroupAssignments(itemId);
+      const baseGroupId = resolveGroupIdAtDate(assignments, dateIso, item.groupId || null);
+      const applicable = (autoTransitionsByItem.get(itemId) || [])
+        .filter((event) => getEventDateIso(event) <= String(dateIso));
+      const projectedTransitions = ignoreExitTransitions
+        ? applicable.filter((event) => String(event?.metadata?.targetStage || '').toLowerCase() !== 'exit')
+        : applicable;
+      const lastTransition = projectedTransitions[projectedTransitions.length - 1];
+      if (!lastTransition) return baseGroupId;
+
+      const targetStage = String(lastTransition?.metadata?.targetStage || '').toLowerCase();
+      const canProject = shouldProjectAutoTransition(assignments, getEventDateIso(lastTransition), dateIso);
+      return canProject && Object.prototype.hasOwnProperty.call(groupIdByStage, targetStage)
+        ? (groupIdByStage[targetStage] || baseGroupId)
+        : baseGroupId;
+    };
+
+    activeNowChildren.forEach((item) => {
+      const itemId = String(item.id || '');
+      const endDate = String(item.enddate || '');
+      if (!itemId || !endDate || endDate < referenceDate) return;
+
+      const groupIdAtEndDate = String(resolveProjectedGroupIdAtDate(item, endDate, { ignoreExitTransitions: true }) || '');
+      const gradeExitDate = computeSchoolGradeExitDate(item, groupIdAtEndDate);
+      if (!gradeExitDate || gradeExitDate <= endDate) return;
+
+      const reassignedBeforeGradeExit = getForecastGroupAssignments(getEffectiveGroupAssignments(itemId)).some((assignment) => (
+        assignment.start
+        && String(assignment.start) > endDate
+        && String(assignment.start) < gradeExitDate
+        && String(assignment.groupId || '') !== groupIdAtEndDate
+      ));
+      if (reassignedBeforeGradeExit) return;
+
+      schoolStayByChildId.set(itemId, { groupId: groupIdAtEndDate, endDate, exitDate: gradeExitDate });
+    });
+
+    const scenarioEvents = futureScenarioEvents.filter((event) => {
+      const schoolStay = schoolStayByChildId.get(String(event?.entityId || ''));
+      if (!schoolStay) return true;
+      const eventDateIso = getEventDateIso(event);
+      if (
+        event?.type === 'auto_group_transition'
+        && String(event?.metadata?.targetStage || '').toLowerCase() === 'exit'
+        && eventDateIso >= schoolStay.endDate
+        && eventDateIso < schoolStay.exitDate
+      ) return false;
+      return !(
+        event?.type === 'group_assignment_end'
+        && String(event?.metadata?.groupId || '') === schoolStay.groupId
+        && eventDateIso > schoolStay.endDate
+        && eventDateIso < schoolStay.exitDate
+      );
+    });
+
     const eventDates = Array.from(
       new Set([
         ...scenarioEvents.map((event) => getEventDateIso(event)).filter((dateIso) => Boolean(dateIso)),
@@ -4325,46 +4397,34 @@ function VisuView() {
     ).sort();
 
     const resolveGroupAtDate = (item, dateIso, { includeExit = true } = {}) => {
-      if (!isRecordActiveOnDate(item, dateIso)) {
-        if (includeExit) {
-          return {
-            groupId: String(syntheticGroupIds.exit),
-            groupLabel: formatGroupLabel(syntheticGroupIds.exit),
-          };
-        }
-        return {
-          groupId: '__NO_GROUP__',
-          groupLabel: noGroup,
-        };
-      }
-
-      const itemId = String(item.id || '');
-      const assignments = getEffectiveGroupAssignments(itemId);
-      const baseGroupIdRaw = resolveGroupIdAtDate(assignments, dateIso, item.groupId || null);
-
-      const transitions = autoTransitionsByItem.get(itemId) || [];
-      const applicable = transitions.filter((event) => getEventDateIso(event) <= String(dateIso));
-      const lastTransition = applicable.length ? applicable[applicable.length - 1] : null;
-      const targetStage = String(lastTransition?.metadata?.targetStage || '').toLowerCase();
-      const assignmentsForItem = getForecastGroupAssignments(assignments);
-      const canProjectTransition = lastTransition && shouldProjectAutoTransition(
-        assignmentsForItem,
-        getEventDateIso(lastTransition),
-        dateIso
-      );
-      const projectedGroupId = canProjectTransition
-        && Object.prototype.hasOwnProperty.call(groupIdByStage, targetStage)
-        ? groupIdByStage[targetStage]
-        : null;
-
-      const groupIdRaw = projectedGroupId || baseGroupIdRaw;
+      const itemId = String(item?.id || '');
+      const groupIdRaw = resolveProjectedGroupIdAtDate(item, dateIso, { ignoreExitTransitions: true });
       const groupId = groupIdRaw ? String(groupIdRaw) : '__NO_GROUP__';
+      const active = isActiveForForecast(item, dateIso, { schoolGroupId: groupId });
+      const applicableTransitions = (autoTransitionsByItem.get(itemId) || [])
+        .filter((event) => getEventDateIso(event) <= String(dateIso));
+      const lastTransition = applicableTransitions[applicableTransitions.length - 1];
+      const isProjectedExit = String(lastTransition?.metadata?.targetStage || '').toLowerCase() === 'exit'
+        && shouldProjectAutoTransition(
+          getEffectiveGroupAssignments(itemId),
+          getEventDateIso(lastTransition),
+          dateIso
+        );
+      const schoolStay = schoolStayByChildId.get(itemId);
+      const keepSchoolStay = schoolStay
+        && schoolStay.groupId === groupId
+        && String(dateIso) < schoolStay.exitDate;
 
-      // Apply maxSchoolGrade exit: if this child should have left already, mark as exit
-      if (includeExit && !isActiveForForecast(item, dateIso, { schoolGroupId: groupId })) {
+      if (includeExit && (!active || (isProjectedExit && !keepSchoolStay))) {
         return {
           groupId: String(syntheticGroupIds.exit),
           groupLabel: formatGroupLabel(syntheticGroupIds.exit),
+        };
+      }
+      if (!includeExit && !active) {
+        return {
+          groupId: '__NO_GROUP__',
+          groupLabel: noGroup,
         };
       }
 
@@ -4374,8 +4434,9 @@ function VisuView() {
 
     const timelineTailDates = activeNowChildren.flatMap((item) => {
       const dates = [];
+      const itemId = String(item?.id || '');
       const enddateRaw = String(item?.enddate || '');
-      if (enddateRaw && enddateRaw >= referenceDate) dates.push(enddateRaw);
+      if (enddateRaw && enddateRaw >= referenceDate && !schoolStayByChildId.has(itemId)) dates.push(enddateRaw);
       if (maxSchoolGradeByGroup.size > 0) {
         const schoolGroupIds = new Set([
           groupIdByStage.school,
@@ -4383,7 +4444,7 @@ function VisuView() {
         ]);
         schoolGroupIds.forEach((groupId) => {
           const exitDate = computeSchoolGradeExitDate(item, groupId);
-          if (!exitDate || exitDate < referenceDate || !isRecordActiveOnDate(item, exitDate)) return;
+          if (!exitDate || exitDate < referenceDate) return;
 
           const dayBeforeExit = new Date(`${exitDate}T00:00:00Z`);
           dayBeforeExit.setUTCDate(dayBeforeExit.getUTCDate() - 1);
@@ -4418,9 +4479,8 @@ function VisuView() {
       };
 
       activeNowChildren.forEach((item) => {
-        if (!isRecordActiveOnDate(item, previousDate)) return;
-
-        const fromState = resolveGroupAtDate(item, previousDate, { includeExit: false });
+        const fromState = resolveGroupAtDate(item, previousDate);
+        if (String(fromState.groupId) === String(syntheticGroupIds.exit)) return;
         const toState = resolveGroupAtDate(item, eventDate);
         const fromNodeId = ensureNode(previousDate, fromState.groupId, fromState.groupLabel);
         const toNodeId = ensureNode(eventDate, toState.groupId, toState.groupLabel);
@@ -4487,11 +4547,11 @@ function VisuView() {
         : activeNowChildren;
 
       allForecastChildren.forEach((item) => {
-        if (!isRecordActiveOnDate(item, dateIso)) return;
         const isSynthetic = Boolean(item._synthetic);
         const state = isSynthetic
           ? { groupId: String(item.groupId || groupIdByStage.kita || '__NO_GROUP__'), groupLabel: groupsById.get(String(item.groupId || '')) || 'Krippe (Zulauf)' }
           : resolveGroupAtDate(item, dateIso);
+        if (isSynthetic ? !isRecordActiveOnDate(item, dateIso) : !isActiveForForecast(item, dateIso, { schoolGroupId: state.groupId })) return;
         const groupId = String(state.groupId || '__NO_GROUP__');
         if (!groupTimelineCounter.has(groupId)) {
           groupTimelineCounter.set(groupId, {
