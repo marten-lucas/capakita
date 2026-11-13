@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import simFinanceReducer, {
+  addGroupFeeEntry,
   addPersonnelCostEntry,
   deletePersonnelCostEntry,
   loadFinanceByScenario,
   seedDefaultBayKiBiGRules,
+  setGroupFeeCatalogs,
+  updateGroupFeeEntry,
   updateFundingSimulationSettings,
   updateGroupParentFeeSubsidy,
   updatePersonnelCostEntry,
@@ -197,8 +200,43 @@ describe('simFinanceSlice', () => {
       monthlyAmount: 240,
     });
     expect(state.financeByScenario['scenario-1'].groupFeeCatalogs.g1[1]).not.toHaveProperty('maxHours');
-    expect(state.financeByScenario['scenario-1'].groupFeeCatalogs.g2).toHaveLength(1);
-    expect(state.financeByScenario['scenario-1'].groupFeeCatalogs.g2[0]).toMatchObject({ zeitkatId: '13', monthlyAmount: 300 });
+    expect(state.financeByScenario['scenario-1'].groupFeeCatalogs.g2).toHaveLength(2);
+    expect(state.financeByScenario['scenario-1'].groupFeeCatalogs.g2).toMatchObject([
+      { zeitkatId: '13', monthlyAmount: 200 },
+      { zeitkatId: '13', monthlyAmount: 300 },
+    ]);
+  });
+});
+
+describe('simFinanceSlice fee catalog conflicts', () => {
+  const entries = [
+    { id: 'first', zeitkatId: '04', validFrom: '2026-01-01', monthlyAmount: 100 },
+    { id: 'second', zeitkatId: '04', validFrom: '2026-01-02', monthlyAmount: 200 },
+    { id: 'duplicate', zeitkatId: '04', validFrom: '2026-01-02', monthlyAmount: 250 },
+  ];
+
+  it('preserves existing duplicates on load and catalog replacement', () => {
+    let state = simFinanceReducer(undefined, loadFinanceByScenario({ s: { groupFeeCatalogs: { g: entries } } }));
+    expect(state.financeByScenario.s.groupFeeCatalogs.g).toMatchObject(entries);
+    state = simFinanceReducer(state, setGroupFeeCatalogs({ scenarioId: 's', catalogs: { g: entries } }));
+    expect(state.financeByScenario.s.groupFeeCatalogs.g).toMatchObject(entries);
+  });
+
+  it('rejects conflicting add/update operations and accepts a distinct period', () => {
+    let state = simFinanceReducer(undefined, loadFinanceByScenario({ s: { groupFeeCatalogs: { g: entries } } }));
+    const original = state.financeByScenario.s.groupFeeCatalogs.g;
+    state = simFinanceReducer(state, addGroupFeeEntry({ scenarioId: 's', groupId: 'g', entry: { ...entries[0], id: 'new' } }));
+    expect(state.financeByScenario.s.groupFeeCatalogs.g).toEqual(original);
+    state = simFinanceReducer(state, updateGroupFeeEntry({ scenarioId: 's', groupId: 'g', entryId: 'first', updates: { validFrom: '2026-01-02' } }));
+    expect(state.financeByScenario.s.groupFeeCatalogs.g).toEqual(original);
+    state = simFinanceReducer(state, updateGroupFeeEntry({ scenarioId: 's', groupId: 'g', entryId: 'first', updates: { validFrom: '2026-01-03' } }));
+    expect(state.financeByScenario.s.groupFeeCatalogs.g).toMatchObject([{ ...entries[0], validFrom: '2026-01-03' }, entries[1], entries[2]]);
+    state = simFinanceReducer(state, updateGroupFeeEntry({ scenarioId: 's', groupId: 'g', entryId: 'second', updates: { monthlyAmount: 210 } }));
+    state = simFinanceReducer(state, addGroupFeeEntry({ scenarioId: 's', groupId: 'g', entry: { ...entries[0], id: 'new', validFrom: '2026-01-04' } }));
+    expect(state.financeByScenario.s.groupFeeCatalogs.g).toMatchObject([
+      { ...entries[0], validFrom: '2026-01-03' }, { ...entries[1], monthlyAmount: 210 }, entries[2],
+      { ...entries[0], id: 'new', validFrom: '2026-01-04' },
+    ]);
   });
 });
 

@@ -1,18 +1,19 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { buildOverlayAwareData } from '../utils/overlayUtils';
 import { calculateChartDataWeekly } from '../utils/chartUtils/chartUtilsWeekly';
+import { filterBookings } from '../utils/chartUtils/chartUtils';
 import { calculateChartDataMidterm, generateMidtermCategories, formatDateToCategory } from '../utils/chartUtils/chartUtilsMidterm';
 import { calculateChartDataHistogram } from '../utils/chartUtils/chartUtilsHistogram';
 import { calculateChartDataAgeHistogram } from '../utils/chartUtils/chartUtilsAgeHistogram';
 import { getActiveDemandChildrenAtDate, isArchivedDataItem } from '../utils/dataVisibility';
 import {
   calculateScenarioMonthlyFinance,
-  convertMonthlyAmountToPeriod,
   getPeriodBoundsForCategory,
   hasAnyBookingInWeek,
   resolveGroupIdsForBounds,
 } from '../utils/financeUtils';
 import { minutesToTime, timeToMinutes } from '../utils/timeUtils';
+import { calculateAdebisFinancePeriod } from '../utils/adebisFinance';
 
 const EMPTY_ARRAY = [];
 const EMPTY_OBJECT = {};
@@ -497,8 +498,17 @@ export const selectWeeklyChartDataByGroup = createSelector(
       (effectiveGroupDefs || []).map((groupDef) => [String(groupDef.id), groupDef.name || String(groupDef.id)])
     );
 
-    return (selectedGroups || [])
-      .filter((groupId) => groupId !== '__NO_GROUP__')
+    const groupIds = selectedGroups?.length ? selectedGroups : (() => {
+      const { demand, capacity } = filterBookings({
+        ...wrappedPayload, referenceDate, selectedGroups: [], selectedQualifications,
+      });
+      return [
+        ...(effectiveGroupDefs || []).filter((group) => group?.id).map((group) => String(group.id)),
+        ...[...demand, ...capacity].map((booking) => booking.groupId ? String(booking.groupId) : '__NO_GROUP__'),
+      ];
+    })();
+
+    return [...new Set(groupIds)]
       .map((groupId) => {
         let chartData;
         try {
@@ -509,7 +519,7 @@ export const selectWeeklyChartDataByGroup = createSelector(
 
         return {
           groupId: String(groupId),
-          groupName: groupLabelById.get(String(groupId)) || String(groupId),
+          groupName: groupId === '__NO_GROUP__' ? 'Keine Gruppe' : (groupLabelById.get(String(groupId)) || String(groupId)),
           chartData: {
             categories: chartData?.categories ? [...chartData.categories] : [],
             demand: chartData?.demand ? chartData.demand.map((value) => (typeof value === 'number' ? value : 0)) : [],
@@ -599,22 +609,13 @@ export const selectMidtermChartData = createSelector(
       .filter(Boolean);
 
     const financeSeriesData = (chartData?.categories || []).map((category) => {
-      const bounds = getPeriodBoundsForCategory(timedimension, category);
-      const financeReferenceDate = bounds?.start || referenceDate;
-      const finance = calculateScenarioMonthlyFinance({
-        referenceDate: financeReferenceDate,
+      return calculateAdebisFinancePeriod({
         effectiveDataItems: effectiveAnalysisDataItems,
         effectiveBookingsByItem,
         effectiveGroupAssignmentsByItem,
         effectiveGroupDefs,
         financeScenario,
-      });
-
-      return {
-        income: convertMonthlyAmountToPeriod(finance.summary.incomeTotal, timedimension),
-        expenses: convertMonthlyAmountToPeriod(finance.summary.expensesTotal, timedimension),
-        net: convertMonthlyAmountToPeriod(finance.summary.net, timedimension),
-      };
+      }, timedimension, category);
     });
 
     const childCountByGroup = buildGroupedCountSeries({

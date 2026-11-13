@@ -8,6 +8,10 @@ import { getZeitkatLabel, validateFeeStaircase } from '../../utils/feeStaircaseV
 import './FeeStaircaseEditor.css';
 
 const SLIDER_HEIGHT = 122;
+const AMOUNT_STEP = 5;
+const MAX_AMOUNT = 100000;
+const formatAmount = (amount) => `${amount.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+const roundAmount = (amount) => Math.round((amount + Number.EPSILON) * 100) / 100;
 const ZEITKAT_SLIDER_ZONES = ZEITKAT_CATALOG;
 const STMAS_FEE_STAFFELUNG_URL = 'https://www.stmas.bayern.de/imperia/md/content/stmas/stmas_inet/service-kinder/newsletter/31_newsletter_eb-staffelung.pdf';
 
@@ -57,28 +61,41 @@ function getPriceMax(entries, baselineEntries) {
   return Math.max(300, Math.ceil((maxAmount * 1.5) / 100) * 100);
 }
 
-function PriceField({ value, label, onChange, onFocus, testId, disabled = false }) {
+function PriceField({ value, label, onChange, onFocus, testId, step, disabled = false }) {
   const [draft, setDraft] = React.useState(value ?? 0);
   React.useEffect(() => setDraft(value ?? 0), [value]);
+  function adjustAmount(delta) {
+    const base = draft === '' || !Number.isFinite(Number(draft)) ? Number(value) || 0 : Number(draft);
+    const next = roundAmount(Math.max(0, Math.min(MAX_AMOUNT, base + delta)));
+    setDraft(next);
+    onFocus();
+    onChange(next);
+  }
+
   return (
-    <NumberInput
-      size="xs"
-      w="100%"
-      min={0}
-      max={100000}
-      decimalScale={2}
-      step={5}
-      disabled={disabled}
-      value={draft}
-      onChange={setDraft}
-      onFocus={onFocus}
-      onBlur={() => {
-        if (draft === '' || Number.isFinite(Number(draft))) onChange(draft === '' ? 0 : Number(draft));
-      }}
-      suffix=" €"
-      aria-label={label}
-      data-testid={testId}
-    />
+    <div className="fee-staircase-price-controls">
+      <button type="button" aria-label={`${label} um ${step} € senken`} title={`−${step} €`} disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => adjustAmount(-step)}>−</button>
+      <NumberInput
+        size="xs"
+        w="100%"
+        min={0}
+        max={MAX_AMOUNT}
+        decimalScale={2}
+        step={step}
+        hideControls
+        disabled={disabled}
+        value={draft}
+        onChange={setDraft}
+        onFocus={onFocus}
+        onBlur={() => {
+          if (draft === '' || Number.isFinite(Number(draft))) onChange(draft === '' ? 0 : Number(draft));
+        }}
+        suffix=" €"
+        aria-label={label}
+        data-testid={testId}
+      />
+      <button type="button" aria-label={`${label} um ${step} € erhöhen`} title={`+${step} €`} disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => adjustAmount(step)}>+</button>
+    </div>
   );
 }
 
@@ -102,7 +119,7 @@ function OriginalMarker({ amount, maxAmount }) {
   );
 }
 
-function ContributionSlider({ zone, entry, originalEntry, priceMax, simulation, invalid, focused, onChange, onActivate, onDeactivate, onFocus }) {
+function ContributionSlider({ zone, entry, originalEntry, priceMax, simulation, invalid, focused, step, onChange, onActivate, onDeactivate, onFocus }) {
   const isActive = Boolean(entry && entry.enabled !== false && Number(entry.monthlyAmount) > 0);
   const amount = Number(entry?.monthlyAmount) || Number(entry?.lastNonZeroAmount) || 0;
   const sliderHeight = simulation ? 120 : SLIDER_HEIGHT;
@@ -168,6 +185,7 @@ function ContributionSlider({ zone, entry, originalEntry, priceMax, simulation, 
         <Box className="fee-staircase-price-field">
           <PriceField
             value={amount}
+            step={step}
             label={`Betrag ZEITKAT ${zone.id}`}
             onChange={onChange}
             onFocus={onFocus}
@@ -222,6 +240,7 @@ export default function FeeStaircaseEditor({
 }) {
   const categoryEntries = entries.filter((entry) => Boolean(getFeeBandZeitkatId(entry)));
   const [selectedPeriodKey, setSelectedPeriodKey] = React.useState(null);
+  const [validityDraft, setValidityDraft] = React.useState(null);
   const periodEntries = React.useMemo(() => {
     const grouped = new Map();
     categoryEntries.forEach((entry) => {
@@ -254,6 +273,45 @@ export default function FeeStaircaseEditor({
     ...feeStaircaseValidation.stepViolations.flatMap(({ previousZone, zone }) => [previousZone.id, zone.id]),
   ]);
   const [focusedZeitkatId, setFocusedZeitkatId] = React.useState(null);
+  const [amountStep, setAmountStep] = React.useState(AMOUNT_STEP);
+  const [bulkMode, setBulkMode] = React.useState('amount');
+  const [bulkValue, setBulkValue] = React.useState('');
+  const [staircaseStart, setStaircaseStart] = React.useState('');
+  const [undo, setUndo] = React.useState(null);
+  const editableEntries = activeEntries.filter((entry) => entry.enabled !== false && Number(entry.monthlyAmount) > 0);
+  const bulkNumber = bulkValue === '' ? NaN : Number(bulkValue);
+  const firstZoneIndex = ZEITKAT_SLIDER_ZONES.findIndex((zone) => zone.id === getFeeBandZeitkatId(editableEntries[0]));
+  const firstAmount = staircaseStart === '' ? Number(editableEntries[0]?.monthlyAmount) || 0 : Number(staircaseStart);
+  const previewEntries = Number.isFinite(bulkNumber) ? editableEntries.map((entry) => {
+    const amount = Number(entry.monthlyAmount);
+    const zoneIndex = ZEITKAT_SLIDER_ZONES.findIndex((zone) => zone.id === getFeeBandZeitkatId(entry));
+    const result = bulkMode === 'amount' ? amount + bulkNumber
+      : bulkMode === 'percent' ? amount * (1 + bulkNumber / 100)
+        : firstAmount + (zoneIndex - firstZoneIndex) * bulkNumber;
+    return { entry, amount: roundAmount(result) };
+  }) : [];
+  const previewValid = previewEntries.length > 0 && previewEntries.every(({ amount }) => (
+    Number.isFinite(amount) && amount > 0 && amount <= MAX_AMOUNT
+  ));
+  const previewByEntry = new Map(previewEntries.map(({ entry, amount }) => [entry, amount]));
+  const previewActiveEntries = activeEntries.map((entry) => previewByEntry.has(entry)
+    ? { ...entry, monthlyAmount: previewByEntry.get(entry) } : entry);
+  const previewValidation = previewValid ? validateFeeStaircase(previewActiveEntries) : null;
+  const canUndo = undo && undo.periodKey === periodKey && JSON.stringify(activeEntries) === undo.after;
+
+  function applyBulkChange() {
+    if (!previewValid) return;
+    setUndo({ periodKey, before: activeEntries, after: JSON.stringify(previewActiveEntries) });
+    replaceActiveEntries(previewActiveEntries);
+    setBulkValue('');
+    setStaircaseStart('');
+  }
+
+  function undoBulkChange() {
+    if (!canUndo) return;
+    replaceActiveEntries(undo.before);
+    setUndo(null);
+  }
 
   function replaceActiveEntries(nextActiveEntries) {
     const preserved = entries.filter((entry) => (
@@ -266,6 +324,8 @@ export default function FeeStaircaseEditor({
     const existing = activeByZone.get(zone.id);
     if (!existing) return;
     const nextAmount = Math.max(0, Number(amount) || 0);
+    if (nextAmount === Number(existing.monthlyAmount)) return;
+    setUndo(null);
     replaceActiveEntries(sortZeitkatEntries(activeEntries.map((entry) => {
       if (getFeeBandZeitkatId(entry) !== zone.id) return entry;
       const previousAmount = Number(entry.monthlyAmount) || 0;
@@ -309,6 +369,7 @@ export default function FeeStaircaseEditor({
   }
 
   function deactivateZeitkat(zone) {
+    setUndo(null);
     const existing = activeByZone.get(zone.id);
     if (!existing) return;
     const amount = Number(existing.monthlyAmount) || Number(existing.lastNonZeroAmount) || 0;
@@ -320,6 +381,7 @@ export default function FeeStaircaseEditor({
   }
 
   function activateZeitkat(zone) {
+    setUndo(null);
     const existing = activeByZone.get(zone.id);
     const monthlyAmount = getActivationAmount(zone, existing);
     if (existing) {
@@ -345,11 +407,29 @@ export default function FeeStaircaseEditor({
     ]));
   }
 
+  const currentDraft = validityDraft?.periodKey === periodKey ? validityDraft : null;
+
   function updateValidity(field, value) {
-    const validFrom = field === 'validFrom' ? value : periodStart;
-    const validUntil = field === 'validUntil' ? value : periodEnd;
+    const validFrom = field === 'validFrom' ? value : (currentDraft?.validFrom ?? periodStart);
+    const validUntil = field === 'validUntil' ? value : (currentDraft?.validUntil ?? periodEnd);
     const nextKey = `${validFrom || ''}|${validUntil || ''}`;
-    replaceActiveEntries(activeEntries.map((entry) => ({ ...entry, [field]: value })));
+    const activeZones = new Set(activeEntries.map((entry) => getFeeBandZeitkatId(entry)));
+    const conflicts = nextKey === periodKey ? [] : (periodEntries.get(nextKey) || [])
+      .map((entry) => getFeeBandZeitkatId(entry))
+      .filter((zoneId) => activeZones.has(zoneId));
+    const error = conflicts.length
+      ? `Für ZEITKAT ${[...new Set(conflicts)].join(', ')} besteht bereits ein Tarif mit dieser Gültigkeit. Bitte ändern Sie den Zeitraum.`
+      : validFrom && validUntil && validFrom > validUntil
+        ? 'Das Anfangsdatum darf nicht nach dem Enddatum liegen.'
+        : '';
+    if (error) {
+      setValidityDraft({ periodKey, validFrom, validUntil, error });
+      return;
+    }
+    setValidityDraft(null);
+    if (nextKey === periodKey) return;
+    setUndo(null);
+    replaceActiveEntries(activeEntries.map((entry) => ({ ...entry, validFrom, validUntil })));
     setSelectedPeriodKey(nextKey);
   }
 
@@ -357,14 +437,14 @@ export default function FeeStaircaseEditor({
     <Stack gap="sm" data-testid="fee-staircase-editor">
       <Group justify="space-between" align="flex-end" wrap="wrap">
         <Text size="sm" fw={600}>ZEITKAT / Stunden pro Tag · Slider</Text>
-        {simulation && onResetAll ? <Button size="xs" variant="subtle" onClick={onResetAll}>Gruppe zurücksetzen</Button> : null}
+        {simulation && onResetAll ? <Button size="xs" variant="subtle" onClick={() => { setUndo(null); onResetAll(); }}>Gruppe zurücksetzen</Button> : null}
       </Group>
 
-      {!simulation && periodOptions.length > 1 ? (
+      {periodOptions.length > 1 ? (
         <Select
           label="Gültigkeitsversion"
           value={periodKey || null}
-          onChange={(value) => setSelectedPeriodKey(value)}
+          onChange={(value) => { setUndo(null); setValidityDraft(null); setSelectedPeriodKey(value); }}
           data={periodOptions}
           w={260}
           data-testid="fee-staircase-period"
@@ -375,7 +455,7 @@ export default function FeeStaircaseEditor({
         <Group align="flex-end" wrap="wrap">
           <DatePickerInput
             label="Tarif gültig von"
-            value={toDate(periodStart)}
+            value={toDate(currentDraft?.validFrom ?? periodStart)}
             onChange={(value) => updateValidity('validFrom', toIsoDate(value))}
             valueFormat="DD.MM.YYYY"
             clearable
@@ -385,7 +465,7 @@ export default function FeeStaircaseEditor({
           />
           <DatePickerInput
             label="Tarif gültig bis"
-            value={toDate(periodEnd)}
+            value={toDate(currentDraft?.validUntil ?? periodEnd)}
             onChange={(value) => updateValidity('validUntil', toIsoDate(value))}
             valueFormat="DD.MM.YYYY"
             clearable
@@ -393,9 +473,77 @@ export default function FeeStaircaseEditor({
             w={190}
             aria-label="Tarif gültig bis"
           />
-          <Text size="xs" c="dimmed">Beitrag über Slider ändern; Zahlenfeld nur bei ausreichend Platz. Inaktive Kategorien lassen sich per Checkbox aktivieren.</Text>
+          <Text size="xs" c="dimmed">Beiträge per Slider, Zahlenfeld oder ± ändern. Inaktive Kategorien lassen sich per Checkbox aktivieren.</Text>
         </Group>
       ) : null}
+      {!simulation && currentDraft?.error ? <Alert color="red" role="alert">{currentDraft.error}</Alert> : null}
+
+      <Select
+        label="Schrittweite für ±"
+        value={String(amountStep)}
+        onChange={(value) => { if (value) setAmountStep(Number(value)); }}
+        data={[1, 5, 10, 25, 50].map((step) => ({ value: String(step), label: `${step} €` }))}
+        allowDeselect={false}
+        size="xs"
+        className="fee-staircase-step"
+      />
+
+      <Box className="fee-staircase-bulk">
+        <Text size="sm" fw={600}>Sammeländerung für diese Gruppe</Text>
+        <Text size="xs" c="dimmed">Nur aktive Kategorien der gewählten Gültigkeitsversion; andere Versionen und inaktive Kategorien bleiben unverändert.</Text>
+        <Group align="flex-end" gap="xs" wrap="wrap">
+          <Select
+            label="Art der Sammeländerung"
+            value={bulkMode}
+            onChange={(value) => { if (value) setBulkMode(value); }}
+            data={[
+              { value: 'amount', label: 'Betrag addieren / abziehen (€)' },
+              { value: 'percent', label: 'Prozent ändern (%)' },
+              { value: 'staircase', label: 'Staffel je Kategorie (€)' },
+            ]}
+            allowDeselect={false}
+            size="xs"
+            className="fee-staircase-bulk-mode"
+          />
+          {bulkMode === 'staircase' ? (
+            <NumberInput
+              label="Startbetrag in €"
+              description="Leer: erster aktiver Beitrag"
+              value={staircaseStart}
+              onChange={setStaircaseStart}
+              min={0}
+              max={MAX_AMOUNT}
+              decimalScale={2}
+              size="xs"
+              className="fee-staircase-bulk-value"
+            />
+          ) : null}
+          <NumberInput
+            label={bulkMode === 'percent' ? 'Änderung in %' : bulkMode === 'staircase' ? 'Schritt je Kategorie in €' : 'Änderung in €'}
+            description={bulkMode === 'staircase' ? 'Auch fehlende Kategorien zählen' : 'Negativ zum Senken'}
+            value={bulkValue}
+            onChange={setBulkValue}
+            decimalScale={2}
+            step={bulkMode === 'percent' ? 1 : AMOUNT_STEP}
+            size="xs"
+            className="fee-staircase-bulk-value"
+          />
+          <Button size="xs" onClick={applyBulkChange} disabled={!previewValid}>Sammeländerung anwenden</Button>
+          <Button size="xs" variant="light" onClick={undoBulkChange} disabled={!canUndo}>Sammeländerung rückgängig</Button>
+        </Group>
+        {bulkValue !== '' && !previewValid ? <Text size="xs" c="red" role="alert">Alle neuen Beiträge müssen zwischen 0,01 € und 100.000 € liegen; mindestens eine Kategorie muss aktiv sein.</Text> : null}
+        {previewValid ? (
+          <div className="fee-staircase-preview" role="region" aria-label="Vorschau Sammeländerung">
+            <Text size="xs" fw={600}>Vorschau (noch nicht angewendet)</Text>
+            {previewEntries.map(({ entry, amount }, index) => (
+              <Text size="xs" key={`${getFeeBandZeitkatId(entry)}-${index}`}>
+                ZEITKAT {getFeeBandZeitkatId(entry)}: {formatAmount(Number(entry.monthlyAmount))} → {formatAmount(amount)}
+              </Text>
+            ))}
+            {!previewValidation.isCompliant ? <Text size="xs" c="red">Die Vorschau erfüllt die Staffelungsregeln nicht; nach dem Anwenden werden die Einzelheiten angezeigt.</Text> : null}
+          </div>
+        ) : null}
+      </Box>
 
       <Box className="fee-staircase-slider-scroll" style={{ overflowX: 'auto', border: '1px solid var(--mantine-color-gray-3)', borderRadius: 8, padding: 6 }}>
         <Box className={`fee-staircase-slider-grid${simulation ? ' fee-staircase-slider-grid--simulation' : ''}`} data-testid="fee-staircase-zeitkat">
@@ -409,6 +557,7 @@ export default function FeeStaircaseEditor({
               simulation={simulation}
               invalid={invalidZeitkatIds.has(zone.id)}
               focused={focusedZeitkatId === zone.id}
+              step={amountStep}
               onChange={(value) => updateZeitkatAmount(zone, Number(value) || 0)}
               onActivate={() => activateZeitkat(zone)}
               onDeactivate={() => deactivateZeitkat(zone)}

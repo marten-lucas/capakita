@@ -31,6 +31,7 @@ import {
   updateBayKiBiGRule,
   deleteBayKiBiGRule,
   setGroupFeeCatalogs,
+  mergeGroupFeeCatalogs,
   setGroupParentFeeSubsidies,
   updateGroupParentFeeSubsidy,
   updateScenarioFinanceSettings,
@@ -104,8 +105,12 @@ function BufferedTextInput({ value, onCommit, ...props }) {
   );
 }
 
-function BufferedNumberInput({ value, onCommit, ...props }) {
+function BufferedNumberInput({ value, onCommit, requiredNonNegative = false, ...props }) {
   const [draft, setDraft] = React.useState(value ?? '');
+  const invalid = requiredNonNegative && (
+    (typeof draft === 'string' && draft.trim() === '') ||
+    !Number.isFinite(Number(draft)) || Number(draft) < 0
+  );
 
   React.useEffect(() => {
     setDraft(value ?? '');
@@ -115,8 +120,11 @@ function BufferedNumberInput({ value, onCommit, ...props }) {
     <NumberInput
       {...props}
       value={draft}
+      error={invalid ? 'Bitte einen gültigen Betrag ab 0 eingeben.' : props.error}
       onChange={(nextValue) => setDraft(nextValue)}
-      onBlur={() => onCommit(draft ?? '')}
+      onBlur={() => {
+        if (!invalid) onCommit(draft ?? '');
+      }}
     />
   );
 }
@@ -236,14 +244,15 @@ function BayKiBiGDetail({ item, scenarioId, dispatch }) {
           <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
             <BufferedNumberInput
               label="Platz 1–50"
-              value={item.teamGrantRates?.first50 ?? 0}
+              value={item.teamGrantRates?.first50 ?? ''}
+              requiredNonNegative
               onCommit={(value) => dispatch(updateBayKiBiGRule({
                 scenarioId,
                 ruleId: item.id,
                 updates: {
                   teamGrantRates: {
                     ...(item.teamGrantRates || {}),
-                    first50: Number(value) || 0,
+                    first50: Number(value),
                   },
                 },
               }))}
@@ -255,14 +264,15 @@ function BayKiBiGDetail({ item, scenarioId, dispatch }) {
             />
             <BufferedNumberInput
               label="Platz 51–150"
-              value={item.teamGrantRates?.remaining100 ?? 0}
+              value={item.teamGrantRates?.remaining100 ?? ''}
+              requiredNonNegative
               onCommit={(value) => dispatch(updateBayKiBiGRule({
                 scenarioId,
                 ruleId: item.id,
                 updates: {
                   teamGrantRates: {
                     ...(item.teamGrantRates || {}),
-                    remaining100: Number(value) || 0,
+                    remaining100: Number(value),
                   },
                 },
               }))}
@@ -422,7 +432,7 @@ function OrgaTabFinance({ section = 'all' }) {
       typeof mapping === 'string' ? { sourceKey: mapping || null } : mapping,
     ]));
     const finalCatalogs = applyFeeCatalogMappings({ mappingsByGroupId: normalizedMappings, catalogsByKey });
-    dispatch(setGroupFeeCatalogs({ scenarioId: selectedScenarioId, catalogs: finalCatalogs }));
+    dispatch(mergeGroupFeeCatalogs({ scenarioId: selectedScenarioId, catalogs: finalCatalogs }));
     const mappedSubsidies = applyParentFeeSubsidyMappings({ mappingsByGroupId: normalizedMappings, parentFeeSubsidiesByKey });
     if (Object.keys(mappedSubsidies).length > 0) {
       dispatch(setGroupParentFeeSubsidies({
@@ -444,15 +454,11 @@ function OrgaTabFinance({ section = 'all' }) {
       const extracted = extractFeeCatalogImportData(parsed, { preferNonMember: true });
 
       if (!Array.isArray(groupDefs) || groupDefs.length === 0) {
-        dispatch(setGroupFeeCatalogs({
-          scenarioId: selectedScenarioId,
-          catalogs: extracted.catalogsByKey,
-        }));
-        dispatch(setGroupParentFeeSubsidies({
-          scenarioId: selectedScenarioId,
-          subsidies: extracted.parentFeeSubsidiesByKey,
-        }));
-        setFeeCatalogFile(null);
+        notifications.show({
+          title: 'Import nicht möglich',
+          message: 'Es sind keine Zielgruppen vorhanden. Bitte zuerst Gruppen anlegen und dann die Kataloge zuordnen.',
+          color: 'red',
+        });
         return;
       }
 
@@ -495,14 +501,17 @@ function OrgaTabFinance({ section = 'all' }) {
   };
 
   const handleApplyFeeCatalogImport = () => {
+    if (unmappedGroups.length > 0) return;
     commitFeeCatalogImport(feeCatalogMappingByGroup, feeCatalogSourceByKey, feeCatalogParentSubsidyByKey);
     setFeeCatalogImportOpen(false);
     setFeeCatalogFile(null);
     notifications.show({ title: 'Beitragskataloge importiert', message: 'Die ausgewählten Zuordnungen wurden angewendet.', color: 'teal' });
   };
 
-  const hasUnmappedGroups = Array.isArray(groupDefs)
-    && groupDefs.some((group) => !feeCatalogMappingByGroup?.[String(group.id)]);
+  const unmappedGroups = (groupDefs || []).filter((group) => {
+    const sourceKey = feeCatalogMappingByGroup?.[String(group.id)];
+    return !sourceKey || !Object.hasOwn(feeCatalogSourceByKey, sourceKey);
+  });
 
   const feeCatalogSourceOptions = (feeCatalogSources || []).map((source) => {
     const sourceName = source.groupName || source.key;
@@ -624,7 +633,7 @@ function OrgaTabFinance({ section = 'all' }) {
           <div>
             <Text fw={600}>Beitragskataloge pro Gruppe</Text>
             <Text size="sm" c="dimmed">
-              Beitragssätze werden je Gruppe und ZEITKAT (Stunden pro Tag) gepflegt. Alte Stundenobergrenzen werden beim Import in die passende ZEITKAT-Kategorie überführt. JSON-Kataloge werden anhand von Gruppenname und Betreuungsart vorbefüllt; eindeutige Zuordnungen werden direkt importiert.
+              Beitragssätze werden je Gruppe und ZEITKAT (Stunden pro Tag) gepflegt. Alte Stundenobergrenzen werden beim Import in die passende ZEITKAT-Kategorie überführt. JSON-Kataloge werden anhand von Gruppenname und Betreuungsart vorbefüllt; eindeutige Zuordnungen werden direkt importiert. Der Import ersetzt die Beitragskataloge der zugeordneten Gruppen; andere Kataloge bleiben erhalten. Bei getrennten Mitglieds- und Nichtmitgliedspreisen wird der Nichtmitgliedspreis verwendet.
             </Text>
           </div>
 
@@ -760,6 +769,12 @@ function OrgaTabFinance({ section = 'all' }) {
             Vorbelegung: {feeCatalogAutoMappedGroupCount} von {groupDefs.length} Gruppen wurden anhand von Gruppenname und Betreuungsart zugeordnet. Prüfe die Vorschläge und ergänze nur unklare Zuordnungen.
           </Text>
 
+          {unmappedGroups.length > 0 && (
+            <Alert color="yellow" title="Zuordnung erforderlich">
+              Für folgende Gruppen fehlt eine Import-Quelle: {unmappedGroups.map((group) => group.name || `Gruppe ${group.id}`).join(', ')}. Bitte jeder Gruppe eine Quelle zuordnen; bis dahin bleiben alle Kataloge unverändert.
+            </Alert>
+          )}
+
           {feeCatalogUnmatchedSourceKeys.length > 0 ? (
             <Alert color="yellow" title="Nicht automatisch zugeordnete Quellen">
               {feeCatalogUnmatchedSourceKeys.join(', ')}
@@ -788,7 +803,7 @@ function OrgaTabFinance({ section = 'all' }) {
             <Button variant="default" onClick={() => setFeeCatalogImportOpen(false)}>
               Abbrechen
             </Button>
-            <Button onClick={handleApplyFeeCatalogImport} disabled={hasUnmappedGroups}>
+            <Button onClick={handleApplyFeeCatalogImport} disabled={unmappedGroups.length > 0}>
               Import anwenden
             </Button>
           </Group>

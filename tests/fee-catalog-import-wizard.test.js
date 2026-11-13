@@ -138,9 +138,17 @@ test('imports Gramschatz fee structures with one click when group types identify
   expect(importedCatalogs['g-kat-schulkind'][0]).toMatchObject({ zeitkatId: '01', monthlyAmount: 110 });
   expect(importedCatalogs['g-kat-krippe'].every((entry) => !Object.hasOwn(entry, 'maxHours'))).toBe(true);
 
+  for (const entries of Object.values(importedCatalogs)) {
+    expect(entries.every((entry) => entry.validFrom === '2025-01-01' && entry.validUntil === '2026-12-31')).toBe(true);
+  }
+  const subsidies = await page.evaluate(() => window.__APP_STORE.getState().simFinance.financeByScenario['fee-catalog-import-e2e'].parentFeeSubsidiesByGroup);
+  expect(subsidies['g-kat-krippe'].enabled).toBe(false);
+  expect(subsidies['g-kat-kiga'].enabled).toBe(true);
+  expect(subsidies['g-kat-schulkind'].enabled).toBe(false);
+
   const krippePanel = await openFeeGroup(page, 'Krippe');
   await expect(krippePanel.getByTestId('fee-staircase-zeitkat')).toBeVisible();
-  await expect(krippePanel.getByLabel('Betrag ZEITKAT 04')).toHaveValue('170 €');
+  await expect(krippePanel.getByRole('textbox', { name: 'Betrag ZEITKAT 04', exact: true })).toHaveValue('170 €');
 });
 
 test('pre-fills recognizable groups and keeps a manual mapping fallback for ambiguous names', async ({ page }) => {
@@ -187,5 +195,5 @@ test('pre-fills recognizable groups and keeps a manual mapping fallback for ambi
 
   const krippePanel = await openFeeGroup(page, 'Bärchengruppe');
   await expect(krippePanel.getByTestId('fee-staircase-zeitkat')).toBeVisible();
-  await expect(krippePanel.getByLabel('Betrag ZEITKAT 04')).toHaveValue('170 €');
+  await expect(krippePanel.getByRole('textbox', { name: 'Betrag ZEITKAT 04', exact: true })).toHaveValue('170 €');
 });

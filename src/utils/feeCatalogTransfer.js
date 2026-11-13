@@ -113,7 +113,11 @@ function extractCatalogDescriptors(obj, options = {}) {
       key,
       groupId: null,
       groupName: val?.description || val?.ageRange || key,
-      entries: Array.isArray(val?.bands) ? val.bands : [],
+      entries: Array.isArray(val?.bands) ? val.bands.map((band) => ({
+        ...band,
+        validFrom: band.validFrom || obj.metadata?.validFrom || '',
+        validUntil: band.validUntil || obj.metadata?.validUntil || '',
+      })) : [],
       parentFeeSubsidy: val?.parentFeeSubsidy,
     }, options));
   }

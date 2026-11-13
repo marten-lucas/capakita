@@ -101,7 +101,8 @@ export function generateBookingDataSeries(referenceDate, filteredBookings, categ
           const category = `${dayName} ${hour}:${String(minute).padStart(2, '0')}`;
           const idx = categoryIndex.get(category);
           if (idx !== undefined) {
-            series[idx] += 1;
+            const share = seg?.allocationSharePercent == null ? 100 : Number(seg.allocationSharePercent);
+            series[idx] += Number.isFinite(share) ? Math.max(0, share) / 100 : 1;
           }
         }
       });

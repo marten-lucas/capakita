@@ -1,6 +1,7 @@
 import { calculateAverageWeeklyHoursForDate, getBayKiBiGWeightForChild, isRecordActiveOnDate } from './financeUtils';
 import { decodeBuchungsart, isAdebisTrue, qualifikationInfo } from './adebisConstants';
 import { sumWeightedBookingHours } from './chartUtils/chartUtils';
+import { calculateAdebisMonthlyBaseFunding } from './adebisFinance';
 
 function toNumber(value) {
   if (value === undefined || value === null || value === '') return null;
@@ -187,7 +188,7 @@ export function calculateAdebisMonthMetrics({
   });
 
   const minimumExpertHours = weightedDailyBookingHours / 4.4;
-  const annualBasisValue = weightedDailyBookingHours * basisValue / 24;
+  const monthlyBaseFunding = calculateAdebisMonthlyBaseFunding(weightedDailyBookingHours, basisValue);
 
   return {
     children,
@@ -212,7 +213,7 @@ export function calculateAdebisMonthMetrics({
       ?? (totalStaffHours ? (expertStaffHours / totalStaffHours) * 100 : null),
     employmentKey: totalStaffHours ? (weightedDailyBookingHours * 5) / totalStaffHours : null,
     basisValue,
-    estimatedFunding: annualBasisValue,
+    estimatedFunding: monthlyBaseFunding,
     operatingDays: toNumber(operatingDaysOverride),
   };
 }

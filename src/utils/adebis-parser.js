@@ -2,6 +2,7 @@ import { convertDDMMYYYYtoYYYYMMDD } from './dateUtils';
 import { createId } from './idUtils';
 import { DEFAULT_GROUP_ICON } from './groupIcons';
 import { decodeBuchungsart, qualifikationInfo } from './adebisConstants';
+import { minutesToTime, timeToMinutes } from './timeUtils';
 
 // Helper to assign unique IDs to all segments in all bookings
 function assignSegmentIdsToBookings(bookings) {
@@ -97,8 +98,8 @@ function belegung2Booking(belegungRaw) {
   (belegungRaw || []).forEach((b) => {
     const bookingId = createId('booking');
     const parsedTimes = Zeiten2Booking(b.ZEITEN, bookingId);
-    if (!hasParsedSegments(parsedTimes)) return;
 
+    // Auch ohne Zeiten tragen Belegungen fachliche Merkmale und ihren Gültigkeitszeitraum.
     // Buchungsart gemäß adebisKITA-Decoder (ART: 0=Regel, A/B=Alternativ, F/G/H=Ferien, K=Kurzzeit)
     const buchungsart = decodeBuchungsart(b.ART);
 
@@ -156,7 +157,7 @@ function anstell2Booking(employeesRaw) {
  */
 export function Zeiten2Booking(zeitenString, bookingId) {
   if (!zeitenString) return [];
-  const daysRaw = zeitenString.split('#').filter(s => s.trim() !== '');
+  const daysRaw = zeitenString.split('#');
   const parsedDays = [];
   const dayNames = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
   daysRaw.forEach((dayStr, dayIndex) => {
@@ -166,11 +167,12 @@ export function Zeiten2Booking(zeitenString, bookingId) {
     for (let i = 0; i < parts.length; i += 2) {
       const start = parts[i];
       const end = parts[i + 1];
-      // Prevent empty segments
-      if (start && end && start !== '' && end !== '') {
+      const startMinutes = timeToMinutes(start);
+      const endMinutes = timeToMinutes(end);
+      if (startMinutes !== null && endMinutes !== null && endMinutes > startMinutes) {
         segments.push({
-          booking_start: start,
-          booking_end: end,
+          booking_start: minutesToTime(startMinutes),
+          booking_end: minutesToTime(endMinutes),
           groupId: '',
           category: 'pedagogical',
           id: `${bookingId}-${dayNames[dayIndex]}-${Date.now()}`

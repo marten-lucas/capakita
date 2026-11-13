@@ -1,6 +1,7 @@
 import { loadZip } from './zipUtils';
 import { isFutureOrEmptyDate } from './dateUtils';
 import { decodeXml, findFileBySuffix, extractObjectListFromXml, detectXmlRecordTag, parseXml } from './xmlUtils';
+import { Zeiten2Booking } from './adebis-parser';
 
 // Extracts and filters the kids, employees, groups, group assignments, and bookings from an Adebis ZIP file
 export async function extractAdebisData(file, isAnonymized, options = {}) {
@@ -130,6 +131,26 @@ export async function extractAdebisData(file, isAnonymized, options = {}) {
             ],
             b => (isSnapshotMode ? isFutureOrEmptyDate(b.BELBIS) : true)
         );
+
+        const withoutTimes = belegungRaw.filter(b => Zeiten2Booking(b.ZEITEN, '').length === 0).length;
+        if (withoutTimes) {
+            warnings.push({
+                code: 'BELEGUNG_WITHOUT_TIMES',
+                message: `${withoutTimes} Belegung(en) ohne auswertbare Zeitsegmente; Metadaten bleiben bei zugeordneten Kindern erhalten. Zeitbasierte Auswertungen sind unvollständig.`
+            });
+        }
+        for (const [field, explanation] of [
+            ['BETRSTD', 'Wochenstunden können nur bei auswertbaren Zeitsegmenten ersatzweise ermittelt werden'],
+            ['GEWKAT', 'die Gewichtung kann nur anhand anderweitig verfügbarer Merkmale ersatzweise ermittelt werden']
+        ]) {
+            const missing = belegungRaw.filter(b => !b[field]).length;
+            if (missing) {
+                warnings.push({
+                    code: `BELEGUNG_MISSING_${field}`,
+                    message: `${field} fehlt oder ist leer bei ${missing} von ${belegungRaw.length} Belegung(en); ${explanation}.`
+                });
+            }
+        }
     } else {
         warnings.push({ code: 'MISSING_BELEGUNG_XML', message: 'belegung.xml nicht gefunden.' });
     }

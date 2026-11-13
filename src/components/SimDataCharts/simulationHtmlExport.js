@@ -1,7 +1,7 @@
 import picoCss from '@picocss/pico/css/pico.min.css?inline';
 import { getFeeBandZeitkatId, ZEITKAT_CATALOG } from '../../utils/adebisConstants';
 import { isDateWithinRange } from '../../utils/financeUtils';
-import { getFeeBandSimulationPriceKey } from '../../utils/foerderSimulation';
+import { getFeeBandSimulationPriceOverride } from '../../utils/foerderSimulation';
 
 export const HTML_FAMILY_PROFILE_MIN_COUNT = 5;
 
@@ -35,15 +35,6 @@ function getApplicableEntry(entries = [], zeitkatId, referenceDate) {
     .sort((left, right) => String(right.validFrom || '').localeCompare(String(left.validFrom || '')))[0] || null;
 }
 
-function getInitialOverrides(temporaryPrices = {}, catalogs = []) {
-  const overrides = {};
-  Object.entries(temporaryPrices || {}).forEach(([key, value]) => {
-    const entry = catalogs.find((candidate) => getFeeBandSimulationPriceKey(candidate) === key);
-    const zeitkatId = getFeeBandZeitkatId(entry) || ZEITKAT_CATALOG.find((zone) => zone.id === key)?.id;
-    if (zeitkatId && Number.isFinite(Number(value))) overrides[zeitkatId] = Math.max(0, Number(value));
-  });
-  return overrides;
-}
 
 /**
  * Builds a strict allowlist snapshot. Family identities and all raw source records
@@ -86,25 +77,33 @@ export function buildAggregateSimulationSnapshot({
     const sourceId = rawId === '__NO_GROUP__' ? '' : rawId;
     const key = groupKeyByRawId.get(rawId);
     const baseEntries = (groupFeeCatalogs?.[sourceId] || []).map(cleanTariffEntry).filter(Boolean);
-    const simulationEntries = (simulationCatalogs?.[sourceId] || []).map(cleanTariffEntry).filter(Boolean);
-    const effectiveEntries = effectiveFeeCatalogs?.[sourceId] || [];
-    const initialOverrides = getInitialOverrides(temporaryPrices?.[sourceId] || {}, simulationCatalogs?.[sourceId] || []);
+    const effectiveEntries = effectiveFeeCatalogs?.[sourceId] || (simulationCatalogs?.[sourceId] || []).map((entry) => {
+      const override = getFeeBandSimulationPriceOverride(entry, temporaryPrices?.[sourceId]);
+      return override === undefined ? entry : { ...entry, monthlyAmount: override };
+    });
+    const simulationEntries = effectiveEntries.map(cleanTariffEntry).filter(Boolean);
+    const initialOverrides = {};
     const initialEnabledOverrides = {};
+    const referencePeriod = effectiveEntries
+      .filter((entry) => isDateWithinRange(referenceDate, entry.validFrom || '', entry.validUntil || ''))
+      .sort((left, right) => String(right.validFrom || '').localeCompare(String(left.validFrom || '')))[0];
     const tariffs = ZEITKAT_CATALOG.map((zone) => {
       const entry = getApplicableEntry(effectiveEntries, zone.id, referenceDate)
         || getApplicableEntry(simulationCatalogs?.[sourceId] || [], zone.id, referenceDate);
       const configuredEntry = getApplicableEntry(simulationCatalogs?.[sourceId] || [], zone.id, referenceDate);
-      const amount = Object.hasOwn(initialOverrides, zone.id)
-        ? initialOverrides[zone.id]
-        : Math.max(0, Number(entry?.monthlyAmount) || 0);
+      const amount = Math.max(0, Number(entry?.monthlyAmount) || 0);
       const enabled = configuredEntry ? configuredEntry.enabled !== false : Boolean(entry);
-      initialEnabledOverrides[zone.id] = enabled;
+
       return {
         zeitkatId: zone.id,
         label: `ZEITKAT ${zone.id} (${zone.kurzbez}h)`,
         maxHours: zone.maxHours,
         initialAmount: amount,
         initialEnabled: enabled,
+        referenceValidity: configuredEntry || referencePeriod ? {
+          validFrom: String((configuredEntry || referencePeriod).validFrom || ''),
+          validUntil: String((configuredEntry || referencePeriod).validUntil || ''),
+        } : null,
       };
     });
     const subsidy = cleanSubsidyRule(effectiveParentFeeSubsidiesByGroup?.[sourceId] || parentFeeSubsidy);
@@ -186,17 +185,19 @@ function calculateAggregateSimulationResultsInternal(snapshot, state, initialize
     const entry = pickEntry(entries, zoneId, date);
     if (!simulation) return !entry || entry.enabled === false ? 0 : round(entry.monthlyAmount);
 
-    const enabledOverride = owns(activeState.enabledOverrides?.[groupKey], zoneId)
+    const referenceValidity = group.tariffs.find((tariff) => tariff.zeitkatId === zoneId)?.referenceValidity;
+    const sameVersion = referenceValidity && (entry
+      ? entry.validFrom === referenceValidity.validFrom && entry.validUntil === referenceValidity.validUntil
+      : inDateRange(date, referenceValidity));
+    const enabledOverride = sameVersion && owns(activeState.enabledOverrides?.[groupKey], zoneId)
       ? activeState.enabledOverrides[groupKey][zoneId]
       : undefined;
     if (enabledOverride === false) return 0;
     if (!entry && enabledOverride !== true) return 0;
     if (entry?.enabled === false && enabledOverride !== true) return 0;
-    const amount = owns(activeState.rateOverrides?.[groupKey], zoneId)
+    const amount = sameVersion && owns(activeState.rateOverrides?.[groupKey], zoneId)
       ? activeState.rateOverrides[groupKey][zoneId]
-      : owns(group.initialOverrides, zoneId)
-        ? group.initialOverrides[zoneId]
-        : entry?.monthlyAmount;
+      : entry?.monthlyAmount;
     return Math.max(0, round(amount));
   };
   const getSubsidy = (groupKey, date, simulation, activeState = state) => {
@@ -392,11 +393,16 @@ function standaloneSimulationRuntime(initializeState, calculateResults) {
       group.tariffs.forEach((tariff) => {
         const field = make('div', null, 'tariff-field');
         field.append(make('span', tariff.label));
+        const validity = tariff.referenceValidity;
+        field.append(make('small', validity
+          ? `${validity.validFrom || 'Sofort'} – ${validity.validUntil || 'unbegrenzt'}`
+          : 'Keine Tarifversion am Stichtag'));
         const row = make('div', null, 'input-row');
         const amount = document.createElement('input');
         amount.type = 'number';
         amount.min = '0';
         amount.step = '1';
+        amount.disabled = !validity;
         amount.value = state.rateOverrides[group.key][tariff.zeitkatId] ?? tariff.initialAmount;
         amount.setAttribute('aria-label', `${group.label} ${tariff.label} monatlich`);
         amount.addEventListener('input', () => {
@@ -406,7 +412,8 @@ function standaloneSimulationRuntime(initializeState, calculateResults) {
         const enabledLabel = make('label', null, 'enabled-field');
         const enabled = document.createElement('input');
         enabled.type = 'checkbox';
-        enabled.checked = state.enabledOverrides[group.key][tariff.zeitkatId] !== false;
+        enabled.disabled = !validity;
+        enabled.checked = state.enabledOverrides[group.key][tariff.zeitkatId] ?? tariff.initialEnabled;
         enabled.setAttribute('aria-label', `${tariff.label} aktiv`);
         enabled.addEventListener('change', () => {
           state.enabledOverrides[group.key][tariff.zeitkatId] = enabled.checked;

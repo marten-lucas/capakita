@@ -256,7 +256,7 @@ export default function MidtermChart() {
         custom: { decimals: 1, suffix: ' %' },
       },
       {
-        name: 'Einnahmen',
+        name: 'Bruttobeiträge + Basisförderung',
         type: 'line',
         data: chartData.income_total || [],
         yAxis: 2,
@@ -276,7 +276,7 @@ export default function MidtermChart() {
         custom: { format: 'currency' },
       },
       {
-        name: 'Saldo',
+        name: 'Saldo (ohne Zusatzförderung)',
         type: 'line',
         data: chartData.net_total || [],
         yAxis: 2,
@@ -508,6 +508,7 @@ export default function MidtermChart() {
 
       <Paper withBorder p="md" radius="md">
         <Title order={5} mb="sm">Betreuungsschlüssel, Fachkraftquote und Finanzen</Title>
+        <Text size="xs" c="dimmed" mb="sm">Finanzen: Bruttobeiträge und ADEBIS-Basisförderung ohne Beitragszuschuss, Zusatzförderung und Reform. Monate als Stichtage, Quartale und Jahre als Summe der Monatsanfänge; Wochen geschätzt mit Monatswert × 12 / 52. Fehlende Angaben erzeugen Lücken.</Text>
         <Box h={{ base: 260, sm: 320 }} data-testid="midterm-ratio-finance-chart">
           <HighchartsReact
             key={`ratio-finance-${(chartData.categories || []).length}`}

@@ -1,3 +1,5 @@
+export { FORECAST_STAGES, nextForecastDay, forecastStageForGroup, resolveForecastStage, buildForecastInflow, buildForecastModel } from './forecastUtilsModel';
+
 export function getForecastGroupAssignments(assignments) {
   if (Array.isArray(assignments)) return assignments;
   if (!assignments || typeof assignments !== 'object') return [];

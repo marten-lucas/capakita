@@ -184,9 +184,11 @@ describe('SimDataFinanceTab', () => {
     expect(screen.getByText('Automatische Einnahmen zum Stichtag')).toBeTruthy();
     expect(screen.getByText('Durchschnittliche Wochenstunden')).toBeTruthy();
     expect(screen.getByText('20.0 h')).toBeTruthy();
-    expect(screen.getByText('Elternbeitrag')).toBeTruthy();
-    expect(screen.getByText('BayKiBiG-Förderung')).toBeTruthy();
-    expect(screen.getByText('Gesamteinnahmen')).toBeTruthy();
+    expect(screen.getByText('Elternbeitrag (brutto)')).toBeTruthy();
+    expect(screen.getByText('ADEBIS-Basisförderung')).toBeTruthy();
+    expect(screen.getByText('40 €')).toBeTruthy();
+    expect(screen.getByText('Summe (ohne Zusatzförderung)')).toBeTruthy();
+    expect(screen.getAllByText('Ungeklärt')).toHaveLength(2);
   });
 
   it('shows staff cost preview with working-time split for capacity items', () => {

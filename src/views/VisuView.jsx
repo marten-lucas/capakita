@@ -8,6 +8,7 @@ import {
   Group,
   Modal,
   Menu,
+  NumberInput,
   Paper,
   RingProgress,
   Select,
@@ -22,6 +23,7 @@ import { MonthPickerInput } from '@mantine/dates';
 import Highcharts from 'highcharts';
 import HighchartsHeatmap from 'highcharts/modules/heatmap';
 import HighchartsSankey from 'highcharts/modules/sankey';
+import HighchartsTimeline from 'highcharts/modules/timeline';
 import { CopySvgButton, CopyableHighcharts as HighchartsReact } from '../components/common/CopyToClipboardButton';
 import ChartFilterForm from '../components/SimDataCharts/ChartFilterForm';
 import WeeklyChart from '../components/SimDataCharts/WeeklyChart';
@@ -29,16 +31,21 @@ import GroupIcon from '../components/common/GroupIcon';
 import { useDispatch, useSelector } from 'react-redux';
 import { setActivePage, setAnalysisSubPage } from '../store/uiSlice';
 import { setSelectedItem, setSelectedItems } from '../store/simScenarioSlice';
-import { ensureScenario } from '../store/chartSlice';
-import { selectWeeklyChartData } from '../store/chartSelectors';
-import { selectHistoricalStatistics, selectGroupTransitionStatistics } from '../store/statisticsSelectors';
+import { ensureScenario, setFilterGroups } from '../store/chartSlice';
+import { selectOverlayAwareChartData, selectWeeklyChartData } from '../store/chartSelectors';
+import { selectForecastEventsAvailable, selectForecastEventsError } from '../store/eventSlice';
+import { buildTrendHistory } from './trendModel';
 import { useOverlayData } from '../hooks/useOverlayData';
-import { calculateScenarioMonthlyFinance, isDateWithinRange, isRecordActiveOnDate, resolveGroupIdAtDate } from '../utils/financeUtils';
+import { isDateWithinRange, isRecordActiveOnDate, resolveGroupIdAtDate, resolveGroupIdsAtDate } from '../utils/financeUtils';
+import { calculateAdebisScenarioMonthlyFinance } from '../utils/adebisFinance';
 import { buildOverlayAwareData } from '../utils/overlayUtils';
-import { allocateFillUpCandidates, getForecastGroupAssignments, getForecastGroupRank, getFutureGroupAssignmentDates, shouldProjectAutoTransition } from '../utils/forecastUtils';
+import { buildForecastInflow, buildForecastModel, getForecastGroupAssignments } from '../utils/forecastUtils';
+import { buildForecastFillUp, limitForecastInflow } from '../utils/forecastUtilsModel';
 import { exportChart } from '../utils/chartExport';
 import { isArchivedDataItem, shouldIncludeDataItemInAnalysis, getActiveDemandChildrenAtDate } from '../utils/dataVisibility';
-import { filterBookings, generateCareRatioSeries } from '../utils/chartUtils/chartUtils';
+import { collectCoverageQualifications, filterBookings } from '../utils/chartUtils/chartUtils';
+import { coverageGroupMetrics, coverageGroups, coverageHeatValue, coverageHoursModel, coverageWeeklyData } from './coverageModel';
+import { buildResilienceStaff, compensateResilienceSlot, drawResilienceDay, evaluateResilienceConstraints, normalizeResilienceConfig } from '../utils/resilienceModel';
 import { buildHistogramDataFromBookings, generateSharedHistogramBins } from '../utils/chartUtils/chartUtilsHistogram';
 import { calculateZeitkatDistribution } from '../utils/chartUtils/chartUtilsZeitkat';
 import HoursHistogramSlide from '../components/SimDataCharts/HoursHistogramSlide';
@@ -63,6 +70,8 @@ import {
 import './VisuView.css';
 
 const EMPTY_LIST = [];
+
+const escapeChartText = (value) => String(value).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 
 const ANALYSIS_LOADING_STAGES = [
   {
@@ -99,8 +108,7 @@ const ANALYSIS_LOADING_STAGES_BY_STORY = {
 
 const LEGAL_EXPERT_RATIO_MIN_PCT = 50;
 const SLOT_HOURS = 0.5;
-const MONTHS_PER_WEEK = 4.33;
-const MONTHLY_HOURS_PER_FTE = 160;
+
 
 const HEATMAP_MODES = {
   UNWEIGHTED_QUOTIENT: 'unweightedQuotient',
@@ -110,7 +118,7 @@ const HEATMAP_MODES = {
 
 const QUALITY_GROUP_COLOR_PALETTE = ['#2563eb', '#059669', '#d97706', '#dc2626', '#7c3aed', '#0891b2', '#be123c', '#4d7c0f'];
 const QUALITY_ADMIN_TIME_COLOR = '#8b5cf6';
-const FORECAST_GROUP_COLOR_PALETTE = ['#0ea5e9', '#22c55e', '#f59e0b', '#a855f7', '#ef4444', '#14b8a6', '#6366f1', '#84cc16'];
+
 const DEMOGRAPHY_RESOLUTION_MONTHS = {
   quarter: 3,
   halfyear: 6,
@@ -165,6 +173,9 @@ if (typeof HighchartsHeatmap === 'function') {
 }
 if (typeof HighchartsSankey === 'function') {
   HighchartsSankey(Highcharts);
+}
+if (typeof HighchartsTimeline === 'function') {
+  HighchartsTimeline(Highcharts);
 }
 
 const STORY_STEPS = [
@@ -462,7 +473,10 @@ function QualityStaffScheduleChart({ scheduleData, accent }) {
         categories: employees.map((employee) => employee.name),
         title: { text: null },
         reversed: true,
-        labels: { style: { fontSize: '10px' } },
+        labels: {
+          formatter() { return escapeChartText(this.value); },
+          style: { fontSize: '10px' },
+        },
       },
       tooltip: {
         formatter() {
@@ -471,7 +485,7 @@ function QualityStaffScheduleChart({ scheduleData, accent }) {
           const roleLabel = this.point.options?.roleLabel || '';
           const planned = Number(this.point.value || 0) > 0 ? 'Ja' : 'Nein';
           const groupName = this.point.options?.groupName || employees[this.point.y]?.groupName || 'Gruppe';
-          return `<b>${employeeName}</b><br/>Typ: <b>${roleLabel}</b><br/>Gruppe: <b>${groupName}</b><br/>${slot}<br/>Geplant: <b>${planned}</b>`;
+          return `<b>${escapeChartText(employeeName)}</b><br/>Typ: <b>${escapeChartText(roleLabel)}</b><br/>Gruppe: <b>${escapeChartText(groupName)}</b><br/>${escapeChartText(slot)}<br/>Geplant: <b>${planned}</b>`;
         },
       },
       series: [
@@ -537,7 +551,7 @@ const QUALITY_CHART_SLIDES = [
   { id: 'quality-plan', title: 'Wochen-Dienstplan (Stichtag)' },
 ];
 
-function QualityStageCarousel({ qualityDonutData, qualityStaffScheduleData, accent }) {
+function QualityStageCarousel({ qualityDonutData, qualityStaffScheduleData, accent, privacyMode }) {
   const [activeIndex, setActiveIndex] = React.useState(0);
   const [emblaApi, setEmblaApi] = React.useState(null);
   const [canGoPrev, setCanGoPrev] = React.useState(false);
@@ -622,7 +636,7 @@ function QualityStageCarousel({ qualityDonutData, qualityStaffScheduleData, acce
 
         <Carousel.Slide>
           <Box className="analysis-coverage-carousel-slide">
-            {activeIndex === 1 ? <QualityStaffScheduleChart scheduleData={qualityStaffScheduleData} accent={accent} /> : null}
+            {activeIndex === 1 ? <QualityStaffScheduleChart key={privacyMode ? 'private' : 'named'} scheduleData={qualityStaffScheduleData} accent={accent} /> : null}
           </Box>
         </Carousel.Slide>
       </Carousel>
@@ -630,7 +644,7 @@ function QualityStageCarousel({ qualityDonutData, qualityStaffScheduleData, acce
   );
 }
 
-function CoverageHeatmap({ categories, groups, heatValues, accent, mode, onHoverChange }) {
+export function CoverageHeatmap({ categories, groups, heatValues, accent, mode, onHoverChange }) {
   const slotsPerDay = React.useMemo(() => Math.max(Math.floor(categories.length / 5), 0), [categories.length]);
   const majorTickPositions = React.useMemo(() => {
     if (slotsPerDay === 0) return [];
@@ -656,10 +670,8 @@ function CoverageHeatmap({ categories, groups, heatValues, accent, mode, onHover
   }, [slotsPerDay]);
 
   const metricRange = React.useMemo(() => {
-    const values = heatValues.map((entry) => {
-      if (Array.isArray(entry)) return Number(entry[2] || 0);
-      return Number(entry?.value || 0);
-    });
+    const values = heatValues.map((entry) => Array.isArray(entry) ? entry[2] : entry?.value)
+      .filter((value) => typeof value === 'number' && Number.isFinite(value));
     const min = values.length ? Math.min(...values) : 0;
     const max = values.length ? Math.max(...values) : 1;
     if (min === max) {
@@ -695,9 +707,9 @@ function CoverageHeatmap({ categories, groups, heatValues, accent, mode, onHover
       return 'Je mehr pädagogische Mitarbeitende anwesend sind, desto kälter (blauer) die Zelle.';
     }
     if (mode === HEATMAP_MODES.CARE_KEY) {
-      return 'Betreuungsschlüssel = Kinder pro pädagogischer Mitarbeiter. Niedriger Schlüssel bedeutet mehr Mitarbeitende pro Kind (kalt).';
+      return 'Gewichtete Kinder pro pädagogischer Kraft (Basisbuchungen); graue Zellen: keine pädagogische Kraft, Schlüssel nicht definiert.';
     }
-    return 'Quotient = Kinder pro pädagogischer Mitarbeiter. Niedriger Quotient bedeutet mehr Mitarbeitende pro Kind (kalt), hoher Quotient bedeutet weniger Mitarbeitende pro Kind (rot).';
+    return 'Quotient = Kinder pro pädagogischer Kraft. Grau: keine pädagogische Kraft, Quotient nicht definiert. Die Farben sind relative Werte, keine Rechtsprüfung.';
   }, [mode]);
 
   const daySeparatorLines = React.useMemo(() => {
@@ -774,8 +786,8 @@ function CoverageHeatmap({ categories, groups, heatValues, accent, mode, onHover
         formatter() {
           const slot = categories[this.point.x] || '';
           const groupName = groups[this.point.y]?.name || 'Gruppe';
-          const value = Number(this.point.value || 0);
-          return `<b>${groupName}</b><br/>${slot}<br/>${metricLabel}: <b>${value.toFixed(2)}</b>`;
+          const value = this.point.value;
+          return `<b>${groupName}</b><br/>${slot}<br/>${metricLabel}: <b>${value == null ? 'Nicht definiert – keine pädagogische Kraft' : Number(value).toFixed(2)}</b>`;
         },
       },
       series: [
@@ -785,6 +797,7 @@ function CoverageHeatmap({ categories, groups, heatValues, accent, mode, onHover
           borderColor: 'rgba(255,255,255,0.6)',
           data: heatValues,
           nullColor: 'rgba(226,232,240,0.5)',
+          nullInteraction: true,
           point: {
             events: {
               mouseOver() {
@@ -795,8 +808,8 @@ function CoverageHeatmap({ categories, groups, heatValues, accent, mode, onHover
                   demand: Number(options.demand || 0),
                   capacityPedagogical: Number(options.capacityPedagogical || 0),
                   capacityAdministrative: Number(options.capacityAdministrative || 0),
-                  careRatio: Number(options.careRatio || 0),
-                  expertRatio: Number(options.expertRatio || 0),
+                  careRatio: options.careRatio,
+                  expertRatio: options.expertRatio,
                 });
               },
             },
@@ -838,7 +851,7 @@ function CoverageHeatmap({ categories, groups, heatValues, accent, mode, onHover
   }, [mode]);
 
   return (
-    <Stack style={{ height: '100%', minHeight: 0 }} gap={4}>
+    <Stack style={{ height: '100%', minHeight: 0 }} gap={4} data-testid="coverage-heatmap">
       <Text size="xs" c="dimmed" ta="center">{legendDescription}</Text>
       <Group gap={10} wrap="nowrap" justify="center">
         {legendEntries.map((entry) => (
@@ -1012,6 +1025,13 @@ function CoverageStageCarousel({ weeklyData, categories, groups, heatValues, hou
   );
 }
 
+function formatResiliencePercent(value) {
+  const number = Number(value) || 0;
+  if (number > 0 && number < 1) return '<1%';
+  if (number > 99 && number < 100) return '>99%';
+  return `${Math.round(number)}%`;
+}
+
 function ResilienceScorePanel({ monteCarlo }) {
   const ringSvgRef = React.useRef(null);
   const resilienceScore = Number(monteCarlo?.resilienceScorePct || 0);
@@ -1026,8 +1046,8 @@ function ResilienceScorePanel({ monteCarlo }) {
             size={180}
             thickness={16}
             roundCaps
-            sections={[{ value: resilienceScore, color: resilienceScore >= 75 ? 'teal' : resilienceScore >= 55 ? 'yellow' : 'red' }]}
-            label={<Text ta="center" fw={800} size="xl">{resilienceScore.toFixed(1)}%</Text>}
+            sections={[{ value: resilienceScore, color: 'blue' }]}
+            label={<Text ta="center" fw={800} size="xl">{formatResiliencePercent(resilienceScore)}</Text>}
           />
         </Box>
         <CopySvgButton svgRef={ringSvgRef} testId="copy-resilience-score" />
@@ -1036,8 +1056,8 @@ function ResilienceScorePanel({ monteCarlo }) {
           Toleranzgewichtet: Tage mit wenig Schließung senken den Score nur anteilig.
         </Text>
         <Group gap="xl">
-          <Text size="sm">Toleranz-Tage: <b>{regularDaysPct.toFixed(1)}%</b></Text>
-          <Text size="sm">Schließung: <b>{closurePct.toFixed(1)}%</b></Text>
+          <Text size="sm">Toleranz-Tage: <b>{formatResiliencePercent(regularDaysPct)}</b></Text>
+          <Text size="sm">Schließung: <b>{formatResiliencePercent(closurePct)}</b></Text>
         </Group>
       </Stack>
     </Paper>
@@ -1304,6 +1324,10 @@ function ResilienceMonteCarloCarousel({ monteCarlo, categories, accent }) {
     };
   }, [emblaApi]);
 
+  if (monteCarlo && !monteCarlo.hasBookingData) {
+    return <Paper withBorder p="md"><Text size="sm">Keine auswertbare Resilienz: Im Zeitfenster fehlen Bedarfs- oder pädagogische Personalbuchungen.</Text></Paper>;
+  }
+
   return (
     <Box className="analysis-coverage-carousel-wrap">
       <Group className="analysis-coverage-carousel-header" justify="space-between" wrap="nowrap">
@@ -1456,20 +1480,23 @@ function FinanceTrendChart({ financeTrend, accent }) {
   );
 
   return (
-    <Paper className="analysis-diagram-placeholder analysis-finance-chart" withBorder p="xs">
+    <Paper className="analysis-diagram-placeholder analysis-finance-chart" withBorder p="xs" data-testid="analysis-finance-chart">
       <HighchartsReact highcharts={Highcharts} options={options} containerProps={{ style: { height: '100%' } }} />
     </Paper>
   );
 }
 
 function PreviewSankeyChart({ previewFlow, accent, privacyMode = false }) {
-  const [hoverInfo, setHoverInfo] = React.useState(null);
+  const [hoverState, setHoverInfo] = React.useState(null);
+  const hoverInfo = hoverState?.privacyMode === privacyMode ? hoverState : null;
+  React.useEffect(() => { setHoverInfo(null); }, [privacyMode]);
   const [stageBadgePositions, setStageBadgePositions] = React.useState([]);
-  const [chart, setChart] = React.useState(null);
+  const [chartState, setChartState] = React.useState(null);
+  const chart = chartState?.privacyMode === privacyMode ? chartState.chart : null;
   const [exporting, setExporting] = React.useState('');
   const [exportError, setExportError] = React.useState('');
   const stageBadgeSignatureRef = React.useRef('');
-  const handleChartReady = React.useCallback((nextChart) => setChart(nextChart), []);
+  const handleChartReady = React.useCallback((nextChart) => setChartState({ chart: nextChart, privacyMode }), [privacyMode]);
   const exportFilenameBase = `capakita-ausblick-${String(previewFlow?.referenceDate || 'export').replace(/[^0-9-]/g, '')}`;
 
   const handleExport = async (format) => {
@@ -1486,8 +1513,18 @@ function PreviewSankeyChart({ previewFlow, accent, privacyMode = false }) {
   };
 
   const filteredLinks = React.useMemo(() => {
-    return previewFlow?.links || [];
-  }, [previewFlow?.links]);
+    const links = previewFlow?.links || [];
+    if (!privacyMode) return links;
+    const childIds = Array.from(new Set(links.flatMap((link) => (link.children || []).map((child) => String(child.id || ''))))).sort();
+    const pseudonyms = new Map(childIds.map((id, index) => [id, `Kind ${index + 1}`]));
+    return links.map(({ from, to, weight, known, projected, unknown, stepDateIso, stepLabel, admission, children }) => ({
+      from, to, weight, known, projected, unknown, stepDateIso, stepLabel, admission,
+      children: (children || []).map((child) => {
+        const name = pseudonyms.get(String(child.id || ''));
+        return { id: name, name };
+      }),
+    }));
+  }, [previewFlow?.links, privacyMode]);
 
   const filteredNodes = React.useMemo(() => {
     const nodes = previewFlow?.nodes || [];
@@ -1498,8 +1535,11 @@ function PreviewSankeyChart({ previewFlow, accent, privacyMode = false }) {
       if (entry?.from) usedIds.add(String(entry.from));
       if (entry?.to) usedIds.add(String(entry.to));
     });
-    return nodes.filter((node) => usedIds.has(String(node.id)));
-  }, [previewFlow?.nodes, filteredLinks]);
+    const usedNodes = nodes.filter((node) => usedIds.has(String(node.id)));
+    return privacyMode
+      ? usedNodes.map(({ id, name, groupId, dateIso, rank, stageLabel }) => ({ id, name, groupId, dateIso, rank, stageLabel }))
+      : usedNodes;
+  }, [previewFlow?.nodes, filteredLinks, privacyMode]);
 
   const hasData = filteredLinks.length > 0;
   const transitionPairs = React.useMemo(() => {
@@ -1633,10 +1673,10 @@ function PreviewSankeyChart({ previewFlow, accent, privacyMode = false }) {
         tooltip: {
           pointFormatter() {
             if (this.isNode) {
-              return `<b>${this.name || ''}</b><br/>Stufe: <b>${this.options?.stageLabel || '-'}</b><br/>Kinder: <b>${Number(this.sum || 0)}</b>`;
+              return `<b>${escapeChartText(this.name || '')}</b><br/>Stufe: <b>${escapeChartText(this.options?.stageLabel || '-')}</b><br/>Kinder: <b>${Number(this.sum || 0)}</b>`;
             }
-            const stepLabel = this.options?.stepLabel ? `<br/>Zeitpunkt: <b>${this.options.stepLabel}</b>` : '';
-            return `<b>${this.fromNode?.name || ''}</b> -> <b>${this.toNode?.name || ''}</b>: <b>${Number(this.weight || 0)}</b>${stepLabel}`;
+            const stepLabel = this.options?.stepLabel ? `<br/>Zeitpunkt: <b>${escapeChartText(this.options.stepLabel)}</b>` : '';
+            return `<b>${escapeChartText(this.fromNode?.name || '')}</b> → <b>${escapeChartText(this.toNode?.name || '')}</b>: <b>${Number(this.weight || 0)}</b>${stepLabel}<br/>Bekannt: ${Number(this.options?.known || 0)} · Projiziert: ${Number(this.options?.projected || 0)} · Ungeklärt: ${Number(this.options?.unknown || 0)}`;
           },
         },
         plotOptions: {
@@ -1664,6 +1704,7 @@ function PreviewSankeyChart({ previewFlow, accent, privacyMode = false }) {
                       });
                     });
                     setHoverInfo({
+                      privacyMode,
                       kind: 'node',
                       title: String(this.name || '-'),
                       subtitle: String(this.options?.stageLabel || '-'),
@@ -1674,10 +1715,12 @@ function PreviewSankeyChart({ previewFlow, accent, privacyMode = false }) {
                   }
 
                   setHoverInfo({
+                    privacyMode,
                     kind: 'link',
                     title: `${this.fromNode?.name || '-'} -> ${this.toNode?.name || '-'}`,
                     subtitle: String(this.options?.stepLabel || '-'),
                     count: Number(this.weight || 0),
+                    sources: { known: this.options?.known || 0, projected: this.options?.projected || 0, unknown: this.options?.unknown || 0 },
                     children: Array.isArray(this.options?.children) ? this.options.children : [],
                   });
                 },
@@ -1693,7 +1736,7 @@ function PreviewSankeyChart({ previewFlow, accent, privacyMode = false }) {
         series: [
           {
             type: 'sankey',
-            name: 'Gruppenubergange',
+            name: 'Stufenübergänge',
             data: linksWithColor,
             nodes: nodesWithColor,
             colorByPoint: false,
@@ -1701,7 +1744,7 @@ function PreviewSankeyChart({ previewFlow, accent, privacyMode = false }) {
             dataLabels: {
               enabled: true,
               nodeFormatter() {
-                return this.name;
+                return escapeChartText(this.name || '');
               },
               style: { color: '#0f172a', fontSize: '10px', fontWeight: '600', textOutline: 'none' },
             },
@@ -1709,7 +1752,7 @@ function PreviewSankeyChart({ previewFlow, accent, privacyMode = false }) {
         ],
       };
     },
-    [accent, filteredLinks, filteredNodes, linksByNodeId, previewFlow?.groupColorsById]
+    [accent, filteredLinks, filteredNodes, linksByNodeId, previewFlow?.groupColorsById, privacyMode]
   );
 
   if (!hasData) {
@@ -1720,10 +1763,10 @@ function PreviewSankeyChart({ previewFlow, accent, privacyMode = false }) {
             Sankey-Chart
           </Badge>
           <Title order={3} className="analysis-diagram-placeholder-title">
-            Keine gruppenbezogenen Ubergange
+            Keine Stufenübergänge
           </Title>
           <Text size="sm" c="dimmed" ta="center" className="analysis-diagram-placeholder-text">
-            Ab dem Stichtag wurden in den bekannten Ereignissen keine Gruppenwechsel aktiver Kinder gefunden.
+            Für die ausgewählten Kinder und den optionalen Zulauf liegen keine darstellbaren Flüsse vor.
           </Text>
         </Stack>
       </Paper>
@@ -1762,6 +1805,7 @@ function PreviewSankeyChart({ previewFlow, accent, privacyMode = false }) {
               </Box>
             ) : null}
             <HighchartsReact
+              key={privacyMode ? 'private' : 'named'}
               highcharts={Highcharts}
               options={options}
               callback={handleChartReady}
@@ -1797,12 +1841,13 @@ function PreviewSankeyChart({ previewFlow, accent, privacyMode = false }) {
               <Badge variant="outline" size="sm" color="gray">{hoverInfo.subtitle}</Badge>
               <Text size="sm" fw={600}>{hoverInfo.title}</Text>
               <Badge variant="light" size="sm" color="gray">Kinder: {hoverInfo.count}</Badge>
+              {hoverInfo.sources && <Text size="xs">Bekannt: {hoverInfo.sources.known} · Projiziert: {hoverInfo.sources.projected} · Ungeklärt: {hoverInfo.sources.unknown}</Text>}
               <Box>
                 <Text size="xs" fw={600} mb={4}>Kinderliste</Text>
                 <Text size="xs" c="dimmed" style={{ lineHeight: 1.5 }}>
                   {(hoverInfo.children || []).slice(0, 120).map((child, idx) => (
                     <span key={`${String(child.id || '')}-${idx}`}>
-                      {privacyMode ? `Kind ${idx + 1}` : (child.name || `Kind ${idx + 1}`)}
+                      {child.name || `Kind ${idx + 1}`}
                       {idx < Math.min((hoverInfo.children || []).length, 120) - 1 ? ', ' : ''}
                     </span>
                   ))}
@@ -1924,7 +1969,7 @@ function ForecastGroupTimelineChart({ previewFlow, accent, privacyMode = false }
       },
       pointFormatter() {
         const dateLabel = Highcharts.dateFormat('%d.%m.%Y', Number(this.x || 0));
-        return `<b>${this.series.name}</b><br/>${dateLabel}: <b>${Number(this.y || 0)}</b> Kinder`;
+        return `<b>${escapeChartText(this.series.name)}</b><br/>${dateLabel}: <b>${Number(this.y || 0)}</b> Kinder`;
       },
     },
     plotOptions: {
@@ -1947,6 +1992,7 @@ function ForecastGroupTimelineChart({ previewFlow, accent, privacyMode = false }
         data: timelineDateMs.map((x, idx) => [x, Number(groupSeries?.data?.[idx] || 0)]),
         color: groupSeries?.color || accent,
         lineWidth: 2,
+        step: 'left',
       },
     ],
   });
@@ -1988,7 +2034,7 @@ function ForecastGroupTimelineChart({ previewFlow, accent, privacyMode = false }
         return { x, y };
       },
       pointFormatter() {
-        const dateText = this.options.dateLabel || this.key || '';
+        const dateText = escapeChartText(this.options.dateLabel || this.key || '');
         const total = Number(this.options.count || 0);
         const autoCount = Number(this.options.autoCount || 0);
         const eventList = this.options.eventList || [];
@@ -1996,7 +2042,7 @@ function ForecastGroupTimelineChart({ previewFlow, accent, privacyMode = false }
           const typeLabel = ev.targetStage
             ? `\u2192 ${ev.targetStage}`
             : String(ev.type || '').replace(/_/g, ' ');
-          return `<li>${ev.entityName || '-'} (${typeLabel})</li>`;
+          return `<li>${escapeChartText(ev.entityName || '-')} (${escapeChartText(typeLabel)})</li>`;
         }).join('');
         const moreHint = eventList.length > 8 ? `<li style="color:#94a3b8">+${eventList.length - 8} weitere</li>` : '';
         return `<strong>${dateText}</strong><br /><span>${total} Events (${autoCount} Auto)</span><ul style="margin:4px 0 0 0;padding-left:16px;font-size:11px">${eventRows}${moreHint}</ul>`;
@@ -2026,7 +2072,13 @@ function ForecastGroupTimelineChart({ previewFlow, accent, privacyMode = false }
       {
         type: 'timeline',
         name: 'Events',
-        data: timelinePoints,
+        data: privacyMode ? timelinePoints.map(({ x, count, autoCount, dateLabel, eventList }) => ({
+          x, count, autoCount, dateLabel,
+          name: `${count} Ereignisse`,
+          label: `${dateLabel} · ${count}`,
+          description: `${autoCount} Annahmen`,
+          eventList: (eventList || []).map(({ type, targetStage }) => ({ type, targetStage, entityName: 'Kind' })),
+        })) : timelinePoints,
         color: '#64748b',
         showInLegend: false,
       },
@@ -2050,8 +2102,9 @@ function ForecastGroupTimelineChart({ previewFlow, accent, privacyMode = false }
             <Box style={{ minHeight: 170, height: 170, flex: '0 0 auto' }}>
               <HighchartsReact
                 highcharts={Highcharts}
+                key={`forecast-events-${privacyMode ? 'private' : 'named'}`}
                 options={timelineOptions}
-                containerProps={{ style: { height: '100%' } }}
+                containerProps={{ 'data-testid': 'forecast-event-timeline', 'data-privacy': privacyMode ? 'on' : 'off', style: { height: '100%' } }}
               />
             </Box>
           </Stack>
@@ -2066,7 +2119,7 @@ function ForecastGroupTimelineChart({ previewFlow, accent, privacyMode = false }
                 </Badge>
                 {seriesByGroup.map((groupSeries) => (
                   <Badge key={`hover-value-${groupSeries.groupId}`} variant="light" size="sm" style={{ backgroundColor: `${groupSeries.color || accent}1A`, color: groupSeries.color || accent }}>
-                    {groupSeries.name}: {Number(groupSeries?.data?.[hoverIndex] || 0)}
+                    {groupSeries.name}: {Number(groupSeries?.data?.[hoverIndex] || 0)} (bekannt {groupSeries.sourceData?.known?.[hoverIndex] || 0}, projiziert {groupSeries.sourceData?.projected?.[hoverIndex] || 0}, ungeklärt {groupSeries.sourceData?.unknown?.[hoverIndex] || 0})
                   </Badge>
                 ))}
                 <Badge variant="light" color="gray" size="sm">
@@ -2186,6 +2239,7 @@ function ForecastHoursTimelineChart({ previewFlow, accent, privacyMode = false }
       data: timelineDateMs.map((x, idx) => [x, Number(groupSeries?.hoursData?.[idx] || 0)]),
       color: groupSeries?.color || accent,
       lineWidth: 2,
+      step: 'left',
     }],
   });
 
@@ -2212,7 +2266,7 @@ function ForecastHoursTimelineChart({ previewFlow, accent, privacyMode = false }
               ))}
               {!privacyMode ? (
                 <Box>
-                  <Text size="xs" fw={600} mb={4} c="dimmed">Kinder mit Buchungen:</Text>
+                  <Text size="xs" fw={600} mb={4} c="dimmed">Kinder in dieser Stufe:</Text>
                   {seriesByGroup.map((groupSeries) => {
                     const children = groupSeries.childrenByIndex?.[hoverIndex] || [];
                     if (!children.length) return null;
@@ -2462,6 +2516,7 @@ function DemographyAgeChart({ demographyData, accent, selectedResolution = 'quar
 
         <Group gap={6} wrap="wrap" justify="flex-end">
           <Select
+            aria-label="Altersgruppe"
             value={selectedCategory}
             onChange={(value) => setSelectedCategory(value || 'all')}
             data={[
@@ -2476,6 +2531,7 @@ function DemographyAgeChart({ demographyData, accent, selectedResolution = 'quar
             data-testid="forecast-demography-category-filter"
           />
           <Select
+            aria-label="Zeitauflösung"
             value={selectedResolution}
             onChange={(value) => onResolutionChange(value || 'quarter')}
             data={[
@@ -2489,6 +2545,7 @@ function DemographyAgeChart({ demographyData, accent, selectedResolution = 'quar
             data-testid="forecast-demography-resolution-filter"
           />
           <MonthPickerInput
+            aria-label="Prognosemonat"
             value={selectedMonth}
             onChange={setSelectedMonth}
             valueFormat="MM/YYYY"
@@ -2617,6 +2674,10 @@ function TrendHistoryChart({ trendData, accent, page = 'counts' }) {
     if (page === 'groupChildren') {
       return Array.isArray(trendData?.groupChildrenSeries) && trendData.groupChildrenSeries.length > 0;
     }
+    if (['entries', 'entryAge', 'corridor', 'regelAge'].includes(page)) {
+      const values = { entries: trendData?.entries, entryAge: trendData?.entryAgeYears, corridor: trendData?.corridorRemainPct, regelAge: trendData?.regelEntryAgeYears };
+      return (values[page] || []).some(Number.isFinite);
+    }
     return true;
   }, [page, trendData]);
 
@@ -2631,7 +2692,7 @@ function TrendHistoryChart({ trendData, accent, page = 'counts' }) {
             Keine historischen Werte
           </Title>
           <Text size="sm" c="dimmed" ta="center" className="analysis-diagram-placeholder-text">
-            Für den gewählten Kontext konnten keine historischen Monatswerte aggregiert werden.
+            Für den gewählten Kontext liegen keine auswertbaren historischen Werte vor.
           </Text>
         </Stack>
       </Paper>
@@ -2640,7 +2701,7 @@ function TrendHistoryChart({ trendData, accent, page = 'counts' }) {
 
   return (
     <Paper className="analysis-diagram-placeholder" withBorder p="xs">
-      <HighchartsReact highcharts={Highcharts} options={options} containerProps={{ style: { height: '100%' } }} />
+      <HighchartsReact highcharts={Highcharts} options={options} containerProps={{ 'data-testid': 'trend-history-chart', style: { height: '100%' } }} />
     </Paper>
   );
 }
@@ -2655,7 +2716,7 @@ const TREND_CHART_SLIDES = [
   { id: 'regelAge', title: 'Ø Alter beim Wechsel in Regelgruppe' },
 ];
 
-function TrendHistoryCarousel({ trendData, accent }) {
+function TrendHistoryCarousel({ trendData, accent, onPageChange }) {
   const [activeIndex, setActiveIndex] = React.useState(0);
   const [emblaApi, setEmblaApi] = React.useState(null);
   const [canGoPrev, setCanGoPrev] = React.useState(false);
@@ -2665,7 +2726,9 @@ function TrendHistoryCarousel({ trendData, accent }) {
     if (!emblaApi) return undefined;
 
     const updateState = () => {
-      setActiveIndex(emblaApi.selectedScrollSnap());
+      const index = emblaApi.selectedScrollSnap();
+      setActiveIndex(index);
+      onPageChange(TREND_CHART_SLIDES[index]?.id || 'counts');
       setCanGoPrev(emblaApi.canScrollPrev());
       setCanGoNext(emblaApi.canScrollNext());
     };
@@ -2678,7 +2741,7 @@ function TrendHistoryCarousel({ trendData, accent }) {
       emblaApi.off('select', updateState);
       emblaApi.off('reInit', updateState);
     };
-  }, [emblaApi]);
+  }, [emblaApi, onPageChange]);
 
   return (
     <Box className="analysis-coverage-carousel-wrap">
@@ -2690,15 +2753,18 @@ function TrendHistoryCarousel({ trendData, accent }) {
           <Badge variant="filled" size="md" className="analysis-coverage-carousel-counter">
             {activeIndex + 1}/{TREND_CHART_SLIDES.length}
           </Badge>
-          <ActionIcon variant="filled" size="md" className="analysis-coverage-carousel-nav" onClick={() => emblaApi?.scrollPrev()} disabled={!canGoPrev}>
+          <ActionIcon variant="filled" size="md" className="analysis-coverage-carousel-nav" aria-label="Vorheriges Trend-Diagramm" onClick={() => emblaApi?.scrollPrev()} disabled={!canGoPrev}>
             <IconChevronLeft size={14} />
           </ActionIcon>
-          <ActionIcon variant="filled" size="md" className="analysis-coverage-carousel-nav" onClick={() => emblaApi?.scrollNext()} disabled={!canGoNext}>
+          <ActionIcon variant="filled" size="md" className="analysis-coverage-carousel-nav" aria-label="Nächstes Trend-Diagramm" onClick={() => emblaApi?.scrollNext()} disabled={!canGoNext}>
             <IconChevronRight size={14} />
           </ActionIcon>
         </Group>
       </Group>
 
+      <Text size="xs" c="dimmed" data-testid="trend-filter-scope">
+        {activeIndex >= 5 ? 'Übergänge und Korridor zeigen die gesamte Einrichtung; Gruppen- und Qualifikationsfilter sind für dieses Diagramm deaktiviert. Die Kennzahlen bleiben gruppen- bzw. personalgefiltert.' : activeIndex === 0 || activeIndex === 2 ? 'Gruppen gelten am jeweiligen Stichtag; Qualifikationen nur für Mitarbeiter und Arbeitsstunden, nicht für Kinder und Buchungsstunden.' : 'Gruppen gelten am jeweiligen Stichtag bzw. Eintrittstag. Qualifikationen sind für Kinderkennzahlen nicht anwendbar.'} Monatswerte zählen aktive Personen einmal; bei mehreren Kindergruppen zählt die erste Zuordnung. Personal kann mehreren Gruppen angehören und wird in der Summe nur einmal gezählt; Stunden sind Wochenwerte, Arbeitsstunden pädagogisch. Offene Grenzen gelten fortdauernd, auch bei Qualifikationen; Abwesenheiten werden nicht abgezogen. Fehlende Buchungen ergeben keine Stunden; Eintritte zählen nur gespeicherte Beginne, die Vollständigkeit ist unbekannt. Jahresrandwerte können unvollständig sein.
+      </Text>
       <Carousel
         withIndicators
         withControls={false}
@@ -2750,13 +2816,14 @@ function TrendHistoryCarousel({ trendData, accent }) {
 
 const FORECAST_CHART_SLIDES = [
   { id: 'preview', title: 'Ausblick (Sankey)' },
-  { id: 'groups-timeline', title: 'Gruppenverlauf & Event-Timeline' },
+  { id: 'groups-timeline', title: 'Stufenverlauf & Ereignisse' },
   { id: 'booking-hours', title: 'Buchungsstunden-Verlauf' },
   { id: 'demography', title: 'Demografie-Prognose' },
 ];
 
 function ForecastStageCarousel({
   previewFlow,
+  inflowBasis,
   demographyData,
   accent,
   privacyMode = false,
@@ -2797,15 +2864,29 @@ function ForecastStageCarousel({
           <Badge variant="filled" size="md" className="analysis-coverage-carousel-counter">
             {activeIndex + 1}/{FORECAST_CHART_SLIDES.length}
           </Badge>
-          <ActionIcon variant="filled" size="md" className="analysis-coverage-carousel-nav" onClick={() => emblaApi?.scrollPrev()} disabled={!canGoPrev}>
+          <ActionIcon variant="filled" size="md" className="analysis-coverage-carousel-nav" aria-label="Vorheriges Diagramm" onClick={() => emblaApi?.scrollPrev()} disabled={!canGoPrev}>
             <IconChevronLeft size={14} />
           </ActionIcon>
-          <ActionIcon variant="filled" size="md" className="analysis-coverage-carousel-nav" onClick={() => emblaApi?.scrollNext()} disabled={!canGoNext}>
+          <ActionIcon variant="filled" size="md" className="analysis-coverage-carousel-nav" aria-label="Nächstes Diagramm" onClick={() => emblaApi?.scrollNext()} disabled={!canGoNext}>
             <IconChevronRight size={14} />
           </ActionIcon>
         </Group>
       </Group>
 
+      <Group gap="xs" wrap="wrap" aria-label="Stichtagszählung">
+        <Badge variant="outline" color="gray">Stichtag: {previewFlow?.referenceDate}</Badge>
+        {(previewFlow?.groupTimeline?.seriesByGroup || []).filter((series) => series.data[0] > 0).map((series) => (
+          <Badge key={series.groupId} variant="light" color="gray">{series.name}: {series.data[0]} (bekannt {series.sourceData.known[0]}, projiziert {series.sourceData.projected[0]}, ungeklärt {series.sourceData.unknown[0]})</Badge>
+        ))}
+      </Group>
+      <Text size="xs" c="dimmed">Sankey und Stufenverlauf zeigen den Stichtagsbestand, bekannte spätere Aufnahmen und angenommene Wechsel. Nur der Stufenverlauf enthält optional geschätzten Zulauf; das Sankey enthält niemals synthetische Kinder. Bekannte Zuordnungen und Austritte haben Vorrang; der letzte Betreuungstag zählt mit. Einschulung ohne Zuordnung bleibt ungeklärt, nicht Schulkindbetreuung, außer bei aktivem Auffüllen. Simulierter Zulauf ergänzt bekannte Aufnahmen bis zum gerundeten Mittel der Jahre mit berücksichtigten Aufnahmen: für die sechs Folgejahre ab 1. September, drei Jahre Krippe, danach Ende der Annahme; bei Gruppenfilter nicht simuliert. Der Gruppenfilter wählt Kinder anhand der Zuordnung am Stichtag bzw. Aufnahmetag. Buchungsstunden verwenden vorhandene Basisbuchungen einschließlich bekannter künftiger Änderungen; unbefristete Buchungen gelten weiter, solange das Kind betreut wird. Unbekannte Änderungen werden nicht prognostiziert, für simulierten Zulauf werden keine Stunden geschätzt.</Text>
+      <Text size="xs" c="orange">Offene Beginne werden als bereits anwesend, offene Enden als fortdauernd behandelt; das ist keine gesicherte Anwesenheit. „Bekannt“ bezeichnet die gespeicherte Zuordnung, nicht eine Garantie für künftige Betreuung. Fehlende oder widersprüchliche Gruppen bleiben ungeklärt.</Text>
+      <Text size="xs" c="orange" data-testid="forecast-inflow-basis">{inflowBasis}</Text>
+      <Text size="xs" c="orange" fw={600}>Auffüllen berücksichtigt alle bekannten Kinder der gesamten Einrichtung einschließlich ungeklärter Bedarfe. Bereits betreute Kandidaten zählen nur einmal; bei Überschreitung der Gesamtkapazität gibt es kein Angebot. Geschätzter Zulauf wird bei gültiger Gesamtkapazität nur berücksichtigt, wenn er während seines gesamten angenommenen Aufenthalts neben dem bekannten Bestand Platz hat. Ohne gültige Gesamtkapazität ist er nicht kapazitätsgeprüft. Abgelehnte Bedarfe bleiben ungeklärt und sind keine tatsächlichen Austritte; angenommene Schulkindbetreuung ist keine verbindliche Gruppenzuordnung. Maximale Schulklasse wird nicht prognostiziert.</Text>
+      {(previewFlow?.fillUp?.issues || []).map((issue) => <Text key={issue} size="xs" c="orange">{issue}</Text>)}
+      {(previewFlow?.fillUp?.decisions || []).filter((decision) => decision.status === 'rejected').length > 0 ? (
+        <Text size="xs" c="orange" data-testid="forecast-fillup-rejected">Nicht gedeckte Auffüllbedarfe: {previewFlow.fillUp.decisions.filter((decision) => decision.status === 'rejected').length} ({previewFlow.fillUp.decisions.filter((decision) => decision.status === 'rejected').map((decision) => decision.date).join(', ')}). Keine Austritte angenommen.</Text>
+      ) : null}
       <Carousel
         withIndicators
         withControls={false}
@@ -2923,6 +3004,8 @@ function VisuView() {
   const groupsByScenario = useSelector((state) => state.simGroup?.groupsByScenario || {});
   const groupDefsByScenario = useSelector((state) => state.simGroup?.groupDefsByScenario || {});
   const eventsByScenario = useSelector((state) => state.events?.eventsByScenario || {});
+  const forecastEventsAvailable = useSelector((state) => !selectedScenarioId || selectForecastEventsAvailable(state, selectedScenarioId));
+  const forecastEventsError = useSelector((state) => selectForecastEventsError(state, selectedScenarioId));
   const qualificationAssignmentsByScenario = useSelector(
     (state) => state.simQualification?.qualificationAssignmentsByScenario || {}
   );
@@ -2949,6 +3032,8 @@ function VisuView() {
   });
   const privacyMode = useSelector((state) => state.ui.privacyMode || false);
   const [demographyResolution, setDemographyResolution] = React.useState('quarter');
+  const [trendPage, setTrendPage] = React.useState('counts');
+  React.useEffect(() => { if (activeStep !== STORY_STEPS.findIndex((step) => step.id === 'trends')) setTrendPage('counts'); }, [activeStep]);
   const [simulateInflow, setSimulateInflow] = React.useState(false);
   const [monteCarloConfig, setMonteCarloConfig] = React.useState({
     runs: 1200,
@@ -2981,12 +3066,7 @@ function VisuView() {
   const qualityReferenceDate = React.useMemo(() => chartState?.referenceDate || todayIso, [chartState?.referenceDate, todayIso]);
   const activeStory = STORY_STEPS[activeStep] || STORY_STEPS[0];
   const settledStory = STORY_STEPS[settledStep] || STORY_STEPS[0];
-  const trendStatistics = useSelector((state) =>
-    selectHistoricalStatistics(state, {
-      aggregation: 'month',
-      asOfDate: qualityReferenceDate,
-    })
-  );
+
   const { getEffectiveDataItems, getEffectiveBookings, getEffectiveGroupAssignments, getEffectiveGroupDefs } = useOverlayData();
   const activeLoadingStages = React.useMemo(
     () => ANALYSIS_LOADING_STAGES_BY_STORY[settledStory.id] || [ANALYSIS_LOADING_STAGES[0]],
@@ -3000,11 +3080,14 @@ function VisuView() {
     [chartState?.filter?.Qualifications]
   );
 
+  const chartOverlayData = useSelector(selectOverlayAwareChartData);
   const [coverageData, setCoverageData] = React.useState(null);
   const [isAnalysisLoading, setIsAnalysisLoading] = React.useState(false);
   const [analysisLoadingStage, setAnalysisLoadingStage] = React.useState(0);
   const [statusHoverData, setStatusHoverData] = React.useState(null);
   const [heatmapMode, setHeatmapMode] = React.useState(HEATMAP_MODES.UNWEIGHTED_QUOTIENT);
+  const [modelCareKey, setModelCareKey] = React.useState('');
+  React.useEffect(() => { setModelCareKey(''); }, [selectedScenarioId]);
   const [qualityOnlyPlannedStaff, setQualityOnlyPlannedStaff] = React.useState(false);
   const handleStatusHoverChange = React.useCallback((data) => setStatusHoverData(data), []);
 
@@ -3020,7 +3103,7 @@ function VisuView() {
       return null;
     }
 
-    const overlayAware = buildOverlayAwareData(selectedScenarioId, {
+    const overlayAware = (needsCoverage && chartOverlayData) || buildOverlayAwareData(selectedScenarioId, {
       simScenario: { scenarios },
       simOverlay: { overlaysByScenario },
       simData: { dataByScenario },
@@ -3033,7 +3116,7 @@ function VisuView() {
     });
     const referenceDate = chartState?.referenceDate || new Date().toISOString().slice(0, 10);
     const fallbackCategories = generateTimeSegments();
-    const weeklyData = weeklyChartData?.categories?.length
+    const weeklyData = coverageWeeklyData(weeklyChartData?.categories?.length
       ? weeklyChartData
       : {
           categories: fallbackCategories,
@@ -3043,23 +3126,24 @@ function VisuView() {
           capacity_administrative: [],
           care_ratio: [],
           expert_ratio: [],
-        };
-    const categories = weeklyData.categories?.length ? weeklyData.categories : fallbackCategories;
-
-    const availableGroups = (overlayAware.effectiveGroupDefs || [])
-      .filter((group) => group && group.id)
-      .map((group) => ({ id: String(group.id), name: group.name || 'Gruppe' }));
-
-    const filteredGroups = selectedGroups.length
-      ? availableGroups.filter((group) => selectedGroups.includes(group.id))
-      : availableGroups;
-
-    const groupsForHeatmap = filteredGroups.length ? filteredGroups : [{ id: '__NO_GROUP__', name: 'Keine Gruppe' }];
+        });
+    const categories = weeklyData.categories;
 
     const rawDataItems = overlayAware.effectiveDataItems || {};
     const rawBookings = overlayAware.effectiveBookingsByItem || {};
     const rawGroupAssignments = overlayAware.effectiveGroupAssignmentsByItem || {};
-    const rawQualificationAssignments = overlayAware.effectiveQualificationAssignmentsByItem || {};
+    const rawQualificationAssignments = collectCoverageQualifications(
+      Object.keys(rawDataItems), overlayAware.scenarioChain, overlaysByScenario, qualificationAssignmentsByScenario
+    );
+    const selectedBookings = filterBookings({
+      bookingsByScenario: { [selectedScenarioId]: rawBookings },
+      dataByScenario: { [selectedScenarioId]: rawDataItems },
+      qualificationAssignmentsByScenario: { [selectedScenarioId]: rawQualificationAssignments },
+      groupsByScenario: { [selectedScenarioId]: rawGroupAssignments },
+      overlaysByScenario: {}, scenarioId: selectedScenarioId, referenceDate,
+      selectedGroups, selectedQualifications,
+    });
+    const groupsForHeatmap = coverageGroups(overlayAware.effectiveGroupDefs, selectedGroups, selectedBookings.demand, selectedBookings.capacity);
 
     const buildSnapshot = (excludedCapacityIds = []) => {
       const excludedSet = new Set((excludedCapacityIds || []).map((id) => String(id)));
@@ -3120,6 +3204,7 @@ function VisuView() {
       const heatValues = [];
       const groupUndercoverageMinutes = [];
       const groupCapacitySeriesByGroup = {};
+      const groupDemandSeriesByGroup = {};
 
       groupsForHeatmap.forEach((group, groupIndex) => {
         const groupFilter = group.id === '__NO_GROUP__' ? ['__NO_GROUP__'] : [group.id];
@@ -3128,19 +3213,17 @@ function VisuView() {
           selectedGroups: groupFilter,
         });
 
-        const groupDemandSeries = generateBookingDataSeries(referenceDate, groupDemand, categories);
-        const groupCapacitySeries = generateBookingDataSeries(referenceDate, groupCapacity, categories, 'all');
+        const groupMetrics = coverageGroupMetrics(categories, groupDemand, groupCapacity, scopedDataItems,
+          overlayAware.effectiveGroupDefs, overlayAware.effectiveQualificationDefs, referenceDate);
+        const groupDemandSeries = groupMetrics.demand;
+        const groupCapacitySeries = groupMetrics.capacity;
         groupCapacitySeriesByGroup[String(group.id)] = groupCapacitySeries.map((value) => Number(value || 0));
+        groupDemandSeriesByGroup[String(group.id)] = groupDemandSeries;
         hoursHistogram.byGroup[String(group.id)] = buildHistogramDataFromBookings(groupDemand, groupCapacity, sharedHistogramBins);
         zeitkatDistribution.byGroup[String(group.id)] = calculateZeitkatDistribution(groupDemand);
-        const groupPedCapacitySeries = generateBookingDataSeries(referenceDate, groupCapacity, categories, 'pedagogical');
-        const groupCareRatioSeries = generateCareRatioSeries(
-          categories,
-          groupDemand,
-          groupCapacity,
-          scopedDataItems,
-          overlayAware.effectiveGroupDefs || []
-        );
+        const groupPedCapacitySeries = groupMetrics.pedagogical;
+        const groupCareRatioSeries = groupMetrics.careRatio;
+        const groupExpertRatioSeries = groupMetrics.expertRatio;
         let groupMinutes = 0;
 
         categories.forEach((_, slotIndex) => {
@@ -3148,21 +3231,13 @@ function VisuView() {
           const capacityValue = Number(groupCapacitySeries[slotIndex] || 0);
           const pedagogicalValue = Number(groupPedCapacitySeries[slotIndex] || 0);
           const administrativeValue = Math.max(0, capacityValue - pedagogicalValue);
-          const careRatioValue = Number(groupCareRatioSeries[slotIndex] || 0);
-          const expertRatioValue = Number(weeklyData?.expert_ratio?.[slotIndex] || 0);
+          const careRatioValue = pedagogicalValue > 0 ? Number(groupCareRatioSeries[slotIndex] || 0) : null;
+          const expertRatioValue = pedagogicalValue > 0 ? Number(groupExpertRatioSeries[slotIndex] || 0) : null;
 
           const delta = capacityValue - demandValue;
           if (delta < 0) groupMinutes += Math.abs(delta) * 30;
 
-          let heatValue;
-          if (heatmapMode === HEATMAP_MODES.CARE_KEY) {
-            heatValue = careRatioValue;
-          } else if (heatmapMode === HEATMAP_MODES.PRESENT_STAFF) {
-            heatValue = pedagogicalValue;
-          } else {
-            // Default and primary mode: Kinder pro pädagogischer Mitarbeiter.
-            heatValue = pedagogicalValue > 0 ? demandValue / pedagogicalValue : (demandValue > 0 ? demandValue : 0);
-          }
+          const heatValue = coverageHeatValue(heatmapMode, demandValue, pedagogicalValue, careRatioValue);
 
           const slotLabel = categories[slotIndex] || '-';
           heatValues.push({
@@ -3197,6 +3272,9 @@ function VisuView() {
         heatValues,
         groupUndercoverageMinutes,
         groupCapacitySeriesByGroup,
+        groupDemandSeriesByGroup,
+        capacityBookings: capacity,
+        demandBookings: demand,
         hoursHistogram,
         zeitkatDistribution,
       };
@@ -3221,39 +3299,45 @@ function VisuView() {
 
     let monteCarloResult = null;
     if (needsResilience) {
-      const runs = Math.max(200, Math.min(20000, Number(monteCarloConfig?.runs || 1200)));
-      const simulationWeeks = Math.max(4, Math.min(52, Number(monteCarloConfig?.simulationWeeks || 26)));
-      const baseAbsenceProb = Math.max(0.01, Math.min(0.9, Number(monteCarloConfig?.baseAbsenceProbabilityPct || 14) / 100));
-      const maxConcurrentOutages = Math.max(1, Math.min(12, Number(monteCarloConfig?.maxConcurrentOutages || 3)));
-      const minExpertRatioPct = Math.max(0, Math.min(100, Number(monteCarloConfig?.minExpertRatioPct || LEGAL_EXPERT_RATIO_MIN_PCT)));
-      const maxCareRatioAllowed = Math.max(1, Math.min(30, Number(monteCarloConfig?.maxCareRatio || 8)));
-      const minGroupHeadcount = Math.max(0, Math.min(10, Number(monteCarloConfig?.minGroupHeadcount || 1)));
+      const config = normalizeResilienceConfig({ minExpertRatioPct: LEGAL_EXPERT_RATIO_MIN_PCT, ...monteCarloConfig });
+      const { runs, simulationWeeks, maxConcurrentOutages, minExpertRatioPct, minGroupHeadcount } = config;
+      const baseAbsenceProb = config.baseAbsenceProbabilityPct / 100;
+      const maxCareRatioAllowed = config.maxCareRatio;
       const minGroupHeadcountByGroup = (monteCarloConfig?.minGroupHeadcountByGroup && typeof monteCarloConfig.minGroupHeadcountByGroup === 'object')
         ? monteCarloConfig.minGroupHeadcountByGroup
         : {};
-      const maxUndercoverageSlots = Math.max(0, Math.min(200, Number(monteCarloConfig?.maxUndercoverageSlots || 4)));
-      const maxOvertimeHoursPerEmployeePerWeek = Math.max(0, Math.min(20, Number(monteCarloConfig?.maxOvertimeHoursPerEmployeePerWeek || 2)));
-      const maxTimeReductionHoursPerWeek = Math.max(0, Math.min(20, Number(monteCarloConfig?.maxTimeReductionHoursPerWeek || 3)));
-      const emergencyDemandReductionPct = Math.max(0, Math.min(80, Number(monteCarloConfig?.emergencyDemandReductionPct || 18)));
+      const { maxUndercoverageSlots, maxOvertimeHoursPerEmployeePerWeek, maxTimeReductionHoursPerWeek, emergencyDemandReductionPct } = config;
       const seasonalityEnabled = Boolean(monteCarloConfig?.seasonalityEnabled);
       const contagionEnabled = Boolean(monteCarloConfig?.contagionEnabled);
-      const contagionBoostPct = Math.max(0, Math.min(200, Number(monteCarloConfig?.contagionBoostPct || 28)));
-      const contagionDays = Math.max(0, Math.min(14, Number(monteCarloConfig?.contagionDays || 3)));
+      const { contagionBoostPct, contagionDays } = config;
       const childCompensationEnabled = Boolean(monteCarloConfig?.childCompensationEnabled);
-      const childCompensationRatePct = Math.max(0, Math.min(30, Number(monteCarloConfig?.childCompensationRatePct || 6)));
+      const { childCompensationRatePct } = config;
 
       const slotsPerDay = Math.max(1, Math.floor(categories.length / 5));
       const dayLabels = ['Mo', 'Di', 'Mi', 'Do', 'Fr'];
-      const groupCount = Math.max(1, groupsForHeatmap.length);
       const groupIdsForMonteCarlo = groupsForHeatmap.map((group) => String(group.id));
-      const baselineGroupCapacitySeries = baselineSnapshot?.groupCapacitySeriesByGroup || {};
-      const expertSeriesBase = (weeklyData?.expert_ratio || []).map((value) => Number(value || 0));
-      const demandSeriesBase = (weeklyData?.demand || []).map((value) => Number(value || 0));
-      const pedSeriesBase = (weeklyData?.capacity_pedagogical || []).map((value) => Number(value || 0));
-      const adminSeriesBase = (weeklyData?.capacity_administrative || []).map((value) => Number(value || 0));
-      const avgPedHeadcount = pedSeriesBase.length
-        ? pedSeriesBase.reduce((sum, value) => sum + value, 0) / pedSeriesBase.length
-        : 1;
+      const groupDemandSeries = { ...baselineSnapshot.groupDemandSeriesByGroup };
+      const unassignedDemand = baselineSnapshot.demandBookings.filter((booking) => !booking.groupId);
+      const unassignedCapacity = baselineSnapshot.capacityBookings.some((booking) => !booking.groupId);
+      if ((unassignedDemand.length || unassignedCapacity) && !groupIdsForMonteCarlo.includes('__NO_GROUP__')) {
+        groupIdsForMonteCarlo.push('__NO_GROUP__');
+        groupDemandSeries.__NO_GROUP__ = generateBookingDataSeries(referenceDate, unassignedDemand, categories);
+      }
+      const { capacity: workBookings } = filterBookings({
+        bookingsByScenario: { [selectedScenarioId]: rawBookings },
+        dataByScenario: { [selectedScenarioId]: rawDataItems },
+        qualificationAssignmentsByScenario: { [selectedScenarioId]: rawQualificationAssignments },
+        groupsByScenario: { [selectedScenarioId]: rawGroupAssignments },
+        overlaysByScenario: {}, scenarioId: selectedScenarioId, referenceDate,
+        selectedGroups: [], selectedQualifications, includeAllCapacityWork: true,
+      });
+      const staff = buildResilienceStaff(baselineSnapshot.capacityBookings, categories, overlayAware.effectiveQualificationDefs, workBookings);
+      const groupMinimums = Object.fromEntries(groupIdsForMonteCarlo.map((groupId) => {
+        const raw = minGroupHeadcountByGroup[groupId];
+        const value = raw == null || raw === '' ? minGroupHeadcount : Number(raw);
+        return [groupId, Number.isFinite(value) ? Math.max(0, Math.min(10, value)) : minGroupHeadcount];
+      }));
+      const demandSeriesBase = baselineSnapshot.demandSeries;
 
       const weeklySeasonality = [1.16, 1.14, 1.08, 1.0, 0.95, 0.9, 0.86, 0.88, 0.94, 1.0, 1.08, 1.15];
 
@@ -3298,13 +3382,15 @@ function VisuView() {
       };
 
       for (let run = 0; run < runs; run += 1) {
+        let contagionRemaining = 0;
         for (let weekIndex = 0; weekIndex < simulationWeeks; weekIndex += 1) {
-          const monthIndex = Math.floor((weekIndex / 4.33) % 12);
+          const weekDate = new Date(`${referenceDate}T12:00:00Z`);
+          weekDate.setUTCDate(weekDate.getUTCDate() + (weekIndex * 7));
+          const monthIndex = weekDate.getUTCMonth();
           const seasonalFactor = seasonalityEnabled ? weeklySeasonality[monthIndex] : 1;
-          const overtimeBudgetSlots = Math.max(0, Math.round(avgPedHeadcount * (maxOvertimeHoursPerEmployeePerWeek / SLOT_HOURS)));
-          let remainingOvertimeBudget = overtimeBudgetSlots;
-          let remainingTimeReductionSlots = Math.max(0, Math.round(maxTimeReductionHoursPerWeek / SLOT_HOURS));
-          let contagionRemaining = 0;
+          let overtimeRemaining = Object.fromEntries(staff.map((person) => [person.id, Math.floor(maxOvertimeHoursPerEmployeePerWeek / SLOT_HOURS)]));
+          let remainingTimeReductionSlots = Math.floor(maxTimeReductionHoursPerWeek / SLOT_HOURS);
+          let dayState = null;
           const dayClosedSlots = Array.from({ length: dayLabels.length }, () => 0);
           const dayClosureCombinationKeys = Array.from({ length: dayLabels.length }, () => Array.from({ length: slotsPerDay }, () => null));
 
@@ -3314,121 +3400,59 @@ function VisuView() {
             const dayIndex = Math.floor(slotIndex / slotsPerDay);
             const slotInDay = slotIndex % slotsPerDay;
             const demandBase = Number(demandSeriesBase[slotIndex] || 0);
-            const pedBase = Number(pedSeriesBase[slotIndex] || 0);
-            const adminBase = Number(adminSeriesBase[slotIndex] || 0);
-            const expertBase = Number(expertSeriesBase[slotIndex] || 0);
-
-            const contagionFactor = contagionEnabled && contagionRemaining > 0 ? (1 + (contagionBoostPct / 100)) : 1;
-            const absenceProb = Math.max(0.01, Math.min(0.95, baseAbsenceProb * seasonalFactor * contagionFactor));
-
-            let absentPed = 0;
-            const outageCap = Math.min(Math.round(pedBase), maxConcurrentOutages);
-            for (let workerIdx = 0; workerIdx < outageCap; workerIdx += 1) {
-              if (nextRandom() < absenceProb) absentPed += 1;
+            if (slotInDay === 0) {
+              dayState = drawResilienceDay(staff, slotIndex, slotsPerDay, baseAbsenceProb * seasonalFactor,
+                maxConcurrentOutages, contagionEnabled ? contagionRemaining : 0,
+                contagionBoostPct, contagionEnabled ? contagionDays : 0, nextRandom);
+              contagionRemaining = dayState.remaining;
             }
-
-            if (contagionEnabled && absentPed > 0) {
-              contagionRemaining = contagionDays;
-            } else if (contagionRemaining > 0) {
-              contagionRemaining -= 1;
+            if (demandBase <= 0 && !dayState.scheduled.some((person) => Object.keys(person.slots[slotIndex]).length > 0)) {
+              cascadeCounts[0] += 1;
+              continue;
             }
-
-            let effectivePed = Math.max(0, pedBase - absentPed);
+            const absentPed = dayState.scheduled.filter((person) => dayState.absent.has(person.id) && Object.keys(person.slots[slotIndex]).length > 0).length;
             let effectiveDemand = demandBase;
             if (childCompensationEnabled && absentPed > 0) {
               const demandFactor = Math.max(0.55, 1 - ((childCompensationRatePct / 100) * absentPed));
               effectiveDemand *= demandFactor;
             }
 
-            let totalStaff = effectivePed + adminBase;
-            const minimumStaffRequired = groupIdsForMonteCarlo.reduce((sum, groupId) => {
-              const rawMin = Number(minGroupHeadcountByGroup[groupId]);
-              const required = Number.isFinite(rawMin) ? rawMin : minGroupHeadcount;
-              return sum + Math.max(0, required);
-            }, 0);
-            const baselineGroupCapacityAtSlot = groupIdsForMonteCarlo.reduce((sum, groupId) => {
-              const series = baselineGroupCapacitySeries[groupId] || [];
-              return sum + Number(series[slotIndex] || 0);
-            }, 0);
-            const groupCapacityScalingFactor = baselineGroupCapacityAtSlot > 0
-              ? (totalStaff / baselineGroupCapacityAtSlot)
-              : 0;
-            const hasGroupMinViolation = groupIdsForMonteCarlo.some((groupId) => {
-              const rawMin = Number(minGroupHeadcountByGroup[groupId]);
-              const groupMinRequired = Number.isFinite(rawMin) ? rawMin : minGroupHeadcount;
-              const series = baselineGroupCapacitySeries[groupId] || [];
-              const baselineGroupCapacity = Number(series[slotIndex] || 0);
-              const effectiveGroupCapacity = baselineGroupCapacityAtSlot > 0
-                ? (baselineGroupCapacity * groupCapacityScalingFactor)
-                : (totalStaff / Math.max(1, groupCount));
-              return effectiveGroupCapacity + 1e-9 < Math.max(0, groupMinRequired);
-            });
-            let currentCareRatio = totalStaff > 0 ? effectiveDemand / totalStaff : Number.POSITIVE_INFINITY;
-            let currentExpertRatio = expertBase;
+            const groupDemand = Object.fromEntries(groupIdsForMonteCarlo.map((id) => [id, Number(groupDemandSeries[id]?.[slotIndex] || 0)]));
+            const slot = compensateResilienceSlot({ people: dayState.scheduled, absent: dayState.absent, slotIndex,
+              groupDemand, groupMinimums, demand: effectiveDemand, maxCareRatio: maxCareRatioAllowed,
+              minExpertRatioPct, overtimeRemaining });
+            overtimeRemaining = slot.overtimeRemaining;
+            let assessment = slot.assessment;
+            let stage = slot.used > 0 ? 1 : 0;
+            const reassess = () => evaluateResilienceConstraints({ groupStaff: slot.groupStaff, activeGroups: slot.activeGroups,
+              groupMinimums, staff: slot.staff, experts: slot.experts, demand: effectiveDemand,
+              maxCareRatio: maxCareRatioAllowed, minExpertRatioPct });
 
-            let stage = 0;
-            let isCompliant = (
-              totalStaff >= minimumStaffRequired
-              && !hasGroupMinViolation
-              && currentCareRatio <= maxCareRatioAllowed
-              && currentExpertRatio >= minExpertRatioPct
-            );
-
-            if (!isCompliant) {
-              const targetStaffForCare = Math.max(0, Math.ceil((effectiveDemand / Math.max(1, maxCareRatioAllowed)) - totalStaff));
-              const overtimeSlotsUsed = Math.min(targetStaffForCare, remainingOvertimeBudget);
-              if (overtimeSlotsUsed > 0) {
-                remainingOvertimeBudget -= overtimeSlotsUsed;
-                effectivePed += overtimeSlotsUsed;
-                totalStaff += overtimeSlotsUsed;
-                currentCareRatio = totalStaff > 0 ? effectiveDemand / totalStaff : Number.POSITIVE_INFINITY;
-                isCompliant = (
-                  totalStaff >= minimumStaffRequired
-                  && !hasGroupMinViolation
-                  && currentCareRatio <= maxCareRatioAllowed
-                  && currentExpertRatio >= minExpertRatioPct
-                );
-                stage = 1;
-              }
-            }
-
-            if (!isCompliant && remainingTimeReductionSlots > 0) {
+            if (!assessment.compliant && remainingTimeReductionSlots > 0 && assessment.careIssue) {
               const reductionFactor = Math.min(0.45, remainingTimeReductionSlots / Math.max(1, categories.length));
               effectiveDemand *= (1 - reductionFactor);
               remainingTimeReductionSlots -= 1;
-              currentCareRatio = totalStaff > 0 ? effectiveDemand / totalStaff : Number.POSITIVE_INFINITY;
-              isCompliant = (
-                totalStaff >= minimumStaffRequired
-                && !hasGroupMinViolation
-                && currentCareRatio <= maxCareRatioAllowed
-                && currentExpertRatio >= minExpertRatioPct
-              );
+              assessment = reassess();
               stage = 2;
             }
 
-            if (!isCompliant) {
+            if (!assessment.compliant && emergencyDemandReductionPct > 0 && assessment.careIssue) {
               effectiveDemand *= (1 - (emergencyDemandReductionPct / 100));
-              currentCareRatio = totalStaff > 0 ? effectiveDemand / totalStaff : Number.POSITIVE_INFINITY;
-              isCompliant = (
-                totalStaff >= minimumStaffRequired
-                && !hasGroupMinViolation
-                && currentCareRatio <= maxCareRatioAllowed
-                && currentExpertRatio >= minExpertRatioPct
-              );
+              assessment = reassess();
               stage = 3;
             }
 
-            if (!isCompliant) {
+            if (!assessment.compliant) {
               stage = 4;
               dayClosedSlots[dayIndex] += 1;
               closedSlotsAllRuns += 1;
               weekdayRiskAccumulator[dayIndex][slotInDay] += 1;
               periodRiskAccumulator[weekIndex][dayIndex] += 1;
 
-              const isHeadcountIssue = totalStaff < minimumStaffRequired;
-              const isGroupMinIssue = hasGroupMinViolation;
-              const isCareRatioIssue = currentCareRatio > maxCareRatioAllowed;
-              const isExpertIssue = currentExpertRatio < minExpertRatioPct;
+              const isHeadcountIssue = assessment.headcountIssue;
+              const isGroupMinIssue = assessment.hasGroupMinViolation;
+              const isCareRatioIssue = assessment.careIssue;
+              const isExpertIssue = assessment.expertIssue;
               const absenceBucket = absentPed >= 3 ? '3+' : String(absentPed);
               const factorLabels = [];
               if (isHeadcountIssue) factorLabels.push('Unterbesetzung');
@@ -3569,6 +3593,7 @@ function VisuView() {
         simulationWeeks,
         baseAbsenceProbabilityPct: baseAbsenceProb * 100,
         maxConcurrentOutages,
+        hasBookingData: staff.some((person) => person.slots.some((groups) => Object.keys(groups).length > 0)) && demandSeriesBase.some((value) => value > 0),
         resilienceScorePct,
         regularDaysPct,
         regularOperationPct,
@@ -3606,10 +3631,7 @@ function VisuView() {
     const deficitSlots = deficits.filter((value) => value > 0).length;
     const worstDeficit = deficits.length ? Math.max(0, ...deficits) : 0;
 
-    const weeklyCapacityHours = capacitySeries.reduce((sum, value) => sum + (Number(value || 0) * SLOT_HOURS), 0);
-    const weeklyDemandHours = demandSeries.reduce((sum, value) => sum + (Number(value || 0) * SLOT_HOURS), 0);
-    const monthlyCapacityFte = (weeklyCapacityHours * MONTHS_PER_WEEK) / MONTHLY_HOURS_PER_FTE;
-    const monthlyDemandFte = (weeklyDemandHours * MONTHS_PER_WEEK) / MONTHLY_HOURS_PER_FTE;
+    const hoursModel = coverageHoursModel(demandSeries, weeklyData?.capacity_pedagogical, modelCareKey);
 
     let financeTrend = {
       categories: [],
@@ -3617,9 +3639,9 @@ function VisuView() {
       expenses: [],
       net: [],
       kpis: {
-        costPerCarePoint: 0,
-        costCoveragePct: 0,
-        rollingNet: 0,
+        costPerCarePoint: null,
+        costCoveragePct: null,
+        rollingNet: null,
       },
     };
 
@@ -3627,59 +3649,57 @@ function VisuView() {
       const monthFormatter = new Intl.DateTimeFormat('de-DE', { month: 'short', year: '2-digit' });
       const baseDate = new Date(referenceDate);
       const shiftMonth = (date, offsetMonths) => {
-        const shifted = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + offsetMonths, 15));
+        const shifted = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + offsetMonths, 1));
         return shifted;
       };
 
+      // Like the midterm finance chart, the financial scope is the whole facility.
+      const financeDataItems = Object.fromEntries(Object.entries(rawDataItems).filter(([, item]) => !isArchivedDataItem(item)));
       const financeRows = Array.from({ length: 12 }, (_, idx) => {
         const monthDate = shiftMonth(baseDate, idx - 11);
         const monthRef = monthDate.toISOString().slice(0, 10);
-        const monthlyFinance = calculateScenarioMonthlyFinance({
+        const monthlyFinance = calculateAdebisScenarioMonthlyFinance({
           referenceDate: monthRef,
-          effectiveDataItems: rawDataItems,
+          effectiveDataItems: financeDataItems,
           effectiveBookingsByItem: rawBookings,
           effectiveGroupAssignmentsByItem: rawGroupAssignments,
           effectiveGroupDefs: overlayAware.effectiveGroupDefs || [],
           financeScenario,
         });
 
-        const carePoints = (monthlyFinance.childRows || []).reduce(
-          (sum, row) => sum + Number(row.bayKiBiGWeight || 0),
-          0
-        );
+        const activeChildren = (monthlyFinance.childRows || []).filter((row) => isRecordActiveOnDate(financeDataItems[row.itemId], monthRef));
+        const carePoints = activeChildren.some((row) => row.bayKiBiGAmount == null || !Number.isFinite(row.bayKiBiGWeight))
+          ? null : activeChildren.reduce((sum, row) => sum + row.bayKiBiGWeight, 0);
 
         return {
           label: monthFormatter.format(monthDate),
-          income: Number(monthlyFinance.summary?.incomeTotal || 0),
-          expenses: Number(monthlyFinance.summary?.expensesTotal || 0),
-          net: Number(monthlyFinance.summary?.net || 0),
+          income: monthlyFinance.summary.incomeTotal,
+          expenses: monthlyFinance.summary.expensesTotal,
+          net: monthlyFinance.summary.net,
           carePoints,
         };
       });
 
-      const latestFinance = financeRows[financeRows.length - 1] || {
-        income: 0,
-        expenses: 0,
-        net: 0,
-        carePoints: 0,
-      };
-
-      const costPerCarePoint = latestFinance.carePoints > 0
-        ? latestFinance.expenses / latestFinance.carePoints
-        : 0;
-      const costCoveragePct = latestFinance.expenses > 0
-        ? (latestFinance.income / latestFinance.expenses) * 100
-        : 0;
-      const rollingNet = financeRows.reduce((sum, row) => sum + Number(row.net || 0), 0);
+      const latestFinance = financeRows[financeRows.length - 1];
+      const costPerCarePoint = latestFinance.expenses != null && latestFinance.carePoints > 0
+        ? latestFinance.expenses / latestFinance.carePoints : null;
+      const costCoveragePct = latestFinance.income != null && latestFinance.expenses > 0
+        ? (latestFinance.income / latestFinance.expenses) * 100 : null;
+      const rollingNet = financeRows.some((row) => row.net == null)
+        ? null : financeRows.reduce((sum, row) => sum + row.net, 0);
 
       financeTrend = {
         categories: financeRows.map((row) => row.label),
         income: financeRows.map((row) => row.income),
         expenses: financeRows.map((row) => row.expenses),
         net: financeRows.map((row) => row.net),
+        missingIncomeMonths: financeRows.filter((row) => row.income == null).length,
+        missingExpenseMonths: financeRows.filter((row) => row.expenses == null).length,
         kpis: {
           costPerCarePoint,
+          costPerCarePointNoDenominator: latestFinance.expenses != null && latestFinance.carePoints === 0,
           costCoveragePct,
+          costCoverageNoDenominator: latestFinance.income != null && latestFinance.expenses === 0,
           rollingNet,
         },
       };
@@ -3689,7 +3709,7 @@ function VisuView() {
       categories,
       weeklyData: {
         ...weeklyData,
-        categories: weeklyData?.categories?.length ? weeklyData.categories : categories,
+        categories,
       },
       groupsForHeatmap,
       heatValues: baselineSnapshot.heatValues,
@@ -3701,8 +3721,7 @@ function VisuView() {
         maxCareRatio,
         avgExpertRatio,
         expertRatioUnderLegalSlots,
-        monthlyCapacityFte,
-        monthlyDemandFte,
+        ...hoursModel,
         deficitSlots,
         worstDeficit,
       },
@@ -3714,6 +3733,7 @@ function VisuView() {
   }, [
     bookingsByScenario,
     chartState,
+    chartOverlayData,
     dataByScenario,
     groupDefsByScenario,
     groupsByScenario,
@@ -3724,6 +3744,7 @@ function VisuView() {
     scenarios,
     monteCarloConfig,
     monteCarloRunId,
+    modelCareKey,
     selectedGroups,
     selectedQualifications,
     selectedScenarioId,
@@ -3914,6 +3935,25 @@ function VisuView() {
     selectedGroups,
   ]);
 
+  const qualityPseudonymsRef = React.useRef({ labels: new Map(), counts: { demand: 0, capacity: 0 } });
+  const qualityPseudonyms = React.useMemo(() => {
+    const registry = qualityPseudonymsRef.current;
+    const result = new Map();
+    Object.values(effectiveDataItems || {})
+      .filter((item) => item?.id != null && (item.type === 'demand' || item.type === 'capacity'))
+      .sort((a, b) => String(a.id).localeCompare(String(b.id)))
+      .forEach((item) => {
+        const key = JSON.stringify([selectedScenarioId, item.type, String(item.id)]);
+        if (!registry.labels.has(key)) {
+          const prefix = item.type === 'demand' ? 'Kind' : 'Mitarbeiter';
+          registry.counts[item.type] += 1;
+          registry.labels.set(key, `${prefix} ${registry.counts[item.type]}`);
+        }
+        result.set(String(item.id), registry.labels.get(key));
+      });
+    return result;
+  }, [effectiveDataItems, selectedScenarioId]);
+
   const qualityStaffScheduleData = React.useMemo(() => {
     const categories = generateTimeSegments();
     const hasGroupFilter = Array.isArray(selectedGroups) && selectedGroups.length > 0;
@@ -3978,7 +4018,7 @@ function VisuView() {
 
         return {
           id: itemId,
-          name: item.name || 'Mitarbeiter',
+          name: privacyMode ? qualityPseudonyms.get(itemId) || 'Mitarbeiter' : item.name || 'Mitarbeiter',
           groupId: groupId || '__NO_GROUP__',
           groupName: groupId ? (groupNameById.get(groupId) || 'Gruppe') : 'Ohne Gruppe',
           groupColor: groupId ? (groupColorById.get(groupId) || '#64748b') : '#64748b',
@@ -4055,778 +4095,48 @@ function VisuView() {
     getEffectiveBookings,
     getEffectiveGroupAssignments,
     groupDefs,
+    privacyMode,
     qualityOnlyPlannedStaff,
+    qualityPseudonyms,
     qualityReferenceDate,
     selectedScenarioId,
     selectedGroups,
   ]);
 
+  const forecastHistory = React.useMemo(() => (
+    Object.values(effectiveDataItems || {}).filter((item) => item?.type === 'demand' && shouldIncludeDataItemInAnalysis(item))
+  ), [effectiveDataItems]);
+  const inflowBasis = React.useMemo(() => {
+    const referenceDate = chartState?.referenceDate || todayIso;
+    const admissions = forecastHistory.filter((item) => item.startdate && item.startdate <= referenceDate);
+    const years = new Set(admissions.map((item) => String(item.startdate).slice(0, 4)));
+    const sample = years.size
+      ? `${admissions.length} Aufnahmedatensätze in ${years.size} Jahren; gerundetes Mittel ${Math.round(admissions.length / years.size)} pro Jahr`
+      : 'keine berücksichtigten Aufnahmedatensätze; kein Mittel berechenbar';
+    return `Zulauf-Datengrundlage bis ${referenceDate}: ${sample}. Nur nicht archivierte Kinder mit zulässigem Status; archivierte und andere Status sind ausgeschlossen. Jahre ohne berücksichtigte Aufnahmen zählen nicht, das Stichtagsjahr nur bis zum Stichtag. Datensätze werden nicht auf doppelte Aufnahmen geprüft; die Historie kann unvollständig sein. ${selectedGroups?.length ? 'Bei aktivem Gruppenfilter wird kein Zulauf simuliert.' : simulateInflow ? 'Zulaufschätzung eingeschaltet.' : 'Zulaufschätzung ausgeschaltet.'}`;
+  }, [chartState?.referenceDate, forecastHistory, selectedGroups, simulateInflow, todayIso]);
+
   const previewFlow = React.useMemo(() => {
     const referenceDate = chartState?.referenceDate || todayIso;
-    const inflowActive = Boolean(simulateInflow);
-    const noGroup = 'Ohne Gruppe';
-    const syntheticGroupIds = {
-      kita: '__AUTO_STAGE_KITA__',
-      school: '__AUTO_STAGE_SCHOOL__',
-      exit: '__AUTO_STAGE_EXIT__',
-    };
-    const dateLabelFormatter = new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
-
-    const groupsById = new Map((groupDefs || []).map((group) => [String(group.id), group.name || 'Gruppe']));
-    const groupMetaById = new Map((groupDefs || []).map((group) => [String(group.id), {
-      name: String(group?.name || ''),
-      type: String(group?.type || ''),
-    }]));
-    groupsById.set(syntheticGroupIds.kita, 'Kita');
-    groupsById.set(syntheticGroupIds.school, 'Schule');
-    groupsById.set(syntheticGroupIds.exit, 'Aus Einrichtung');
-    groupMetaById.set(syntheticGroupIds.kita, { name: 'Kita', type: 'Regelgruppe' });
-    groupMetaById.set(syntheticGroupIds.school, { name: 'Schule', type: 'Schulkindgruppe' });
-    groupMetaById.set(syntheticGroupIds.exit, { name: 'Aus Einrichtung', type: 'Exit' });
-
-    const fillUpSchoolGroupDefs = (groupDefs || []).filter((group) => (
-      String(group?.type || '') === 'Schulkindgruppe' && Boolean(group?.fillUp)
-    ));
-    const fillUpGroupIds = new Set(fillUpSchoolGroupDefs.map((group) => String(group.id)));
-    const configuredFacilityLimits = fillUpSchoolGroupDefs
-      .map((group) => String(group?.maxFacilityCount ?? '').trim())
-      .filter((rawLimit) => rawLimit !== '')
-      .map(Number)
-      .filter((limit) => Number.isFinite(limit) && limit >= 0);
-    const fillUpFacilityCapacity = configuredFacilityLimits.length > 0
-      ? Math.min(...configuredFacilityLimits)
-      : Infinity;
-
-    const maxSchoolGradeByGroup = new Map();
-    (groupDefs || []).forEach((group) => {
-      const gid = String(group.id);
-      const type = String(group?.type || '').toLowerCase();
-      const raw = Number(group?.maxSchoolGrade);
-      if (type.includes('schul') && Number.isFinite(raw) && raw > 0) {
-        maxSchoolGradeByGroup.set(gid, raw);
-      }
+    const selected = new Set((selectedGroups || []).map(String));
+    const children = Object.values(effectiveDataItems || {}).filter((item) => {
+      if (!item || item.type !== 'demand' || !shouldIncludeDataItemInAnalysis(item) || (item.enddate && item.enddate < referenceDate)) return false;
+      if (!selected.size) return true;
+      const date = item.startdate && item.startdate > referenceDate ? item.startdate : referenceDate;
+      const assignments = getEffectiveGroupAssignments(String(item.id));
+      const groupIds = resolveGroupIdsAtDate(assignments, date, getForecastGroupAssignments(assignments).length ? null : item.groupId);
+      return groupIds.length ? groupIds.some((id) => selected.has(String(id))) : selected.has('__NO_GROUP__');
     });
-
-    const getSchoolStartYear = (item) => {
-      const birthDate = parseIsoDateSafe(item?.dateofbirth);
-      if (!birthDate) return null;
-      const sixthBirthYear = birthDate.getUTCFullYear() + 6;
-      const sixthBirthMonth = birthDate.getUTCMonth() + 1;
-      return sixthBirthMonth <= 9 ? sixthBirthYear : sixthBirthYear + 1;
-    };
-
-    const getSchoolGradePriority = (item, dateIso) => {
-      const schoolStartYear = getSchoolStartYear(item);
-      if (!schoolStartYear) return Number.MAX_SAFE_INTEGER;
-      return Math.max(1, Number(String(dateIso).slice(0, 4)) - schoolStartYear + 1);
-    };
-
-    const computeSchoolGradeExitDate = (item, schoolGroupId) => {
-      const maxGrade = maxSchoolGradeByGroup.get(String(schoolGroupId || ''));
-      const schoolStartYear = getSchoolStartYear(item);
-      if (!maxGrade || !schoolStartYear) return null;
-      const exitYear = schoolStartYear + maxGrade;
-      return `${String(exitYear).padStart(4, '0')}-09-01`;
-    };
-
-    const schoolStayByChildId = new Map();
-    const isActiveForForecast = (item, dateIso, { schoolGroupId = null } = {}) => {
-      const date = String(dateIso || '');
-      if (item?.startdate && date < String(item.startdate)) return false;
-      const configuredExitDate = schoolGroupId
-        ? computeSchoolGradeExitDate(item, schoolGroupId)
-        : null;
-      if (configuredExitDate && date >= configuredExitDate) return false;
-      if (isRecordActiveOnDate(item, date)) return true;
-
-      const retainedSchoolStay = schoolStayByChildId.get(String(item?.id || ''));
-      return Boolean(
-        retainedSchoolStay
-        && retainedSchoolStay.groupId === String(schoolGroupId || '')
-        && date > retainedSchoolStay.endDate
-        && date >= retainedSchoolStay.startDate
-        && date < retainedSchoolStay.exitDate
-      );
-    };
-
-    const groupColorsById = (() => {
-      const map = {};
-      (groupDefs || []).forEach((group, idx) => {
-        map[String(group.id)] = FORECAST_GROUP_COLOR_PALETTE[idx % FORECAST_GROUP_COLOR_PALETTE.length];
-      });
-      map[String(syntheticGroupIds.kita)] = '#0ea5e9';
-      map[String(syntheticGroupIds.school)] = '#6366f1';
-      map[String(syntheticGroupIds.exit)] = '#cbd5e1';
-      map.__NO_GROUP__ = '#94a3b8';
-      return map;
-    })();
-
-    const isSchoolGroupDef = (group) => {
-      const type = String(group?.type || '').toLowerCase();
-      return type.includes('schul') || type.includes('hort');
-    };
-    const schoolGroupByType = (groupDefs || []).find((group) => isSchoolGroupDef(group) && !group?.fillUp)
-      || (groupDefs || []).find(isSchoolGroupDef);
-    const isSchoolGroupName = (group) => (
-      /^(schulkind(?:gruppe|betreuung)?|schulgruppe|schule|hort(?:gruppe)?)(?:$|[\s_-])/i.test(String(group?.name || '').trim())
-    );
-    const schoolGroupByName = (groupDefs || []).find((group) => isSchoolGroupName(group) && !group?.fillUp)
-      || (groupDefs || []).find(isSchoolGroupName);
-    const groupIdByStage = {
-      kita: String(
-        (groupDefs || []).find((group) => {
-          const type = String(group?.type || '').toLowerCase();
-          const name = String(group?.name || '').toLowerCase();
-          return type.includes('regel') || type.includes('kita') || name.includes('regel') || name.includes('kita');
-        })?.id || syntheticGroupIds.kita
-      ),
-      school: String(schoolGroupByType?.id || schoolGroupByName?.id || syntheticGroupIds.school),
-      exit: String(syntheticGroupIds.exit),
-    };
-
-    const formatGroupLabel = (groupIdRaw) => {
-      if (!groupIdRaw) return noGroup;
-      const groupId = String(groupIdRaw);
-      const baseName = groupsById.get(groupId) || noGroup;
-      if (fillUpGroupIds.has(groupId)) {
-        return `${baseName} (Auffuellen)`;
-      }
-      return baseName;
-    };
-
-    const getAgeBucketRank = (groupId) => getForecastGroupRank(
-      groupId,
-      groupMetaById.get(String(groupId || '')) || {},
-      syntheticGroupIds.exit
-    );
-
-    const hasGroupFilter = Array.isArray(selectedGroups) && selectedGroups.length > 0;
-    const selectedGroupSet = new Set((selectedGroups || []).map((value) => String(value)));
-
-    const allScenarioEvents = (eventsByScenario?.[selectedScenarioId] || []).filter((event) => {
-      if (!event || event.enabled === false) return false;
-      if (event.entityType !== 'demand') return false;
-      const eventDateIso = String(event?.simulatedDate || event?.effectiveDate || '');
-      if (!eventDateIso) return false;
-      return event.type === 'group_assignment_start'
-        || event.type === 'group_assignment_end'
-        || event.type === 'auto_group_transition';
-    });
-
-    const getEventDateIso = (event) => String(event?.simulatedDate || event?.effectiveDate || '');
-
-    const flowCounter = new Map();
-    const nodesById = new Map();
-
-    const makeNodeId = (dateIso, groupId) => `${dateIso}__${groupId || '__NO_GROUP__'}`;
-
-    const ensureNode = (dateIso, groupId, groupLabel) => {
-      const id = makeNodeId(dateIso, groupId);
-      if (!nodesById.has(id)) {
-        nodesById.set(id, {
-          id,
-          name: groupLabel,
-          dateIso,
-          groupId: groupId || '__NO_GROUP__',
-          groupLabel,
-          count: 0,
-        });
-      }
-      return id;
-    };
-
-    const addFlow = (fromNodeId, toNodeId, stepLabel, stepDateIso, weight = 1, children = []) => {
-      if (!fromNodeId || !toNodeId || weight <= 0) return;
-      const key = `${fromNodeId}__${toNodeId}__${stepDateIso || ''}`;
-      const current = flowCounter.get(key);
-      if (current) {
-        current.weight += weight;
-        current.children = [...(current.children || []), ...children];
-      } else {
-        flowCounter.set(key, {
-          from: fromNodeId,
-          to: toNodeId,
-          weight,
-          stepLabel,
-          stepDateIso,
-          children: [...children],
-        });
-      }
-    };
-
-    const forecastChildren = getActiveDemandChildrenAtDate(effectiveDataItems || {}, referenceDate);
-
-    const activeNowChildren = forecastChildren.filter((item) => {
-      const itemId = String(item.id);
-      const assignments = getEffectiveGroupAssignments(itemId);
-      const currentGroupId = resolveGroupIdAtDate(assignments, referenceDate, item.groupId || null);
-      if (!hasGroupFilter) return true;
-      if (!currentGroupId) return selectedGroupSet.has('__NO_GROUP__');
-      return selectedGroupSet.has(String(currentGroupId));
-    });
-
-    const activeNowChildIds = new Set(forecastChildren.map((item) => String(item.id || '')));
-    const scenarioEventsForActiveChildren = allScenarioEvents.filter((event) => activeNowChildIds.has(String(event?.entityId || '')));
-    const futureScenarioEvents = scenarioEventsForActiveChildren.filter((event) => {
-      const eventDateIso = String(event?.simulatedDate || event?.effectiveDate || '');
-      return eventDateIso >= referenceDate;
-    });
-
-    // Simulated inflow: synthetic "phantom" children entering each Sept 1 in forecast window
-    // Compute avg entries directly from dataByScenario historical startdates.
-    const simulatedInflowChildren = [];
-    if (inflowActive) {
-      const scenarioItemsForInflow = selectedScenarioId ? (dataByScenario?.[selectedScenarioId] || {}) : {};
-      const entryYearCounts = new Map();
-      Object.values(scenarioItemsForInflow).forEach((item) => {
-        if (!item || item.archived || item.type !== 'demand') return;
-        if (!shouldIncludeDataItemInAnalysis(item)) return;
-        const startIso = String(item.startdate || '');
-        if (!startIso) return;
-        const yearKey = startIso.slice(0, 4);
-        entryYearCounts.set(yearKey, Number(entryYearCounts.get(yearKey) || 0) + 1);
-      });
-      const entriesTotalVals = Array.from(entryYearCounts.values());
-      const avgAnnualEntries = entriesTotalVals.length > 0
-        ? entriesTotalVals.reduce((sum, v) => sum + v, 0) / entriesTotalVals.length
-        : 0;
-      if (avgAnnualEntries > 0) {
-        const refYear = Number(String(referenceDate).slice(0, 4));
-        const maxYears = 6;
-        for (let yearOffset = 1; yearOffset <= maxYears; yearOffset += 1) {
-          const entryYear = refYear + yearOffset;
-          const entryDate = `${entryYear}-09-01`;
-          const exitDate = `${entryYear + 3}-09-01`; // assume Krippe 3 years
-          const count = Math.round(avgAnnualEntries);
-          for (let i = 0; i < count; i += 1) {
-            simulatedInflowChildren.push({
-              _synthetic: true,
-              id: `__inflow__${entryYear}__${i}`,
-              name: `Zulauf ${entryYear} #${i + 1}`,
-              startdate: entryDate,
-              enddate: exitDate,
-              type: 'demand',
-              groupId: groupIdByStage.kita || null,
-            });
-          }
-        }
-      }
-    }
-
-    const assignmentDates = forecastChildren.flatMap((item) => (
-      getFutureGroupAssignmentDates(
-        getEffectiveGroupAssignments(String(item.id)),
-        referenceDate
-      )
-    ));
-
-    const autoTransitionsByItem = new Map();
-    scenarioEventsForActiveChildren
-      .filter((event) => event?.type === 'auto_group_transition' && event?.metadata?.targetStage)
-      .forEach((event) => {
-        const itemId = String(event.entityId || '');
-        if (!itemId) return;
-        const next = autoTransitionsByItem.get(itemId) || [];
-        next.push(event);
-        autoTransitionsByItem.set(itemId, next);
-      });
-    autoTransitionsByItem.forEach((events, itemId) => {
-      autoTransitionsByItem.set(
-        itemId,
-        [...events].sort((left, right) => {
-          const dateDiff = getEventDateIso(left).localeCompare(getEventDateIso(right));
-          if (dateDiff !== 0) return dateDiff;
-          return String(left.id || '').localeCompare(String(right.id || ''));
-        })
-      );
-    });
-
-    const resolveProjectedGroupIdAtDate = (item, dateIso, { ignoreExitTransitions = false } = {}) => {
-      const itemId = String(item?.id || '');
-      if (!itemId) return null;
-      const assignments = getEffectiveGroupAssignments(itemId);
-      const baseGroupId = resolveGroupIdAtDate(assignments, dateIso, item.groupId || null);
-      const applicable = (autoTransitionsByItem.get(itemId) || [])
-        .filter((event) => getEventDateIso(event) <= String(dateIso));
-      const projectedTransitions = ignoreExitTransitions
-        ? applicable.filter((event) => String(event?.metadata?.targetStage || '').toLowerCase() !== 'exit')
-        : applicable;
-      const lastTransition = projectedTransitions[projectedTransitions.length - 1];
-      if (!lastTransition) return baseGroupId;
-
-      const targetStage = String(lastTransition?.metadata?.targetStage || '').toLowerCase();
-      const canProject = shouldProjectAutoTransition(assignments, getEventDateIso(lastTransition), dateIso);
-      return canProject && Object.prototype.hasOwnProperty.call(groupIdByStage, targetStage)
-        ? (groupIdByStage[targetStage] || baseGroupId)
-        : baseGroupId;
-    };
-
-    forecastChildren.forEach((item) => {
-      const itemId = String(item.id || '');
-      const endDate = String(item.enddate || '');
-      if (!itemId || !endDate || endDate < referenceDate) return;
-
-      let schoolGroupId = String(resolveProjectedGroupIdAtDate(item, endDate, { ignoreExitTransitions: true }) || '');
-      let schoolStartDate = endDate;
-      if (!maxSchoolGradeByGroup.has(schoolGroupId)) {
-        const nextDay = new Date(`${endDate}T00:00:00Z`);
-        nextDay.setUTCDate(nextDay.getUTCDate() + 1);
-        const nextDayIso = nextDay.toISOString().slice(0, 10);
-        const nextGroupId = String(resolveProjectedGroupIdAtDate(item, nextDayIso, { ignoreExitTransitions: true }) || '');
-        const hasSchoolTransitionAtBoundary = (
-          (autoTransitionsByItem.get(itemId) || []).some((event) => (
-            String(event?.metadata?.targetStage || '').toLowerCase() === 'school'
-            && getEventDateIso(event) === nextDayIso
-          ))
-          || getForecastGroupAssignments(getEffectiveGroupAssignments(itemId)).some((assignment) => (
-            String(assignment.groupId || '') === nextGroupId
-            && String(assignment.start || '') === nextDayIso
-          ))
-        );
-        if (!maxSchoolGradeByGroup.has(nextGroupId) || !hasSchoolTransitionAtBoundary) return;
-        schoolGroupId = nextGroupId;
-        schoolStartDate = nextDayIso;
-      }
-
-      const gradeExitDate = computeSchoolGradeExitDate(item, schoolGroupId);
-      if (!gradeExitDate || gradeExitDate <= schoolStartDate) return;
-
-      const reassignedBeforeGradeExit = getForecastGroupAssignments(getEffectiveGroupAssignments(itemId)).some((assignment) => (
-        assignment.start
-        && String(assignment.start) > schoolStartDate
-        && String(assignment.start) < gradeExitDate
-        && String(assignment.groupId || '') !== schoolGroupId
-      ));
-      if (reassignedBeforeGradeExit) return;
-
-      schoolStayByChildId.set(itemId, { groupId: schoolGroupId, endDate, startDate: schoolStartDate, exitDate: gradeExitDate });
-    });
-
-    const scenarioEvents = futureScenarioEvents.filter((event) => {
-      const schoolStay = schoolStayByChildId.get(String(event?.entityId || ''));
-      if (!schoolStay) return true;
-      const eventDateIso = getEventDateIso(event);
-      if (
-        event?.type === 'auto_group_transition'
-        && String(event?.metadata?.targetStage || '').toLowerCase() === 'exit'
-        && eventDateIso >= schoolStay.endDate
-        && eventDateIso < schoolStay.exitDate
-      ) return false;
-      return !(
-        event?.type === 'group_assignment_end'
-        && String(event?.metadata?.groupId || '') === schoolStay.groupId
-        && eventDateIso > schoolStay.endDate
-        && eventDateIso < schoolStay.exitDate
-      );
-    });
-
-    const eventDates = Array.from(
-      new Set([
-        ...scenarioEvents.map((event) => getEventDateIso(event)).filter((dateIso) => Boolean(dateIso)),
-        ...assignmentDates,
-      ])
-    ).sort();
-    const capacityRejectedAtByChildId = new Map();
-    const admittedFillUpGroupByChildId = new Map();
-    const exitedAtByChildId = new Map();
-
-    const resolveGroupAtDate = (item, dateIso, { includeExit = true } = {}) => {
-      const itemId = String(item?.id || '');
-      const exitedAt = exitedAtByChildId.get(itemId);
-      if (exitedAt && String(dateIso) >= exitedAt) {
-        return includeExit
-          ? { groupId: String(syntheticGroupIds.exit), groupLabel: formatGroupLabel(syntheticGroupIds.exit) }
-          : { groupId: '__NO_GROUP__', groupLabel: noGroup };
-      }
-      const rejectedAt = capacityRejectedAtByChildId.get(itemId);
-      if (rejectedAt && String(dateIso) >= rejectedAt) {
-        return includeExit
-          ? { groupId: String(syntheticGroupIds.exit), groupLabel: formatGroupLabel(syntheticGroupIds.exit) }
-          : { groupId: '__NO_GROUP__', groupLabel: noGroup };
-      }
-      const groupIdRaw = resolveProjectedGroupIdAtDate(item, dateIso, { ignoreExitTransitions: true });
-      const groupId = groupIdRaw ? String(groupIdRaw) : '__NO_GROUP__';
-      const active = isActiveForForecast(item, dateIso, { schoolGroupId: groupId });
-      const applicableTransitions = (autoTransitionsByItem.get(itemId) || [])
-        .filter((event) => getEventDateIso(event) <= String(dateIso));
-      const lastTransition = applicableTransitions[applicableTransitions.length - 1];
-      const isProjectedExit = String(lastTransition?.metadata?.targetStage || '').toLowerCase() === 'exit'
-        && shouldProjectAutoTransition(
-          getEffectiveGroupAssignments(itemId),
-          getEventDateIso(lastTransition),
-          dateIso
-        );
-      const schoolStay = schoolStayByChildId.get(itemId);
-      const keepSchoolStay = schoolStay
-        && String(dateIso) >= schoolStay.endDate
-        && String(dateIso) < schoolStay.exitDate
-        && (String(dateIso) < schoolStay.startDate || schoolStay.groupId === groupId);
-
-      if (includeExit && (!active || (isProjectedExit && !keepSchoolStay))) {
-        return {
-          groupId: String(syntheticGroupIds.exit),
-          groupLabel: formatGroupLabel(syntheticGroupIds.exit),
-        };
-      }
-      if (!includeExit && !active) {
-        return {
-          groupId: '__NO_GROUP__',
-          groupLabel: noGroup,
-        };
-      }
-
-      const groupLabel = groupIdRaw ? formatGroupLabel(groupId) : noGroup;
-      return { groupId, groupLabel };
-    };
-
-    const timelineTailDates = forecastChildren.flatMap((item) => {
-      const dates = [];
-      const itemId = String(item?.id || '');
-      const enddateRaw = String(item?.enddate || '');
-      if (enddateRaw && enddateRaw >= referenceDate && !schoolStayByChildId.has(itemId)) dates.push(enddateRaw);
-      if (maxSchoolGradeByGroup.size > 0) {
-        const schoolGroupIds = new Set([
-          groupIdByStage.school,
-          ...(groupDefs || []).filter((group) => maxSchoolGradeByGroup.has(String(group.id))).map((group) => String(group.id)),
-        ]);
-        schoolGroupIds.forEach((groupId) => {
-          const exitDate = computeSchoolGradeExitDate(item, groupId);
-          if (!exitDate || exitDate < referenceDate) return;
-
-          const dayBeforeExit = new Date(`${exitDate}T00:00:00Z`);
-          dayBeforeExit.setUTCDate(dayBeforeExit.getUTCDate() - 1);
-          const groupBeforeExit = resolveGroupAtDate(item, dayBeforeExit.toISOString().slice(0, 10), { includeExit: false });
-          if (String(groupBeforeExit.groupId) === String(groupId)) dates.push(exitDate);
-        });
-      }
-      return dates;
-    });
-
-    const timelineDates = Array.from(new Set([referenceDate, ...eventDates, ...timelineTailDates])).sort();
-    const activeDataOrderById = new Map(forecastChildren.map((item, index) => [String(item.id || ''), index]));
-
-    timelineDates.forEach((dateIso) => {
-      const states = forecastChildren.map((item) => ({
-        item,
-        itemId: String(item.id || ''),
-        groupState: resolveGroupAtDate(item, dateIso),
-      }));
-      states.forEach(({ itemId, groupState }) => {
-        if (String(groupState.groupId) === String(syntheticGroupIds.exit) && !exitedAtByChildId.has(itemId)) {
-          exitedAtByChildId.set(itemId, dateIso);
-        }
-      });
-      const familyCounts = new Map();
-      states.forEach(({ item, itemId, groupState }) => {
-        if (String(groupState.groupId) === String(syntheticGroupIds.exit)) return;
-        const familyId = String(item.familyId || item.familyLabel || `child:${itemId}`);
-        familyCounts.set(familyId, Number(familyCounts.get(familyId) || 0) + 1);
-      });
-
-      let guaranteedChildren = 0;
-      let assignedFillUpChildren = 0;
-      const candidates = [];
-
-      states.forEach(({ item, itemId, groupState }) => {
-        if (String(groupState.groupId) === String(syntheticGroupIds.exit)) return;
-        const groupId = String(groupState.groupId || '__NO_GROUP__');
-        if (!fillUpGroupIds.has(groupId)) {
-          guaranteedChildren += 1;
-          return;
-        }
-
-        const assignments = getForecastGroupAssignments(getEffectiveGroupAssignments(itemId));
-        const assignedGroupId = String(resolveGroupIdAtDate(assignments, dateIso, item.groupId || null) || '');
-        const hasActiveFillUpAssignment = fillUpGroupIds.has(assignedGroupId) && (
-          String(item.groupId || '') === assignedGroupId
-          || assignments.some((assignment) => (
-            String(assignment.groupId || '') === assignedGroupId
-            && (!assignment.start || String(assignment.start) <= dateIso)
-            && (!assignment.end || String(assignment.end) >= dateIso)
-          ))
-        );
-        const exitDate = computeSchoolGradeExitDate(item, groupId);
-        const hasKnownFutureFillUpAssignment = assignments.some((assignment) => (
-          fillUpGroupIds.has(String(assignment.groupId || ''))
-          && assignment.start
-          && String(assignment.start) > dateIso
-          && (!exitDate || String(assignment.start) <= exitDate)
-        ));
-        const wasAdmitted = admittedFillUpGroupByChildId.has(itemId);
-
-        if (dateIso === referenceDate || hasActiveFillUpAssignment || hasKnownFutureFillUpAssignment || wasAdmitted) {
-          admittedFillUpGroupByChildId.set(itemId, groupId);
-          assignedFillUpChildren += 1;
-          return;
-        }
-
-        const familyId = String(item.familyId || item.familyLabel || `child:${itemId}`);
-        candidates.push({
-          id: itemId,
-          groupId,
-          gradePriority: getSchoolGradePriority(item, dateIso),
-          siblingPriority: Number(familyCounts.get(familyId) || 0) > 1 ? 1 : 0,
-          dataOrder: Number(activeDataOrderById.get(itemId) || 0),
-        });
-      });
-
-      const availablePlaces = Number.isFinite(fillUpFacilityCapacity)
-        ? Math.max(0, Math.floor(fillUpFacilityCapacity - guaranteedChildren - assignedFillUpChildren))
-        : Infinity;
-      const { accepted, rejected } = allocateFillUpCandidates(candidates, availablePlaces);
-      accepted.forEach((candidate) => admittedFillUpGroupByChildId.set(candidate.id, candidate.groupId));
-      rejected.forEach((candidate) => {
-        capacityRejectedAtByChildId.set(candidate.id, dateIso);
-        exitedAtByChildId.set(candidate.id, dateIso);
-      });
-    });
-
-    const stepSummaries = [];
-    let previousDate = timelineDates[0] || referenceDate;
-
-    timelineDates.slice(1).forEach((eventDate) => {
-      const stepLabel = dateLabelFormatter.format(parseIsoDateSafe(eventDate) || new Date(`${eventDate}T00:00:00Z`));
-      let changedInStep = 0;
-      let linkedInStep = 0;
-      const stepFlowCounter = new Map();
-
-      const addStepFlow = (fromNodeId, toNodeId, child, weight = 1) => {
-        if (!fromNodeId || !toNodeId || weight <= 0) return;
-        const key = `${fromNodeId}__${toNodeId}`;
-        const current = stepFlowCounter.get(key);
-        if (current) {
-          current.weight += weight;
-          current.children.push(child);
-        } else {
-          stepFlowCounter.set(key, { from: fromNodeId, to: toNodeId, weight, children: [child] });
-        }
-      };
-
-      activeNowChildren.forEach((item) => {
-        const fromState = resolveGroupAtDate(item, previousDate);
-        if (String(fromState.groupId) === String(syntheticGroupIds.exit)) return;
-        const toState = resolveGroupAtDate(item, eventDate);
-        const fromNodeId = ensureNode(previousDate, fromState.groupId, fromState.groupLabel);
-        const toNodeId = ensureNode(eventDate, toState.groupId, toState.groupLabel);
-
-        addStepFlow(fromNodeId, toNodeId, { id: String(item.id || ''), name: String(item.name || 'Kind') }, 1);
-        linkedInStep += 1;
-        if (fromState.groupId !== toState.groupId) {
-          changedInStep += 1;
-        }
-      });
-
-      if (linkedInStep > 0) {
-        stepFlowCounter.forEach((entry) => {
-          addFlow(entry.from, entry.to, stepLabel, eventDate, Number(entry.weight || 0), entry.children || []);
-        });
-        stepSummaries.push({
-          dateIso: eventDate,
-          label: stepLabel,
-          changed: changedInStep,
-          linked: linkedInStep,
-        });
-        previousDate = eventDate;
-      }
-    });
-
-    const links = Array.from(flowCounter.values())
-      .map((entry) => ({
-        from: entry.from,
-        to: entry.to,
-        weight: Number(entry.weight || 0),
-        stepLabel: entry.stepLabel,
-        stepDateIso: entry.stepDateIso,
-        children: Array.from(
-          new Map((entry.children || []).map((child) => [String(child.id || ''), child])).values()
-        ),
-      }))
-      .filter((entry) => entry.weight > 0);
-
-    const nodeCountById = new Map();
-    timelineDates.forEach((dateIso, dateIndex) => {
-      const previousDate = dateIndex > 0 ? timelineDates[dateIndex - 1] : null;
-      activeNowChildren.forEach((item) => {
-        const state = resolveGroupAtDate(item, dateIso);
-        if (String(state.groupId) === String(syntheticGroupIds.exit) && previousDate) {
-          const previousState = resolveGroupAtDate(item, previousDate);
-          if (String(previousState.groupId) === String(syntheticGroupIds.exit)) return;
-        }
-        const nodeId = ensureNode(dateIso, state.groupId, state.groupLabel);
-        nodeCountById.set(nodeId, Number(nodeCountById.get(nodeId) || 0) + 1);
-      });
-    });
-
-    const nodes = Array.from(nodesById.values()).map((node) => ({
-      id: node.id,
-      name: `${node.name}: ${Number(nodeCountById.get(node.id) || 0)} Kinder`,
-      groupId: node.groupId,
-      dateIso: node.dateIso,
-      rank: getAgeBucketRank(node.groupId),
-      stageLabel: node.dateIso === referenceDate
-        ? 'Stichtag'
-        : dateLabelFormatter.format(parseIsoDateSafe(node.dateIso) || new Date(`${node.dateIso}T00:00:00Z`)),
-    }));
-    const timelineLabels = timelineDates.map((dateIso) => dateLabelFormatter.format(parseIsoDateSafe(dateIso) || new Date(`${dateIso}T00:00:00Z`)));
-    const groupTimelineCounter = new Map();
-
-    timelineDates.forEach((dateIso, dateIndex) => {
-      const allForecastChildren = inflowActive
-        ? [...activeNowChildren, ...simulatedInflowChildren]
-        : activeNowChildren;
-
-      allForecastChildren.forEach((item) => {
-        const isSynthetic = Boolean(item._synthetic);
-        const state = isSynthetic
-          ? { groupId: String(item.groupId || groupIdByStage.kita || '__NO_GROUP__'), groupLabel: groupsById.get(String(item.groupId || '')) || 'Krippe (Zulauf)' }
-          : resolveGroupAtDate(item, dateIso);
-        if (isSynthetic ? !isRecordActiveOnDate(item, dateIso) : !isActiveForForecast(item, dateIso, { schoolGroupId: state.groupId })) return;
-        const groupId = String(state.groupId || '__NO_GROUP__');
-        if (!groupTimelineCounter.has(groupId)) {
-          groupTimelineCounter.set(groupId, {
-            groupId,
-            name: state.groupLabel,
-            color: groupColorsById[groupId] || '#64748b',
-            data: timelineDates.map(() => 0),
-            hoursData: timelineDates.map(() => 0),
-            childrenByIndex: timelineDates.map(() => []),
-          });
-        }
-        const groupSeries = groupTimelineCounter.get(groupId);
-        groupSeries.data[dateIndex] = Number(groupSeries.data[dateIndex] || 0) + 1;
-
-        if (!isSynthetic) {
-          // Accumulate weekly booking hours for this child at this date
-          const itemId = String(item.id || '');
-          const bookingsForItem = Object.values(getEffectiveBookings(itemId) || {});
-          const activeBookings = bookingsForItem.filter((b) => isRecordActiveOnDate(b, dateIso));
-          const childWeeklyHours = activeBookings.reduce((sum, booking) => {
-            let totalMins = 0;
-            (booking.times || []).forEach((day) => {
-              (day.segments || []).forEach((seg) => {
-                if (!seg.booking_start || !seg.booking_end) return;
-                const [sh, sm] = String(seg.booking_start).split(':').map(Number);
-                const [eh, em] = String(seg.booking_end).split(':').map(Number);
-                const mins = ((eh * 60 + em) - (sh * 60 + sm));
-                if (mins > 0) totalMins += mins;
-              });
-            });
-            return sum + (totalMins / 60);
-          }, 0);
-          groupSeries.hoursData[dateIndex] = Number(groupSeries.hoursData[dateIndex] || 0) + childWeeklyHours;
-          groupSeries.childrenByIndex[dateIndex].push({
-            id: itemId,
-            name: String(item.name || 'Kind'),
-          });
-        }
-      });
-    });
-
-    const seriesByGroup = Array.from(groupTimelineCounter.values())
-      .sort((left, right) => {
-        const leftRank = getAgeBucketRank(left.groupId);
-        const rightRank = getAgeBucketRank(right.groupId);
-        if (leftRank !== rightRank) return leftRank - rightRank;
-
-        const leftMax = Math.max(...left.data, 0);
-        const rightMax = Math.max(...right.data, 0);
-        if (leftMax !== rightMax) return rightMax - leftMax;
-        return String(left.name).localeCompare(String(right.name), 'de', { sensitivity: 'base' });
-      });
-
-    const eventByDate = scenarioEvents.reduce((accumulator, event) => {
-      const key = getEventDateIso(event);
-      if (!key) return accumulator;
-      if (!accumulator[key]) {
-        accumulator[key] = { total: 0, auto: 0, eventList: [] };
-      }
-      accumulator[key].total += 1;
-      if (event?.type === 'auto_group_transition') {
-        accumulator[key].auto += 1;
-      }
-      accumulator[key].eventList.push({
-        id: String(event?.id || ''),
-        type: String(event?.type || ''),
-        entityName: String(event?.entityName || ''),
-        description: String(event?.description || ''),
-        targetStage: String(event?.metadata?.targetStage || ''),
-      });
-      return accumulator;
-    }, {});
-
-    const timelinePoints = Object.entries(eventByDate)
-      .sort(([leftDate], [rightDate]) => String(leftDate).localeCompare(String(rightDate)))
-      .map(([dateIso, counts]) => ({
-        x: new Date(`${dateIso}T00:00:00Z`).getTime(),
-        name: `${Number(counts.total || 0)} Events`,
-        label: `${dateLabelFormatter.format(parseIsoDateSafe(dateIso) || new Date(`${dateIso}T00:00:00Z`))} · ${Number(counts.total || 0)}`,
-        description: `${Number(counts.auto || 0)} Auto-Events`,
-        count: Number(counts.total || 0),
-        autoCount: Number(counts.auto || 0),
-        dateLabel: dateLabelFormatter.format(parseIsoDateSafe(dateIso) || new Date(`${dateIso}T00:00:00Z`)),
-        eventList: counts.eventList || [],
-      }));
-
-    const changedLinks = links.filter((entry) => {
-      const fromNode = nodesById.get(entry.from);
-      const toNode = nodesById.get(entry.to);
-      return fromNode && toNode && fromNode.groupId !== toNode.groupId;
-    });
-
-    const changedVolumes = changedLinks.map((entry) => Number(entry.weight || 0));
-    const totalTransitions = changedVolumes.reduce((sum, value) => sum + value, 0);
-    const top3Transitions = [...changedVolumes].sort((a, b) => b - a).slice(0, 3).reduce((sum, value) => sum + value, 0);
-    const concentrationPct = totalTransitions > 0 ? (top3Transitions / totalTransitions) * 100 : 0;
-
-    const topTransition = changedLinks.reduce((best, current) => {
-      const currentWeight = Number(current.weight || 0);
-      if (!best || currentWeight > best.weight) {
-        const fromNode = nodesById.get(current.from);
-        const toNode = nodesById.get(current.to);
-        return {
-          from: fromNode?.name || '-',
-          to: toNode?.name || '-',
-          weight: currentWeight,
-        };
-      }
-      return best;
-    }, null);
-
-    return {
-      referenceDate,
-      eventDates: stepSummaries,
-      nodes,
-      links,
-      groupColorsById,
-      groupTimeline: {
-        dates: timelineDates,
-        labels: timelineLabels,
-        seriesByGroup,
-        timelinePoints,
-        rangeStartIso: timelineDates[0] || referenceDate,
-        rangeEndIso: timelineDates[timelineDates.length - 1] || referenceDate,
-      },
-      kpis: {
-        activeNowCount: activeNowChildren.length,
-        eventStepsCount: stepSummaries.length,
-        transitionCount: totalTransitions,
-        concentrationPct,
-        topTransition,
-      },
-    };
-  }, [
-    chartState?.referenceDate,
-    dataByScenario,
-    effectiveDataItems,
-    eventsByScenario,
-    getEffectiveBookings,
-    getEffectiveGroupAssignments,
-    groupDefs,
-    selectedGroups,
-    selectedScenarioId,
-    simulateInflow,
-    todayIso,
-  ]);
+    const assignmentsByChild = Object.fromEntries(forecastHistory.map((item) => [String(item.id), getEffectiveGroupAssignments(String(item.id))]));
+    const events = eventsByScenario?.[selectedScenarioId] || [];
+    const fillUp = buildForecastFillUp({ referenceDate, children: forecastHistory, groups: groupDefs || [], assignmentsByChild, events });
+    const inflow = simulateInflow && !selected.size
+      ? limitForecastInflow({ inflow: buildForecastInflow({ referenceDate, history: forecastHistory, futureAdmissions: children }), children: forecastHistory, capacity: fillUp.capacity })
+      : [];
+    const bookingsByChild = Object.fromEntries(children.map((item) => [String(item.id), getEffectiveBookings(String(item.id))]));
+    return buildForecastModel({ referenceDate, children, groups: groupDefs || [], assignmentsByChild, bookingsByChild, events, inflow, fillUp });
+  }, [chartState?.referenceDate, effectiveDataItems, eventsByScenario, getEffectiveBookings,
+    getEffectiveGroupAssignments, groupDefs, selectedGroups, selectedScenarioId, simulateInflow, todayIso, forecastHistory]);
 
   const demographyData = React.useMemo(() => {
     const referenceDate = chartState?.referenceDate || todayIso;
@@ -4851,73 +4161,12 @@ function VisuView() {
     const hasGroupFilter = Array.isArray(selectedGroups) && selectedGroups.length > 0;
     const groupFilterSet = new Set((selectedGroups || []).map((value) => String(value)));
 
-    const scenarioEvents = (eventsByScenario?.[selectedScenarioId] || []).filter((event) => (
-      event
-      && event.enabled !== false
-      && event.type === 'auto_group_transition'
-      && event.entityType === 'demand'
-      && event.effectiveDate
-      && event.metadata?.targetStage
-    ));
-
-    const autoTransitionsByItem = new Map();
-    scenarioEvents.forEach((event) => {
-      const itemId = String(event.entityId || '');
-      if (!itemId) return;
-      const next = autoTransitionsByItem.get(itemId) || [];
-      next.push(event);
-      autoTransitionsByItem.set(itemId, next);
-    });
-    autoTransitionsByItem.forEach((events, itemId) => {
-      autoTransitionsByItem.set(
-        itemId,
-        [...events].sort((left, right) => {
-          const dateDiff = String(left.effectiveDate).localeCompare(String(right.effectiveDate));
-          if (dateDiff !== 0) return dateDiff;
-          return String(left.id || '').localeCompare(String(right.id || ''));
-        })
-      );
-    });
-
-    const groupIdByStage = {
-      kita: String(
-        (groupDefs || []).find((group) => {
-          const type = String(group?.type || '').toLowerCase();
-          const name = String(group?.name || '').toLowerCase();
-          return type.includes('regel') || type.includes('kita') || name.includes('regel') || name.includes('kita');
-        })?.id || ''
-      ),
-      school: String(
-        (groupDefs || []).find((group) => {
-          const type = String(group?.type || '').toLowerCase();
-          const name = String(group?.name || '').toLowerCase();
-          return type.includes('schul') || name.includes('schul');
-        })?.id || ''
-      ),
-    };
-
-    const resolveProjectedGroupIdAtDate = (item, dateIso) => {
-      const itemId = String(item?.id || '');
-      if (!itemId) return null;
-
-      const baseGroupId = resolveGroupIdAtDate(getEffectiveGroupAssignments(itemId), dateIso, item.groupId || null);
-      const transitions = autoTransitionsByItem.get(itemId) || [];
-      if (!transitions.length) return baseGroupId;
-
-      const applicable = transitions.filter((event) => String(event.effectiveDate) <= String(dateIso));
-      if (!applicable.length) return baseGroupId;
-
-      const lastTransition = applicable[applicable.length - 1];
-      const targetStage = String(lastTransition?.metadata?.targetStage || '').toLowerCase();
-      const projectedGroupId = groupIdByStage[targetStage];
-      return projectedGroupId || baseGroupId;
-    };
 
     const isGroupSelected = (item, dateIso) => {
       if (!hasGroupFilter) return true;
-      const groupId = resolveProjectedGroupIdAtDate(item, dateIso);
-      if (!groupId) return groupFilterSet.has('__NO_GROUP__');
-      return groupFilterSet.has(String(groupId));
+      const assignments = getEffectiveGroupAssignments(String(item.id));
+      const groupIds = resolveGroupIdsAtDate(assignments, dateIso, getForecastGroupAssignments(assignments).length ? null : item.groupId);
+      return groupIds.length ? groupIds.some((id) => groupFilterSet.has(String(id))) : groupFilterSet.has('__NO_GROUP__');
     };
 
     const snapshots = Array.from({ length: 12 }, (_, idx) => {
@@ -4988,231 +4237,20 @@ function VisuView() {
   }, [
     chartState?.referenceDate,
     effectiveDataItems,
-    eventsByScenario,
     getEffectiveGroupAssignments,
-    groupDefs,
     selectedGroups,
-    selectedScenarioId,
     demographyResolution,
     todayIso,
   ]);
 
   const trendHistoryData = React.useMemo(() => {
-    const bucketsAll = Array.isArray(trendStatistics?.buckets) ? trendStatistics.buckets : [];
-    const reference = parseIsoDateSafe(qualityReferenceDate);
-    const cutoffDate = reference ? new Date(reference.getTime()) : null;
-    if (cutoffDate) cutoffDate.setUTCFullYear(cutoffDate.getUTCFullYear() - 10);
-    const cutoffIso = cutoffDate ? cutoffDate.toISOString().slice(0, 10) : null;
-    const buckets = cutoffIso
-      ? bucketsAll.filter((bucket) => String(bucket.evaluationDate || bucket.end || '') >= cutoffIso)
-      : bucketsAll;
-    const scenarioItems = selectedScenarioId ? (dataByScenario?.[selectedScenarioId] || {}) : {};
-    const trendYearCategories = (
-      Number.isInteger(cutoffDate?.getUTCFullYear()) && Number.isInteger(reference?.getUTCFullYear())
-        ? Array.from({ length: reference.getUTCFullYear() - cutoffDate.getUTCFullYear() + 1 }, (_, idx) => String(cutoffDate.getUTCFullYear() + idx))
-        : []
-    );
-
-    const categories = buckets.map((bucket) => String(bucket.label || ''));
-    const children = buckets.map((bucket) => Number(bucket.childrenCount || 0));
-    const bookingHours = buckets.map((bucket) => Number(bucket.bookingHours || 0));
-    const workingHours = buckets.map((bucket) => Number(bucket.careHours || 0));
-    const groupNamesById = new Map((groupDefs || []).map((group) => [String(group.id), String(group.name || 'Gruppe')]));
-    const childrenByGroupSeries = new Map();
-
-    buckets.forEach((bucket, bucketIndex) => {
-      const evalDate = String(bucket.evaluationDate || bucket.end || '');
-      if (!evalDate) return;
-
-      Object.values(scenarioItems).forEach((item) => {
-        if (!item || item.archived || item.type !== 'demand') return;
-        if (!shouldIncludeDataItemInAnalysis(item)) return;
-        if (!isRecordActiveOnDate(item, evalDate)) return;
-
-        const itemId = String(item.id || '');
-        const groupIdRaw = resolveGroupIdAtDate(getEffectiveGroupAssignments(itemId), evalDate, item.groupId || null);
-        const groupId = groupIdRaw ? String(groupIdRaw) : '__NO_GROUP__';
-        const groupName = groupIdRaw ? (groupNamesById.get(groupId) || 'Gruppe') : 'Ohne Gruppe';
-
-        if (!childrenByGroupSeries.has(groupId)) {
-          childrenByGroupSeries.set(groupId, {
-            name: groupName,
-            data: buckets.map(() => 0),
-          });
-        }
-        const series = childrenByGroupSeries.get(groupId);
-        series.data[bucketIndex] = Number(series.data[bucketIndex] || 0) + 1;
-      });
-    });
-
-    const groupChildrenSeries = Array.from(childrenByGroupSeries.values())
-      .map((series, idx) => {
-        const palette = ['#0ea5e9', '#14b8a6', '#22c55e', '#f97316', '#eab308', '#a855f7', '#ef4444', '#64748b'];
-        return {
-          type: 'line',
-          name: series.name,
-          data: series.data,
-          color: palette[idx % palette.length],
-        };
-      })
-      .sort((left, right) => String(left.name).localeCompare(String(right.name), 'de', { sensitivity: 'base' }));
-
-    const entryYearStart = cutoffDate ? cutoffDate.getUTCFullYear() : null;
-    const entryYearEnd = reference ? reference.getUTCFullYear() : null;
-    const entryYearCategories = (
-      Number.isInteger(entryYearStart) && Number.isInteger(entryYearEnd) && entryYearStart <= entryYearEnd
-    )
-      ? Array.from({ length: entryYearEnd - entryYearStart + 1 }, (_, idx) => String(entryYearStart + idx))
-      : [];
-
-    const entriesByYear = new Map(entryYearCategories.map((year) => [year, 0]));
-    const entryAgeSumByYear = new Map(entryYearCategories.map((year) => [year, 0]));
-    const entryAgeCountByYear = new Map(entryYearCategories.map((year) => [year, 0]));
-
-    Object.values(scenarioItems).forEach((item) => {
-      if (!item || item.archived || item.type !== 'demand') return;
-      if (!shouldIncludeDataItemInAnalysis(item)) return;
-
-      const startIso = String(item.startdate || '');
-      if (!startIso) return;
-      if (cutoffIso && startIso < cutoffIso) return;
-      if (String(startIso) > String(qualityReferenceDate)) return;
-
-      const yearKey = String(startIso).slice(0, 4);
-      if (!entriesByYear.has(yearKey)) return;
-
-      entriesByYear.set(yearKey, Number(entriesByYear.get(yearKey) || 0) + 1);
-
-      const dob = parseIsoDateSafe(item.dateofbirth);
-      const startDate = parseIsoDateSafe(startIso);
-      if (!dob || !startDate) return;
-
-      let years = startDate.getUTCFullYear() - dob.getUTCFullYear();
-      const monthDelta = startDate.getUTCMonth() - dob.getUTCMonth();
-      if (monthDelta < 0 || (monthDelta === 0 && startDate.getUTCDate() < dob.getUTCDate())) {
-        years -= 1;
-      }
-
-      const beforeBirthday = (
-        startDate.getUTCMonth() < dob.getUTCMonth()
-        || (startDate.getUTCMonth() === dob.getUTCMonth() && startDate.getUTCDate() < dob.getUTCDate())
-      );
-      const birthdayThisYear = new Date(Date.UTC(
-        startDate.getUTCFullYear(),
-        dob.getUTCMonth(),
-        dob.getUTCDate()
-      ));
-      const lastBirthday = beforeBirthday
-        ? new Date(Date.UTC(startDate.getUTCFullYear() - 1, dob.getUTCMonth(), dob.getUTCDate()))
-        : birthdayThisYear;
-      const dayMs = 24 * 60 * 60 * 1000;
-      const daysSinceBirthday = Math.max(0, Math.round((startDate.getTime() - lastBirthday.getTime()) / dayMs));
-      const ageYears = years + (daysSinceBirthday / 365.25);
-      if (!Number.isFinite(ageYears) || ageYears < 0) return;
-
-      entryAgeSumByYear.set(yearKey, Number(entryAgeSumByYear.get(yearKey) || 0) + ageYears);
-      entryAgeCountByYear.set(yearKey, Number(entryAgeCountByYear.get(yearKey) || 0) + 1);
-    });
-
-    const entries = entryYearCategories.map((year) => Number(entriesByYear.get(year) || 0));
-    const entryAgeYears = entryYearCategories.map((year) => {
-      const count = Number(entryAgeCountByYear.get(year) || 0);
-      if (count <= 0) return null;
-      const sum = Number(entryAgeSumByYear.get(year) || 0);
-      return Number((sum / count).toFixed(2));
-    });
-
-    const employees = buckets.map((bucket) => {
-      const evalDate = String(bucket.evaluationDate || bucket.end || '');
-      if (!evalDate) return 0;
-
-      return Object.values(scenarioItems).reduce((sum, item) => {
-        if (!item || item.archived || item.type !== 'capacity') return sum;
-        if (!shouldIncludeDataItemInAnalysis(item)) return sum;
-        if (!isRecordActiveOnDate(item, evalDate)) return sum;
-        return sum + 1;
-      }, 0);
-    });
-
-    const latestIndex = categories.length - 1;
-    const firstIndex = 0;
-    const avgChildren = children.length > 0 ? (children.reduce((sum, value) => sum + Number(value || 0), 0) / children.length) : 0;
-    const avgEmployees = employees.length > 0 ? (employees.reduce((sum, value) => sum + Number(value || 0), 0) / employees.length) : 0;
-    const avgEntries = entries.length > 0 ? (entries.reduce((sum, value) => sum + Number(value || 0), 0) / entries.length) : 0;
-    const entryAgeValid = entryAgeYears.filter((value) => Number.isFinite(value));
-    const avgEntryAgeYears = entryAgeValid.length > 0
-      ? (entryAgeValid.reduce((sum, value) => sum + Number(value || 0), 0) / entryAgeValid.length)
-      : 0;
-
-    const annualTransitionState = {
-      simScenario: { selectedScenarioId },
-      simData: { dataByScenario },
-      simBooking: { bookingsByScenario },
-      simGroup: { groupsByScenario, groupDefsByScenario },
-    };
-
-    const annualTransitionStats = trendYearCategories.map((year) => {
-      const asOfDate = `${year}-12-31`;
-      return selectGroupTransitionStatistics(annualTransitionState, {
-        asOfDate,
-        windowDays: 90,
-      });
-    });
-
-    const corridorRemainPct = annualTransitionStats.map((result) => Number(((result?.corridor?.remainProbability || 0) * 100).toFixed(1)));
-    const regelEntryAgeYears = annualTransitionStats.map((result, index) => {
-      const year = trendYearCategories[index];
-      const yearTransitions = Array.isArray(result?.transitions)
-        ? result.transitions.filter((transition) => transition.toGroupId === 'regelgruppe' && String(transition.date || '').startsWith(`${year}-`))
-        : [];
-      const ages = yearTransitions
-        .map((transition) => Number(transition.ageMonths))
-        .filter((value) => Number.isFinite(value));
-      if (ages.length === 0) return null;
-      return Number((ages.reduce((sum, value) => sum + value, 0) / ages.length / 12).toFixed(2));
-    });
-
-    const avgChildrenByGroup = groupChildrenSeries
-      .map((series) => {
-        const seriesAvg = series.data.length > 0
-          ? (series.data.reduce((sum, value) => sum + Number(value || 0), 0) / series.data.length)
-          : 0;
-        return { name: series.name, average: seriesAvg };
-      })
-      .sort((left, right) => right.average - left.average);
-
-    const avgChildrenByGroupSubtitle = avgChildrenByGroup.length > 0
-      ? avgChildrenByGroup.map((entry) => `${entry.name}: ${entry.average.toFixed(1)}`).join(' · ')
-      : 'Keine Gruppendaten verfügbar.';
-
-    return {
-      categories,
-      entryYearCategories,
-      children,
-      employees,
-      bookingHours,
-      workingHours,
-      entries,
-      entryAgeYears,
-      trendYearCategories,
-      corridorRemainPct,
-      regelEntryAgeYears,
-      groupChildrenSeries,
-      kpis: {
-        latestChildren: latestIndex >= 0 ? Number(children[latestIndex] || 0) : 0,
-        latestEmployees: latestIndex >= 0 ? Number(employees[latestIndex] || 0) : 0,
-        latestBookingHours: latestIndex >= 0 ? Number(bookingHours[latestIndex] || 0) : 0,
-        latestWorkingHours: latestIndex >= 0 ? Number(workingHours[latestIndex] || 0) : 0,
-        avgEntries,
-        avgEntryAgeYears,
-        avgChildren,
-        avgEmployees,
-        avgChildrenByGroupSubtitle,
-        childrenDelta: latestIndex > firstIndex ? Number(children[latestIndex] || 0) - Number(children[firstIndex] || 0) : 0,
-        bookingDelta: latestIndex > firstIndex ? Number(bookingHours[latestIndex] || 0) - Number(bookingHours[firstIndex] || 0) : 0,
-      },
-    };
-  }, [bookingsByScenario, dataByScenario, getEffectiveGroupAssignments, groupDefs, groupDefsByScenario, groupsByScenario, qualityReferenceDate, selectedScenarioId, trendStatistics]);
+    if (activeStory.id !== 'trends') return { kpis: {} };
+    return buildTrendHistory({
+      simScenario: { scenarios }, simOverlay: { overlaysByScenario }, simData: { dataByScenario },
+      simBooking: { bookingsByScenario }, simGroup: { groupsByScenario, groupDefsByScenario },
+      simQualification: { qualificationAssignmentsByScenario, qualificationDefsByScenario },
+    }, { scenarioId: selectedScenarioId, asOfDate: qualityReferenceDate, selectedGroups, selectedQualifications });
+  }, [activeStory.id, scenarios, overlaysByScenario, dataByScenario, bookingsByScenario, groupsByScenario, groupDefsByScenario, qualificationAssignmentsByScenario, qualificationDefsByScenario, selectedScenarioId, qualityReferenceDate, selectedGroups, selectedQualifications]);
 
   const stageRecommendations =
     activeStory.id === 'options'
@@ -5279,17 +4317,17 @@ function VisuView() {
             },
             {
               key: 'kpi-monthly-fte',
-              title: 'Monatliche Kapazität (FTE)',
-              value: `${coverageData?.kpis?.monthlyCapacityFte?.toFixed(2) || '0.00'}`,
-              text: `Monatlicher Bedarf: ${coverageData?.kpis?.monthlyDemandFte?.toFixed(2) || '0.00'} FTE`,
-              tone: (coverageData?.kpis?.monthlyCapacityFte || 0) >= (coverageData?.kpis?.monthlyDemandFte || 0) ? 'good' : 'warn',
+              title: 'Pädagogische Kapazität (Modell-FTE)',
+              value: coverageData ? coverageData.kpis.monthlyStaffFte.toFixed(2) : '–',
+              text: coverageData ? `${coverageData.kpis.weeklyChildHours.toFixed(1)} Kinderstunden/Woche · ${coverageData.kpis.weeklyStaffHours.toFixed(1)} päd. Personalstunden/Woche · ${coverageData.kpis.monthlyModelFte == null ? 'Kein Modell-Personalbedarf ohne Schlüssel' : `Modell-Personalbedarf ${coverageData.kpis.monthlyModelFte.toFixed(2)} FTE`}` : 'Berechnung läuft',
+              tone: 'neutral',
             },
             {
               key: 'kpi-hover-slot',
               title: statusHoverData?.label || 'Aktuelle Diagrammwerte',
               value: statusHoverData ? `${statusHoverData.demand} Kinder / ${statusHoverData.capacityPedagogical + statusHoverData.capacityAdministrative} MA` : '–',
-              text: statusHoverData ? `Schlüssel ${statusHoverData.careRatio.toFixed(2)} · Fachkraft ${statusHoverData.expertRatio.toFixed(0)}%` : 'Hover über das Diagramm',
-              tone: statusHoverData && statusHoverData.demand > (statusHoverData.capacityPedagogical + statusHoverData.capacityAdministrative) ? 'warn' : 'good',
+              text: statusHoverData ? `Schlüssel ${statusHoverData.careRatio == null || statusHoverData.capacityPedagogical <= 0 ? 'nicht definiert (keine päd. Kraft)' : statusHoverData.careRatio.toFixed(2)} · Fachkraftquote ${statusHoverData.expertRatio == null || statusHoverData.capacityPedagogical <= 0 ? 'nicht definiert' : `${statusHoverData.expertRatio.toFixed(0)}%`}` : 'Hover über das Diagramm',
+              tone: 'neutral',
             },
           ]
       : activeStory.id === 'transitions'
@@ -5297,23 +4335,23 @@ function VisuView() {
             {
               key: 'kpi-resilience-score',
               title: 'Resilienz-Score',
-              value: `${(coverageData?.resilience?.monteCarlo?.resilienceScorePct || 0).toFixed(1)}%`,
+              value: coverageData?.resilience?.monteCarlo?.hasBookingData ? formatResiliencePercent(coverageData.resilience.monteCarlo.resilienceScorePct) : 'Keine Daten',
               text: 'Toleranzgewichteter Tages-Score trotz Schließungsereignissen.',
-              tone: (coverageData?.resilience?.monteCarlo?.resilienceScorePct || 0) >= 70 ? 'good' : 'warn',
+              tone: 'neutral',
             },
             {
               key: 'kpi-closure-rate',
               title: 'Schließungsrate',
-              value: `${(coverageData?.resilience?.monteCarlo?.closurePct || 0).toFixed(1)}%`,
+              value: coverageData?.resilience?.monteCarlo?.hasBookingData ? formatResiliencePercent(coverageData.resilience.monteCarlo.closurePct) : 'Keine Daten',
               text: 'Anteil der Slots, die in Stufe Schließung enden.',
-              tone: (coverageData?.resilience?.monteCarlo?.closurePct || 0) > 8 ? 'warn' : 'good',
+              tone: 'neutral',
             },
             {
               key: 'kpi-cascade-regular',
               title: 'Kaskade: Regelbetrieb',
-              value: `${(coverageData?.resilience?.monteCarlo?.regularOperationPct || 0).toFixed(1)}%`,
+              value: coverageData?.resilience?.monteCarlo?.hasBookingData ? formatResiliencePercent(coverageData.resilience.monteCarlo.regularOperationPct) : 'Keine Daten',
               text: 'Slots, die ohne Kompensationsstufe gelöst wurden.',
-              tone: (coverageData?.resilience?.monteCarlo?.regularOperationPct || 0) >= 60 ? 'good' : 'warn',
+              tone: 'neutral',
             },
             {
               key: 'kpi-simulation-profile',
@@ -5328,23 +4366,23 @@ function VisuView() {
             {
               key: 'kpi-cost-per-care-point',
               title: 'Kosten pro Betreuungspunkt',
-              value: `${(coverageData?.financeTrend?.kpis?.costPerCarePoint || 0).toFixed(0)} EUR`,
-              text: 'Monatsausgaben je BayKiBiG-Betreuungspunkt.',
+              value: coverageData?.financeTrend?.kpis?.costPerCarePoint == null ? (coverageData?.financeTrend?.kpis?.costPerCarePointNoDenominator ? 'Nicht berechenbar' : 'Ungeklärt') : `${coverageData.financeTrend.kpis.costPerCarePoint.toFixed(0)} EUR`,
+              text: 'Personalkosten je Gewichtungspunkt am Monatsanfang; ohne Punkte oder bei fehlenden Angaben nicht berechenbar.',
               tone: 'warn',
             },
             {
               key: 'kpi-coverage',
               title: 'Kostendeckungsgrad',
-              value: `${(coverageData?.financeTrend?.kpis?.costCoveragePct || 0).toFixed(1)}%`,
-              text: 'Monatseinnahmen im Verhältnis zu Monatsausgaben.',
-              tone: (coverageData?.financeTrend?.kpis?.costCoveragePct || 0) >= 100 ? 'good' : 'warn',
+              value: coverageData?.financeTrend?.kpis?.costCoveragePct == null ? (coverageData?.financeTrend?.kpis?.costCoverageNoDenominator ? 'Nicht berechenbar' : 'Ungeklärt') : `${coverageData.financeTrend.kpis.costCoveragePct.toFixed(1)}%`,
+              text: 'Bruttobeiträge und Basisförderung im Verhältnis zu Personalkosten; bei null Kosten oder fehlenden Angaben nicht berechenbar.',
+              tone: coverageData?.financeTrend?.kpis?.costCoveragePct == null ? 'warn' : coverageData.financeTrend.kpis.costCoveragePct >= 100 ? 'good' : 'warn',
             },
             {
               key: 'kpi-rolling-net',
               title: 'Saldo 12 Monate',
-              value: `${(coverageData?.financeTrend?.kpis?.rollingNet || 0).toFixed(0)} EUR`,
-              text: 'Kumuliertes Ergebnis über den 12-Monatsverlauf.',
-              tone: (coverageData?.financeTrend?.kpis?.rollingNet || 0) >= 0 ? 'good' : 'problem',
+              value: coverageData?.financeTrend?.kpis?.rollingNet == null ? 'Ungeklärt' : `${coverageData.financeTrend.kpis.rollingNet.toFixed(0)} EUR`,
+              text: 'Summe der zwölf Monatssalden; bei einer Lücke nicht berechenbar.',
+              tone: coverageData?.financeTrend?.kpis?.rollingNet == null ? 'warn' : coverageData.financeTrend.kpis.rollingNet >= 0 ? 'good' : 'problem',
             },
           ]
       : activeStory.id === 'compare'
@@ -5353,14 +4391,14 @@ function VisuView() {
               key: 'kpi-active-now',
               title: 'Aktive Kinder (Stichtag)',
               value: `${previewFlow?.kpis?.activeNowCount || 0}`,
-              text: 'Kohorte fur den Verlauf ohne externe Zugange.',
+              text: 'Kinder am Stichtag; spätere Aufnahmen erscheinen im Sankey und Stufenverlauf, geschätzter Zulauf nur im Stufenverlauf.',
               tone: 'good',
             },
             {
               key: 'kpi-transition-steps',
               title: 'Ereignisschritte mit Wechseln',
               value: `${previewFlow?.kpis?.eventStepsCount || 0}`,
-              text: `${previewFlow?.kpis?.transitionCount || 0} Gruppenwechsel uber alle bekannten Ereigniszeitpunkte.`,
+              text: `${previewFlow?.kpis?.transitionCount || 0} Stufenwechsel einschließlich Annahmen und Austritten.`,
               tone: (previewFlow?.kpis?.eventStepsCount || 0) > 0 ? 'good' : 'warn',
             },
             {
@@ -5369,7 +4407,7 @@ function VisuView() {
               value: `${(previewFlow?.kpis?.concentrationPct || 0).toFixed(1)}%`,
               text: previewFlow?.kpis?.topTransition
                 ? `Großter Einzelubergang: ${previewFlow.kpis.topTransition.from} -> ${previewFlow.kpis.topTransition.to} (${previewFlow.kpis.topTransition.weight}).`
-                : 'Keine gruppenbezogenen Ubergange im Zeitraum.',
+                : 'Keine Stufenübergänge im Zeitraum.',
               tone: (previewFlow?.kpis?.concentrationPct || 0) > 70 ? 'warn' : 'good',
             },
             {
@@ -5392,28 +4430,28 @@ function VisuView() {
             {
               key: 'kpi-trend-inflow',
               title: 'Durchschnittlicher Zulauf',
-              value: `${(trendHistoryData?.kpis?.avgEntries || 0).toFixed(1)}`,
-              text: 'Ø Neu-Anmeldungen pro Jahr über 10 Jahre.',
+              value: trendHistoryData?.kpis?.avgEntries == null ? '–' : trendHistoryData.kpis.avgEntries.toFixed(1),
+              text: 'Ø Eintritte pro Kalenderjahr im 10-Jahres-Fenster; Randjahre können unvollständig sein.',
               tone: 'good',
             },
             {
               key: 'kpi-trend-entry-age',
               title: 'Durchschnittliches Eintrittsalter',
-              value: `${(trendHistoryData?.kpis?.avgEntryAgeYears || 0).toFixed(2)} Jahre`,
+              value: trendHistoryData?.kpis?.avgEntryAgeYears == null ? '–' : `${trendHistoryData.kpis.avgEntryAgeYears.toFixed(2)} Jahre`,
               text: 'Gemittelt über die jährlichen Eintrittsalter.',
               tone: 'good',
             },
             {
               key: 'kpi-trend-children-average',
               title: 'Durchschnittliche Kinderanzahl',
-              value: `${(trendHistoryData?.kpis?.avgChildren || 0).toFixed(1)}`,
+              value: trendHistoryData?.kpis?.avgChildren == null ? '–' : trendHistoryData.kpis.avgChildren.toFixed(1),
               text: trendHistoryData?.kpis?.avgChildrenByGroupSubtitle || 'Keine Gruppendaten verfügbar.',
               tone: 'good',
             },
             {
               key: 'kpi-trend-employees-average',
               title: 'Durchschnittliche MitarbeiterZahl',
-              value: `${(trendHistoryData?.kpis?.avgEmployees || 0).toFixed(1)}`,
+              value: trendHistoryData?.kpis?.avgEmployees == null ? '–' : trendHistoryData.kpis.avgEmployees.toFixed(1),
               text: 'Ø aktive Kapazität über die historischen Buckets.',
               tone: 'good',
             },
@@ -5484,7 +4522,7 @@ function VisuView() {
     >
       <Box className="analysis-album-flow-root">
         <Paper p="xs" className="analysis-album-flow-shell">
-          <Box className="analysis-story-stepper-scroll" data-testid="analysis-story-navigation">
+          <Box className="analysis-story-stepper-scroll" data-testid="analysis-story-navigation" role="region" aria-label="Analysebereiche" tabIndex={0}>
             <Stepper
               active={activeStep}
               onStepClick={handleStepChange}
@@ -5493,7 +4531,6 @@ function VisuView() {
               size="xs"
               iconSize={24}
               className="analysis-story-stepper"
-              aria-label="Analysebereiche"
             >
               {STORY_STEPS.map((story) => {
                 const StoryIcon = story.icon;
@@ -5518,6 +4555,17 @@ function VisuView() {
         p="xs"
         withBorder
       >
+        {activeStory.id === 'compare' && !forecastEventsAvailable && (
+          <Text role="alert" size="sm" c="orange" data-testid="forecast-events-unavailable">
+            Prognose unvollständig: {forecastEventsError || 'Ereignisse sind nicht verfügbar oder werden aktualisiert.'}
+          </Text>
+        )}
+        {activeStory.id === 'status' && (
+          <Group align="end" gap="sm" mb="xs">
+            <NumberInput label="Modell-Betreuungsschlüssel (Kinder je päd. Kraft)" value={modelCareKey} onChange={setModelCareKey} min={0.1} decimalScale={2} placeholder="Keine Annahme" w={280} />
+            <Text size="xs" c="dimmed" data-testid="coverage-model-basis">Optionale Modellannahme für diese Ansicht, keine Rechtsvorgabe oder Rechtsprüfung; beim Szenariowechsel zurückgesetzt. Kinderstunden ÷ Schlüssel; 4,33 Wochen/Monat, 160 Stunden/FTE. Für diese Modellstunden: Mo–Fr 7:00 bis 17:00 Uhr (Ende ausgeschlossen), 30-Minuten-Slots mit dem Belegungsstand am Slotbeginn. Bei Zwischenzeiten ist dies eine Näherung; keine Ausfall-, Vorbereitungs- oder Gruppenmindestzeiten und keine Bedarfsdeckung im Einzelzeitpunkt. Stunden- und Buchungszeitkategorien-Histogramme werten die vollständigen Buchungen aus.</Text>
+          </Group>
+        )}
         {stageRecommendations.length > 0 ? (
           <Group grow align="stretch" gap="xs" className="analysis-stage-recommendations" data-testid="analysis-stage-recommendations">
             {stageRecommendations.map((item) => (
@@ -5551,7 +4599,7 @@ function VisuView() {
                         openDataItem(record.id);
                       }}
                     >
-                      {record.name} ({record.missingReasons.join(', ')})
+                      {privacyMode ? qualityPseudonyms.get(record.id) || (record.type === 'demand' ? 'Kind' : 'Mitarbeiter') : record.name} ({record.missingReasons.join(', ')})
                     </Anchor>
                   ))}
                   {item.records.length > 4 && (
@@ -5602,6 +4650,7 @@ function VisuView() {
               qualityDonutData={qualityDonutData}
               qualityStaffScheduleData={qualityStaffScheduleData}
               accent={activeStory.accent}
+              privacyMode={privacyMode}
             />
           ) : activeStory.id === 'status' ? (
             <CoverageStageCarousel
@@ -5626,6 +4675,7 @@ function VisuView() {
           ) : activeStory.id === 'compare' ? (
             <ForecastStageCarousel
               previewFlow={previewFlow}
+              inflowBasis={inflowBasis}
               demographyData={demographyData}
               accent={activeStory.accent}
               privacyMode={privacyMode}
@@ -5633,7 +4683,7 @@ function VisuView() {
               onDemographyResolutionChange={setDemographyResolution}
             />
           ) : activeStory.id === 'trends' ? (
-            <TrendHistoryCarousel trendData={trendHistoryData} accent={activeStory.accent} />
+            <TrendHistoryCarousel trendData={trendHistoryData} accent={activeStory.accent} onPageChange={setTrendPage} />
           ) : activeStory.id === 'options' ? (
             <FundingSimulationPanel accent={activeStory.accent} scrollPage />
           ) : (
@@ -5642,18 +4692,43 @@ function VisuView() {
         </Box>
 
         <Box className="analysis-stage-filterbar" data-testid="analysis-stage-filterbar">
+          {activeStory.id === 'transitions' ? (
+            <Box data-testid="analysis-resilience-basis" px="xs" mb={4} style={{ minWidth: 0, flex: '1 1 auto', maxHeight: '7rem', overflowY: 'auto' }}>
+              {coverageData?.resilience?.monteCarlo && !coverageData.resilience.monteCarlo.hasBookingData ? <Text size="xs" c="orange">Im betrachteten Zeitfenster fehlen Bedarfs- oder pädagogische Personalbuchungen; die Modellwerte sind nicht belastbar.</Text> : null}
+              <Text size="xs" c="dimmed">Modell, keine Prognose oder Rechtsprüfung. Werte sind zufallsabhängige, nicht empirisch kalibrierte Schätzungen; wenige Läufe und seltene Ereignisse sind besonders unsicher. Wiederholte Slots und Tage sind keine unabhängigen Stichproben. Die gefilterte Stichtagswoche wird Mo–Fr von 7:00 bis 17:00 Uhr (Ende ausgeschlossen) in 30-Minuten-Slots wiederholt; Bedarf und Personal werden am Slotbeginn erfasst. Ausfälle werden pro eingeplanter Person und Betriebstag unabhängig gezogen und auf das Tagesmaximum begrenzt; ein Ausfall dauert einen Tag. Der Ansteckungsschub gilt für die folgenden Betriebstage, auch über Wochenenden hinweg. Saisonfaktoren sind pauschale Annahmen.</Text>
+              <Text size="xs" c="dimmed">Nur pädagogische Buchungen zählen; Gruppenanteile und Qualifikation folgen dem Stichtag. Der Betreuungsschlüssel ist die ungewichtete Nachfrage geteilt durch das gesamte pädagogische Personal, nicht je Gruppe. Mehrarbeit nutzt verfügbare, an diesem Tag eingeplante Personen außerhalb ihrer Buchung, mit Wochenbudget und freier Gruppenzuordnung; die Kaskade ist eine Reihenfolge-Heuristik, keine optimale Dienstplanung. Ruhezeiten werden nicht geprüft. Nicht zugeordnete Buchungen bilden eine eigene Gruppe mit globalem Minimum. Zeitreduktion senkt die Slot-Nachfrage pauschal um verbleibende Wochen-Slots geteilt durch Wochen-Slots (höchstens 45 %); Kinderkompensation je anwesend geplantem Ausfall bis höchstens 45 %, Notbetreuung um den eingestellten Satz. Keine konkreten Buchungen werden geändert. Leere Zeit-Slots gehen in die Prozentwerte ein; geschlossene Slots sind Modellverstöße, keine tatsächlichen Schließungen; Vorfälle enden täglich. Das Wochen-Toleranzbudget wird gleichmäßig auf fünf Tage verteilt; der Score gewichtet tägliche Überschreitungen nach dem verbleibenden Slot-Anteil. Außerhalb belegter oder besetzter Gruppen gilt kein Gruppenminimum. Hohe Lauf- und Wochenzahlen können den Browser länger blockieren.</Text>
+            </Box>
+          ) : activeStory.id === 'cohort' ? (
+            <Box data-testid="analysis-finance-basis" px="xs" mb={4} style={{ minWidth: 0, flex: '1 1 auto', maxHeight: '7rem', overflowY: 'auto' }}>
+              {coverageData?.financeTrend && (coverageData.financeTrend.missingIncomeMonths > 0 || coverageData.financeTrend.missingExpenseMonths > 0) ? (
+                <Text size="xs" c="orange">Ungeklärt: Einnahmen in {coverageData.financeTrend.missingIncomeMonths} und Personalkosten in {coverageData.financeTrend.missingExpenseMonths} Monaten. Fehlende Regeln, Tarife, Buchungsdaten oder Personalkosten erzeugen Lücken; ein Saldo ist nur bei vollständigen Einnahmen und Ausgaben berechenbar.</Text>
+              ) : null}
+              <Text size="xs" c="dimmed">Zwölf Monatsanfänge, gesamte Einrichtung wie im Finanzchart: Gruppen- und Qualifikationsfilter gelten hier nicht; archivierte Datensätze sind ausgeschlossen. Stichtagswerte, keine taggenaue Abrechnung.</Text>
+              <Text size="xs" c="dimmed">Einnahmen: Bruttobeiträge und ADEBIS-Basisförderung (gewichtete Tagesstunden × Jahresbasiswert / 24), ohne Beitragszuschuss, Zusatzförderung und Reform. Ausgaben: erfasste Personalkosten, ohne Sachkosten. Saldo und Kostendeckung beziehen sich nur auf diese Größen, nicht auf das vollständige Betriebsergebnis.</Text>
+            </Box>
+          ) : null}
           {activeStory.id === 'compare' ? (
-            <Group gap="sm" mb={4} wrap="nowrap" align="center" style={{ paddingLeft: 8 }}>
+            <Group gap="sm" mb={4} wrap="wrap" align="center" style={{ paddingLeft: 8 }}>
               <Switch
                 size="sm"
-                label="Zulauf simulieren"
+                label="Zulauf im Stufenverlauf simulieren"
                 checked={simulateInflow}
                 onChange={(e) => setSimulateInflow(e.currentTarget.checked)}
-                title="Simuliert neue Kinder basierend auf historischen Eintrittsdaten"
+                title="Ohne Gruppenfilter: bekannte Aufnahmen werden auf den geschätzten Jahreszulauf aus nicht archivierten Datensätzen angerechnet; ergänzender Eintritt am 1. September für drei Jahre Krippe."
               />
+              <Text size="xs" c={selectedGroups.length ? 'orange' : 'dimmed'} data-testid="forecast-group-filter-status">
+                {selectedGroups.length ? 'Gruppenfilter aktiv: kein geschätzter Zulauf.' : 'Alle Gruppen (kein Filter).'} Der Gruppenfilter gilt auch für andere Analysen und den Finanz-Forecast.
+              </Text>
+              {selectedGroups.length ? <Button size="compact-xs" variant="light" onClick={() => dispatch(setFilterGroups({ scenarioId: selectedScenarioId, groups: [] }))}>Gruppenfilter leeren</Button> : null}
             </Group>
           ) : null}
           <ChartFilterForm
+            allowEmptyGroups
+            allowEmptyQualifications={activeStory.id === 'trends'}
+            groupFilterDisabled={activeStory.id === 'trends' && (trendPage === 'corridor' || trendPage === 'regelAge')}
+            qualificationFilterDisabled={activeStory.id === 'trends' && trendPage !== 'counts' && trendPage !== 'hours'}
+            qualificationFilterDescription={activeStory.id === 'trends' ? (trendPage === 'counts' || trendPage === 'hours' ? 'Gilt nur für Mitarbeiter und Arbeitsstunden; keine Auswahl: alle Qualifikationen.' : 'Für dieses Diagramm nicht anwendbar; Auswahl bleibt für andere Ansichten erhalten.') : undefined}
+            groupFilterDescription={activeStory.id === 'trends' && (trendPage === 'corridor' || trendPage === 'regelAge') ? 'Für dieses Übergangsdiagramm nicht anwendbar; Auswahl bleibt erhalten und wirkt weiterhin auf die Kennzahlen.' : activeStory.id === 'cohort' ? 'Der Finanzverlauf zeigt die gesamte Einrichtung; Gruppen- und Qualifikationsfilter gelten hier nicht. Die Filter wirken weiterhin in anderen Ansichten und im Finanz-Forecast.' : undefined}
             showStichtag
             scenarioId={selectedScenarioId}
             compactBar

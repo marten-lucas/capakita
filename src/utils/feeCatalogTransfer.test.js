@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import gramschatzData from '../../tests/testdata/gramschatz-fees-2025.json';
+import { findFeeEntryForZeitkat } from './financeUtils';
+import simFinanceReducer, { mergeGroupFeeCatalogs, setGroupFeeCatalogs } from '../store/simFinanceSlice';
 import {
   buildFeeCatalogExportPayload,
   parseFeeCatalogImportPayload,
@@ -9,6 +11,16 @@ import {
 } from './feeCatalogTransfer';
 
 describe('feeCatalogTransfer roundtrip with PDF data', () => {
+  it('übernimmt den Gültigkeitszeitraum der Gramschatz-Staffeln und beachtet ihn bei der Tarifwahl', () => {
+    const { catalogsByKey } = extractFeeCatalogImportData(gramschatzData);
+    const catalog = catalogsByKey.childrenUnder3;
+    expect(catalog).toHaveLength(7);
+    expect(findFeeEntryForZeitkat(catalog, '04', '2024-12-31')).toBeNull();
+    expect(findFeeEntryForZeitkat(catalog, '04', '2025-01-01')).toMatchObject({ monthlyAmount: 170 });
+    expect(findFeeEntryForZeitkat(catalog, '04', '2026-12-31')).toMatchObject({ monthlyAmount: 170 });
+    expect(findFeeEntryForZeitkat(catalog, '04', '2027-01-01')).toBeNull();
+  });
+
   it('exports and re-imports the Gramschatz fee catalogs without loss', () => {
     const scenario = gramschatzData.testScenarios.baykibig_weights_gramschatz_2025;
 
@@ -76,6 +88,31 @@ describe('feeCatalogTransfer roundtrip with PDF data', () => {
   it('rejects invalid payloads', () => {
     expect(() => parseFeeCatalogImportPayload(null)).toThrow('Ungueltiges JSON-Format.');
     expect(() => parseFeeCatalogImportPayload({ foo: 'bar' })).toThrow('JSON enthaelt keine groupFeeCatalogs oder catalogs.');
+  });
+
+  it('bewahrt Altbestand bei einer unvollständigen Zuordnung auch beim direkten Schreibvorgang', () => {
+    const extracted = extractFeeCatalogImportData(gramschatzData, { preferNonMember: true });
+    const groupDefs = [
+      { id: 'krippe', name: 'Bärchen', type: 'Krippe' },
+      { id: 'regel', name: 'Sonne', type: 'Regelgruppe' },
+      { id: 'schule', name: 'Fuchs', type: 'Schulkind' },
+    ];
+    const proposal = proposeFeeCatalogMappings({ groupDefs, catalogDescriptors: extracted.catalogDescriptors });
+    expect(proposal.mappingsByGroupId.krippe.sourceKey).toBe('childrenUnder3');
+    expect(proposal.mappingsByGroupId.regel.sourceKey).toBeNull();
+    expect(proposal.mappingsByGroupId.schule.sourceKey).toBe('schoolChildren');
+    let state = simFinanceReducer(undefined, setGroupFeeCatalogs({ scenarioId: 's', catalogs: {
+      regel: [{ id: 'bestand', zeitkatId: '04', monthlyAmount: 42 }],
+      archiv: [{ id: 'archiv', zeitkatId: '05', monthlyAmount: 43 }],
+    } }));
+    const before = state.financeByScenario.s.groupFeeCatalogs;
+    const catalogs = applyFeeCatalogMappings({ mappingsByGroupId: proposal.mappingsByGroupId, catalogsByKey: extracted.catalogsByKey });
+    state = simFinanceReducer(state, mergeGroupFeeCatalogs({ scenarioId: 's', catalogs }));
+    const after = state.financeByScenario.s.groupFeeCatalogs;
+    expect(after.regel).toEqual(before.regel);
+    expect(after.archiv).toEqual(before.archiv);
+    expect(after.krippe[0]).toMatchObject({ monthlyAmount: 170, validFrom: '2025-01-01', validUntil: '2026-12-31' });
+    expect(after.schule[0]).toMatchObject({ monthlyAmount: 110, validFrom: '2025-01-01', validUntil: '2026-12-31' });
   });
 
   it('maps catalogs to target groups even with different IDs via wizard proposal', () => {

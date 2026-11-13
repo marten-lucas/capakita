@@ -58,10 +58,10 @@ describe('adebisFörder – calculateChildMonthlyRevenue mit Zeitfaktor (gated)'
     dateofbirth: '2022-03-01', // 3 Jahre alt am Stichtag → Regelkind 1,0
   };
   const financeScenario = {
-    bayKiBiGRules: [{ id: 'r1', baseValue: 11.0, validFrom: '2026-01-01', weightFactors: { regelkind_3to6: 1.0 } }],
+    bayKiBiGRules: [{ id: 'r1', baseValue: 132.0, validFrom: '2026-01-01', weightFactors: { regelkind_3to6: 1.0 } }],
   };
 
-  it('Default (aus): bayKiBiGAmount = Basiswert × Gewicht, Zeitfaktor 1', () => {
+  it('Default (aus): bayKiBiGAmount = Jahresbasiswert × Gewicht / 12, Zeitfaktor 1', () => {
     const result = calculateChildMonthlyRevenue({
       item, bookings: [basisBooking()], groupAssignments: {}, groupDefs: [],
       financeScenario, referenceDate: REF,
@@ -71,7 +71,7 @@ describe('adebisFörder – calculateChildMonthlyRevenue mit Zeitfaktor (gated)'
     expect(result.zeitkatFactor).toBe(1);
   });
 
-  it('Aktiviert: bayKiBiGAmount = Basiswert × Gewicht × Zeitfaktor (RE-Formel)', () => {
+  it('Aktiviert: bayKiBiGAmount = Jahresbasiswert × Gewicht × Zeitfaktor / 12', () => {
     const result = calculateChildMonthlyRevenue({
       item, bookings: [basisBooking()], groupAssignments: {}, groupDefs: [],
       financeScenario, referenceDate: REF, applyZeitkatFactor: true,

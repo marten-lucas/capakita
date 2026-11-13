@@ -265,8 +265,9 @@ function TopNav({ variant = 'sidebar', sidebarCollapsed = false, onToggleSidebar
       refreshEventsForScenario({
         scenarioId: selectedScenarioId,
         simData: appState.simData,
+        simOverlay: { overlaysByScenario: cleaned.overlaysByScenario },
         simBooking: { bookingsByScenario: cleaned.bookingsByScenario },
-        simGroup: { groupsByScenario: cleaned.groupsByScenario },
+        simGroup: { groupsByScenario: cleaned.groupsByScenario, groupDefsByScenario: appState.simGroup.groupDefsByScenario },
         simScenario: appState.simScenario,
       })
     );

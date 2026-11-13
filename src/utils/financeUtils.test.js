@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   calculateChildMonthlyRevenue,
   calculateMonthlyStaffCost,
+  calculateScenarioMonthlyFinance,
   convertMonthlyAmountToPeriod,
   getPeriodBoundsForCategory,
   hasAnyBookingInWeek,
@@ -82,8 +83,31 @@ describe('financeUtils', () => {
 
     expect(result.weeklyHours).toBe(20);
     expect(result.parentFeeAmount).toBe(280);
-    expect(result.bayKiBiGAmount).toBe(240);
-    expect(result.totalAmount).toBe(520);
+    expect(result.bayKiBiGAmount).toBe(20);
+    expect(result.totalAmount).toBe(300);
+  });
+
+  it('aggregates monthly funding and fees without annualizing funding twice', () => {
+    const input = {
+      effectiveDataItems: { child: { id: 'child', type: 'demand', dateofbirth: '2022-01-01', groupId: 'g1' } },
+      effectiveBookingsByItem: { child: { booking: { startdate: '2026-01-01', rawdata: { ART: '0', ZEITKAT: '06' } } } },
+      effectiveGroupAssignmentsByItem: {},
+      effectiveGroupDefs: [{ id: 'g1', type: 'Kindergarten' }],
+      financeScenario: {
+        bayKiBiGRules: [{ baseValue: 1200, validFrom: '2026-01-01', weightFactors: { regelkind_3to6: 1 } }],
+        groupFeeCatalogs: { g1: [{ zeitkatId: '06', monthlyAmount: 200 }] },
+      },
+      applyZeitkatFactor: true,
+    };
+    const months = Array.from({ length: 12 }, (_, index) => calculateScenarioMonthlyFinance({
+      ...input,
+      referenceDate: `2026-${String(index + 1).padStart(2, '0')}-01`,
+    }));
+
+    expect(months[0].childRows[0]).toMatchObject({ parentFeeAmount: 200, bayKiBiGAmount: 150, totalAmount: 350 });
+    expect(months[0].summary).toMatchObject({ incomeParents: 200, incomeBayKiBiG: 150, incomeTotal: 350, net: 350 });
+    expect(months.reduce((sum, month) => sum + month.summary.incomeBayKiBiG, 0)).toBe(1800);
+    expect(convertMonthlyAmountToPeriod(months[0].summary.incomeTotal, 'year')).toBe(4200);
   });
 
   it('selects imported category-specific fee rates by ZEITKAT, not total weekly hours', () => {
@@ -154,6 +178,22 @@ describe('financeUtils', () => {
     expect(result.baseMonthlyCost).toBe(4800);
     expect(result.adjustedMonthlyCost).toBe(0);
     expect(result.absenceCostFactor).toBe(0);
+  });
+
+  it('uses UI absence boundaries over stale legacy dates for monthly staff costs', () => {
+    const cost = (absence, referenceDate = '2026-03-15') => calculateMonthlyStaffCost({
+      item: { id: 'staff', type: 'capacity', absences: [absence] },
+      itemFinance: { salaryHistory: [{ annualGrossSalary: 12000 }] }, referenceDate,
+      partialAbsenceThresholdDays: 42, partialAbsenceEmployerSharePercent: 0,
+    });
+    const openEnd = { start: '2026-01-01', end: '', startdate: '2030-01-01', enddate: '2026-02-28', payType: 'unpaid' };
+    expect(cost(openEnd).adjustedMonthlyCost).toBe(0);
+    expect(cost({ ...openEnd, start: '', end: '2026-03-15', startdate: '2030-01-01' }).adjustedMonthlyCost).toBeCloseTo(1000 * 16 / 31);
+    expect(cost({ start: '', startdate: '2026-01-01', end: '', enddate: '2026-02-28', payType: 'partially_paid' }).adjustedMonthlyCost).toBe(1000);
+    expect(cost({ start: '2026-01-01', startdate: '2026-03-15', end: '', payType: 'partially_paid' }).adjustedMonthlyCost).toBe(0);
+    expect(cost({ startdate: '2026-01-01', enddate: '2026-03-15', payType: 'unpaid' }).adjustedMonthlyCost).toBeCloseTo(1000 * 16 / 31);
+    expect(cost({ start: '2026-03-15', enddate: '2026-03-15', payType: 'unpaid' }).adjustedMonthlyCost).toBeCloseTo(1000 * 30 / 31);
+    expect(cost({ start: '2030-01-01', end: '2030-12-31', payType: 'unpaid' }).adjustedMonthlyCost).toBe(1000);
   });
 
   it('keeps full staff costs when no interruption is entered (absences empty)', () => {
@@ -316,7 +356,7 @@ describe('financeUtils', () => {
 
       expect(result.bayKiBiGWeight).toBe(2.2);
       expect(result.zeitkatFactor).toBe(1.5);
-      expect(result.bayKiBiGAmount).toBeCloseTo(330, 8);
+      expect(result.bayKiBiGAmount).toBeCloseTo(27.5, 8);
     });
 
     it('derives the ZEITKAT factor from booking times for the reform model', () => {
@@ -340,14 +380,14 @@ describe('financeUtils', () => {
         referenceDate: '2026-03-01',
       };
 
-      expect(calculateChildMonthlyRevenue(input).bayKiBiGAmount).toBe(100);
+      expect(calculateChildMonthlyRevenue(input).bayKiBiGAmount).toBeCloseTo(100 / 12, 8);
       const derived = calculateChildMonthlyRevenue({
         ...input,
         applyZeitkatFactor: true,
         deriveZeitkatFactor: true,
       });
       expect(derived.zeitkatFactor).toBe(1.5);
-      expect(derived.bayKiBiGAmount).toBe(150);
+      expect(derived.bayKiBiGAmount).toBe(12.5);
     });
 
     it('recalculates child revenue when reference date changes and assigns the correct group/catalog', () => {
@@ -405,13 +445,13 @@ describe('financeUtils', () => {
 
       expect(juneResult.groupId).toBe('g1');
       expect(juneResult.parentFeeAmount).toBe(165);
-      expect(juneResult.bayKiBiGAmount).toBe(200); // 100 * weight 2.0 (under3)
-      expect(juneResult.totalAmount).toBe(365);
+      expect(juneResult.bayKiBiGAmount).toBeCloseTo(100 * 2 / 12, 8);
+      expect(juneResult.totalAmount).toBeCloseTo(165 + 100 * 2 / 12, 8);
 
       expect(julyResult.groupId).toBe('g2');
       expect(julyResult.parentFeeAmount).toBe(225);
-      expect(julyResult.bayKiBiGAmount).toBe(400); // 200 * weight 2.0 (under3)
-      expect(julyResult.totalAmount).toBe(625);
+      expect(julyResult.bayKiBiGAmount).toBeCloseTo(200 * 2 / 12, 8);
+      expect(julyResult.totalAmount).toBeCloseTo(225 + 200 * 2 / 12, 8);
     });
 
     it('returns zero values when no valid BayKiBiG rule and no matching fee band exist at reference date', () => {
@@ -490,8 +530,8 @@ describe('financeUtils', () => {
       });
 
       expect(result.parentFeeAmount).toBe(100);
-      expect(result.bayKiBiGAmount).toBe(200);
-      expect(result.totalAmount).toBe(300);
+      expect(result.bayKiBiGAmount).toBeCloseTo(200 / 12, 8);
+      expect(result.totalAmount).toBeCloseTo(100 + 200 / 12, 8);
     });
   });
 

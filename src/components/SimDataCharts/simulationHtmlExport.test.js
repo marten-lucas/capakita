@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { JSDOM, VirtualConsole } from 'jsdom';
+import { getFeeBandSimulationPriceKey } from '../../utils/foerderSimulation';
 import {
   buildAggregateSimulationSnapshot,
   buildStandaloneSimulationHtml,
@@ -53,6 +54,25 @@ function createFixture() {
 }
 
 describe('standalone simulation HTML export', () => {
+  it('übernimmt und bearbeitet Preisänderungen nur für die angezeigte Tarifversion', () => {
+    const fees = [
+      { id: '2026', zeitkatId: '05', monthlyAmount: 100, validFrom: '2026-01-01', validUntil: '2026-12-31' },
+      { id: '2027', zeitkatId: '05', monthlyAmount: 200, validFrom: '2027-01-01' },
+    ];
+    const months = Array.from({ length: 12 }, () => [{ groupId: 'g', zeitkatId: '05', childCount: 1 }]);
+    const snapshot = buildAggregateSimulationSnapshot({
+      annualIncomeRows: [{ year: 2026, contributions: 9000 }, { year: 2027, contributions: 12000 }],
+      familyProfileData: { totalFamilies: 5, profiles: [{ familyCount: 5, years: { 2026: months, 2027: months } }] },
+      groupDefs: [{ id: 'g' }], groupFeeCatalogs: { g: fees }, simulationCatalogs: { g: fees },
+      temporaryPrices: { g: { [getFeeBandSimulationPriceKey(fees[0])]: 150 } }, referenceDate: '2026-03-15',
+    });
+    expect(snapshot.groups[0].simulationTariffs.map((entry) => entry.monthlyAmount)).toEqual([150, 200]);
+    const state = createInitialStandaloneSimulationState(snapshot);
+    state.rateOverrides.g1['05'] = 175;
+    const result = calculateAggregateSimulationResults(snapshot, state);
+    expect(result.annualResults.map((year) => year.parentFees)).toEqual([10500, 12000]);
+  });
+
   it('exports only neutral, thresholded aggregates and no personal identifiers', () => {
     const { snapshot } = createFixture();
     const serialized = JSON.stringify(snapshot);

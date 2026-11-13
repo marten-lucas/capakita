@@ -10,6 +10,7 @@ import {
 } from '../../store/chartSlice';
 import { useOverlayData } from '../../hooks/useOverlayData';
 import EventPicker from '../EventCalendar/EventPicker';
+import { RESILIENCE_LIMITS } from '../../utils/resilienceModel';
 
 const EMPTY_SELECTION = [];
 
@@ -18,6 +19,12 @@ function ChartFilterForm({
   scenarioId,
   onTimedimensionChange,
   groupsOnly = false,
+  allowEmptyGroups = false,
+  groupFilterDescription = null,
+  groupFilterDisabled = false,
+  qualificationFilterDisabled = false,
+  qualificationFilterDescription = null,
+  allowEmptyQualifications = false,
   showHeatmapModeControl = false,
   heatmapMode = 'unweightedQuotient',
   onHeatmapModeChange,
@@ -78,13 +85,13 @@ function ChartFilterForm({
   );
 
   React.useEffect(() => {
-    if (scenarioId && selectedGroups.length === 0 && groupOptions.length > 0) {
+    if (!allowEmptyGroups && scenarioId && selectedGroups.length === 0 && groupOptions.length > 0) {
       dispatch(setFilterGroups({ scenarioId, groups: groupOptions.map((option) => option.value) }));
     }
-  }, [dispatch, scenarioId, selectedGroups.length, groupOptions]);
+  }, [allowEmptyGroups, dispatch, scenarioId, selectedGroups.length, groupOptions]);
 
   React.useEffect(() => {
-    if (groupsOnly) return;
+    if (groupsOnly || qualificationFilterDisabled || allowEmptyQualifications) return;
     if (scenarioId && selectedQualifications.length === 0 && qualificationOptions.length > 0) {
       dispatch(
         setFilterQualifications({
@@ -93,7 +100,7 @@ function ChartFilterForm({
         })
       );
     }
-  }, [dispatch, scenarioId, selectedQualifications.length, qualificationOptions, groupsOnly]);
+  }, [dispatch, scenarioId, selectedQualifications.length, qualificationOptions, groupsOnly, qualificationFilterDisabled, allowEmptyQualifications]);
 
   return (
     <>
@@ -121,8 +128,11 @@ function ChartFilterForm({
           <Group align="flex-start" wrap="wrap">
             <MultiSelect
               label="Gruppen"
+              description={groupFilterDescription ?? (allowEmptyGroups ? 'Keine Auswahl: alle Gruppen. Der Filter gilt für alle Analyseansichten und den Finanz-Forecast.' : undefined)}
+              placeholder={allowEmptyGroups ? 'Alle Gruppen (kein Filter)' : undefined}
               data={groupOptions}
               value={selectedGroups}
+              disabled={groupFilterDisabled}
               onChange={(value) => dispatch(setFilterGroups({ scenarioId, groups: value }))}
               searchable
               clearable
@@ -132,6 +142,8 @@ function ChartFilterForm({
             {!groupsOnly && (
               <MultiSelect
                 label="Qualifikationen"
+                description={qualificationFilterDescription}
+                disabled={qualificationFilterDisabled}
                 data={qualificationOptions}
                 value={selectedQualifications}
                 onChange={(value) => dispatch(setFilterQualifications({ scenarioId, qualifications: value }))}
@@ -191,25 +203,26 @@ function ChartFilterForm({
           {showMonteCarloControls && monteCarloParams && (
             <Stack gap="xs" data-testid="analysis-monte-carlo-controls">
               <Text fw={600} size="sm">Monte-Carlo</Text>
+              <Text size="xs" c="dimmed">Modellannahmen: Stichtagswoche wird wiederholt; Ausfälle gelten je Person für einen Betriebstag (Mo–Fr), nicht als Krankheitsdauer. Der Ansteckungsschub gilt für die folgenden Betriebstage und verlängert sich bei weiteren Ausfällen.</Text>
               <NumberInput
                 label="Läufe"
                 value={monteCarloParams.runs}
-                min={100}
-                max={10000}
+                min={RESILIENCE_LIMITS.runs[0]}
+                max={RESILIENCE_LIMITS.runs[1]}
                 step={100}
                 onChange={(value) => {
                   const nextValue = Number(value);
                   if (!Number.isFinite(nextValue)) return;
                   onMonteCarloParamsChange?.({
                     ...monteCarloParams,
-                    runs: Math.max(100, Math.min(10000, Math.round(nextValue))),
+                    runs: Math.max(RESILIENCE_LIMITS.runs[0], Math.min(RESILIENCE_LIMITS.runs[1], Math.round(nextValue))),
                   });
                 }}
               />
               <NumberInput
-                label="Basis-Ausfallwahrscheinlichkeit (%)"
+                label="Basis-Ausfallwahrscheinlichkeit pro Person und Betriebstag (%)"
                 value={monteCarloParams.baseAbsenceProbabilityPct}
-                min={1}
+                min={0}
                 max={80}
                 step={1}
                 onChange={(value) => {
@@ -217,7 +230,7 @@ function ChartFilterForm({
                   if (!Number.isFinite(nextValue)) return;
                   onMonteCarloParamsChange?.({
                     ...monteCarloParams,
-                    baseAbsenceProbabilityPct: Math.max(1, Math.min(80, Math.round(nextValue))),
+                    baseAbsenceProbabilityPct: Math.max(0, Math.min(80, Math.round(nextValue))),
                   });
                 }}
               />
@@ -237,9 +250,9 @@ function ChartFilterForm({
                 }}
               />
               <NumberInput
-                label="Max. gleichz. Ausfälle"
+                label="Max. Ausfälle pro Betriebstag"
                 value={monteCarloParams.maxConcurrentOutages}
-                min={1}
+                min={0}
                 max={12}
                 step={1}
                 onChange={(value) => {
@@ -247,7 +260,7 @@ function ChartFilterForm({
                   if (!Number.isFinite(nextValue)) return;
                   onMonteCarloParamsChange?.({
                     ...monteCarloParams,
-                    maxConcurrentOutages: Math.max(1, Math.min(12, Math.round(nextValue))),
+                    maxConcurrentOutages: Math.max(0, Math.min(12, Math.round(nextValue))),
                   });
                 }}
               />
@@ -433,7 +446,7 @@ function ChartFilterForm({
                 }}
               />
               <NumberInput
-                label="Ansteckungsdauer (Tage)"
+                label="Ansteckungsschub nach Ausfall (Betriebstage)"
                 value={monteCarloParams.contagionDays}
                 min={0}
                 max={14}

@@ -298,6 +298,7 @@ export const importScenario = ({
     dispatch(refreshAllEvents({
       simScenario: getState().simScenario,
       simData: getState().simData,
+      simOverlay: getState().simOverlay,
       simBooking: getState().simBooking,
       simGroup: getState().simGroup,
     }));

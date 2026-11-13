@@ -58,12 +58,13 @@
   margin-inline: var(--mantine-spacing-xs);
 }
 
-.analysis-story-stepper [data-orientation='horizontal'] {
+.analysis-story-stepper .mantine-Stepper-stepBody {
   max-width: 12rem;
   min-width: 0;
 }
 
-.analysis-story-stepper [data-orientation='horizontal'] > :first-child {
+.analysis-story-stepper .mantine-Stepper-stepLabel,
+.analysis-story-stepper .mantine-Stepper-stepDescription {
   display: block;
   max-width: 100%;
   overflow: hidden;
@@ -71,18 +72,12 @@
   white-space: nowrap;
 }
 
-.analysis-story-stepper [data-orientation='horizontal'] > :last-child {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 @media (max-width: 48em) {
-  .analysis-story-stepper [data-orientation='horizontal'] {
+  .analysis-story-stepper .mantine-Stepper-stepBody {
     max-width: 8rem;
   }
 
-  .analysis-story-stepper [data-orientation='horizontal'] > :last-child {
+  .analysis-story-stepper .mantine-Stepper-stepDescription {
     display: none;
   }
 }

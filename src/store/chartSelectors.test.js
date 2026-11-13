@@ -139,6 +139,8 @@ describe('chartSelectors auto transition projection', () => {
     expect(septemberIndex).toBeGreaterThanOrEqual(0);
     expect(result.demand[augustIndex]).toBe(10);
     expect(result.demand[septemberIndex]).toBe(5);
+    expect(result.income_total[augustIndex]).toBeNull();
+    expect(result.net_total[augustIndex]).toBeNull();
     expect(result.child_count[augustIndex]).toBe(1);
     expect(result.child_count[septemberIndex]).toBe(1);
     expect(result.employee_count[augustIndex]).toBe(1);

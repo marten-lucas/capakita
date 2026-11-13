@@ -2,12 +2,14 @@ import React from 'react';
 import { Stack, Button, Text, Group, Badge, ActionIcon, TextInput, Select, Switch, NumberInput } from '@mantine/core';
 import { IconPlus, IconTrash } from '@tabler/icons-react';
 import { useSelector, useDispatch } from 'react-redux';
-import { addGroupDef, updateGroupDef, deleteGroupDef } from '../../store/simGroupSlice';
+import { addGroupDef, updateGroupDef, deleteGroupDef, importGroupDefs } from '../../store/simGroupSlice';
+import { setGroupDefOverlay } from '../../store/simOverlaySlice';
 import { useOverlayData } from '../../hooks/useOverlayData';
 import TabbedListDetail from '../common/TabbedListDetail';
 import GroupIcon from '../common/GroupIcon';
 import GroupIconPicker from './GroupIconPicker';
 import { DEFAULT_GROUP_ICON, normalizeGroupIcon } from '../../utils/groupIcons';
+import { FORECAST_STAGES, forecastStageForGroup } from '../../utils/forecastUtilsModel';
 
 const GROUP_TYPE_OPTIONS = [
   { value: 'Krippe', label: 'Krippe (0-3 Jahre)' },
@@ -15,11 +17,36 @@ const GROUP_TYPE_OPTIONS = [
   { value: 'Schulkindgruppe', label: 'Schulkindgruppe (6+ Jahre)' },
 ];
 
+const FORECAST_STAGE_OPTIONS = [
+  { value: 'auto', label: 'Automatisch (nicht bestätigt)' },
+  { value: 'krippe', label: 'Krippe' },
+  { value: 'kita', label: 'Regelgruppe' },
+  { value: 'school', label: 'Schulkindbetreuung' },
+  { value: 'unknown', label: 'Ungeklärt (bewusst offen)' },
+];
+
 function OrgaTabGroupDefs() {
   const dispatch = useDispatch();
   const selectedScenarioId = useSelector((state) => state.simScenario.selectedScenarioId);
-  const { getEffectiveGroupDefs } = useOverlayData();
+  const { getEffectiveGroupDefs, isBasedScenario } = useOverlayData();
+  const hasGroupDefOverlay = useSelector((state) => Array.isArray(state.simOverlay.overlaysByScenario[selectedScenarioId]?.groupDefs)
+    && state.simOverlay.overlaysByScenario[selectedScenarioId].groupDefs.length > 0);
+  const hasOwnGroupDefs = useSelector((state) => Boolean(state.simGroup.groupDefsByScenario[selectedScenarioId]?.length));
   const groupDefs = getEffectiveGroupDefs();
+
+  const updateForecastStage = (item, forecastStage) => {
+    if (hasGroupDefOverlay) {
+      dispatch(setGroupDefOverlay({
+        scenarioId: selectedScenarioId,
+        overlayData: groupDefs.map((group) => String(group.id) === String(item.id) ? { ...group, forecastStage } : group),
+      }));
+    } else {
+      if (isBasedScenario && !hasOwnGroupDefs) {
+        dispatch(importGroupDefs({ scenarioId: selectedScenarioId, defs: groupDefs }));
+      }
+      dispatch(updateGroupDef({ scenarioId: selectedScenarioId, groupId: item.id, updates: { forecastStage } }));
+    }
+  };
 
   const handleAddGroup = () => {
     dispatch(
@@ -30,6 +57,7 @@ function OrgaTabGroupDefs() {
           name: 'Neue Gruppe',
           icon: DEFAULT_GROUP_ICON,
           type: 'Regelgruppe',
+          forecastStage: 'auto',
           fillUp: false,
           maxFacilityCount: '',
           maxSchoolGrade: '',
@@ -98,6 +126,24 @@ function OrgaTabGroupDefs() {
                 )
               }
             />
+            <Select
+              label="Stufe für die Prognose"
+              description="Unabhängig vom Gruppentyp. Automatisch schätzt anhand von Name und Typ; die Schätzung ist nicht bestätigt. Ungeklärt verhindert eine automatische Zuordnung, z. B. bei Mischgruppen. Nur eine einheitliche Stufe ausdrücklich bestätigen."
+              data={FORECAST_STAGE_OPTIONS}
+              value={FORECAST_STAGE_OPTIONS.some((option) => option.value === item?.forecastStage) ? item.forecastStage : (item?.forecastStage ? 'unknown' : 'auto')}
+              onChange={(value) => { if (value) updateForecastStage(item, value); }}
+              allowDeselect={false}
+            />
+            {isBasedScenario && !hasOwnGroupDefs && !hasGroupDefOverlay && (
+              <Text size="sm" c="dimmed">
+                Die Auswahl erstellt eine eigene Kopie aller Gruppen für dieses Szenario. Spätere Änderungen der Basisgruppen werden nicht übernommen.
+              </Text>
+            )}
+            <Text size="sm" c="dimmed">
+              Prognose verwendet: {FORECAST_STAGES[forecastStageForGroup(item)].label}
+              {(!item?.forecastStage || item.forecastStage === 'auto') ? ' (automatische Schätzung, nicht bestätigt)'
+                : FORECAST_STAGE_OPTIONS.some((option) => option.value === item.forecastStage) ? ' (ausgewählt)' : ' (ungültige gespeicherte Auswahl)'}
+            </Text>
             {isSchoolGroup ? (
               <Switch
                 label="Auffuellen aktivieren"

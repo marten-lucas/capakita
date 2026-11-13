@@ -12,7 +12,10 @@ import simOverlayReducer from '../store/simOverlaySlice';
 import chartReducer from '../store/chartSlice';
 import eventReducer from '../store/eventSlice';
 import datesOfInterestReducer from '../store/datesOfInterestSlice';
-import { isRecordActiveOnDate } from './financeUtils';
+import { calculateChildMonthlyRevenue, isRecordActiveOnDate } from './financeUtils';
+import { isParentFeeSubsidyEligible } from './foerderSimulation';
+import { sumBookingHours } from './bookingUtils';
+import { sumWeightedBookingHours } from './chartUtils/chartUtils';
 import JSZip from 'jszip';
 import { extractAdebisData } from './adebis-reader';
 import { buildFamilyRelations, attachFamilyInfo } from './adebisFamily';
@@ -63,6 +66,115 @@ function xmlTimesContainRealEntries(value) {
 }
 
 describe('Adebis import regression', () => {
+  it('referenziert fehlende Felder im anonymisierten Standard-ZIP nur aggregiert', async () => {
+    const zipPath = path.resolve(process.cwd(), 'tests/testdata', testZips[0]);
+    const { rawdata, importMeta } = await extractAdebisData(await readFile(zipPath), true, { mode: 'historical' });
+    const rows = rawdata.belegungRaw;
+    expect(rows).toHaveLength(690);
+    for (const field of ['BETRSTD', 'GEWKAT', 'PANTEIL']) {
+      expect(rows.filter((row) => row[field] !== '').length, field).toBe(0);
+    }
+    expect(rows.filter((row) => row.ZEITKAT !== '')).toHaveLength(685);
+    expect(rows.filter((row) => row.BUZEITKAT !== '')).toHaveLength(685);
+    expect(rows.filter((row) => row.ART !== '')).toHaveLength(690);
+    expect(importMeta.warnings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'BELEGUNG_MISSING_BETRSTD', message: expect.stringContaining('690 von 690') }),
+      expect.objectContaining({ code: 'BELEGUNG_MISSING_GEWKAT', message: expect.stringContaining('690 von 690') }),
+    ]));
+  });
+
+  it('erhält Belegungen ohne auswertbare Zeiten samt Merkmalen und Kindzuordnung', async () => {
+    const zip = new JSZip();
+    zip.file('kind.xml', '<KINDER><KIND><KINDNR>1</KINDNR><STATUS>+</STATUS><GEBDATUM>01.01.2020</GEBDATUM></KIND></KINDER>');
+    zip.file('belegung.xml', [
+      '<BELEGUNGEN>',
+      '<BELEGUNGSBUCHUNG><IDNR>1</IDNR><KINDNR>1</KINDNR><BELVON>01.01.2025</BELVON><BELBIS>31.12.2025</BELBIS><ART>0</ART><SCHULKIND>.F.</SCHULKIND></BELEGUNGSBUCHUNG>',
+      '<BELEGUNGSBUCHUNG><IDNR>2</IDNR><KINDNR>1</KINDNR><BELVON>01.09.2026</BELVON><ART>0</ART><ZEITEN>|||#99:00|10:00</ZEITEN><SCHULKIND>.T.</SCHULKIND><KRIPPENK>.T.</KRIPPENK></BELEGUNGSBUCHUNG>',
+      '</BELEGUNGEN>',
+    ].join(''));
+    const buffer = await zip.generateAsync({ type: 'nodebuffer' });
+    const snapshot = await extractAdebisData(buffer, false);
+    const result = await extractAdebisData(buffer, false, { mode: 'historical' });
+    expect(snapshot.rawdata.belegungRaw.map((b) => b.IDNR)).toEqual(['2']);
+    expect(result.rawdata.belegungRaw.map((b) => b.IDNR)).toEqual(['1', '2']);
+    expect(result.importMeta.warnings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'BELEGUNG_WITHOUT_TIMES', message: expect.stringContaining('2 Belegung(en)') }),
+      expect.objectContaining({ code: 'BELEGUNG_MISSING_BETRSTD', message: expect.stringContaining('2 von 2') }),
+      expect.objectContaining({ code: 'BELEGUNG_MISSING_BETRSTD', message: expect.stringContaining('nur bei auswertbaren Zeitsegmenten') }),
+      expect.objectContaining({ code: 'BELEGUNG_MISSING_GEWKAT', message: expect.stringContaining('2 von 2') }),
+    ]));
+
+    const { simDataList } = adebis2simData(result.rawdata.kidsRaw, []);
+    const { bookings, bookingReference } = adebis2bookings(result.rawdata.belegungRaw, []);
+    expect(bookings).toHaveLength(2);
+    expect(bookingReference).toHaveLength(2);
+    const store = createTestStore();
+    await store.dispatch(importScenario({
+      scenarioSettings: { name: 'Synthetischer Import', imported: true },
+      simDataList, bookings, bookingReference, groupDefs: [], qualiDefs: [], groupAssignments: [],
+    }));
+    const state = store.getState();
+    const scenarioId = state.simScenario.selectedScenarioId;
+    const child = Object.values(state.simData.dataByScenario[scenarioId]).find((item) => item.type === 'demand');
+    const imported = Object.values(state.simBooking.bookingsByScenario[scenarioId][child.id]);
+    expect(imported).toHaveLength(2);
+    const schoolBooking = imported.find((b) => b.adebisId.id === '2');
+    expect(schoolBooking).toMatchObject({
+      startdate: '2026-09-01', enddate: '', times: [],
+      buchungsart: { basis: true }, rawdata: { SCHULKIND: '.T.', KRIPPENK: '.T.', BETRSTD: '', ZEITKAT: '' },
+    });
+    const active = imported.filter((b) => isRecordActiveOnDate(b, '2026-09-01'));
+    expect(active).toHaveLength(1);
+    expect(isParentFeeSubsidyEligible(child, null, active, '2026-09-01')).toBe(false);
+    expect(isParentFeeSubsidyEligible(child, null, [{ ...schoolBooking, rawdata: { SCHULKIND: '.F.' } }], '2026-09-01')).toBe(true);
+    expect(sumBookingHours(schoolBooking)).toBe(0);
+    expect(sumWeightedBookingHours(schoolBooking)).toBe(0);
+    const revenue = calculateChildMonthlyRevenue({
+      item: { ...child, groupId: 'g1' }, bookings: active, groupAssignments: {}, groupDefs: [],
+      financeScenario: { bayKiBiGRules: [], groupFeeCatalogs: { g1: [{ id: 'fee', zeitkatId: '05', monthlyAmount: 150 }] } },
+      referenceDate: '2026-09-01',
+    });
+    expect(revenue).toMatchObject({ weeklyHours: 0, zeitkatId: null, parentFeeAmount: 0 });
+  });
+
+  it('warnt nicht über fehlende Zeiten oder Felder bei auswertbaren Werten einschließlich null', async () => {
+    const zip = new JSZip();
+    zip.file('belegung.xml', '<BELEGUNGEN><BELEGUNGSBUCHUNG><IDNR>1</IDNR><KINDNR>1</KINDNR><ZEITEN>08:00|09:00</ZEITEN><BETRSTD>0</BETRSTD><GEWKAT>R</GEWKAT></BELEGUNGSBUCHUNG></BELEGUNGEN>');
+    const { rawdata, importMeta } = await extractAdebisData(await zip.generateAsync({ type: 'nodebuffer' }), false);
+    expect(rawdata.belegungRaw[0]).toMatchObject({ BETRSTD: '0', GEWKAT: 'R' });
+
+    expect(importMeta.warnings.some((warning) => warning.code.startsWith('BELEGUNG_'))).toBe(false);
+  });
+
+  it('parst nur gültige Segmente und erhält leere Wochentagspositionen', () => {
+    for (const zeiten of ['', '|||', '99:00|10:00', '08:00|08:00', '12:00|08:00', '08:00|', 'text|09:00']) {
+      const { bookings } = adebis2bookings([{ IDNR: '1', KINDNR: '1', ZEITEN: zeiten, SCHULKIND: '.T.' }], []);
+      expect(bookings[0].times, zeiten).toEqual([]);
+      expect(sumBookingHours(bookings[0]), zeiten).toBe(0);
+    }
+    const { bookings } = adebis2bookings([{ IDNR: '2', KINDNR: '1', ZEITEN: '#7|8:30|25:00|26:00#|||#09:00|10:00' }], []);
+    expect(bookings[0].times).toMatchObject([
+      { day: 2, day_name: 'Di', segments: [{ booking_start: '07:00', booking_end: '08:30' }] },
+      { day: 4, day_name: 'Do', segments: [{ booking_start: '09:00', booking_end: '10:00' }] },
+    ]);
+    expect(sumBookingHours(bookings[0])).toBe(2.5);
+    expect(adebis2bookings([], [{ IDNR: '1', ZEITEN: '|||'}, { IDNR: '2', ZEITEN: '07:00|08:00' }]).bookings).toHaveLength(1);
+  });
+
+  it('übernimmt explizite BETRSTD und ZEITKAT ohne Zeitsegmente, ohne sie zu erfinden', () => {
+    const { bookings } = adebis2bookings([{ IDNR: '1', KINDNR: '1', ART: '0', BETRSTD: '25,5', ZEITKAT: '05' }], []);
+    const booking = bookings[0];
+    expect(booking.times).toEqual([]);
+    expect(sumBookingHours(booking)).toBe(0);
+    expect(sumWeightedBookingHours(booking)).toBe(25.5);
+    const revenue = calculateChildMonthlyRevenue({
+      item: { type: 'demand', groupId: 'g1' }, bookings, groupAssignments: {}, groupDefs: [],
+      financeScenario: { bayKiBiGRules: [], groupFeeCatalogs: { g1: [{ id: 'fee', zeitkatId: '05', monthlyAmount: 150 }] } },
+      referenceDate: '2026-09-01',
+    });
+    expect(revenue).toMatchObject({ weeklyHours: 0, zeitkatId: '05', parentFeeAmount: 150 });
+  });
+
   it('supports snapshot and historical import modes', async () => {
     let foundHistoricalDelta = false;
 

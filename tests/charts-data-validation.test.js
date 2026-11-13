@@ -8,12 +8,12 @@ console.log(`\n📊 E2E Tests running at level: ${getTestLevelDescription()}\n`)
  * Create deterministic test data for chart validation
  * Minimal setup: one child and one employee with several weekly booking slots
  */
-async function createChartTestData(page) {
+async function createChartTestData(page, { referenceDate = null } = {}) {
   await page.goto('/');
 
   await page.waitForFunction(() => typeof window !== 'undefined' && !!window.__APP_STORE, { timeout: 5000 });
 
-  await page.evaluate(() => {
+  await page.evaluate((referenceDate) => {
     const store = window.__APP_STORE;
     const scenarioId = 'chart-data-validation';
 
@@ -31,6 +31,12 @@ async function createChartTestData(page) {
       type: 'chart/ensureScenario',
       payload: scenarioId,
     });
+    if (referenceDate) {
+      store.dispatch({
+        type: 'chart/setReferenceDate',
+        payload: { scenarioId, date: referenceDate },
+      });
+    }
 
     store.dispatch({
       type: 'chart/setFilterGroups',
@@ -148,7 +154,7 @@ async function createChartTestData(page) {
       type: 'ui/setActivePage',
       payload: 'data',
     });
-  });
+  }, referenceDate);
 
   await page.waitForFunction(() => window.__APP_STORE?.getState?.().ui?.activePage === 'data', { timeout: 5000 });
 }
@@ -327,16 +333,22 @@ test('Chart Data Validation - Weekly Chart', async ({ page }) => {
 });
 
 test('Chart Data Validation - Ausblick carousel navigates to Sankey and demography', async ({ page }) => {
-  await createChartTestData(page);
+  await createChartTestData(page, { referenceDate: '2026-11-12' });
   await goToVisu(page, { stepId: 'compare', slideIndex: 0 });
 
   await expect(page.getByText('Ausblick (Sankey)', { exact: true })).toBeVisible();
-  await expect(page.getByRole('heading', { name: /Keine gruppenbezogenen Ubergange/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Vorheriges Diagramm', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Nächstes Diagramm', exact: true })).toBeEnabled();
+  await expect(page.getByTestId('forecast-sankey-chart')).toBeVisible();
+  await expect(page.getByTestId('forecast-sankey-chart')).toHaveAttribute('data-transition-pairs', 'Ungeklärt: 1 Kinder -> Ungeklärt: 1 Kinder');
 
   await goToVisu(page, { stepId: 'compare', slideIndex: 3 });
   await expect(page.getByText('Demografie-Prognose', { exact: true })).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Altersgruppe', exact: true })).toBeVisible();
   await expect(page.getByTestId('forecast-demography-monthpicker')).toBeVisible();
+  await expect(page.getByTestId('forecast-demography-monthpicker')).toHaveAccessibleName('Prognosemonat');
   await expect(page.getByTestId('forecast-demography-resolution-filter')).toBeVisible();
+  await expect(page.getByTestId('forecast-demography-resolution-filter')).toHaveAccessibleName('Zeitauflösung');
 });
 
 test('Chart Data Validation - Demography chart filters render', async ({ page }) => {
@@ -360,13 +372,14 @@ test('Chart Data Validation - Booking hours slide renders in Bedarfsdeckung', as
 });
 
 test('Chart Data Validation - current analysis stages render their charts', async ({ page }) => {
-  await createChartTestData(page);
+  await createChartTestData(page, { referenceDate: '2026-11-12' });
   await goToVisu(page, { stepId: 'status' });
   await expect(page.getByText('Kapazität & Bedarf', { exact: true })).toBeVisible();
   await expect(page.locator('.analysis-stage-content .highcharts-container').first()).toBeVisible();
 
   await goToVisu(page, { stepId: 'compare', slideIndex: 0 });
-  await expect(page.getByRole('heading', { name: /Keine gruppenbezogenen Ubergange/ })).toBeVisible();
+  await expect(page.getByTestId('forecast-sankey-chart')).toBeVisible();
+  await expect(page.getByTestId('forecast-sankey-chart')).toHaveAttribute('data-transition-pairs', 'Ungeklärt: 1 Kinder -> Ungeklärt: 1 Kinder');
 
   await goToVisu(page, { stepId: 'compare', slideIndex: 3 });
   await expect(page.getByTestId('forecast-demography-monthpicker')).toBeVisible();

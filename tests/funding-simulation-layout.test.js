@@ -25,9 +25,15 @@ test('Beitragssimulation erweitert die Analyse und scrollt im gesamten Inhaltsbe
   await expect(page.getByTestId('annual-income-results')).toBeVisible();
   await expect(page.getByTestId('simulation-scenario-select')).toBeVisible();
 
-  const downloadPromise = page.waitForEvent('download');
   await page.getByTestId('export-simulation-pdf').click();
+  const pdfDialog = page.getByRole('dialog', { name: 'Datenschutz prüfen – PDF-Export' });
+  await expect(pdfDialog).toBeVisible();
+  await expect(pdfDialog.getByRole('button', { name: 'PDF-Dialog schließen' })).toBeVisible();
+  await expect(pdfDialog.getByRole('switch', { name: 'Familienliste mit individuellen Beiträgen aufnehmen' })).not.toBeChecked();
+  const downloadPromise = page.waitForEvent('download');
+  await pdfDialog.getByRole('button', { name: 'PDF herunterladen' }).click();
   const download = await downloadPromise;
+  await expect(pdfDialog).toBeHidden();
   expect(download.suggestedFilename()).toMatch(/\.pdf$/i);
   const pdfPath = await download.path();
   expect(pdfPath).toBeTruthy();

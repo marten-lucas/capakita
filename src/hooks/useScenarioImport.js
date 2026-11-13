@@ -625,6 +625,7 @@ export function useScenarioImport() {
         selectedScenarioId: targetScenarioId,
       },
       simData: { dataByScenario: nextDataByScenario },
+      simOverlay: currentState.simOverlay,
       simBooking: { bookingsByScenario: nextBookingsByScenario },
       simGroup: {
         groupsByScenario: nextGroupsByScenario,

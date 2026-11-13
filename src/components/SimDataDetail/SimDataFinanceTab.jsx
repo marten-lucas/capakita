@@ -24,11 +24,11 @@ import {
   updatePersonnelCostEntry,
 } from '../../store/simFinanceSlice';
 import {
-  calculateChildMonthlyRevenue,
   calculateMonthlyStaffCost,
   isRecordActiveOnDate,
 } from '../../utils/financeUtils';
 import { calculateWorktimeFromBookings } from '../../utils/bookingUtils';
+import { calculateAdebisChildMonthlyRevenue } from '../../utils/adebisFinance';
 
 function toDateValue(value) {
   return value ? new Date(value) : null;
@@ -200,7 +200,7 @@ function SimDataFinanceTab() {
   if (!item) return null;
 
   if (item.type === 'demand') {
-    const childFinance = calculateChildMonthlyRevenue({
+    const childFinance = calculateAdebisChildMonthlyRevenue({
       item,
       bookings: effectiveBookings,
       groupAssignments: getEffectiveGroupAssignments(selectedItemId),
@@ -215,7 +215,7 @@ function SimDataFinanceTab() {
           <Stack gap="xs">
             <Text fw={600}>Automatische Einnahmen zum Stichtag</Text>
             <Text size="sm" c="dimmed">
-              Grundlage ist der Stichtag {referenceDate} mit den aktuell gueltigen Gruppen- und Finanzstammdaten.
+              Monatswert zum Stichtag {referenceDate}: Bruttobeitrag und ADEBIS-Basisförderung (gewichtete Tagesstunden × Jahresbasiswert / 24). Ohne Beitragszuschuss, Zusatzförderung und Reformkorrektur; keine Jahresprognose.
             </Text>
           </Stack>
         </Paper>
@@ -224,20 +224,21 @@ function SimDataFinanceTab() {
           <Stack gap="sm">
             <Group justify="space-between" wrap="wrap">
               <Text>Durchschnittliche Wochenstunden</Text>
-              <Text fw={600}>{childFinance.weeklyHours.toFixed(1)} h</Text>
+              <Text fw={600}>{childFinance.reasons.some((reason) => ['Basisbuchung fehlt', 'Mehrere aktive Basisbuchungen', 'Buchungsstunden fehlen'].includes(reason)) ? 'Ungeklärt' : `${childFinance.weeklyHours.toFixed(1)} h`}</Text>
             </Group>
             <Group justify="space-between" wrap="wrap">
-              <Text>Elternbeitrag</Text>
-              <Text fw={600}>{formatCurrency(childFinance.parentFeeAmount)}</Text>
+              <Text>Elternbeitrag (brutto)</Text>
+              <Text fw={600}>{childFinance.parentFeeAmount == null ? 'Ungeklärt' : formatCurrency(childFinance.parentFeeAmount)}</Text>
             </Group>
             <Group justify="space-between" wrap="wrap">
-              <Text>BayKiBiG-Förderung</Text>
-              <Text fw={600}>{formatCurrency(childFinance.bayKiBiGAmount)}</Text>
+              <Text>ADEBIS-Basisförderung</Text>
+              <Text fw={600}>{childFinance.bayKiBiGAmount == null ? 'Ungeklärt' : formatCurrency(childFinance.bayKiBiGAmount)}</Text>
             </Group>
             <Group justify="space-between" wrap="wrap">
-              <Text fw={600}>Gesamteinnahmen</Text>
-              <Text fw={700}>{formatCurrency(childFinance.totalAmount)}</Text>
+              <Text fw={600}>Summe (ohne Zusatzförderung)</Text>
+              <Text fw={700}>{childFinance.totalAmount == null ? 'Ungeklärt' : formatCurrency(childFinance.totalAmount)}</Text>
             </Group>
+            {childFinance.reasons.length > 0 && <Text size="sm" c="orange">Ungeklärt: {childFinance.reasons.join('; ')}.</Text>}
           </Stack>
         </Paper>
       </Stack>

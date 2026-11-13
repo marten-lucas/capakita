@@ -36,6 +36,14 @@ function getComparableEnd(value) {
   return value?.validUntil || value?.enddate || value?.end || '';
 }
 
+// Match chartUtils: explicitly cleared UI boundaries override legacy dates.
+export function getAbsenceRange(absence) {
+  return {
+    start: absence?.start ?? absence?.startdate ?? '',
+    end: absence?.end ?? absence?.enddate ?? '',
+  };
+}
+
 export function isDateWithinRange(date, start, end) {
   if (!date) return false;
   const startOk = !start || start <= date;
@@ -581,7 +589,7 @@ function getAbsenceDayCostShare(absence, isoDate, thresholdDays = 42, employerSh
   if (payType === 'fully_paid') return 1;
   if (payType === 'unpaid') return 0;
 
-  const start = parseIsoDate(absence?.start || absence?.startdate || '');
+  const start = parseIsoDate(getAbsenceRange(absence).start);
   const current = parseIsoDate(isoDate);
   if (!start || !current) return 1;
 
@@ -658,7 +666,10 @@ export function calculateMonthlyStaffCost({
   for (let cursor = parseIsoDate(monthBounds.start); cursor && formatIsoDate(cursor) <= monthBounds.end; cursor = addUtcDays(cursor, 1)) {
     const isoDate = formatIsoDate(cursor);
     totalDays += 1;
-    const activeAbsence = absences.find((absence) => isDateWithinRange(isoDate, absence.start || absence.startdate || '', absence.end || absence.enddate || ''));
+    const activeAbsence = absences.find((absence) => {
+      const { start, end } = getAbsenceRange(absence);
+      return isDateWithinRange(isoDate, start, end);
+    });
     payableDays += activeAbsence
       ? getAbsenceDayCostShare(activeAbsence, isoDate, partialAbsenceThresholdDays, partialAbsenceEmployerSharePercent)
       : 1;
@@ -816,14 +827,14 @@ export function calculateChildMonthlyRevenue({
   );
   const parentFeeAmount = Number(feeEntry?.monthlyAmount) || 0;
 
-  // RE-Korrektur (adebisKITA 7.5): Förderbetrag = Basiswert × Buchungszeitfaktor ×
-  // Gewichtungsfaktor. Der Faktor bleibt für bestehende Finanz-KPIs standardmäßig
+  // Jahresförderung = Jahresbasiswert × Buchungszeitfaktor × Gewichtungsfaktor.
+  // Der Faktor bleibt für bestehende Finanz-KPIs standardmäßig
   // aus; der Reform-Modellwert kann ihn ausdrücklich aktivieren und fehlende ZEITKAT
   // optional aus den Buchungssegmenten ableiten.
   const zeitkatFactor = applyZeitkatFactor
     ? (resolveZeitkatFactorForChild(bookings, referenceDate, deriveZeitkatFactor) ?? 1)
     : 1;
-  const bayKiBiGAmount = (Number(bayKiBiGRule?.baseValue) || 0) * bayKiBiGWeight * zeitkatFactor;
+  const bayKiBiGAmount = (Number(bayKiBiGRule?.baseValue) || 0) * bayKiBiGWeight * zeitkatFactor / 12;
 
   return {
     weeklyHours,

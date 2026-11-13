@@ -137,14 +137,16 @@ function normalizeFeeBand(entry = {}) {
 }
 
 function normalizeFeeCatalog(entries = []) {
-  const byZeitkatAndValidity = new Map();
-  (Array.isArray(entries) ? entries : []).map((entry) => normalizeFeeBand(entry)).forEach((entry) => {
-    const identity = entry.zeitkatId
-      ? `${entry.zeitkatId}|${entry.validFrom || ''}|${entry.validUntil || ''}`
-      : `unmapped:${entry.id}`;
-    byZeitkatAndValidity.set(identity, entry);
-  });
-  return Array.from(byZeitkatAndValidity.values());
+  return (Array.isArray(entries) ? entries : []).map((entry) => normalizeFeeBand(entry));
+}
+
+function hasFeeIdentityConflict(entry, entries) {
+  const zeitkatId = getFeeBandZeitkatId(entry);
+  return Boolean(zeitkatId) && entries.some((other) => (
+    getFeeBandZeitkatId(other) === zeitkatId
+    && (other.validFrom || '') === (entry.validFrom || '')
+    && (other.validUntil || '') === (entry.validUntil || '')
+  ));
 }
 
 function normalizeSalaryHistoryEntry(entry = {}) {
@@ -408,13 +410,10 @@ const simFinanceSlice = createSlice({
       const { scenarioId, groupId, entry } = action.payload;
       const scenarioFinance = ensureScenarioFinanceState(state, scenarioId);
       const normalizedGroupId = String(groupId);
-      if (!scenarioFinance.groupFeeCatalogs[normalizedGroupId]) {
-        scenarioFinance.groupFeeCatalogs[normalizedGroupId] = [];
-      }
-      scenarioFinance.groupFeeCatalogs[normalizedGroupId] = normalizeFeeCatalog([
-        ...scenarioFinance.groupFeeCatalogs[normalizedGroupId],
-        entry,
-      ]);
+      const entries = scenarioFinance.groupFeeCatalogs[normalizedGroupId] || [];
+      const normalizedEntry = normalizeFeeBand(entry);
+      if (hasFeeIdentityConflict(normalizedEntry, entries)) return;
+      scenarioFinance.groupFeeCatalogs[normalizedGroupId] = [...entries, normalizedEntry];
     },
     updateGroupFeeEntry(state, action) {
       const { scenarioId, groupId, entryId, updates } = action.payload;
@@ -425,11 +424,13 @@ const simFinanceSlice = createSlice({
       const normalizedEntryId = String(entryId);
       const index = entries.findIndex((entry) => String(entry.id) === normalizedEntryId);
       if (index === -1) return;
-      entries[index] = normalizeFeeBand({
-        ...entries[index],
-        ...updates,
-      });
-      scenarioFinance.groupFeeCatalogs[normalizedGroupId] = normalizeFeeCatalog(entries);
+      const updatedEntry = normalizeFeeBand({ ...entries[index], ...updates });
+      const previousEntry = entries[index];
+      const identityChanged = getFeeBandZeitkatId(updatedEntry) !== getFeeBandZeitkatId(previousEntry)
+        || (updatedEntry.validFrom || '') !== (previousEntry.validFrom || '')
+        || (updatedEntry.validUntil || '') !== (previousEntry.validUntil || '');
+      if (identityChanged && hasFeeIdentityConflict(updatedEntry, entries.filter((_, entryIndex) => entryIndex !== index))) return;
+      entries[index] = updatedEntry;
     },
     deleteGroupFeeEntry(state, action) {
       const { scenarioId, groupId, entryId } = action.payload;
@@ -444,6 +445,13 @@ const simFinanceSlice = createSlice({
       const { scenarioId, groupId } = action.payload;
       const scenarioFinance = ensureScenarioFinanceState(state, scenarioId);
       delete scenarioFinance.groupFeeCatalogs[String(groupId)];
+    },
+    mergeGroupFeeCatalogs(state, action) {
+      const { scenarioId, catalogs } = action.payload;
+      const scenarioFinance = ensureScenarioFinanceState(state, scenarioId);
+      Object.entries(catalogs || {}).forEach(([groupId, entries]) => {
+        scenarioFinance.groupFeeCatalogs[String(groupId)] = normalizeFeeCatalog(entries);
+      });
     },
     setGroupFeeCatalogs(state, action) {
       const { scenarioId, catalogs } = action.payload;
@@ -555,6 +563,7 @@ export const {
   updateGroupFeeEntry,
   deleteGroupFeeEntry,
   deleteGroupFeeCatalog,
+  mergeGroupFeeCatalogs,
   setGroupFeeCatalogs,
   addSalaryHistoryEntry,
   updateSalaryHistoryEntry,

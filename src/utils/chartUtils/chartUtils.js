@@ -1,11 +1,19 @@
 import { segmentMatchesMode } from '../bookingUtils';
 import { timeToMinutes } from '../timeUtils';
 import { shouldIncludeDataItemInAnalysis } from '../dataVisibility';
-import { resolveGroupIdAtDate, splitBookingByGroupAtDate } from '../financeUtils';
-import { getGewkatFactor, isAdebisTrue } from '../adebisConstants';
+import { isDateWithinRange, isRecordActiveOnDate, resolveGroupIdAtDate, splitBookingByGroupAtDate } from '../financeUtils';
+import { decodeBuchungsart, getGewkatFactor, getZeitkatZoneIndex, isAdebisTrue } from '../adebisConstants';
 
 // Backward-compatible re-export (zuvor hier definiert, jetzt zentral in adebisConstants)
 export { isAdebisTrue };
+
+// UI fields take precedence, including explicitly cleared (open) boundaries.
+export function getAbsenceRange(absence) {
+  return {
+    start: absence?.start ?? absence?.startdate ?? '',
+    end: absence?.end ?? absence?.enddate ?? '',
+  };
+}
 
 /**
  * Betreuungsstunden laut adebis (belegung.BETRSTD, Wochensumme der Buchung).
@@ -258,6 +266,20 @@ export function generateCareRatioSeries(categories, filteredDemandBookings, filt
 
 
 
+// Keep separately dated records while applying overrides by assignment ID.
+export function collectCoverageQualifications(itemIds, scenarioChain, overlaysByScenario, assignmentsByScenario) {
+  return Object.fromEntries(itemIds.map((itemId) => {
+    const records = new Map();
+    for (const scenario of [...scenarioChain].reverse()) {
+      Object.entries(assignmentsByScenario[scenario.id]?.[itemId] || {}).forEach(([id, value]) => records.set(String(value?.id || id), value));
+      (overlaysByScenario[scenario.id]?.qualificationDefs || []).forEach((value, index) => {
+        if (String(value?.dataItemId) === String(itemId) && value.qualification) records.set(String(value.id || `overlay:${scenario.id}:${index}`), value);
+      });
+    }
+    return [itemId, Object.fromEntries(records)];
+  }));
+}
+
 /**
  * Overlay-aware booking filter.
  * Returns { demand: [...], capacity: [...] }
@@ -273,7 +295,9 @@ export function filterBookings({
   referenceDate,
   selectedGroups,
   selectedQualifications,
-  groupsByScenario
+  groupsByScenario,
+  includeTimelessFeeBookings = false,
+  includeAllCapacityWork = false,
 }) {
   const demand = [];
   const capacity = [];
@@ -297,7 +321,15 @@ export function filterBookings({
 
   // Helper: get overlayed qualification assignments for an item
   function getOverlayedQualifications(itemId) {
-    return qualificationAssignments[itemId] || {};
+    const assignments = { ...qualificationAssignments[itemId] };
+    if (Array.isArray(overlays.qualificationDefs)) {
+      overlays.qualificationDefs.forEach((assignment, index) => {
+        if (String(assignment?.dataItemId) === String(itemId) && assignment.qualification) {
+          assignments[assignment.id || `overlay:${index}`] = assignment;
+        }
+      });
+    }
+    return assignments;
   }
 
   // Helper: check if booking is active at referenceDate
@@ -317,10 +349,10 @@ export function filterBookings({
   // Helper: check if data item is absent at referenceDate
   function isDataItemAbsent(item, date) {
     if (!Array.isArray(item.absences)) return false;
-    return item.absences.some(abs => {
-      const startOk = !abs.startdate || abs.startdate <= date;
-      const endOk = !abs.enddate || abs.enddate >= date;
-      return startOk && endOk;
+    return item.absences.some(absence => {
+      if (!absence || typeof absence !== 'object') return false;
+      const { start, end } = getAbsenceRange(absence);
+      return isDateWithinRange(date, start, end);
     });
   }
 
@@ -357,7 +389,11 @@ export function filterBookings({
     // For demand: only group filter
     if (type === 'demand' && groupMatch) {
       itemBookings.forEach(booking => {
-        if (isActiveAt(booking, referenceDate) && sumWeightedBookingHours(booking) > 0) {
+        const type = booking?.buchungsart || decodeBuchungsart(booking?.rawdata?.ART);
+        const explicitZeitkat = String(booking?.rawdata?.ZEITKAT || '').trim();
+        const timelessFeeBooking = includeTimelessFeeBookings && type?.basis !== false
+          && getZeitkatZoneIndex(explicitZeitkat) >= 0;
+        if (isActiveAt(booking, referenceDate) && (sumWeightedBookingHours(booking) > 0 || timelessFeeBooking)) {
           demand.push({ ...booking, itemId, groupId });
         }
       });
@@ -366,7 +402,7 @@ export function filterBookings({
     // For capacity: group and qualification filter
     if (type === 'capacity') {
       const qualiAssignments = Object.values(getOverlayedQualifications(itemId));
-      const qualiKeys = qualiAssignments.map(a => a.qualification);
+      const qualiKeys = qualiAssignments.filter(a => a?.qualification && isRecordActiveOnDate(a, referenceDate)).map(a => a.qualification);
 
       let qualiMatch = false;
       if (selectedQualifications.length === 0) {
@@ -379,7 +415,8 @@ export function filterBookings({
 
       if (qualiMatch) {
         itemBookings.forEach(booking => {
-          if (!isActiveAt(booking, referenceDate) || sumWeightedBookingHours(booking, { mode: 'pedagogical' }) <= 0) {
+          const mode = includeAllCapacityWork ? 'all' : 'pedagogical';
+          if (!isActiveAt(booking, referenceDate) || sumWeightedBookingHours(booking, { mode, preferBetrstd: false }) <= 0) {
             return;
           }
 
@@ -392,7 +429,7 @@ export function filterBookings({
 
           splitBookings.forEach((splitBooking) => {
             if (!groupMatchesSelection(splitBooking.groupId)) return;
-            if (sumWeightedBookingHours(splitBooking, { mode: 'pedagogical' }) <= 0) return;
+            if (sumWeightedBookingHours(splitBooking, { mode, preferBetrstd: false }) <= 0) return;
 
             capacity.push({
               ...splitBooking,

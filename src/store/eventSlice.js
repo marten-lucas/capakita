@@ -1,4 +1,6 @@
 import { createSlice, createSelector } from '@reduxjs/toolkit';
+import { getEffectiveDataItems, getEffectiveBookings, getEffectiveGroupAssignments, getEffectiveGroupDefs } from '../utils/overlayUtils';
+import { getAbsenceRange } from '../utils/financeUtils';
 
 const DEFAULT_AUTO_EVENT_SETTINGS = {
     kita: {
@@ -29,17 +31,11 @@ function getScenarioAutoEventSettings(simScenario, scenarioId) {
     return normalizeAutoEventSettings(scenario?.autoEventSettings);
 }
 
-// Helper: get next working day (Mon-Fri)
-function getNextWorkingDay(dateStr) {
-    if (!dateStr) return null;
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return null;
-    let day = d.getDay();
-    // 0 = Sunday, 6 = Saturday
-    if (day === 5) d.setDate(d.getDate() + 3); // Friday -> Monday
-    else if (day === 6) d.setDate(d.getDate() + 2); // Saturday -> Monday
-    else d.setDate(d.getDate() + 1); // else next day
-    return d.toISOString().slice(0, 10);
+function getNextCalendarDay(dateStr) {
+    const date = parseIsoDateUtc(dateStr);
+    if (!date) return null;
+    date.setUTCDate(date.getUTCDate() + 1);
+    return toIsoDateUtc(date);
 }
 
 function addYearsToIsoDate(dateStr, years) {
@@ -67,7 +63,7 @@ function parseIsoDateUtc(dateStr) {
     const month = Number(match[2]) - 1;
     const day = Number(match[3]);
     const date = new Date(Date.UTC(year, month, day));
-    if (isNaN(date.getTime())) return null;
+    if (isNaN(date.getTime()) || date.getUTCFullYear() !== year || date.getUTCMonth() !== month || date.getUTCDate() !== day) return null;
     return date;
 }
 
@@ -143,6 +139,12 @@ function isWithinAttendanceRange(item, effectiveDate) {
 function buildAutomaticTransitionEvents({ dataItems, existingEvents = [], scenarioId, disabledIds = {}, autoEventSettings }) {
     const events = [];
     const settings = normalizeAutoEventSettings(autoEventSettings);
+    const realEventsByEntity = new Map();
+    for (const event of existingEvents) {
+        if (event.type !== 'group_assignment_start' && event.type !== 'presence_end') continue;
+        if (!realEventsByEntity.has(event.entityId)) realEventsByEntity.set(event.entityId, []);
+        realEventsByEntity.get(event.entityId).push(event);
+    }
 
     Object.entries(dataItems).forEach(([itemKey, item]) => {
         if (item?.type !== 'demand' || !item?.dateofbirth) return;
@@ -158,7 +160,7 @@ function buildAutomaticTransitionEvents({ dataItems, existingEvents = [], scenar
             {
                 id: `auto_transition_school_${itemKey}`,
                 effectiveDate: calculateSchoolEntryDateBavaria(item.dateofbirth, isCorridorDeferred(item)),
-                description: 'Automatischer Gruppenwechsel: Kita → Schulkindbetreuung',
+                description: 'Einschulung angenommen: anschließende Betreuung ungeklärt',
                 targetStage: 'school',
                 bookingDeltaHours: settings.school.bookingDeltaHours,
             }
@@ -167,8 +169,9 @@ function buildAutomaticTransitionEvents({ dataItems, existingEvents = [], scenar
         if (item?.enddate) {
             transitions.push({
                 id: `auto_transition_exit_${itemKey}`,
-                effectiveDate: item.enddate,
-                description: 'Automatisches Ausscheiden: Prognostizierter Austritt aus der Einrichtung',
+                effectiveDate: getNextCalendarDay(item.enddate),
+                sourceDate: item.enddate,
+                description: 'Austritt nach dem letzten Betreuungstag',
                 targetStage: 'exit',
                 bookingDeltaHours: 0,
             });
@@ -177,9 +180,9 @@ function buildAutomaticTransitionEvents({ dataItems, existingEvents = [], scenar
         transitions.forEach((transition) => {
             if (!transition.effectiveDate) return;
             const allowSchoolBoundary = isSchoolTransitionAtAttendanceBoundary(item, transition);
-            if (!isWithinAttendanceRange(item, transition.effectiveDate) && !allowSchoolBoundary) return;
-            if (hasConflictingRealEvent({
-                existingEvents,
+            if (!isWithinAttendanceRange(item, transition.effectiveDate) && !allowSchoolBoundary && transition.targetStage !== 'exit') return;
+            if (transition.targetStage !== 'exit' && hasConflictingRealEvent({
+                existingEvents: realEventsByEntity.get(itemKey) || [],
                 itemKey,
                 effectiveDate: transition.effectiveDate,
                 attendanceEndDate: item?.enddate,
@@ -190,7 +193,7 @@ function buildAutomaticTransitionEvents({ dataItems, existingEvents = [], scenar
                 id: transition.id,
                 scenarioId,
                 effectiveDate: transition.effectiveDate,
-                sourceDate: transition.effectiveDate,
+                sourceDate: transition.sourceDate || transition.effectiveDate,
                 type: 'auto_group_transition',
                 category: 'auto_transition',
                 entityType: 'demand',
@@ -226,12 +229,51 @@ function resolveEntityName(dataItems, itemId, explicitName) {
     return 'Unbekannt';
 }
 
+// Resolve only the overlay data used by events, avoiding qualification and definition work.
+function getEventData(state, scenarioId) {
+    const scenarios = state.simScenario?.scenarios || [];
+    const byId = new Map(scenarios.map(scenario => [scenario.id, scenario]));
+    const chain = [];
+    const seen = new Set();
+    let currentId = scenarioId;
+    while (currentId) {
+        if (seen.has(currentId)) throw new Error(`Ereignisse für Szenario ${scenarioId}: Zyklus in der Szenariovererbung bei ${currentId}.`);
+        seen.add(currentId);
+        const scenario = byId.get(currentId);
+        if (!scenario) throw new Error(`Ereignisse für Szenario ${scenarioId}: Basisszenario ${currentId} nicht gefunden.`);
+        chain.push(scenario);
+        currentId = scenario.baseScenarioId;
+    }
+    const overlays = state.simOverlay?.overlaysByScenario || {};
+    const dataItems = getEffectiveDataItems(chain, overlays, state.simData?.dataByScenario || {});
+    const bookingsByItem = {};
+    const groupsByItem = {};
+    const rawBookings = state.simBooking?.bookingsByScenario || {};
+    const rawGroups = state.simGroup?.groupsByScenario || {};
+    let forecastInputsDiffer = false;
+    for (const itemId of Object.keys(dataItems)) {
+        bookingsByItem[itemId] = getEffectiveBookings(chain, overlays, rawBookings, itemId);
+        groupsByItem[itemId] = getEffectiveGroupAssignments(chain, overlays, rawGroups, itemId);
+        // Forecast's useOverlayData currently selects a whole map from the first
+        // matching layer, unlike the chart's per-record merge used above.
+        const firstBookings = chain.map(({ id }) => overlays[id]?.bookings?.[itemId] || rawBookings[id]?.[itemId]).find(Boolean) || {};
+        const firstGroups = chain.map(({ id }) => overlays[id]?.groupassignments?.[itemId] || rawGroups[id]?.[itemId]).find(Boolean) || {};
+        if (Object.keys(firstBookings).length !== Object.keys(bookingsByItem[itemId]).length ||
+            Object.keys(firstGroups).length !== Object.keys(groupsByItem[itemId]).length) forecastInputsDiffer = true;
+    }
+    const rawDefs = state.simGroup?.groupDefsByScenario || {};
+    const mergedDefs = getEffectiveGroupDefs(chain, overlays, rawDefs);
+    const firstDefs = chain.flatMap(({ id }) => [overlays[id]?.groupDefs, rawDefs[id]])
+        .find(defs => Array.isArray(defs) && defs.length > 0) || [];
+    const firstDefIds = new Set(firstDefs.map(def => def.id));
+    if (firstDefIds.size !== firstDefs.length || firstDefIds.size !== mergedDefs.length) forecastInputsDiffer = true;
+    return { dataItems, bookingsByItem, groupsByItem, forecastInputsDiffer };
+}
+
 // Extract events for a scenario from state
 function extractEventsForScenario(state, scenarioId, disabledIds = {}) {
     const events = [];
-    const dataItems = state.simData.dataByScenario[scenarioId] || {};
-    const bookingsByItem = state.simBooking.bookingsByScenario[scenarioId] || {};
-    const groupsByItem = state.simGroup.groupsByScenario[scenarioId] || {};
+    const { dataItems, bookingsByItem, groupsByItem, forecastInputsDiffer } = getEventData(state, scenarioId);
     const autoEventSettings = getScenarioAutoEventSettings(state.simScenario, scenarioId);
 
     // Helper: create event object
@@ -287,7 +329,7 @@ function extractEventsForScenario(state, scenarioId, disabledIds = {}) {
             );
         }
         if (item.enddate) {
-            const nextDay = getNextWorkingDay(item.enddate);
+            const nextDay = getNextCalendarDay(item.enddate);
             if (nextDay) {
                 events.push(
                     createEvent({
@@ -307,8 +349,8 @@ function extractEventsForScenario(state, scenarioId, disabledIds = {}) {
         // Absences
         (item.absences || []).forEach((abs, absIndex) => {
             const absenceId = abs.id || `absence_${absIndex}`;
-            if (abs.start || abs.startdate) {
-                const startDate = abs.start || abs.startdate;
+            const { start: startDate, end: endDate } = getAbsenceRange(abs);
+            if (startDate) {
                 events.push(
                     createEvent({
                         id: `absence_start_${itemKey}_${absenceId}`,
@@ -324,9 +366,8 @@ function extractEventsForScenario(state, scenarioId, disabledIds = {}) {
                     })
                 );
             }
-            if (abs.end || abs.enddate) {
-                const endDate = abs.end || abs.enddate;
-                const nextDay = getNextWorkingDay(endDate);
+            if (endDate) {
+                const nextDay = getNextCalendarDay(endDate);
                 if (nextDay) {
                     events.push(
                         createEvent({
@@ -371,7 +412,7 @@ function extractEventsForScenario(state, scenarioId, disabledIds = {}) {
                 );
             }
             if (booking.enddate) {
-                const nextDay = getNextWorkingDay(booking.enddate);
+                const nextDay = getNextCalendarDay(booking.enddate);
                 if (nextDay) {
                     events.push(
                         createEvent({
@@ -417,7 +458,7 @@ function extractEventsForScenario(state, scenarioId, disabledIds = {}) {
                 );
             }
             if (assignment.end) {
-                const nextDay = getNextWorkingDay(assignment.end);
+                const nextDay = getNextCalendarDay(assignment.end);
                 if (nextDay) {
                     events.push(
                         createEvent({
@@ -481,7 +522,21 @@ function extractEventsForScenario(state, scenarioId, disabledIds = {}) {
         }
     });
 
-    return events;
+    return { events, forecastInputsDiffer };
+}
+
+function refreshScenario(state, source, scenarioId) {
+    if (!state.statusByScenario) state.statusByScenario = {};
+    try {
+        const result = extractEventsForScenario(source, scenarioId, state.disabledEventIdsByScenario[scenarioId] || {});
+        state.eventsByScenario[scenarioId] = result.events;
+        state.statusByScenario[scenarioId] = result.forecastInputsDiffer
+            ? { state: 'incomplete', error: `Abweichende Overlay-Auflösung für Buchungen, Gruppen oder Gruppendefinitionen im Szenario ${scenarioId}. Prognose unvollständig.` }
+            : { state: 'ready', error: null };
+    } catch (error) {
+        delete state.eventsByScenario[scenarioId];
+        state.statusByScenario[scenarioId] = { state: 'error', error: error instanceof Error ? error.message : String(error) };
+    }
 }
 
 const eventSlice = createSlice({
@@ -489,31 +544,41 @@ const eventSlice = createSlice({
     initialState: {
         eventsByScenario: {},
         disabledEventIdsByScenario: {},
+        statusByScenario: {},
         _needsRefresh: false,
     },
     reducers: {
         // Manual trigger to refresh events for all scenarios
         refreshAllEvents(state, action) {
-            const { simData, simBooking, simGroup, simScenario } = action.payload;
+            const { simScenario } = action.payload;
             state.eventsByScenario = {};
-            Object.keys(simData.dataByScenario || {}).forEach(scenarioId => {
-                state.eventsByScenario[scenarioId] = extractEventsForScenario(
-                    { simData, simBooking, simGroup, simScenario },
-                    scenarioId,
-                    state.disabledEventIdsByScenario[scenarioId] || {}
-                );
+            state.statusByScenario = {};
+            (simScenario?.scenarios || []).forEach(({ id: scenarioId }) => {
+                refreshScenario(state, action.payload, scenarioId);
             });
-            state._needsRefresh = false; // Clear refresh flag after refreshing
+            state._needsRefresh = false;
+            state._refreshBlocked = false;
+            state._refreshError = null;
         },
         // Manual trigger for one scenario
         refreshEventsForScenario(state, action) {
-            const { scenarioId, simData, simBooking, simGroup, simScenario } = action.payload;
-            state.eventsByScenario[scenarioId] = extractEventsForScenario(
-                { simData, simBooking, simGroup, simScenario },
-                scenarioId,
-                state.disabledEventIdsByScenario[scenarioId] || {}
-            );
-            state._needsRefresh = false; // Clear refresh flag after refreshing
+            const { scenarioId } = action.payload;
+            refreshScenario(state, action.payload, scenarioId);
+            // A single scenario cannot make an invalidated global cache complete.
+        },
+        invalidateEvents(state) {
+            state.eventsByScenario = {};
+            state.statusByScenario = {};
+            state._needsRefresh = true;
+            state._refreshBlocked = false;
+            state._refreshError = null;
+        },
+        eventRefreshFailed(state, action) {
+            state.eventsByScenario = {};
+            state.statusByScenario = {};
+            state._needsRefresh = true;
+            state._refreshBlocked = true;
+            state._refreshError = action.payload;
         },
         setEventEnabled(state, action) {
             const { scenarioId, eventId, enabled } = action.payload;
@@ -527,14 +592,21 @@ const eventSlice = createSlice({
                 state.disabledEventIdsByScenario[scenarioId][eventId] = true;
             }
 
-            const events = state.eventsByScenario[scenarioId] || [];
-            state.eventsByScenario[scenarioId] = events.map((event) =>
-                event.id === eventId ? { ...event, enabled } : event
-            );
+            const events = state.eventsByScenario[scenarioId];
+            if (events) {
+                state.eventsByScenario[scenarioId] = events.map((event) =>
+                    event.id === eventId ? { ...event, enabled } : event
+                );
+            }
         },
         clearEventOverridesForScenario(state, action) {
             const { scenarioId } = action.payload;
             delete state.disabledEventIdsByScenario[scenarioId];
+            delete state.eventsByScenario[scenarioId];
+            if (state.statusByScenario) delete state.statusByScenario[scenarioId];
+            state._needsRefresh = true;
+            state._refreshBlocked = false;
+            state._refreshError = null;
         },
     },
     extraReducers: (builder) => {
@@ -544,13 +616,29 @@ const eventSlice = createSlice({
                 action.type.startsWith('simData/') ||
                 action.type.startsWith('simBooking/') ||
                 action.type.startsWith('simGroup/') ||
-                action.type === 'simScenario/updateScenario',
+                action.type.startsWith('simOverlay/') ||
+                ['simScenario/addScenario', 'simScenario/updateScenario', 'simScenario/deleteScenario', 'simScenario/setScenarios'].includes(action.type),
             (state) => {
-                state._needsRefresh = true; // Mark for refresh
+                state.eventsByScenario = {};
+                state.statusByScenario = {};
+                state._needsRefresh = true;
+                state._refreshBlocked = false;
+                state._refreshError = null;
             }
         );
     },
 });
+
+// Older snapshots do not have per-scenario statuses; retain their global freshness semantics.
+export const selectForecastEventsAvailable = (state, scenarioId) => {
+    const events = state.events;
+    if (!scenarioId || !Array.isArray(events?.eventsByScenario?.[scenarioId])) return false;
+    const status = events?.statusByScenario?.[scenarioId];
+    return status ? status.state === 'ready' : !events?._needsRefresh && !events?._refreshBlocked;
+};
+
+export const selectForecastEventsError = (state, scenarioId) =>
+    state.events?.statusByScenario?.[scenarioId]?.error || state.events?._refreshError || null;
 
 // Selector: get all events for a scenario
 export const selectEventsForScenario = createSelector(
@@ -616,6 +704,6 @@ export const selectConsolidatedEventsForScenario = createSelector(
   }
 );
 
-export const { refreshAllEvents, refreshEventsForScenario, setEventEnabled, clearEventOverridesForScenario } = eventSlice.actions;
+export const { refreshAllEvents, refreshEventsForScenario, invalidateEvents, eventRefreshFailed, setEventEnabled, clearEventOverridesForScenario } = eventSlice.actions;
 export default eventSlice.reducer;
 
